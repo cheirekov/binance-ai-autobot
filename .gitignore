@@ -3,7 +3,6 @@ dist/
 .pnpm-store/
 .DS_Store
 .env
-.env.*
 
 # Persistent runtime data (mounted as a Docker volume)
 data/
