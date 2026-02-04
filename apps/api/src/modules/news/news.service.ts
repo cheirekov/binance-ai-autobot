@@ -39,6 +39,65 @@ function stableId(feed: string, fallback: string): string {
   return crypto.createHash("sha256").update(`${feed}::${fallback}`).digest("hex").slice(0, 24);
 }
 
+function decodeHtmlEntities(input: string): string {
+  // Minimal entity decoder to normalize RSS content for UI/AI consumption.
+  const named: Record<string, string> = {
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: "\"",
+    apos: "'",
+    nbsp: " "
+  };
+
+  return input.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, entity) => {
+    if (typeof entity !== "string") return match;
+
+    if (entity.startsWith("#x") || entity.startsWith("#X")) {
+      const code = Number.parseInt(entity.slice(2), 16);
+      if (!Number.isFinite(code) || code <= 0) return match;
+      try {
+        return String.fromCodePoint(code);
+      } catch {
+        return match;
+      }
+    }
+
+    if (entity.startsWith("#")) {
+      const code = Number.parseInt(entity.slice(1), 10);
+      if (!Number.isFinite(code) || code <= 0) return match;
+      try {
+        return String.fromCodePoint(code);
+      } catch {
+        return match;
+      }
+    }
+
+    const replacement = named[entity];
+    return replacement ?? match;
+  });
+}
+
+function normalizeText(input: string): string {
+  return decodeHtmlEntities(input)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function fetchText(url: string, timeoutMs: number): Promise<string> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { headers: { "user-agent": "autobot/0.1" }, signal: controller.signal });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    return await res.text();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 @Injectable()
 export class NewsService {
   private cached: NewsSnapshot | null = null;
@@ -79,19 +138,16 @@ export class NewsService {
     const parser = new Parser();
     const items: NewsItem[] = [];
     const errors: Array<{ feed: string; error: string }> = [];
+    const timeoutMs = Number.parseInt(process.env.NEWS_FETCH_TIMEOUT_MS ?? "8000", 10);
 
     for (const feed of this.feedUrls) {
       try {
-        const res = await fetch(feed, { headers: { "user-agent": "autobot/0.1" } });
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        const xml = await res.text();
+        const xml = await fetchText(feed, timeoutMs);
         const parsed = await parser.parseString(xml);
         const source = sourceFromUrl(feed);
 
         for (const it of parsed.items ?? []) {
-          const title = (it.title ?? "").trim();
+          const title = normalizeText(it.title ?? "");
           if (!title) continue;
 
           const publishedAt = it.isoDate ?? it.pubDate;
@@ -104,7 +160,11 @@ export class NewsService {
             title,
             link,
             publishedAt,
-            summary: (it.contentSnippet ?? it.content ?? "").trim() || undefined
+            summary: (() => {
+              const raw = (it.contentSnippet ?? it.content ?? "").trim();
+              if (!raw) return undefined;
+              return normalizeText(raw);
+            })()
           });
         }
       } catch (e) {
@@ -136,4 +196,3 @@ export class NewsService {
     return snapshot;
   }
 }
-
