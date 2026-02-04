@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { apiGet, apiPut } from "../../api/http";
+import { apiGet, apiPost, apiPut } from "../../api/http";
 import { usePublicConfig } from "../../hooks/usePublicConfig";
 
 export function SettingsAdvanced(): JSX.Element {
@@ -10,9 +10,19 @@ export function SettingsAdvanced(): JSX.Element {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
+  const [apiBaseUrl, setApiBaseUrl] = useState("");
+  const [apiHost, setApiHost] = useState("0.0.0.0");
+  const [apiPort, setApiPort] = useState(8148);
+  const [uiHost, setUiHost] = useState("0.0.0.0");
+  const [uiPort, setUiPort] = useState(4173);
+
   const [neverTradeSymbolsText, setNeverTradeSymbolsText] = useState("");
   const [autoBlacklistEnabled, setAutoBlacklistEnabled] = useState(true);
   const [autoBlacklistTtlMinutes, setAutoBlacklistTtlMinutes] = useState(180);
+
+  const [rotatingApiKey, setRotatingApiKey] = useState(false);
+  const [rotatedApiKey, setRotatedApiKey] = useState<string | null>(null);
+  const [rotateApiKeyError, setRotateApiKeyError] = useState<string | null>(null);
 
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -23,6 +33,11 @@ export function SettingsAdvanced(): JSX.Element {
 
   useEffect(() => {
     if (!config?.advanced) return;
+    setApiBaseUrl(config.advanced.apiBaseUrl ?? "");
+    setApiHost(config.advanced.apiHost ?? "0.0.0.0");
+    setApiPort(config.advanced.apiPort ?? 8148);
+    setUiHost(config.advanced.uiHost ?? "0.0.0.0");
+    setUiPort(config.advanced.uiPort ?? 4173);
     setNeverTradeSymbolsText((config.advanced.neverTradeSymbols ?? []).join("\n"));
     setAutoBlacklistEnabled(config.advanced.autoBlacklistEnabled);
     setAutoBlacklistTtlMinutes(config.advanced.autoBlacklistTtlMinutes);
@@ -96,6 +111,11 @@ export function SettingsAdvanced(): JSX.Element {
         .filter(Boolean);
 
       await apiPut("/config/advanced", {
+        apiBaseUrl: apiBaseUrl.trim(),
+        apiHost,
+        apiPort,
+        uiHost,
+        uiPort,
         neverTradeSymbols,
         autoBlacklistEnabled,
         autoBlacklistTtlMinutes
@@ -105,6 +125,25 @@ export function SettingsAdvanced(): JSX.Element {
       setSaveError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onRotateApiKey(): Promise<void> {
+    setRotateApiKeyError(null);
+    setRotatedApiKey(null);
+    setRotatingApiKey(true);
+    try {
+      const res = await apiPost<{ apiKey: string }>("/config/rotate-api-key", {});
+      setRotatedApiKey(res.apiKey);
+      try {
+        await navigator.clipboard.writeText(res.apiKey);
+      } catch {
+        // ignore
+      }
+    } catch (e) {
+      setRotateApiKeyError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRotatingApiKey(false);
     }
   }
 
@@ -154,6 +193,88 @@ export function SettingsAdvanced(): JSX.Element {
       {savedAt ? <div className="subtitle">Saved at {new Date(savedAt).toLocaleTimeString()}.</div> : null}
 
       <div className="row cols-2">
+        <div className="card">
+          <div className="title">Endpoints</div>
+          <div className="subtitle">
+            These values are saved to config and used by the UI proxy when <code>API_BASE_URL</code> is not set. Changing container ports still
+            requires a restart.
+          </div>
+
+          <label className="label" style={{ marginTop: 12 }}>
+            API base URL (optional)
+          </label>
+          <input
+            className="field"
+            value={apiBaseUrl}
+            onChange={(e) => setApiBaseUrl(e.target.value)}
+            placeholder="http://api:8148"
+          />
+          <div className="subtitle">Leave empty to use the container/environment default.</div>
+
+          <div className="row cols-2" style={{ marginTop: 12 }}>
+            <div>
+              <label className="label">API host (info)</label>
+              <input className="field" value={apiHost} onChange={(e) => setApiHost(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">API port (info)</label>
+              <input
+                className="field"
+                type="number"
+                min={1}
+                max={65535}
+                value={apiPort}
+                onChange={(e) => setApiPort(Number.parseInt(e.target.value, 10))}
+              />
+            </div>
+          </div>
+
+          <div className="row cols-2" style={{ marginTop: 12 }}>
+            <div>
+              <label className="label">UI host (info)</label>
+              <input className="field" value={uiHost} onChange={(e) => setUiHost(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">UI port (info)</label>
+              <input
+                className="field"
+                type="number"
+                min={1}
+                max={65535}
+                value={uiPort}
+                onChange={(e) => setUiPort(Number.parseInt(e.target.value, 10))}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="title">API key</div>
+          <div className="subtitle">
+            Required as <code>x-api-key</code> when calling the API directly. Current key ends with <code>{config.advanced?.apiKeyHint}</code>.
+          </div>
+
+          {rotateApiKeyError ? (
+            <div className="subtitle" style={{ color: "var(--danger)", marginTop: 10 }}>
+              Rotate failed: {rotateApiKeyError}
+            </div>
+          ) : null}
+
+          {rotatedApiKey ? (
+            <div style={{ marginTop: 10 }}>
+              <label className="label">New API key (copied if possible)</label>
+              <input className="field" value={rotatedApiKey} readOnly />
+              <div className="subtitle">Update any external clients that call the API directly.</div>
+            </div>
+          ) : null}
+
+          <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button className="btn danger" onClick={onRotateApiKey} disabled={rotatingApiKey}>
+              {rotatingApiKey ? "Rotating…" : "Rotate API key"}
+            </button>
+          </div>
+        </div>
+
         <div>
           <label className="label">Never trade (symbols)</label>
           <textarea

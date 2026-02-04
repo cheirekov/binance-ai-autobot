@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Put } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Post, Put } from "@nestjs/common";
 import { z } from "zod";
 import type { AppConfig } from "@autobot/shared";
 import { AppConfigSchema } from "@autobot/shared";
@@ -6,6 +6,11 @@ import { AppConfigSchema } from "@autobot/shared";
 import { ConfigService } from "./config.service";
 
 const AdvancedUpdateSchema = z.object({
+  apiBaseUrl: z.union([z.string().url(), z.literal("")]).optional(),
+  apiHost: z.string().min(1).optional(),
+  apiPort: z.number().int().min(1).max(65535).optional(),
+  uiHost: z.string().min(1).optional(),
+  uiPort: z.number().int().min(1).max(65535).optional(),
   neverTradeSymbols: z.array(z.string().min(1)).optional(),
   autoBlacklistEnabled: z.boolean().optional(),
   autoBlacklistTtlMinutes: z.number().int().min(1).max(43200).optional()
@@ -51,7 +56,17 @@ export class ConfigController {
       allowFutures: boolean;
     };
     integrations?: { binanceConfigured: boolean; openaiConfigured: boolean };
-    advanced?: { neverTradeSymbols: string[]; autoBlacklistEnabled: boolean; autoBlacklistTtlMinutes: number };
+    advanced?: {
+      apiHost: string;
+      apiPort: number;
+      uiHost: string;
+      uiPort: number;
+      apiBaseUrl?: string;
+      apiKeyHint: string;
+      neverTradeSymbols: string[];
+      autoBlacklistEnabled: boolean;
+      autoBlacklistTtlMinutes: number;
+    };
   } {
     const config = this.configService.load();
     if (!config) {
@@ -76,6 +91,12 @@ export class ConfigController {
         openaiConfigured: Boolean(config.basic.openai.apiKey)
       },
       advanced: {
+        apiHost: config.advanced.apiHost,
+        apiPort: config.advanced.apiPort,
+        uiHost: config.advanced.uiHost,
+        uiPort: config.advanced.uiPort,
+        apiBaseUrl: config.advanced.apiBaseUrl,
+        apiKeyHint: config.advanced.apiKey.slice(-6),
         neverTradeSymbols: config.advanced.neverTradeSymbols,
         autoBlacklistEnabled: config.advanced.autoBlacklistEnabled,
         autoBlacklistTtlMinutes: config.advanced.autoBlacklistTtlMinutes
@@ -118,5 +139,11 @@ export class ConfigController {
     const config = AppConfigSchema.parse(body);
     this.configService.importConfig(config);
     return { ok: true };
+  }
+
+  @Post("rotate-api-key")
+  rotateApiKey(): { apiKey: string } {
+    const next = this.configService.rotateApiKey();
+    return { apiKey: next.advanced.apiKey };
   }
 }

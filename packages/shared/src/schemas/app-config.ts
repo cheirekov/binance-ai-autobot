@@ -71,6 +71,7 @@ export type BasicSettings = z.infer<typeof BasicSettingsSchema>;
 
 export const AdvancedSettingsSchema = z.object({
   apiKey: z.string().min(16),
+  apiBaseUrl: z.string().url().optional(),
   apiHost: z.string().min(1),
   apiPort: z.number().int().min(1).max(65535),
   uiHost: z.string().min(1),

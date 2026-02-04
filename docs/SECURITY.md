@@ -15,11 +15,18 @@ The UI container enforces **HTTP Basic Auth** after onboarding is completed.
 
 ## API authentication
 
-After onboarding, the API requires `x-api-key` for most endpoints.
+After onboarding, the API requires `x-api-key` for all endpoints (including `/health` by default).
 
 The browser does **not** receive the API key:
 
 - The UI server proxies `/api/*` and injects the API key server-side.
+
+### Docker exposure
+
+By default, `docker-compose.yml` binds the API port to `127.0.0.1` only (not public). To expose it publicly, set:
+
+- `API_HOST_BIND=0.0.0.0`
+- Optionally `API_PUBLIC_HEALTH=true` to allow unauthenticated `/health`
 
 ## Safe defaults
 

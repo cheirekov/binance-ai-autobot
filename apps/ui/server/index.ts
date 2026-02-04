@@ -43,7 +43,7 @@ async function start(): Promise<void> {
   const host = process.env.HOST ?? "localhost";
   const port = Number.parseInt(process.env.PORT ?? "4173", 10);
   const dataDir = process.env.DATA_DIR ?? path.resolve(process.cwd(), "../../data");
-  const apiBaseUrl = process.env.API_BASE_URL ?? "http://localhost:8148";
+  const defaultApiBaseUrl = process.env.API_BASE_URL ?? "http://localhost:8148";
 
   let cache: ConfigCache | null = null;
 
@@ -78,9 +78,14 @@ async function start(): Promise<void> {
   app.use(
     "/api",
     createProxyMiddleware({
-      target: apiBaseUrl,
+      target: defaultApiBaseUrl,
       changeOrigin: true,
       pathRewrite: { "^/api": "" },
+      router: () => {
+        cache = loadConfig(dataDir, cache);
+        const override = cache?.config.advanced.apiBaseUrl?.trim();
+        return override ? override : defaultApiBaseUrl;
+      },
       on: {
         proxyReq: (proxyReq) => {
           cache = loadConfig(dataDir, cache);

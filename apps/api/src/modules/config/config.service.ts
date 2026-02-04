@@ -139,6 +139,11 @@ export class ConfigService {
   }
 
   updateAdvanced(patch: {
+    apiBaseUrl?: string;
+    apiHost?: string;
+    apiPort?: number;
+    uiHost?: string;
+    uiPort?: number;
     neverTradeSymbols?: string[];
     autoBlacklistEnabled?: boolean;
     autoBlacklistTtlMinutes?: number;
@@ -152,9 +157,31 @@ export class ConfigService {
       ? patch.neverTradeSymbols.map((s) => s.trim()).filter(Boolean)
       : undefined;
 
+    const apiHost = patch.apiHost?.trim();
+    const uiHost = patch.uiHost?.trim();
+
+    const apiBaseUrl = (() => {
+      if (patch.apiBaseUrl === undefined) return undefined;
+      const trimmed = patch.apiBaseUrl.trim();
+      if (!trimmed) return undefined;
+      try {
+        const u = new URL(trimmed);
+        if (u.protocol !== "http:" && u.protocol !== "https:") {
+          throw new Error("Only http/https URLs are allowed.");
+        }
+      } catch (e) {
+        throw new BadRequestException(`Invalid apiBaseUrl: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      return trimmed;
+    })();
+
     const nextAdvanced = {
       ...current.advanced,
       ...patch,
+      ...(apiBaseUrl === undefined && patch.apiBaseUrl !== undefined ? { apiBaseUrl: undefined } : {}),
+      ...(apiBaseUrl ? { apiBaseUrl } : {}),
+      ...(apiHost ? { apiHost } : {}),
+      ...(uiHost ? { uiHost } : {}),
       ...(neverTradeSymbols ? { neverTradeSymbols } : {})
     };
 
@@ -162,6 +189,26 @@ export class ConfigService {
       ...current,
       updatedAt: new Date().toISOString(),
       advanced: nextAdvanced
+    });
+
+    this.save(next);
+    return next;
+  }
+
+  rotateApiKey(): AppConfig {
+    const current = this.load();
+    if (!current) {
+      throw new BadRequestException("Bot is not initialized.");
+    }
+
+    const apiKey = crypto.randomBytes(32).toString("hex");
+    const next = AppConfigSchema.parse({
+      ...current,
+      updatedAt: new Date().toISOString(),
+      advanced: {
+        ...current.advanced,
+        apiKey
+      }
     });
 
     this.save(next);

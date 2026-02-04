@@ -22,7 +22,17 @@ export type PublicConfig = {
     allowFutures: boolean;
   };
   integrations?: { binanceConfigured: boolean; openaiConfigured: boolean };
-  advanced?: { neverTradeSymbols: string[]; autoBlacklistEnabled: boolean; autoBlacklistTtlMinutes: number };
+  advanced?: {
+    apiHost: string;
+    apiPort: number;
+    uiHost: string;
+    uiPort: number;
+    apiBaseUrl?: string;
+    apiKeyHint: string;
+    neverTradeSymbols: string[];
+    autoBlacklistEnabled: boolean;
+    autoBlacklistTtlMinutes: number;
+  };
 };
 
 export function usePublicConfig(): { loading: boolean; config: PublicConfig | null; error?: string } {

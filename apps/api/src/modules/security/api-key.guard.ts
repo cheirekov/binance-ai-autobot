@@ -11,20 +11,17 @@ export class ApiKeyGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<Request>();
     const path = req.path ?? req.url;
 
-    if (path === "/health") {
-      return true;
-    }
-
     const config = this.configService.load();
     if (!config) {
-      if (path.startsWith("/setup")) {
+      if (path === "/health" || path.startsWith("/setup")) {
         return true;
       }
       throw new UnauthorizedException("Bot is not initialized. Complete /setup first.");
     }
 
-    if (path === "/setup/status") {
-      return true;
+    if (path === "/health") {
+      const publicHealth = String(process.env.API_PUBLIC_HEALTH ?? "false").toLowerCase() === "true";
+      if (publicHealth) return true;
     }
 
     const apiKey = req.header("x-api-key");

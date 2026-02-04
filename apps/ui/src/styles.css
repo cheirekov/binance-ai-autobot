@@ -129,6 +129,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 14px;
 }
@@ -218,9 +219,30 @@ select {
   padding: 10px 8px;
   border-bottom: 1px solid rgba(36, 49, 75, 0.7);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .table th {
   color: var(--muted);
   font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  body {
+    background: var(--bg);
+  }
+
+  .container {
+    padding: 14px;
+  }
+
+  .card {
+    background: var(--panel);
+  }
+
+  .table th,
+  .table td {
+    padding: 9px 6px;
+    font-size: 12px;
+  }
 }
