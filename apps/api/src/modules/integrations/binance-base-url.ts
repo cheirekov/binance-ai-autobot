@@ -9,7 +9,7 @@ export function resolveBinanceBaseUrl(config: AppConfig | null): string {
   if (override) return normalizeBaseUrl(override);
 
   if (config?.advanced.binanceEnvironment === "SPOT_TESTNET") {
-    return "https://testnet.binance.vision";
+    return "https://demo-api.binance.com";
   }
 
   const env = (process.env.BINANCE_BASE_URL ?? "").trim();
@@ -17,4 +17,3 @@ export function resolveBinanceBaseUrl(config: AppConfig | null): string {
 
   return "https://api.binance.com";
 }
-

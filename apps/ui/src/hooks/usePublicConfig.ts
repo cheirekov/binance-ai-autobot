@@ -37,7 +37,8 @@ export type PublicConfig = {
   };
 };
 
-export function usePublicConfig(): { loading: boolean; config: PublicConfig | null; error?: string } {
+export function usePublicConfig(options?: { pollMs?: number }): { loading: boolean; config: PublicConfig | null; error?: string } {
+  const pollMs = options?.pollMs ?? 10_000;
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -63,12 +64,34 @@ export function usePublicConfig(): { loading: boolean; config: PublicConfig | nu
     }
 
     run();
-    const t = setInterval(run, 10_000);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (pollMs <= 0) return;
+
+    let cancelled = false;
+    const t = setInterval(() => {
+      if (cancelled) return;
+      void apiGet<PublicConfig>("/config/public")
+        .then((next) => {
+          if (cancelled) return;
+          setConfig(next);
+          setError(undefined);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          setError(e instanceof Error ? e.message : String(e));
+        });
+    }, pollMs);
+
     return () => {
       cancelled = true;
       clearInterval(t);
     };
-  }, []);
+  }, [pollMs]);
 
   return { loading, config, error };
 }

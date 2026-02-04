@@ -4,7 +4,7 @@ import { apiGet, apiPost, apiPut } from "../../api/http";
 import { usePublicConfig } from "../../hooks/usePublicConfig";
 
 export function SettingsAdvanced(): JSX.Element {
-  const { loading, config, error } = usePublicConfig();
+  const { loading, config, error } = usePublicConfig({ pollMs: 0 });
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);

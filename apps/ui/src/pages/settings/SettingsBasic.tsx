@@ -4,7 +4,7 @@ import { apiPut } from "../../api/http";
 import { usePublicConfig } from "../../hooks/usePublicConfig";
 
 export function SettingsBasic(): JSX.Element {
-  const { loading, config, error } = usePublicConfig();
+  const { loading, config, error } = usePublicConfig({ pollMs: 0 });
   const basic = config?.basic;
 
   const [saving, setSaving] = useState(false);

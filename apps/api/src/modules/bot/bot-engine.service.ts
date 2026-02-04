@@ -197,6 +197,25 @@ export class BotEngineService {
       try {
         const check = await this.marketData.validateMarketOrderQty(candidateSymbol, desiredQty);
         if (!check.ok) {
+          if (!liveTrading && check.requiredQty) {
+            const req = Number.parseFloat(check.requiredQty);
+            if (Number.isFinite(req) && req > 0) {
+              normalizedQty = req;
+            } else {
+              const summary = `Skip ${candidateSymbol}: Invalid suggested qty for minNotional`;
+              const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+              const next = {
+                ...current,
+                activeOrders: filled.activeOrders,
+                orderHistory: filled.orderHistory,
+                decisions: alreadyLogged
+                  ? current.decisions
+                  : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+              } satisfies BotState;
+              this.save(next);
+              return;
+            }
+          } else {
           const reason = check.reason ?? "Binance min order constraints";
           const details =
             check.minNotional || check.notional || check.price
@@ -220,6 +239,7 @@ export class BotEngineService {
           } satisfies BotState;
           this.save(next);
           return;
+          }
         }
         if (check.normalizedQty) {
           normalizedQty = Number.parseFloat(check.normalizedQty);

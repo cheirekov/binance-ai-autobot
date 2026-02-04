@@ -52,6 +52,7 @@ export type BinanceSymbolRules = {
 export type MarketQtyValidation = {
   ok: boolean;
   normalizedQty?: string;
+  requiredQty?: string;
   price?: string;
   notional?: string;
   minNotional?: string;
@@ -62,6 +63,12 @@ function pow10(exp: number): bigint {
   let n = 1n;
   for (let i = 0; i < exp; i += 1) n *= 10n;
   return n;
+}
+
+function ceilDiv(n: bigint, d: bigint): bigint {
+  if (d === 0n) throw new Error("Division by zero");
+  if (n <= 0n) return 0n;
+  return (n + d - 1n) / d;
 }
 
 function decimalsFromStep(stepSize: string): number {
@@ -311,13 +318,29 @@ export class BinanceMarketDataService {
     const notionalHuman = scaledIntToString((notionalInt * pow10(notionalDecimals)) / notionalScale, notionalDecimals);
 
     if (left < right) {
+      let requiredQtyInt = ceilDiv(right, priceInt * pow10(minNotionalDecimals));
+      if (requiredQtyInt < minQtyInt) requiredQtyInt = minQtyInt;
+
+      const maxQtyInt = toScaledInt(lot.maxQty, decimals);
+      if (stepInt > 0n) {
+        const remainder = requiredQtyInt % stepInt;
+        if (remainder !== 0n) {
+          requiredQtyInt = requiredQtyInt + (stepInt - remainder);
+        }
+      }
+
+      const requiredQty = requiredQtyInt <= maxQtyInt ? scaledIntToString(requiredQtyInt, decimals) : undefined;
       return {
         ok: false,
         normalizedQty,
+        requiredQty,
         price,
         minNotional: notional.minNotional,
         notional: notionalHuman,
-        reason: `Below minNotional ${notional.minNotional}`
+        reason:
+          requiredQty && requiredQty !== normalizedQty
+            ? `Below minNotional ${notional.minNotional} (need qty ≥ ${requiredQty})`
+            : `Below minNotional ${notional.minNotional}`
       };
     }
 

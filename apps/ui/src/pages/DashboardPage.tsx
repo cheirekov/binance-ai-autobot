@@ -70,7 +70,8 @@ export function DashboardPage(): JSX.Element {
   const binancePill = useMemo(() => {
     const b = integrations.status?.binance;
     if (!b) return { label: "Binance: —", tone: "neutral" as const };
-    const env = b.baseUrl.includes("testnet") ? "Testnet" : "Mainnet";
+    const isTestnet = /testnet|binance\.vision|demo-api\.binance\.com/i.test(b.baseUrl);
+    const env = isTestnet ? "Testnet" : "Mainnet";
     if (!b.configured) return { label: "Binance: Missing keys", tone: "bad" as const };
     if (b.authenticated) return { label: `Binance: Auth OK (${env})`, tone: "ok" as const };
     if (b.reachable) return { label: `Binance: Reachable (auth failed · ${env})`, tone: "bad" as const };
