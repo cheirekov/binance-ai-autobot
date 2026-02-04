@@ -9,6 +9,13 @@
 
 If you deploy beyond localhost, you must introduce encryption-at-rest and a proper secrets manager.
 
+### Binance key hygiene
+
+- Create **separate API keys** for mainnet and testnet.
+- Restrict permissions (start with read-only; enable trading only when you explicitly turn Live trading on).
+- Restrict allowed IPs if possible (your server’s public IP).
+- Rotate keys by generating a new key in Binance and updating it in UI → Settings → Advanced, then revoking the old key in Binance.
+
 ## UI authentication
 
 The UI container enforces **HTTP Basic Auth** after onboarding is completed.

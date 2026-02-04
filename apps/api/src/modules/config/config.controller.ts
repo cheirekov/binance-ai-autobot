@@ -33,6 +33,11 @@ const UiAuthUpdateSchema = z.object({
   enabled: z.boolean().optional()
 });
 
+const BinanceCredentialsUpdateSchema = z.object({
+  apiKey: z.string().min(1),
+  apiSecret: z.string().min(1)
+});
+
 @Controller("config")
 export class ConfigController {
   constructor(private readonly configService: ConfigService) {}
@@ -128,6 +133,13 @@ export class ConfigController {
   updateUiAuth(@Body() body: unknown): { ok: true } {
     const patch = UiAuthUpdateSchema.parse(body);
     this.configService.updateUiAuth(patch);
+    return { ok: true };
+  }
+
+  @Put("binance-credentials")
+  updateBinanceCredentials(@Body() body: unknown): { ok: true } {
+    const patch = BinanceCredentialsUpdateSchema.parse(body);
+    this.configService.updateBinanceCredentials(patch);
     return { ok: true };
   }
 

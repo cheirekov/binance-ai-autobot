@@ -265,6 +265,28 @@ export class ConfigService {
     return next;
   }
 
+  updateBinanceCredentials(patch: { apiKey: string; apiSecret: string }): AppConfig {
+    const current = this.load();
+    if (!current) {
+      throw new BadRequestException("Bot is not initialized.");
+    }
+
+    const next = AppConfigSchema.parse({
+      ...current,
+      updatedAt: new Date().toISOString(),
+      basic: {
+        ...current.basic,
+        binance: {
+          apiKey: patch.apiKey.trim(),
+          apiSecret: patch.apiSecret.trim()
+        }
+      }
+    });
+
+    this.save(next);
+    return next;
+  }
+
   importConfig(config: AppConfig): AppConfig {
     const derived = deriveSettings({ risk: config.basic.risk, tradeMode: config.basic.tradeMode });
     const next = AppConfigSchema.parse({

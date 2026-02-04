@@ -10,6 +10,12 @@ export function SettingsAdvanced(): JSX.Element {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
+  const [savingBinanceKeys, setSavingBinanceKeys] = useState(false);
+  const [binanceKeysSavedAt, setBinanceKeysSavedAt] = useState<string | null>(null);
+  const [binanceKeysError, setBinanceKeysError] = useState<string | null>(null);
+  const [binanceApiKey, setBinanceApiKey] = useState("");
+  const [binanceApiSecret, setBinanceApiSecret] = useState("");
+
   const [apiBaseUrl, setApiBaseUrl] = useState("");
   const [apiHost, setApiHost] = useState("0.0.0.0");
   const [apiPort, setApiPort] = useState(8148);
@@ -132,6 +138,31 @@ export function SettingsAdvanced(): JSX.Element {
       setSaveError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onSaveBinanceKeys(): Promise<void> {
+    setBinanceKeysError(null);
+    setBinanceKeysSavedAt(null);
+
+    if (!binanceApiKey.trim() || !binanceApiSecret.trim()) {
+      setBinanceKeysError("Both Binance API key and secret are required.");
+      return;
+    }
+
+    setSavingBinanceKeys(true);
+    try {
+      await apiPut("/config/binance-credentials", {
+        apiKey: binanceApiKey.trim(),
+        apiSecret: binanceApiSecret.trim()
+      });
+      setBinanceApiKey("");
+      setBinanceApiSecret("");
+      setBinanceKeysSavedAt(new Date().toISOString());
+    } catch (e) {
+      setBinanceKeysError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingBinanceKeys(false);
     }
   }
 
@@ -277,6 +308,54 @@ export function SettingsAdvanced(): JSX.Element {
             placeholder="https://api.binance.com"
           />
           <div className="subtitle">Leave empty to use the selected environment default.</div>
+        </div>
+
+        <div className="card">
+          <div className="title">Binance API keys</div>
+          <div className="subtitle">
+            Keys are stored in <code>data/config.json</code>. When you switch environment (mainnet/testnet), update keys accordingly.
+          </div>
+
+          {binanceKeysError ? (
+            <div className="subtitle" style={{ color: "var(--danger)", marginTop: 10 }}>
+              Save failed: {binanceKeysError}
+            </div>
+          ) : null}
+          {binanceKeysSavedAt ? <div className="subtitle">Saved at {new Date(binanceKeysSavedAt).toLocaleTimeString()}.</div> : null}
+
+          <label className="label" style={{ marginTop: 12 }}>
+            API key
+          </label>
+          <input
+            className="field"
+            value={binanceApiKey}
+            onChange={(e) => setBinanceApiKey(e.target.value)}
+            placeholder="Paste your Binance API key"
+            autoComplete="off"
+          />
+
+          <label className="label" style={{ marginTop: 12 }}>
+            API secret
+          </label>
+          <input
+            className="field"
+            type="password"
+            value={binanceApiSecret}
+            onChange={(e) => setBinanceApiSecret(e.target.value)}
+            placeholder="Paste your Binance API secret"
+            autoComplete="off"
+          />
+
+          <div className="subtitle" style={{ marginTop: 10 }}>
+            Recommendation: create separate keys for mainnet and testnet; restrict permissions and IPs. Rotate by generating a new key in Binance and
+            updating it here, then revoke the old one in Binance.
+          </div>
+
+          <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button className="btn primary" onClick={onSaveBinanceKeys} disabled={savingBinanceKeys}>
+              {savingBinanceKeys ? "Saving…" : "Save Binance keys"}
+            </button>
+          </div>
         </div>
 
         <div className="card">
