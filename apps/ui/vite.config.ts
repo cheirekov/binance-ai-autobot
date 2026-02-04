@@ -23,6 +23,11 @@ export default defineConfig(() => {
 
   return {
     plugins: [react()],
+    build: {
+      commonjsOptions: {
+        include: [/node_modules/, /packages\/shared\/dist/]
+      }
+    },
     server: {
       host,
       port,
@@ -31,7 +36,7 @@ export default defineConfig(() => {
           target: apiBaseUrl,
           changeOrigin: true,
           headers: apiKeyFromDisk ? { "x-api-key": apiKeyFromDisk } : undefined,
-          rewrite: (p) => p.replace(/^\\/api/, "")
+          rewrite: (p) => p.replace(/^\/api/, "")
         }
       }
     },

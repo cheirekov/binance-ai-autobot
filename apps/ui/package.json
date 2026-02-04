@@ -7,7 +7,7 @@
     "build": "vite build && tsup server/index.ts --out-dir server-dist --format cjs --platform node --target node20",
     "start": "node server-dist/index.js",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@autobot/shared": "workspace:*",
@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@types/basic-auth": "^1.1.0",
+    "@types/bcryptjs": "^2.4.0",
     "@types/express": "^4.17.0",
     "@types/node": "^20.0.0",
     "@types/react": "^18.3.0",

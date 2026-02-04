@@ -70,7 +70,6 @@ export function DashboardPage(): JSX.Element {
     refresh();
     const t = setInterval(refresh, 2500);
     return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function startStop(next: "start" | "stop"): Promise<void> {

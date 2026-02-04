@@ -83,13 +83,11 @@ async function start(): Promise<void> {
   app.get("*", (_req, res) => res.sendFile(path.join(distDir, "index.html")));
 
   app.listen(port, host, () => {
-    // eslint-disable-next-line no-console
     console.log(`[ui] listening on http://${host}:${port}`);
   });
 }
 
 start().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

@@ -3,6 +3,9 @@
   "compilerOptions": {
     "module": "CommonJS",
     "types": ["node"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false,
     "noEmit": true
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts"]

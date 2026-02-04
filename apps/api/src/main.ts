@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import type { RequestHandler } from "express";
 import { json } from "express";
 
 import { AppModule } from "./modules/app.module";
@@ -16,8 +17,9 @@ async function bootstrap(): Promise<void> {
 
   app.use(json({ limit: "2mb" }));
 
-  const pinoHttp = await import("pino-http");
-  app.use(pinoHttp.default({ logger }));
+  const pinoHttpModule = await import("pino-http");
+  const pinoHttp = pinoHttpModule.default as unknown as (opts: unknown) => RequestHandler;
+  app.use(pinoHttp({ logger }));
 
   app.useLogger({
     log: (message) => logger.info({ msg: message }),
@@ -34,7 +36,6 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

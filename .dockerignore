@@ -1,0 +1,17 @@
+**/node_modules
+**/dist
+**/server-dist
+**/.pnpm-store
+
+# Persistent runtime data (secrets/state/logs)
+data
+
+# Local env files (may contain secrets)
+.env
+.env.*
+
+.git
+.github
+
+*.log
+coverage
