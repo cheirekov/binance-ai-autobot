@@ -1,0 +1,14 @@
+services:
+  ci:
+    image: node:20-alpine
+    working_dir: /repo
+    volumes:
+      - ./:/repo
+    command: >
+      sh -lc "
+        corepack enable &&
+        pnpm install --no-frozen-lockfile &&
+        pnpm lint &&
+        pnpm test &&
+        pnpm build
+      "

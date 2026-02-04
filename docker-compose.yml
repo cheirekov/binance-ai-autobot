@@ -1,0 +1,30 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      - NODE_ENV=production
+      - DATA_DIR=/data
+      - PORT=3000
+    volumes:
+      - ./data:/data
+    ports:
+      - "${API_PORT:-3000}:3000"
+
+  ui:
+    build:
+      context: .
+      dockerfile: apps/ui/Dockerfile
+    environment:
+      - NODE_ENV=production
+      - DATA_DIR=/data
+      - HOST=0.0.0.0
+      - PORT=4173
+      - API_BASE_URL=${API_BASE_URL:-http://api:3000}
+    volumes:
+      - ./data:/data:ro
+    ports:
+      - "${UI_PORT:-4173}:4173"
+    depends_on:
+      - api
