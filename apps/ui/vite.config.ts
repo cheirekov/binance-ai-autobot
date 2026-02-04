@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 export default defineConfig(() => {
-  const apiBaseUrl = process.env.API_BASE_URL ?? "http://localhost:3000";
+  const apiBaseUrl = process.env.API_BASE_URL ?? "http://localhost:8148";
   const host = process.env.VITE_HOST ?? "localhost";
   const port = Number.parseInt(process.env.VITE_PORT ?? "4173", 10);
 

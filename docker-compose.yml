@@ -6,14 +6,14 @@ services:
     environment:
       - NODE_ENV=production
       - DATA_DIR=/data
-      - PORT=3000
+      - PORT=8148
       - BINANCE_BASE_URL=${BINANCE_BASE_URL:-https://api.binance.com}
       - NEWS_FEEDS=${NEWS_FEEDS:-https://cointelegraph.com/rss,https://cryptoslate.com/feed/,https://decrypt.co/feed}
       - NEWS_FETCH_TIMEOUT_MS=${NEWS_FETCH_TIMEOUT_MS:-8000}
     volumes:
       - ./data:/data
     ports:
-      - "${API_PORT:-3000}:3000"
+      - "${API_PORT:-8148}:8148"
 
   ui:
     build:
@@ -24,7 +24,7 @@ services:
       - DATA_DIR=/data
       - HOST=0.0.0.0
       - PORT=4173
-      - API_BASE_URL=${API_BASE_URL:-http://api:3000}
+      - API_BASE_URL=${API_BASE_URL:-http://api:8148}
     volumes:
       - ./data:/data:ro
     ports:

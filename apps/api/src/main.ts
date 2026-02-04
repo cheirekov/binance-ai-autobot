@@ -29,7 +29,7 @@ async function bootstrap(): Promise<void> {
     verbose: (message) => logger.trace({ msg: message })
   });
 
-  const port = Number.parseInt(process.env.PORT ?? "3000", 10);
+  const port = Number.parseInt(process.env.PORT ?? "8148", 10);
   await app.listen(port, "0.0.0.0");
 
   logger.info({ msg: "API listening", port });

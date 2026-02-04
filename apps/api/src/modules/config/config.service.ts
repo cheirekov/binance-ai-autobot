@@ -90,7 +90,7 @@ export class ConfigService {
       advanced: {
         apiKey,
         apiHost: process.env.API_HOST ?? "0.0.0.0",
-        apiPort: Number.parseInt(process.env.PORT ?? "3000", 10),
+        apiPort: Number.parseInt(process.env.PORT ?? "8148", 10),
         uiHost: process.env.UI_HOST ?? "0.0.0.0",
         uiPort: Number.parseInt(process.env.UI_PORT ?? "4173", 10),
         neverTradeSymbols: [],

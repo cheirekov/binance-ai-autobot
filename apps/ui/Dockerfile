@@ -13,7 +13,7 @@ ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=4173
 ENV DATA_DIR=/data
-ENV API_BASE_URL=http://api:3000
+ENV API_BASE_URL=http://api:8148
 
 WORKDIR /app/apps/ui
 CMD ["node", "server-dist/index.js"]

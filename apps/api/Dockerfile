@@ -10,7 +10,7 @@ RUN pnpm -C packages/shared build
 RUN pnpm -C apps/api build
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=8148
 ENV DATA_DIR=/data
 
 WORKDIR /app/apps/api
