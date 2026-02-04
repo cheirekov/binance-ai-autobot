@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { apiPut } from "../../api/http";
+import { apiGet, apiPut } from "../../api/http";
 import { usePublicConfig } from "../../hooks/usePublicConfig";
 
 export function SettingsAdvanced(): JSX.Element {
@@ -14,12 +14,76 @@ export function SettingsAdvanced(): JSX.Element {
   const [autoBlacklistEnabled, setAutoBlacklistEnabled] = useState(true);
   const [autoBlacklistTtlMinutes, setAutoBlacklistTtlMinutes] = useState(180);
 
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importedName, setImportedName] = useState<string | null>(null);
+  const [importedJson, setImportedJson] = useState<unknown | null>(null);
+
   useEffect(() => {
     if (!config?.advanced) return;
     setNeverTradeSymbolsText((config.advanced.neverTradeSymbols ?? []).join("\n"));
     setAutoBlacklistEnabled(config.advanced.autoBlacklistEnabled);
     setAutoBlacklistTtlMinutes(config.advanced.autoBlacklistTtlMinutes);
   }, [config?.advanced]);
+
+  async function onExport(): Promise<void> {
+    setExportError(null);
+    setExporting(true);
+    try {
+      const cfg = await apiGet<unknown>("/config/export");
+      const content = JSON.stringify(cfg, null, 2);
+      const blob = new Blob([content], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "config.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function onPickImportFile(file: File | null): Promise<void> {
+    setImportedName(null);
+    setImportedJson(null);
+    setImportError(null);
+    if (!file) return;
+
+    setImportedName(file.name);
+    try {
+      const text = await file.text();
+      setImportedJson(JSON.parse(text));
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function onImport(): Promise<void> {
+    setImportError(null);
+    if (!importedJson) {
+      setImportError("Pick a config.json file first.");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      await apiPut("/config/import", importedJson);
+      setImportedJson(null);
+      setImportedName(null);
+      window.location.reload();
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function onSave(): Promise<void> {
     setSaveError(null);
@@ -133,7 +197,44 @@ export function SettingsAdvanced(): JSX.Element {
           {saving ? "Saving…" : "Save"}
         </button>
       </div>
+
+      <div className="card" style={{ marginTop: 14 }}>
+        <div className="title">Export / Import</div>
+        <div className="subtitle">This includes secrets (Binance/OpenAI keys). Store the file securely.</div>
+
+        {exportError ? (
+          <div className="subtitle" style={{ color: "var(--danger)", marginTop: 10 }}>
+            Export failed: {exportError}
+          </div>
+        ) : null}
+
+        <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button className="btn" onClick={onExport} disabled={exporting}>
+            {exporting ? "Exporting…" : "Export config.json"}
+          </button>
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <label className="label">Import config.json (overwrites current settings)</label>
+          <input
+            className="field"
+            type="file"
+            accept="application/json,.json"
+            onChange={(e) => void onPickImportFile(e.target.files?.[0] ?? null)}
+          />
+          {importedName ? <div className="subtitle">Selected: {importedName}</div> : null}
+          {importError ? (
+            <div className="subtitle" style={{ color: "var(--danger)" }}>
+              Import failed: {importError}
+            </div>
+          ) : null}
+          <div style={{ marginTop: 10 }}>
+            <button className="btn danger" onClick={onImport} disabled={importing || !importedJson}>
+              {importing ? "Importing…" : "Import and reload"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
-

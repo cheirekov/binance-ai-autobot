@@ -18,6 +18,13 @@ export function SettingsBasic(): JSX.Element {
   const [aiMinTradeConfidence, setAiMinTradeConfidence] = useState<number>(basic?.aiMinTradeConfidence ?? 65);
   const [liveTrading, setLiveTrading] = useState<boolean>(basic?.liveTrading ?? false);
   const [homeStableCoin, setHomeStableCoin] = useState<string>(basic?.homeStableCoin ?? "USDC");
+  const [uiAuthEnabled, setUiAuthEnabled] = useState<boolean>(basic?.uiAuth?.enabled ?? true);
+  const [uiUsername, setUiUsername] = useState<string>(basic?.uiAuth?.username ?? "admin");
+  const [uiPassword, setUiPassword] = useState<string>("");
+  const [uiPassword2, setUiPassword2] = useState<string>("");
+  const [savingUiAuth, setSavingUiAuth] = useState(false);
+  const [uiAuthSavedAt, setUiAuthSavedAt] = useState<string | null>(null);
+  const [uiAuthError, setUiAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!basic) return;
@@ -27,6 +34,8 @@ export function SettingsBasic(): JSX.Element {
     setAiMinTradeConfidence(basic.aiMinTradeConfidence);
     setLiveTrading(basic.liveTrading);
     setHomeStableCoin(basic.homeStableCoin);
+    setUiAuthEnabled(basic.uiAuth?.enabled ?? true);
+    setUiUsername(basic.uiAuth?.username ?? "admin");
     setConfirmLive(false);
   }, [basic]);
 
@@ -60,6 +69,43 @@ export function SettingsBasic(): JSX.Element {
       setSaveError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onSaveUiAuth(): Promise<void> {
+    setUiAuthError(null);
+    setUiAuthSavedAt(null);
+
+    if (!uiUsername.trim()) {
+      setUiAuthError("Username is required.");
+      return;
+    }
+
+    if (uiPassword || uiPassword2) {
+      if (uiPassword.length < 8) {
+        setUiAuthError("Password must be at least 8 characters.");
+        return;
+      }
+      if (uiPassword !== uiPassword2) {
+        setUiAuthError("Password confirmation does not match.");
+        return;
+      }
+    }
+
+    setSavingUiAuth(true);
+    try {
+      await apiPut("/config/ui-auth", {
+        enabled: uiAuthEnabled,
+        username: uiUsername.trim(),
+        ...(uiPassword ? { password: uiPassword } : {})
+      });
+      setUiPassword("");
+      setUiPassword2("");
+      setUiAuthSavedAt(new Date().toISOString());
+    } catch (e) {
+      setUiAuthError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingUiAuth(false);
     }
   }
 
@@ -191,6 +237,54 @@ export function SettingsBasic(): JSX.Element {
         <button className="btn primary" onClick={onSave} disabled={saving || (liveTrading && !confirmLive)}>
           {saving ? "Saving…" : "Save"}
         </button>
+      </div>
+
+      <div className="card" style={{ marginTop: 14 }}>
+        <div className="title">UI access (Basic Auth)</div>
+        <div className="subtitle">Changing this will require re-login on all devices.</div>
+
+        {uiAuthError ? (
+          <div className="subtitle" style={{ color: "var(--danger)", marginTop: 10 }}>
+            {uiAuthError}
+          </div>
+        ) : null}
+
+        {uiAuthSavedAt ? (
+          <div className="subtitle" style={{ marginTop: 10 }}>
+            Saved at {new Date(uiAuthSavedAt).toLocaleTimeString()}. Reload the page to re-authenticate.
+          </div>
+        ) : null}
+
+        <div className="row cols-2" style={{ marginTop: 12 }}>
+          <div>
+            <label className="label">UI auth</label>
+            <select className="field" value={uiAuthEnabled ? "on" : "off"} onChange={(e) => setUiAuthEnabled(e.target.value === "on")}>
+              <option value="on">On (recommended)</option>
+              <option value="off">Off</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Username</label>
+            <input className="field" value={uiUsername} onChange={(e) => setUiUsername(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="row cols-2" style={{ marginTop: 12 }}>
+          <div>
+            <label className="label">New password</label>
+            <input className="field" type="password" value={uiPassword} onChange={(e) => setUiPassword(e.target.value)} placeholder="Leave empty to keep current" />
+          </div>
+          <div>
+            <label className="label">Confirm password</label>
+            <input className="field" type="password" value={uiPassword2} onChange={(e) => setUiPassword2(e.target.value)} placeholder="Repeat new password" />
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <button className="btn primary" onClick={onSaveUiAuth} disabled={savingUiAuth}>
+            {savingUiAuth ? "Saving…" : "Save UI access"}
+          </button>
+        </div>
       </div>
     </div>
   );

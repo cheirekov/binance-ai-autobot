@@ -1,5 +1,7 @@
-import { Body, Controller, Get, Put } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Put } from "@nestjs/common";
 import { z } from "zod";
+import type { AppConfig } from "@autobot/shared";
+import { AppConfigSchema } from "@autobot/shared";
 
 import { ConfigService } from "./config.service";
 
@@ -18,6 +20,12 @@ const BasicUpdateSchema = z.object({
   liveTrading: z.boolean().optional()
 });
 
+const UiAuthUpdateSchema = z.object({
+  username: z.string().min(1).optional(),
+  password: z.string().min(8).optional(),
+  enabled: z.boolean().optional()
+});
+
 @Controller("config")
 export class ConfigController {
   constructor(private readonly configService: ConfigService) {}
@@ -33,6 +41,7 @@ export class ConfigController {
       liveTrading: boolean;
       aiEnabled: boolean;
       aiMinTradeConfidence: number;
+      uiAuth?: { username: string; enabled: boolean };
     };
     derived?: {
       maxOpenPositions: number;
@@ -58,7 +67,8 @@ export class ConfigController {
         risk: config.basic.risk,
         liveTrading: config.basic.liveTrading,
         aiEnabled: config.basic.aiEnabled,
-        aiMinTradeConfidence: config.basic.aiMinTradeConfidence
+        aiMinTradeConfidence: config.basic.aiMinTradeConfidence,
+        uiAuth: { username: config.basic.uiAuth.username, enabled: config.basic.uiAuth.enabled }
       },
       derived: config.derived,
       integrations: {
@@ -86,5 +96,27 @@ export class ConfigController {
     this.configService.updateAdvanced(patch);
     return { ok: true };
   }
-}
 
+  @Put("ui-auth")
+  updateUiAuth(@Body() body: unknown): { ok: true } {
+    const patch = UiAuthUpdateSchema.parse(body);
+    this.configService.updateUiAuth(patch);
+    return { ok: true };
+  }
+
+  @Get("export")
+  exportConfig(): AppConfig {
+    const config = this.configService.load();
+    if (!config) {
+      throw new BadRequestException("Bot is not initialized.");
+    }
+    return config;
+  }
+
+  @Put("import")
+  importConfig(@Body() body: unknown): { ok: true } {
+    const config = AppConfigSchema.parse(body);
+    this.configService.importConfig(config);
+    return { ok: true };
+  }
+}

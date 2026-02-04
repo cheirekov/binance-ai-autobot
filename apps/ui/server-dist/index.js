@@ -43,6 +43,12 @@ function unauthorized(res) {
   res.setHeader("WWW-Authenticate", 'Basic realm="Autobot UI"');
   res.status(401).send("Unauthorized");
 }
+function logAuthFailure(req, reason, username) {
+  const ip = req.ip ?? "unknown";
+  const ua = req.headers["user-agent"] ?? "unknown";
+  const path2 = req.originalUrl ?? req.url;
+  console.warn(`[ui] auth failed: ${reason}`, { ip, path: path2, username, ua });
+}
 async function start() {
   const app = (0, import_express.default)();
   const host = process.env.HOST ?? "localhost";
@@ -54,10 +60,19 @@ async function start() {
     cache = loadConfig(dataDir, cache);
     if (!cache?.config.basic.uiAuth.enabled) return next();
     const creds = (0, import_basic_auth.default)(req);
-    if (!creds?.name || !creds.pass) return unauthorized(res);
+    if (!creds?.name || !creds.pass) {
+      logAuthFailure(req, "missing credentials");
+      return unauthorized(res);
+    }
     const { username, passwordHash } = cache.config.basic.uiAuth;
-    if (creds.name !== username) return unauthorized(res);
-    if (!import_bcryptjs.default.compareSync(creds.pass, passwordHash)) return unauthorized(res);
+    if (creds.name !== username) {
+      logAuthFailure(req, "username mismatch", creds.name);
+      return unauthorized(res);
+    }
+    if (!import_bcryptjs.default.compareSync(creds.pass, passwordHash)) {
+      logAuthFailure(req, "password mismatch", creds.name);
+      return unauthorized(res);
+    }
     return next();
   });
   app.get("/health", (_req, res) => {

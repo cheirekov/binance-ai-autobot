@@ -24,6 +24,11 @@ export function OnboardingBasic(): JSX.Element {
   const [saved, setSaved] = useState(false);
   const [confirmLiveTrading, setConfirmLiveTrading] = useState(false);
 
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importedName, setImportedName] = useState<string | null>(null);
+  const [importedJson, setImportedJson] = useState<unknown | null>(null);
+
   const [traderRegion, setTraderRegion] = useState<SetupRequest["traderRegion"]>("EEA");
   const [homeStableCoin, setHomeStableCoin] = useState(defaultHomeStableCoin(traderRegion));
   const [tradeMode, setTradeMode] = useState<SetupRequest["tradeMode"]>("SPOT_GRID");
@@ -43,6 +48,39 @@ export function OnboardingBasic(): JSX.Element {
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]): void {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function onPickImportFile(file: File | null): Promise<void> {
+    setImportError(null);
+    setImportedName(null);
+    setImportedJson(null);
+    if (!file) return;
+
+    setImportedName(file.name);
+    try {
+      const text = await file.text();
+      setImportedJson(JSON.parse(text));
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function onImport(): Promise<void> {
+    setImportError(null);
+    if (!importedJson) {
+      setImportError("Pick a config.json file first.");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      await apiPost("/setup/import", importedJson);
+      window.location.reload();
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImporting(false);
+    }
   }
 
   async function onSubmit(): Promise<void> {
@@ -80,6 +118,30 @@ export function OnboardingBasic(): JSX.Element {
       <div>
         <div className="title">Basic</div>
         <div className="subtitle">Enough to unlock the bot. Defaults adapt to your risk level.</div>
+      </div>
+
+      <div className="card">
+        <div className="title">Import existing config</div>
+        <div className="subtitle">Use this if you already exported a `config.json` from another instance.</div>
+        <div style={{ marginTop: 12 }}>
+          <input
+            className="field"
+            type="file"
+            accept="application/json,.json"
+            onChange={(e) => void onPickImportFile(e.target.files?.[0] ?? null)}
+          />
+          {importedName ? <div className="subtitle">Selected: {importedName}</div> : null}
+          {importError ? (
+            <div className="subtitle" style={{ color: "var(--danger)" }}>
+              Import error: {importError}
+            </div>
+          ) : null}
+          <div style={{ marginTop: 10 }}>
+            <button className="btn danger" disabled={importing || !importedJson} onClick={() => void onImport()}>
+              {importing ? "Importing…" : "Import and reload"}
+            </button>
+          </div>
+        </div>
       </div>
 
       {error ? (

@@ -167,4 +167,44 @@ export class ConfigService {
     this.save(next);
     return next;
   }
+
+  updateUiAuth(patch: { username?: string; password?: string; enabled?: boolean }): AppConfig {
+    const current = this.load();
+    if (!current) {
+      throw new BadRequestException("Bot is not initialized.");
+    }
+
+    const nextUiAuth = {
+      ...current.basic.uiAuth,
+      ...(patch.enabled === undefined ? {} : { enabled: patch.enabled }),
+      ...(patch.username === undefined ? {} : { username: patch.username.trim() }),
+      ...(patch.password === undefined
+        ? {}
+        : { passwordHash: bcrypt.hashSync(patch.password, 12), passwordHashAlgo: "bcrypt" as const })
+    };
+
+    const next = AppConfigSchema.parse({
+      ...current,
+      updatedAt: new Date().toISOString(),
+      basic: {
+        ...current.basic,
+        uiAuth: nextUiAuth
+      }
+    });
+
+    this.save(next);
+    return next;
+  }
+
+  importConfig(config: AppConfig): AppConfig {
+    const derived = deriveSettings({ risk: config.basic.risk, tradeMode: config.basic.tradeMode });
+    const next = AppConfigSchema.parse({
+      ...config,
+      version: CONFIG_VERSION,
+      updatedAt: new Date().toISOString(),
+      derived
+    });
+    this.save(next);
+    return next;
+  }
 }

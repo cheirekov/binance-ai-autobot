@@ -1,6 +1,6 @@
 import { Body, ConflictException, Controller, Get, Post } from "@nestjs/common";
-import type { BasicSetupRequest } from "@autobot/shared";
-import { BasicSetupRequestSchema, defaultHomeStableCoin } from "@autobot/shared";
+import type { AppConfig, BasicSetupRequest } from "@autobot/shared";
+import { AppConfigSchema, BasicSetupRequestSchema, defaultHomeStableCoin, deriveSettings } from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
 
@@ -29,6 +29,18 @@ export class SetupController {
     const config = this.configService.createInitialConfig(normalized);
     this.configService.save(config);
 
+    return { initialized: true };
+  }
+
+  @Post("import")
+  importConfig(@Body() body: unknown): { initialized: true } {
+    if (this.configService.isInitialized()) {
+      throw new ConflictException("Already initialized.");
+    }
+
+    const config = AppConfigSchema.parse(body) satisfies AppConfig;
+    const derived = deriveSettings({ risk: config.basic.risk, tradeMode: config.basic.tradeMode });
+    this.configService.save({ ...config, updatedAt: new Date().toISOString(), derived });
     return { initialized: true };
   }
 }

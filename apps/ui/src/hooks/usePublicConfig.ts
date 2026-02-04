@@ -12,6 +12,7 @@ export type PublicConfig = {
     liveTrading: boolean;
     aiEnabled: boolean;
     aiMinTradeConfidence: number;
+    uiAuth?: { username: string; enabled: boolean };
   };
   derived?: {
     maxOpenPositions: number;
@@ -59,4 +60,3 @@ export function usePublicConfig(): { loading: boolean; config: PublicConfig | nu
 
   return { loading, config, error };
 }
-
