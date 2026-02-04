@@ -30,6 +30,13 @@ function unauthorized(res: express.Response): void {
   res.status(401).send("Unauthorized");
 }
 
+function logAuthFailure(req: express.Request, reason: string, username?: string): void {
+  const ip = req.ip ?? "unknown";
+  const ua = req.headers["user-agent"] ?? "unknown";
+  const path = req.originalUrl ?? req.url;
+  console.warn(`[ui] auth failed: ${reason}`, { ip, path, username, ua });
+}
+
 async function start(): Promise<void> {
   const app = express();
 
@@ -46,11 +53,20 @@ async function start(): Promise<void> {
     if (!cache?.config.basic.uiAuth.enabled) return next();
 
     const creds = basicAuth(req);
-    if (!creds?.name || !creds.pass) return unauthorized(res);
+    if (!creds?.name || !creds.pass) {
+      logAuthFailure(req, "missing credentials");
+      return unauthorized(res);
+    }
 
     const { username, passwordHash } = cache.config.basic.uiAuth;
-    if (creds.name !== username) return unauthorized(res);
-    if (!bcrypt.compareSync(creds.pass, passwordHash)) return unauthorized(res);
+    if (creds.name !== username) {
+      logAuthFailure(req, "username mismatch", creds.name);
+      return unauthorized(res);
+    }
+    if (!bcrypt.compareSync(creds.pass, passwordHash)) {
+      logAuthFailure(req, "password mismatch", creds.name);
+      return unauthorized(res);
+    }
 
     return next();
   });
