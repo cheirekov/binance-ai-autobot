@@ -7,6 +7,8 @@ import { ConfigService } from "./config.service";
 
 const AdvancedUpdateSchema = z.object({
   apiBaseUrl: z.union([z.string().url(), z.literal("")]).optional(),
+  binanceEnvironment: z.enum(["MAINNET", "SPOT_TESTNET"]).optional(),
+  binanceBaseUrlOverride: z.union([z.string().url(), z.literal("")]).optional(),
   apiHost: z.string().min(1).optional(),
   apiPort: z.number().int().min(1).max(65535).optional(),
   uiHost: z.string().min(1).optional(),
@@ -62,6 +64,8 @@ export class ConfigController {
       uiHost: string;
       uiPort: number;
       apiBaseUrl?: string;
+      binanceEnvironment: "MAINNET" | "SPOT_TESTNET";
+      binanceBaseUrlOverride?: string;
       apiKeyHint: string;
       neverTradeSymbols: string[];
       autoBlacklistEnabled: boolean;
@@ -96,6 +100,8 @@ export class ConfigController {
         uiHost: config.advanced.uiHost,
         uiPort: config.advanced.uiPort,
         apiBaseUrl: config.advanced.apiBaseUrl,
+        binanceEnvironment: config.advanced.binanceEnvironment,
+        binanceBaseUrlOverride: config.advanced.binanceBaseUrlOverride,
         apiKeyHint: config.advanced.apiKey.slice(-6),
         neverTradeSymbols: config.advanced.neverTradeSymbols,
         autoBlacklistEnabled: config.advanced.autoBlacklistEnabled,

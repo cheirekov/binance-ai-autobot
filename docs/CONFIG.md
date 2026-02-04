@@ -31,6 +31,7 @@ Default:
 - API base URL override (optional; used by UI proxy when set)
 - API key rotation (auto-generated on setup; can be rotated from UI)
 - API/UI host + port (informational today; container ports are still controlled by Docker/env)
+- Binance environment (Mainnet / Spot testnet) + optional base URL override
 
 ## Derived defaults
 

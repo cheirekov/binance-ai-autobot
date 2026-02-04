@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
 
+import { ConfigService } from "../config/config.service";
 import { BinanceClient } from "./binance-client";
+import { resolveBinanceBaseUrl } from "./binance-base-url";
 
 type ExchangeInfoResponse = {
   symbols?: ExchangeInfoSymbol[];
@@ -162,11 +164,25 @@ function parseNotionalFilter(filters: Array<Record<string, unknown>>): NotionalF
 
 @Injectable()
 export class BinanceMarketDataService {
-  private readonly baseUrl = (process.env.BINANCE_BASE_URL ?? "https://api.binance.com").replace(/\/+$/, "");
-  private readonly client = new BinanceClient({ baseUrl: this.baseUrl });
+  private clientCache: { baseUrl: string; client: BinanceClient } | null = null;
 
   private readonly rulesCache = new Map<string, { atMs: number; rules: BinanceSymbolRules }>();
   private readonly priceCache = new Map<string, { atMs: number; price: string }>();
+
+  constructor(private readonly configService: ConfigService) {}
+
+  private get client(): BinanceClient {
+    const config = this.configService.load();
+    const baseUrl = resolveBinanceBaseUrl(config);
+
+    if (this.clientCache?.baseUrl !== baseUrl) {
+      this.clientCache = { baseUrl, client: new BinanceClient({ baseUrl }) };
+      this.rulesCache.clear();
+      this.priceCache.clear();
+    }
+
+    return this.clientCache.client;
+  }
 
   async getSymbolRules(symbol: string): Promise<BinanceSymbolRules> {
     const sym = symbol.trim().toUpperCase();

@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import { ConfigService } from "../config/config.service";
 import { BinanceClient } from "./binance-client";
+import { resolveBinanceBaseUrl } from "./binance-base-url";
 
 export type BinanceStatus = {
   checkedAt: string;
@@ -26,7 +27,7 @@ export class BinanceStatusService {
     }
 
     const config = this.configService.load();
-    const baseUrl = process.env.BINANCE_BASE_URL ?? "https://api.binance.com";
+    const baseUrl = resolveBinanceBaseUrl(config);
 
     if (!config) {
       this.cachedAtMs = now;
@@ -92,4 +93,3 @@ export class BinanceStatusService {
     return status;
   }
 }
-

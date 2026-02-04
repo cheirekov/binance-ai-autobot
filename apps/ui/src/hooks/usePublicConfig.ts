@@ -28,6 +28,8 @@ export type PublicConfig = {
     uiHost: string;
     uiPort: number;
     apiBaseUrl?: string;
+    binanceEnvironment: "MAINNET" | "SPOT_TESTNET";
+    binanceBaseUrlOverride?: string;
     apiKeyHint: string;
     neverTradeSymbols: string[];
     autoBlacklistEnabled: boolean;

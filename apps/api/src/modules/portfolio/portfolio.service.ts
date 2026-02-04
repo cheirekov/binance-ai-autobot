@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import { ConfigService } from "../config/config.service";
 import { BinanceClient } from "../integrations/binance-client";
+import { resolveBinanceBaseUrl } from "../integrations/binance-base-url";
 
 type BinanceAccountResponse = {
   balances?: Array<{ asset: string; free: string; locked: string }>;
@@ -45,7 +46,7 @@ export class PortfolioService {
     const config = this.configService.load();
 
     const homeStableCoin = config?.basic.homeStableCoin ?? "USDC";
-    const baseUrl = process.env.BINANCE_BASE_URL ?? "https://api.binance.com";
+    const baseUrl = resolveBinanceBaseUrl(config);
 
     const errors: string[] = [];
 

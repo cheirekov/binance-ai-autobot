@@ -8,6 +8,9 @@ export type TraderRegion = z.infer<typeof TraderRegionSchema>;
 export const TradeModeSchema = z.enum(["SPOT", "SPOT_GRID"]);
 export type TradeMode = z.infer<typeof TradeModeSchema>;
 
+export const BinanceEnvironmentSchema = z.enum(["MAINNET", "SPOT_TESTNET"]);
+export type BinanceEnvironment = z.infer<typeof BinanceEnvironmentSchema>;
+
 export const BasicSetupRequestSchema = z
   .object({
     binanceApiKey: z.string().min(1),
@@ -72,6 +75,8 @@ export type BasicSettings = z.infer<typeof BasicSettingsSchema>;
 export const AdvancedSettingsSchema = z.object({
   apiKey: z.string().min(16),
   apiBaseUrl: z.string().url().optional(),
+  binanceEnvironment: BinanceEnvironmentSchema.default("MAINNET"),
+  binanceBaseUrlOverride: z.string().url().optional(),
   apiHost: z.string().min(1),
   apiPort: z.number().int().min(1).max(65535),
   uiHost: z.string().min(1),

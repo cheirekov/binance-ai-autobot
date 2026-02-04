@@ -40,8 +40,23 @@ export class BinanceClient {
     return await this.request("/api/v3/ticker/price");
   }
 
+  async ticker24hr(): Promise<
+    Array<{
+      symbol: string;
+      lastPrice: string;
+      quoteVolume: string;
+      priceChangePercent: string;
+    }>
+  > {
+    return await this.request("/api/v3/ticker/24hr");
+  }
+
   async exchangeInfo(symbol?: string): Promise<unknown> {
     return await this.request("/api/v3/exchangeInfo", symbol ? { query: { symbol } } : undefined);
+  }
+
+  async klines(symbol: string, interval: string, limit: number): Promise<unknown> {
+    return await this.request("/api/v3/klines", { query: { symbol, interval, limit } });
   }
 
   private sign(queryString: string): string {

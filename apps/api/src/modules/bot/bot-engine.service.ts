@@ -8,6 +8,7 @@ import { BotStateSchema, defaultBotState } from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
 import { BinanceMarketDataService } from "../integrations/binance-market-data.service";
+import { UniverseService } from "../universe/universe.service";
 
 function atomicWriteFile(filePath: string, data: string): void {
   const tmpPath = `${filePath}.tmp`;
@@ -26,7 +27,8 @@ export class BotEngineService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly marketData: BinanceMarketDataService
+    private readonly marketData: BinanceMarketDataService,
+    private readonly universe: UniverseService
   ) {}
 
   getState(): BotState {
@@ -93,9 +95,21 @@ export class BotEngineService {
     this.save({ ...this.getState(), running: true, phase: "EXAMINING", lastError: undefined });
 
     this.examineTimer = setTimeout(() => {
-      this.addDecision("EXAMINE", "Universe scan finished (stub)");
-      this.save({ ...this.getState(), phase: "TRADING" });
-    }, 2500);
+      void (async () => {
+        try {
+          const snap = await this.universe.scanAndWait();
+          const top = snap.candidates?.[0];
+          const summary = top
+            ? `Universe scan finished: top ${top.symbol} (ADX ${top.adx14?.toFixed(1) ?? "—"} · RSI ${top.rsi14?.toFixed(1) ?? "—"})`
+            : "Universe scan finished (no candidates)";
+          this.addDecision("EXAMINE", summary);
+        } catch (err) {
+          this.addDecision("EXAMINE", `Universe scan failed: ${err instanceof Error ? err.message : String(err)}`);
+        } finally {
+          this.save({ ...this.getState(), phase: "TRADING" });
+        }
+      })();
+    }, 250);
 
     this.loopTimer = setInterval(() => {
       void this.tick();
@@ -128,7 +142,15 @@ export class BotEngineService {
       const filled = maybeFillOne();
 
       const homeStable = config?.basic.homeStableCoin ?? "USDT";
-      const candidateSymbol = `BTC${homeStable}`;
+      const candidateSymbol = await (async () => {
+        try {
+          const snap = await this.universe.getLatest();
+          const best = snap.candidates?.find((c) => c.symbol && !this.isSymbolBlocked(c.symbol, current));
+          return best?.symbol ?? `BTC${homeStable}`;
+        } catch {
+          return `BTC${homeStable}`;
+        }
+      })();
       const blockedReason = this.isSymbolBlocked(candidateSymbol, current);
       if (blockedReason) {
         const summary = `Skip ${candidateSymbol}: ${blockedReason}`;

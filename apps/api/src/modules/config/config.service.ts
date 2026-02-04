@@ -89,6 +89,9 @@ export class ConfigService {
       },
       advanced: {
         apiKey,
+        binanceEnvironment: "MAINNET",
+        binanceBaseUrlOverride: undefined,
+        apiBaseUrl: undefined,
         apiHost: process.env.API_HOST ?? "0.0.0.0",
         apiPort: Number.parseInt(process.env.PORT ?? "8148", 10),
         uiHost: process.env.UI_HOST ?? "0.0.0.0",
@@ -140,6 +143,8 @@ export class ConfigService {
 
   updateAdvanced(patch: {
     apiBaseUrl?: string;
+    binanceEnvironment?: "MAINNET" | "SPOT_TESTNET";
+    binanceBaseUrlOverride?: string;
     apiHost?: string;
     apiPort?: number;
     uiHost?: string;
@@ -175,11 +180,28 @@ export class ConfigService {
       return trimmed;
     })();
 
+    const binanceBaseUrlOverride = (() => {
+      if (patch.binanceBaseUrlOverride === undefined) return undefined;
+      const trimmed = patch.binanceBaseUrlOverride.trim();
+      if (!trimmed) return undefined;
+      try {
+        const u = new URL(trimmed);
+        if (u.protocol !== "http:" && u.protocol !== "https:") {
+          throw new Error("Only http/https URLs are allowed.");
+        }
+      } catch (e) {
+        throw new BadRequestException(`Invalid binanceBaseUrlOverride: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      return trimmed;
+    })();
+
     const nextAdvanced = {
       ...current.advanced,
       ...patch,
       ...(apiBaseUrl === undefined && patch.apiBaseUrl !== undefined ? { apiBaseUrl: undefined } : {}),
       ...(apiBaseUrl ? { apiBaseUrl } : {}),
+      ...(binanceBaseUrlOverride === undefined && patch.binanceBaseUrlOverride !== undefined ? { binanceBaseUrlOverride: undefined } : {}),
+      ...(binanceBaseUrlOverride ? { binanceBaseUrlOverride } : {}),
       ...(apiHost ? { apiHost } : {}),
       ...(uiHost ? { uiHost } : {}),
       ...(neverTradeSymbols ? { neverTradeSymbols } : {})

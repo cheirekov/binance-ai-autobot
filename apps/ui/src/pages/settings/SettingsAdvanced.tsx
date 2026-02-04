@@ -16,6 +16,9 @@ export function SettingsAdvanced(): JSX.Element {
   const [uiHost, setUiHost] = useState("0.0.0.0");
   const [uiPort, setUiPort] = useState(4173);
 
+  const [binanceEnvironment, setBinanceEnvironment] = useState<"MAINNET" | "SPOT_TESTNET">("MAINNET");
+  const [binanceBaseUrlOverride, setBinanceBaseUrlOverride] = useState("");
+
   const [neverTradeSymbolsText, setNeverTradeSymbolsText] = useState("");
   const [autoBlacklistEnabled, setAutoBlacklistEnabled] = useState(true);
   const [autoBlacklistTtlMinutes, setAutoBlacklistTtlMinutes] = useState(180);
@@ -38,6 +41,8 @@ export function SettingsAdvanced(): JSX.Element {
     setApiPort(config.advanced.apiPort ?? 8148);
     setUiHost(config.advanced.uiHost ?? "0.0.0.0");
     setUiPort(config.advanced.uiPort ?? 4173);
+    setBinanceEnvironment(config.advanced.binanceEnvironment ?? "MAINNET");
+    setBinanceBaseUrlOverride(config.advanced.binanceBaseUrlOverride ?? "");
     setNeverTradeSymbolsText((config.advanced.neverTradeSymbols ?? []).join("\n"));
     setAutoBlacklistEnabled(config.advanced.autoBlacklistEnabled);
     setAutoBlacklistTtlMinutes(config.advanced.autoBlacklistTtlMinutes);
@@ -112,6 +117,8 @@ export function SettingsAdvanced(): JSX.Element {
 
       await apiPut("/config/advanced", {
         apiBaseUrl: apiBaseUrl.trim(),
+        binanceEnvironment,
+        binanceBaseUrlOverride: binanceBaseUrlOverride.trim(),
         apiHost,
         apiPort,
         uiHost,
@@ -246,6 +253,30 @@ export function SettingsAdvanced(): JSX.Element {
               />
             </div>
           </div>
+        </div>
+
+        <div className="card">
+          <div className="title">Binance environment</div>
+          <div className="subtitle">Switch between mainnet and Spot testnet. Testnet can be unstable/outage-prone.</div>
+
+          <label className="label" style={{ marginTop: 12 }}>
+            Environment
+          </label>
+          <select className="field" value={binanceEnvironment} onChange={(e) => setBinanceEnvironment(e.target.value as "MAINNET" | "SPOT_TESTNET")}>
+            <option value="MAINNET">Mainnet (real)</option>
+            <option value="SPOT_TESTNET">Spot testnet</option>
+          </select>
+
+          <label className="label" style={{ marginTop: 12 }}>
+            Base URL override (optional)
+          </label>
+          <input
+            className="field"
+            value={binanceBaseUrlOverride}
+            onChange={(e) => setBinanceBaseUrlOverride(e.target.value)}
+            placeholder="https://api.binance.com"
+          />
+          <div className="subtitle">Leave empty to use the selected environment default.</div>
         </div>
 
         <div className="card">

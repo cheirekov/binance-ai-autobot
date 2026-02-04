@@ -6,6 +6,7 @@ import { useApiHealth } from "../hooks/useApiHealth";
 import { useIntegrationsStatus } from "../hooks/useIntegrationsStatus";
 import { usePortfolioWallet } from "../hooks/usePortfolioWallet";
 import { usePublicConfig } from "../hooks/usePublicConfig";
+import { useUniverseSnapshot } from "../hooks/useUniverseSnapshot";
 
 type BotState = {
   running: boolean;
@@ -30,11 +31,14 @@ export function DashboardPage(): JSX.Element {
   const [state, setState] = useState<BotState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [universeBusy, setUniverseBusy] = useState(false);
+  const [universeMsg, setUniverseMsg] = useState<string | null>(null);
 
   const apiHealth = useApiHealth();
   const publicConfig = usePublicConfig();
   const integrations = useIntegrationsStatus();
   const wallet = usePortfolioWallet();
+  const universe = useUniverseSnapshot();
 
   const phasePill = useMemo(() => {
     if (!state) return "…";
@@ -66,9 +70,10 @@ export function DashboardPage(): JSX.Element {
   const binancePill = useMemo(() => {
     const b = integrations.status?.binance;
     if (!b) return { label: "Binance: —", tone: "neutral" as const };
+    const env = b.baseUrl.includes("testnet") ? "Testnet" : "Mainnet";
     if (!b.configured) return { label: "Binance: Missing keys", tone: "bad" as const };
-    if (b.authenticated) return { label: "Binance: Auth OK", tone: "ok" as const };
-    if (b.reachable) return { label: "Binance: Reachable (auth failed)", tone: "bad" as const };
+    if (b.authenticated) return { label: `Binance: Auth OK (${env})`, tone: "ok" as const };
+    if (b.reachable) return { label: `Binance: Reachable (auth failed · ${env})`, tone: "bad" as const };
     return { label: "Binance: Offline", tone: "bad" as const };
   }, [integrations.status?.binance]);
 
@@ -110,6 +115,19 @@ export function DashboardPage(): JSX.Element {
   const walletTotal = wallet.wallet?.totalEstimatedHome;
   const walletTopAssets = wallet.wallet?.assets?.slice(0, 10) ?? [];
   const walletUnpricedCount = wallet.wallet ? wallet.wallet.assets.filter((a) => a.estValueHome === undefined).length : 0;
+
+  async function rescanUniverse(): Promise<void> {
+    setUniverseMsg(null);
+    setUniverseBusy(true);
+    try {
+      const res = await apiPost<{ ok: true; started: boolean }>("/universe/scan", {});
+      setUniverseMsg(res.started ? "Universe scan started." : "Universe scan is already running.");
+    } catch (e) {
+      setUniverseMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUniverseBusy(false);
+    }
+  }
 
   return (
     <div className="container">
@@ -205,6 +223,83 @@ export function DashboardPage(): JSX.Element {
               </div>
             </div>
           ) : null}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div className="title">Universe</div>
+        <div className="subtitle">
+          {state?.phase === "EXAMINING" ? (
+            <>Scanning market…</>
+          ) : universe.loading ? (
+            <>Loading…</>
+          ) : universe.error ? (
+            <>{universe.error}</>
+          ) : universe.snapshot ? (
+            <>
+              Last scan: {new Date(universe.snapshot.finishedAt).toLocaleTimeString()} · {universe.snapshot.interval} ·{" "}
+              {universe.snapshot.quoteAssets.join(", ")} · {universe.snapshot.baseUrl}
+            </>
+          ) : (
+            <>No scan yet.</>
+          )}
+        </div>
+
+        {universe.snapshot?.errors?.length ? (
+          <div className="subtitle" style={{ marginTop: 8 }}>
+            Warnings:{" "}
+            {universe.snapshot.errors
+              .slice(0, 2)
+              .map((e) => (e.symbol ? `${e.symbol}: ${e.error}` : e.error))
+              .join(" · ")}
+            {universe.snapshot.errors.length > 2 ? ` (+${universe.snapshot.errors.length - 2} more)` : ""}
+          </div>
+        ) : null}
+
+        {universeMsg ? <div className="subtitle" style={{ marginTop: 8 }}>{universeMsg}</div> : null}
+
+        <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button className="btn" onClick={rescanUniverse} disabled={universeBusy}>
+            {universeBusy ? "Scanning…" : "Rescan"}
+          </button>
+        </div>
+
+        <div style={{ marginTop: 12, maxHeight: 260, overflow: "auto" }}>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Hint</th>
+                <th>Score</th>
+                <th>Δ24h</th>
+                <th>RSI</th>
+                <th>ADX</th>
+                <th>ATR%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(universe.snapshot?.candidates ?? []).slice(0, 12).map((c) => (
+                <tr key={c.symbol}>
+                  <td>{c.symbol}</td>
+                  <td>{c.strategyHint ?? "—"}</td>
+                  <td>{c.score.toFixed(2)}</td>
+                  <td style={{ color: c.priceChangePct24h >= 0 ? "var(--success)" : "var(--danger)" }}>
+                    {c.priceChangePct24h.toFixed(2)}%
+                  </td>
+                  <td>{c.rsi14 === undefined ? "—" : c.rsi14.toFixed(1)}</td>
+                  <td>{c.adx14 === undefined ? "—" : c.adx14.toFixed(1)}</td>
+                  <td>{c.atrPct14 === undefined ? "—" : c.atrPct14.toFixed(2)}</td>
+                </tr>
+              ))}
+              {(universe.snapshot?.candidates?.length ?? 0) === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ color: "var(--muted)" }}>
+                    No candidates yet. Start the bot to trigger an examine scan, or press Rescan.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
       </div>
 
