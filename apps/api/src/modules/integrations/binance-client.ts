@@ -32,6 +32,14 @@ export class BinanceClient {
     return await this.request("/api/v3/account", { signed: true });
   }
 
+  async tickerPrice(symbol: string): Promise<{ symbol: string; price: string }> {
+    return await this.request("/api/v3/ticker/price", { query: { symbol } });
+  }
+
+  async tickerPrices(): Promise<Array<{ symbol: string; price: string }>> {
+    return await this.request("/api/v3/ticker/price");
+  }
+
   private sign(queryString: string): string {
     if (!this.apiSecret) {
       throw new Error("Missing Binance apiSecret for signed request");
@@ -91,4 +99,3 @@ export class BinanceClient {
     }
   }
 }
-

@@ -1,4 +1,4 @@
-import { NavLink, Route, Routes } from "react-router-dom";
+import { Link, NavLink, Route, Routes } from "react-router-dom";
 
 import { SettingsAdvanced } from "./settings/SettingsAdvanced";
 import { SettingsBasic } from "./settings/SettingsBasic";
@@ -12,7 +12,12 @@ export function SettingsPage(): JSX.Element {
           <div className="title">Settings</div>
           <div className="subtitle">Basic → Advanced → Expert (Kodi-like). Defaults adapt across levels.</div>
         </div>
-        <span className="pill">Config</span>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Link className="btn" to="/">
+            Home
+          </Link>
+          <span className="pill">Config</span>
+        </div>
       </div>
 
       <div className="grid">
@@ -35,4 +40,3 @@ export function SettingsPage(): JSX.Element {
     </div>
   );
 }
-

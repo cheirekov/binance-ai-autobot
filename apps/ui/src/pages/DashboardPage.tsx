@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { apiGet, apiPost } from "../api/http";
 import { useApiHealth } from "../hooks/useApiHealth";
 import { useIntegrationsStatus } from "../hooks/useIntegrationsStatus";
+import { usePortfolioWallet } from "../hooks/usePortfolioWallet";
 import { usePublicConfig } from "../hooks/usePublicConfig";
 
 type BotState = {
@@ -13,7 +14,17 @@ type BotState = {
   decisions: Array<{ id: string; ts: string; kind: string; summary: string }>;
   activeOrders: Array<{ id: string; ts: string; symbol: string; side: string; type: string; status: string; qty: number; price?: number }>;
   orderHistory: Array<{ id: string; ts: string; symbol: string; side: string; type: string; status: string; qty: number; price?: number }>;
+  symbolBlacklist?: Array<{ symbol: string; reason: string; createdAt: string; expiresAt: string }>;
 };
+
+type PillTone = "neutral" | "ok" | "bad" | "warn";
+
+function pillClass(tone: PillTone): string {
+  if (tone === "ok") return "pill ok";
+  if (tone === "bad") return "pill bad";
+  if (tone === "warn") return "pill warn";
+  return "pill";
+}
 
 export function DashboardPage(): JSX.Element {
   const [state, setState] = useState<BotState | null>(null);
@@ -23,6 +34,7 @@ export function DashboardPage(): JSX.Element {
   const apiHealth = useApiHealth();
   const publicConfig = usePublicConfig();
   const integrations = useIntegrationsStatus();
+  const wallet = usePortfolioWallet();
 
   const phasePill = useMemo(() => {
     if (!state) return "…";
@@ -30,31 +42,41 @@ export function DashboardPage(): JSX.Element {
   }, [state]);
 
   const apiPill = useMemo(() => {
-    if (apiHealth.loading) return "API: …";
-    return apiHealth.ok ? "API: Online" : "API: Offline";
+    if (apiHealth.loading) return { label: "API: …", tone: "neutral" as const };
+    return apiHealth.ok ? { label: "API: Online", tone: "ok" as const } : { label: "API: Offline", tone: "bad" as const };
   }, [apiHealth.loading, apiHealth.ok]);
 
   const modePill = useMemo(() => {
     const mode = publicConfig.config?.basic?.tradeMode;
-    if (!mode) return "Mode: —";
-    return mode === "SPOT_GRID" ? "Mode: Spot + Grid" : "Mode: Spot";
+    if (!mode) return { label: "Mode: —", tone: "neutral" as const };
+    return mode === "SPOT_GRID" ? { label: "Mode: Spot + Grid", tone: "neutral" as const } : { label: "Mode: Spot", tone: "neutral" as const };
   }, [publicConfig.config?.basic?.tradeMode]);
 
   const openAiPill = useMemo(() => {
     const openai = integrations.status?.openai;
-    if (!openai) return "OpenAI: —";
-    if (!openai.enabled) return openai.configured ? "OpenAI: Configured (off)" : "OpenAI: Off";
-    return openai.configured ? "OpenAI: On" : "OpenAI: Missing key";
+    if (!openai) return { label: "OpenAI: —", tone: "neutral" as const };
+    if (!openai.enabled) {
+      return openai.configured
+        ? { label: "OpenAI: Configured (off)", tone: "bad" as const }
+        : { label: "OpenAI: Off", tone: "bad" as const };
+    }
+    return openai.configured ? { label: "OpenAI: On", tone: "ok" as const } : { label: "OpenAI: Missing key", tone: "bad" as const };
   }, [integrations.status?.openai]);
 
   const binancePill = useMemo(() => {
     const b = integrations.status?.binance;
-    if (!b) return "Binance: —";
-    if (!b.configured) return "Binance: Missing keys";
-    if (b.authenticated) return "Binance: Auth OK";
-    if (b.reachable) return "Binance: Reachable (auth failed)";
-    return "Binance: Offline";
+    if (!b) return { label: "Binance: —", tone: "neutral" as const };
+    if (!b.configured) return { label: "Binance: Missing keys", tone: "bad" as const };
+    if (b.authenticated) return { label: "Binance: Auth OK", tone: "ok" as const };
+    if (b.reachable) return { label: "Binance: Reachable (auth failed)", tone: "bad" as const };
+    return { label: "Binance: Offline", tone: "bad" as const };
   }, [integrations.status?.binance]);
+
+  const livePill = useMemo(() => {
+    const liveTrading = publicConfig.config?.basic?.liveTrading;
+    if (liveTrading === undefined) return { label: "Live: —", tone: "neutral" as const };
+    return liveTrading ? { label: "Live: On", tone: "ok" as const } : { label: "Live: Off", tone: "bad" as const };
+  }, [publicConfig.config?.basic?.liveTrading]);
 
   async function refresh(): Promise<void> {
     setError(null);
@@ -84,6 +106,11 @@ export function DashboardPage(): JSX.Element {
     }
   }
 
+  const homeStableCoin = wallet.wallet?.homeStableCoin ?? publicConfig.config?.basic?.homeStableCoin ?? "USDC";
+  const walletTotal = wallet.wallet?.totalEstimatedHome;
+  const walletTopAssets = wallet.wallet?.assets?.slice(0, 10) ?? [];
+  const walletUnpricedCount = wallet.wallet ? wallet.wallet.assets.filter((a) => a.estValueHome === undefined).length : 0;
+
   return (
     <div className="container">
       <div className="topbar">
@@ -100,10 +127,11 @@ export function DashboardPage(): JSX.Element {
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-        <span className="pill">{apiPill}</span>
-        <span className="pill">{binancePill}</span>
-        <span className="pill">{openAiPill}</span>
-        <span className="pill">{modePill}</span>
+        <span className={pillClass(apiPill.tone)}>{apiPill.label}</span>
+        <span className={pillClass(binancePill.tone)}>{binancePill.label}</span>
+        <span className={pillClass(openAiPill.tone)}>{openAiPill.label}</span>
+        <span className={pillClass(livePill.tone)}>{livePill.label}</span>
+        <span className={pillClass(modePill.tone)}>{modePill.label}</span>
       </div>
 
       {error ? (
@@ -149,6 +177,111 @@ export function DashboardPage(): JSX.Element {
             <span className="pill">Phase: {state?.phase ?? "—"}</span>
             <span className="pill">Active orders: {state?.activeOrders?.length ?? 0}</span>
             <span className="pill">Decisions: {state?.decisions?.length ?? 0}</span>
+            <span className="pill">Blacklisted: {state?.symbolBlacklist?.length ?? 0}</span>
+          </div>
+
+          {(state?.symbolBlacklist?.length ?? 0) > 0 ? (
+            <div style={{ marginTop: 12 }}>
+              <div className="subtitle">Temporary blacklist (cooldown)</div>
+              <div style={{ marginTop: 8, maxHeight: 120, overflow: "auto" }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Symbol</th>
+                      <th>Reason</th>
+                      <th>Expires</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(state?.symbolBlacklist ?? []).slice(0, 8).map((e) => (
+                      <tr key={`${e.symbol}:${e.expiresAt}`}>
+                        <td>{e.symbol}</td>
+                        <td>{e.reason}</td>
+                        <td>{new Date(e.expiresAt).toLocaleTimeString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="row cols-2" style={{ marginBottom: 14 }}>
+        <div className="card">
+          <div className="title">Wallet</div>
+          <div className="subtitle">
+            {wallet.loading
+              ? "Loading…"
+              : wallet.error
+                ? wallet.error
+                : wallet.wallet?.errors?.length
+                  ? wallet.wallet.errors.join(" · ")
+                  : `Estimated in ${homeStableCoin} (prices may be delayed)`}
+          </div>
+
+          <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span className="pill">
+              Total (est):{" "}
+              <b>
+                {walletTotal === undefined ? "—" : `${walletTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${homeStableCoin}`}
+              </b>
+            </span>
+            <span className="pill">
+              Assets: <b>{wallet.wallet?.assets?.length ?? 0}</b>
+            </span>
+            <span className={pillClass(walletUnpricedCount === 0 ? "ok" : "warn")}>
+              Priced: <b>{wallet.wallet ? wallet.wallet.assets.length - walletUnpricedCount : 0}</b> / <b>{wallet.wallet?.assets?.length ?? 0}</b>
+            </span>
+          </div>
+
+          <div style={{ marginTop: 10, maxHeight: 260, overflow: "auto" }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Asset</th>
+                  <th>Total</th>
+                  <th>Est. value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {walletTopAssets.map((a) => (
+                  <tr key={a.asset}>
+                    <td>{a.asset}</td>
+                    <td>{a.total.toLocaleString(undefined, { maximumFractionDigits: 8 })}</td>
+                    <td>
+                      {a.estValueHome === undefined
+                        ? "—"
+                        : `${a.estValueHome.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${homeStableCoin}`}
+                    </td>
+                  </tr>
+                ))}
+                {walletTopAssets.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} style={{ color: "var(--muted)" }}>
+                      No wallet data yet.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="title">PnL</div>
+          <div className="subtitle">Coming soon: PnL requires a persisted trade ledger (fills + commissions + conversion at fill time).</div>
+          <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span className="pill">
+              Realized: <b>—</b>
+            </span>
+            <span className="pill">
+              Unrealized: <b>—</b>
+            </span>
+            <span className="pill">
+              Currency: <b>{homeStableCoin}</b>
+            </span>
           </div>
         </div>
       </div>

@@ -118,14 +118,15 @@ export class BotEngineService {
       const candidateSymbol = `BTC${homeStable}`;
       const blockedReason = this.isSymbolBlocked(candidateSymbol, current);
       if (blockedReason) {
+        const summary = `Skip ${candidateSymbol}: ${blockedReason}`;
+        const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
         const next = {
           ...current,
           activeOrders: filled.activeOrders,
           orderHistory: filled.orderHistory,
-          decisions: [
-            { id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary: `Skip ${candidateSymbol}: ${blockedReason}` },
-            ...current.decisions
-          ].slice(0, 200)
+          decisions: alreadyLogged
+            ? current.decisions
+            : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
         } satisfies BotState;
         this.save(next);
         return;
@@ -153,8 +154,9 @@ export class BotEngineService {
         return;
       }
 
+      const liveTrading = Boolean(config?.basic.liveTrading);
       const orderStatusRoll = Math.random();
-      const status: Order["status"] = orderStatusRoll < 0.12 ? "REJECTED" : orderStatusRoll < 0.35 ? "FILLED" : "NEW";
+      const status: Order["status"] = liveTrading ? (orderStatusRoll < 0.12 ? "REJECTED" : orderStatusRoll < 0.35 ? "FILLED" : "NEW") : orderStatusRoll < 0.35 ? "FILLED" : "NEW";
       const order: Order = {
         id: crypto.randomUUID(),
         ts: new Date().toISOString(),
@@ -178,8 +180,11 @@ export class BotEngineService {
           {
             id: crypto.randomUUID(),
             ts: new Date().toISOString(),
-            kind: "TRADE",
-            summary: aiEnabled && aiConfidence !== null ? `${decisionSummary} (AI ${aiConfidence}%)` : decisionSummary
+            kind: liveTrading ? "TRADE" : "PAPER",
+            summary:
+              aiEnabled && aiConfidence !== null
+                ? `${decisionSummary} (${liveTrading ? "live" : "paper"} · AI ${aiConfidence}%)`
+                : `${decisionSummary} (${liveTrading ? "live" : "paper"})`
           },
           ...current.decisions
         ].slice(0, 200),

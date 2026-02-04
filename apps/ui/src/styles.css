@@ -157,6 +157,24 @@ select {
   font-size: 12px;
 }
 
+.pill.ok {
+  color: var(--success);
+  border-color: rgba(49, 208, 127, 0.55);
+  background: rgba(49, 208, 127, 0.1);
+}
+
+.pill.bad {
+  color: var(--danger);
+  border-color: rgba(255, 90, 106, 0.55);
+  background: rgba(255, 90, 106, 0.12);
+}
+
+.pill.warn {
+  color: #f6c356;
+  border-color: rgba(246, 195, 86, 0.55);
+  background: rgba(246, 195, 86, 0.1);
+}
+
 .grid {
   display: grid;
   gap: 14px;
