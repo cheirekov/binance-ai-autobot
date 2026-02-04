@@ -7,6 +7,7 @@ import type { BotState, Decision, Order, SymbolBlacklistEntry } from "@autobot/s
 import { BotStateSchema, defaultBotState } from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
+import { BinanceMarketDataService } from "../integrations/binance-market-data.service";
 
 function atomicWriteFile(filePath: string, data: string): void {
   const tmpPath = `${filePath}.tmp`;
@@ -21,8 +22,12 @@ export class BotEngineService {
 
   private loopTimer: NodeJS.Timeout | null = null;
   private examineTimer: NodeJS.Timeout | null = null;
+  private tickInFlight = false;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly marketData: BinanceMarketDataService
+  ) {}
 
   getState(): BotState {
     if (!fs.existsSync(this.statePath)) {
@@ -93,6 +98,14 @@ export class BotEngineService {
     }, 2500);
 
     this.loopTimer = setInterval(() => {
+      void this.tick();
+    }, 5000);
+  }
+
+  private async tick(): Promise<void> {
+    if (this.tickInFlight) return;
+    this.tickInFlight = true;
+    try {
       const config = this.configService.load();
       const current0 = this.getState();
       const current = this.pruneExpiredBlacklist(current0);
@@ -157,6 +170,55 @@ export class BotEngineService {
       const liveTrading = Boolean(config?.basic.liveTrading);
       const orderStatusRoll = Math.random();
       const status: Order["status"] = liveTrading ? (orderStatusRoll < 0.12 ? "REJECTED" : orderStatusRoll < 0.35 ? "FILLED" : "NEW") : orderStatusRoll < 0.35 ? "FILLED" : "NEW";
+      const desiredQty = 0.001;
+      let normalizedQty = desiredQty;
+      try {
+        const check = await this.marketData.validateMarketOrderQty(candidateSymbol, desiredQty);
+        if (!check.ok) {
+          const reason = check.reason ?? "Binance min order constraints";
+          const details =
+            check.minNotional || check.notional || check.price
+              ? ` (${[
+                  check.minNotional ? `minNotional ${check.minNotional}` : null,
+                  check.notional ? `notional ${check.notional}` : null,
+                  check.price ? `price ${check.price}` : null
+                ]
+                  .filter(Boolean)
+                  .join(" · ")})`
+              : "";
+          const summary = `Skip ${candidateSymbol}: ${reason}${details}`;
+          const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+          const next = {
+            ...current,
+            activeOrders: filled.activeOrders,
+            orderHistory: filled.orderHistory,
+            decisions: alreadyLogged
+              ? current.decisions
+              : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+          } satisfies BotState;
+          this.save(next);
+          return;
+        }
+        if (check.normalizedQty) {
+          normalizedQty = Number.parseFloat(check.normalizedQty);
+        }
+      } catch (err) {
+        if (liveTrading) {
+          const summary = `Skip ${candidateSymbol}: Cannot validate Binance min order rules (${err instanceof Error ? err.message : String(err)})`;
+          const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+          const next = {
+            ...current,
+            activeOrders: filled.activeOrders,
+            orderHistory: filled.orderHistory,
+            decisions: alreadyLogged
+              ? current.decisions
+              : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+          } satisfies BotState;
+          this.save(next);
+          return;
+        }
+      }
+
       const order: Order = {
         id: crypto.randomUUID(),
         ts: new Date().toISOString(),
@@ -164,7 +226,7 @@ export class BotEngineService {
         side: Math.random() > 0.5 ? "BUY" : "SELL",
         type: "MARKET",
         status,
-        qty: 0.001
+        qty: normalizedQty
       };
 
       const decisionSummary =
@@ -213,7 +275,9 @@ export class BotEngineService {
         ...nextState
       };
       this.save(next);
-    }, 5000);
+    } finally {
+      this.tickInFlight = false;
+    }
   }
 
   stop(): void {

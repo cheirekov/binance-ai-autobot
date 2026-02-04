@@ -40,6 +40,10 @@ export class BinanceClient {
     return await this.request("/api/v3/ticker/price");
   }
 
+  async exchangeInfo(symbol?: string): Promise<unknown> {
+    return await this.request("/api/v3/exchangeInfo", symbol ? { query: { symbol } } : undefined);
+  }
+
   private sign(queryString: string): string {
     if (!this.apiSecret) {
       throw new Error("Missing Binance apiSecret for signed request");
