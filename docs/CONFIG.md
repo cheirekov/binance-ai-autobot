@@ -32,6 +32,8 @@ Default:
 - API key rotation (auto-generated on setup; can be rotated from UI)
 - API/UI host + port (informational today; container ports are still controlled by Docker/env)
 - Binance environment (Mainnet / Spot testnet) + optional base URL override
+  - Mainnet default: `https://api.binance.com`
+  - Spot testnet default: `https://demo-api.binance.com`
 
 ## Derived defaults
 
@@ -43,3 +45,12 @@ Current derived fields include:
 - `maxOpenPositions`
 - `maxPositionPct`
 - `allowSpot`, `allowGrid`, `allowFutures`
+
+## Live execution safety (env)
+
+In addition to UI settings, Docker `.env` variables provide hard safety rails:
+
+- `ALLOW_MAINNET_LIVE_TRADING` (default `false`): blocks MAINNET live orders unless explicitly enabled.
+- `LIVE_TRADE_COOLDOWN_MS` (default `60000`): minimum time between real orders.
+- `LIVE_TRADE_NOTIONAL_CAP` (default `25`): max quote notional per order.
+- `LIVE_TRADE_SLIPPAGE_BUFFER` (default `1.005`): conservative buffer used only for a balance check.

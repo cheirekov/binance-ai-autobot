@@ -20,7 +20,11 @@ export function createLogger(): pino.Logger {
   return pino(
     {
       level: process.env.LOG_LEVEL ?? "info",
-      base: undefined
+      base: undefined,
+      redact: {
+        paths: ["req.headers", "res.headers"],
+        remove: true
+      }
     },
     pino.multistream([{ stream: process.stdout }, { stream: destination }])
   );

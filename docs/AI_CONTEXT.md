@@ -6,7 +6,7 @@ Build a **fully-automated**, dockerized Binance trading bot with a simple onboar
 
 This document exists so future GPT/Codex sessions can patch the codebase without re-reading everything.
 
-## Current status (Feb 4, 2026)
+## Current status (Feb 9, 2026)
 
 Bootstrap scaffolding:
 
@@ -17,6 +17,14 @@ Bootstrap scaffolding:
 - `/config/*` endpoints for safe config reads/updates
 - `/integrations/*` endpoints (Binance/OpenAI status)
 - `/news/latest` endpoint (RSS aggregation + disk cache)
+- Spot **testnet** live execution (minimal): the bot can place Spot `MARKET` orders when `liveTrading=true` and Advanced → Binance environment is `SPOT_TESTNET` (mainnet is blocked by default).
+
+## Local references (for study)
+
+This repo contains third‑party codebases under `references/` to study established patterns (exchange adapters, sizing, risk controls, backtesting).
+
+- Summary + license notes: `docs/REFERENCES_ANALYSIS.md`
+- Important: **do not copy** GPLv3 code from `references/freqtrade-stable` into this repo unless we intentionally adopt GPLv3.
 
 ## Hard rules (product)
 
@@ -42,7 +50,8 @@ All runtime state lives under `DATA_DIR` (default: `./data` locally, `/data` in 
 
 ## What’s intentionally stubbed
 
-- Real Binance order placement (Spot/Grid/Futures)
+- Grid/Futures live execution
+- Spot live execution beyond the current minimal `MARKET` order path (order lifecycle polling, cancels, sells, etc.)
 - Market data ingestion + indicators (RSI/ADX/etc) and strategy selection
 - Tax jurisdiction modeling (region-based rules must be verified)
 - OpenAI-driven decision loop (behind `aiEnabled`)

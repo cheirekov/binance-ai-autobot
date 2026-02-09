@@ -10,6 +10,15 @@
 - Settings UI (Basic/Advanced) + integration status endpoints
 - RSS aggregation endpoint with disk cache (not yet used for trading)
 
+## Phase 0.5 — Reference review + POC selection (now)
+
+- Review local reference projects under `references/`
+- Extract reusable patterns (connectivity, market limits, risk controls) without copying GPL code
+- Decide POC direction:
+  - Node adapter layer + `ccxt` (recommended), or
+  - Python sidecar engine + NestJS control plane
+- Document findings: `docs/REFERENCES_ANALYSIS.md`
+
 ## Phase 1 — Binance connectivity (safe)
 
 - Read-only mode first: balances, symbols, fees, order book snapshots
@@ -26,7 +35,8 @@
 
 - Explicit user acknowledgement + safety checks
 - Limits (max daily loss, max order size, cooldowns, circuit breakers)
-- Spot live trading
+- Spot **testnet** live trading (minimal `MARKET` order path; mainnet blocked by default)
+- Spot mainnet live trading (requires additional safeguards + explicit opt-in)
 
 ## Phase 4 — Advanced bots
 

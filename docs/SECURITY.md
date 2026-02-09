@@ -28,6 +28,12 @@ The browser does **not** receive the API key:
 
 - The UI server proxies `/api/*` and injects the API key server-side.
 
+### Logs
+
+API request logs are persisted under `DATA_DIR/logs/api.log`. Sensitive headers (like `x-api-key` and `authorization`) are redacted, so you can share logs for debugging without leaking credentials.
+
+> If you ran older versions (before Feb 9, 2026), `x-api-key` may have been written into `api.log`. Delete/rotate old logs before sharing.
+
 ### Docker exposure
 
 By default, `docker-compose.yml` binds the API port to `127.0.0.1` only (not public). To expose it publicly, set:

@@ -8,6 +8,7 @@ import { BotStateSchema, defaultBotState } from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
 import { BinanceMarketDataService } from "../integrations/binance-market-data.service";
+import { BinanceTradingService, isBinanceTestnetBaseUrl } from "../integrations/binance-trading.service";
 import { UniverseService } from "../universe/universe.service";
 
 function atomicWriteFile(filePath: string, data: string): void {
@@ -28,6 +29,7 @@ export class BotEngineService {
   constructor(
     private readonly configService: ConfigService,
     private readonly marketData: BinanceMarketDataService,
+    private readonly trading: BinanceTradingService,
     private readonly universe: UniverseService
   ) {}
 
@@ -121,27 +123,52 @@ export class BotEngineService {
     this.tickInFlight = true;
     try {
       const config = this.configService.load();
-      const current0 = this.getState();
-      const current = this.pruneExpiredBlacklist(current0);
+      let current = this.pruneExpiredBlacklist(this.getState());
       if (!current.running) return;
       if (current.phase !== "TRADING") return;
 
-      const maybeFillOne = (): { activeOrders: Order[]; orderHistory: Order[] } => {
-        if (current.activeOrders.length === 0) {
-          return { activeOrders: current.activeOrders, orderHistory: current.orderHistory };
+      const homeStable = config?.basic.homeStableCoin ?? "USDT";
+      const liveRequested = Boolean(config?.basic.liveTrading);
+      const binanceEnvironment = config?.advanced.binanceEnvironment ?? "MAINNET";
+      const allowMainnetLiveTrading = String(process.env.ALLOW_MAINNET_LIVE_TRADING ?? "false").toLowerCase() === "true";
+      const liveTrading = liveRequested && (binanceEnvironment === "SPOT_TESTNET" || allowMainnetLiveTrading);
+
+      if (liveRequested && !liveTrading) {
+        const summary =
+          "Live trading requested, but MAINNET live is disabled. Switch Advanced → Binance environment to Spot testnet, or set ALLOW_MAINNET_LIVE_TRADING=true.";
+        const alreadyLogged = current.decisions[0]?.kind === "ENGINE" && current.decisions[0]?.summary === summary;
+        if (!alreadyLogged) {
+          current = {
+            ...current,
+            decisions: [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "ENGINE", summary }, ...current.decisions].slice(0, 200)
+          };
+        }
+      }
+
+      if (liveTrading && current.activeOrders.length > 0) {
+        const canceledOrders: Order[] = current.activeOrders.map((o) => ({ ...o, status: "CANCELED" }));
+        current = {
+          ...current,
+          activeOrders: [],
+          orderHistory: [...canceledOrders, ...current.orderHistory].slice(0, 200)
+        };
+        this.save(current);
+      }
+
+      const maybeFillOne = (state: BotState): { activeOrders: Order[]; orderHistory: Order[] } => {
+        if (state.activeOrders.length === 0) {
+          return { activeOrders: state.activeOrders, orderHistory: state.orderHistory };
         }
         if (Math.random() > 0.4) {
-          return { activeOrders: current.activeOrders, orderHistory: current.orderHistory };
+          return { activeOrders: state.activeOrders, orderHistory: state.orderHistory };
         }
 
-        const [toFill, ...rest] = current.activeOrders;
+        const [toFill, ...rest] = state.activeOrders;
         const filled: Order = { ...toFill, status: "FILLED" };
-        return { activeOrders: rest, orderHistory: [filled, ...current.orderHistory].slice(0, 200) };
+        return { activeOrders: rest, orderHistory: [filled, ...state.orderHistory].slice(0, 200) };
       };
 
-      const filled = maybeFillOne();
-
-      const homeStable = config?.basic.homeStableCoin ?? "USDT";
+      const filled = liveTrading ? { activeOrders: current.activeOrders, orderHistory: current.orderHistory } : maybeFillOne(current);
       const candidateSymbol = await (async () => {
         try {
           const snap = await this.universe.getLatest();
@@ -189,15 +216,237 @@ export class BotEngineService {
         return;
       }
 
-      const liveTrading = Boolean(config?.basic.liveTrading);
+      if (liveTrading) {
+        const baseUrl = this.trading.getBaseUrl();
+        const envLabel = isBinanceTestnetBaseUrl(baseUrl) ? "testnet" : "mainnet";
+
+        const cooldownMs = Number.parseInt(process.env.LIVE_TRADE_COOLDOWN_MS ?? "60000", 10);
+        if (Number.isFinite(cooldownMs) && cooldownMs > 0) {
+          const lastTrade = current.decisions.find((d) => d.kind === "TRADE");
+          const lastTradeAt = lastTrade ? Date.parse(lastTrade.ts) : Number.NaN;
+          if (Number.isFinite(lastTradeAt) && Date.now() - lastTradeAt < cooldownMs) {
+            return;
+          }
+        }
+
+        try {
+          const rules = await this.marketData.getSymbolRules(candidateSymbol);
+          if (rules.quoteAsset !== homeStable) {
+            const summary = `Skip ${candidateSymbol}: Quote asset ${rules.quoteAsset} ≠ home stable ${homeStable}`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
+
+          const balances = await this.trading.getBalances();
+          const quoteFree = balances.find((b) => b.asset === homeStable)?.free ?? 0;
+          if (!Number.isFinite(quoteFree) || quoteFree <= 0) {
+            const summary = `Skip ${candidateSymbol}: No ${homeStable} balance available`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
+
+          const priceStr = await this.marketData.getTickerPrice(candidateSymbol);
+          const price = Number.parseFloat(priceStr);
+          if (!Number.isFinite(price) || price <= 0) {
+            throw new Error(`Invalid ticker price: ${priceStr}`);
+          }
+
+          const maxPositionPct = config?.derived.maxPositionPct ?? 1;
+          const notionalCap = Number.parseFloat(process.env.LIVE_TRADE_NOTIONAL_CAP ?? "25");
+          const rawTargetNotional = quoteFree * (maxPositionPct / 100);
+          const targetNotional = Math.min(rawTargetNotional, Number.isFinite(notionalCap) && notionalCap > 0 ? notionalCap : rawTargetNotional, quoteFree);
+          const desiredQty = targetNotional / price;
+
+          const check = await this.marketData.validateMarketOrderQty(candidateSymbol, desiredQty);
+          const qtyStr = check.ok ? check.normalizedQty : check.requiredQty;
+          if (!qtyStr) {
+            const reason = check.reason ?? "Binance min order constraints";
+            const summary = `Skip ${candidateSymbol}: ${reason}`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
+
+          const qty = Number.parseFloat(qtyStr);
+          if (!Number.isFinite(qty) || qty <= 0) {
+            throw new Error(`Invalid normalized quantity: ${qtyStr}`);
+          }
+
+          const slippageBuffer = Number.parseFloat(process.env.LIVE_TRADE_SLIPPAGE_BUFFER ?? "1.005");
+          const bufferedCost = qty * price * (Number.isFinite(slippageBuffer) && slippageBuffer > 0 ? slippageBuffer : 1);
+          const enforcedCap = Number.isFinite(notionalCap) && notionalCap > 0 ? notionalCap : null;
+          if (enforcedCap && Number.isFinite(bufferedCost) && bufferedCost > enforcedCap) {
+            const summary = `Skip ${candidateSymbol}: Would exceed live notional cap (${bufferedCost.toFixed(4)} > ${enforcedCap.toFixed(4)} ${homeStable})`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
+          if (Number.isFinite(bufferedCost) && bufferedCost > quoteFree) {
+            const summary = `Skip ${candidateSymbol}: Insufficient ${homeStable} for estimated cost (${bufferedCost.toFixed(4)} > ${quoteFree.toFixed(4)})`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
+
+          const res = await this.trading.placeSpotMarketOrder({ symbol: candidateSymbol, side: "BUY", quantity: qtyStr });
+
+          const mapStatus = (s: string | undefined): Order["status"] => {
+            const st = (s ?? "").toUpperCase();
+            if (st === "FILLED") return "FILLED";
+            if (st === "NEW" || st === "PARTIALLY_FILLED") return "NEW";
+            if (st === "CANCELED" || st === "EXPIRED") return "CANCELED";
+            return "REJECTED";
+          };
+
+          const avgPrice = (() => {
+            const fills = res.fills ?? [];
+            let qtySum = 0;
+            let costSum = 0;
+            for (const f of fills) {
+              const fp = Number.parseFloat(f.price ?? "");
+              const fq = Number.parseFloat(f.qty ?? "");
+              if (!Number.isFinite(fp) || !Number.isFinite(fq) || fq <= 0) continue;
+              qtySum += fq;
+              costSum += fp * fq;
+            }
+            if (qtySum <= 0) return undefined;
+            const ap = costSum / qtySum;
+            return Number.isFinite(ap) && ap > 0 ? ap : undefined;
+          })();
+
+          const executedQty = Number.parseFloat(res.executedQty ?? "");
+          const origQty = Number.parseFloat(res.origQty ?? "");
+          const finalQty = Number.isFinite(executedQty) && executedQty > 0 ? executedQty : Number.isFinite(origQty) && origQty > 0 ? origQty : qty;
+
+          const order: Order = {
+            id: res.orderId !== undefined ? String(res.orderId) : crypto.randomUUID(),
+            ts: new Date().toISOString(),
+            symbol: candidateSymbol,
+            side: "BUY",
+            type: "MARKET",
+            status: mapStatus(res.status),
+            qty: finalQty,
+            ...(avgPrice ? { price: avgPrice } : {})
+          };
+
+          const decisionSummary = `Binance ${envLabel} BUY MARKET ${candidateSymbol} qty ${qtyStr} → ${order.status} (orderId ${order.id})`;
+
+          let nextState: BotState = {
+            ...current,
+            lastError: undefined,
+            decisions: [
+              {
+                id: crypto.randomUUID(),
+                ts: new Date().toISOString(),
+                kind: "TRADE",
+                summary: decisionSummary,
+                details: {
+                  baseUrl,
+                  orderId: order.id,
+                  status: res.status,
+                  executedQty: res.executedQty,
+                  cummulativeQuoteQty: res.cummulativeQuoteQty
+                }
+              },
+              ...current.decisions
+            ].slice(0, 200),
+            activeOrders: filled.activeOrders,
+            orderHistory: filled.orderHistory
+          };
+
+          if (order.status === "NEW") {
+            nextState = { ...nextState, activeOrders: [order, ...nextState.activeOrders].slice(0, 50) };
+          } else {
+            nextState = { ...nextState, orderHistory: [order, ...nextState.orderHistory].slice(0, 200) };
+          }
+
+          this.save(nextState);
+          return;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          const summary = `Order rejected for ${candidateSymbol} (${envLabel}): ${msg}`;
+          const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+          let nextState: BotState = {
+            ...current,
+            lastError: msg,
+            activeOrders: filled.activeOrders,
+            orderHistory: filled.orderHistory,
+            decisions: alreadyLogged
+              ? current.decisions
+              : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+          };
+
+          if (config?.advanced.autoBlacklistEnabled) {
+            const ttlMinutes = config.advanced.autoBlacklistTtlMinutes ?? 180;
+            const now = new Date();
+            nextState = this.addSymbolBlacklist(nextState, {
+              symbol: candidateSymbol,
+              reason: msg.slice(0, 120),
+              createdAt: now.toISOString(),
+              expiresAt: new Date(now.getTime() + ttlMinutes * 60_000).toISOString()
+            });
+          }
+
+          this.save(nextState);
+          return;
+        }
+      }
+
+      // Paper mode (stub execution)
       const orderStatusRoll = Math.random();
-      const status: Order["status"] = liveTrading ? (orderStatusRoll < 0.12 ? "REJECTED" : orderStatusRoll < 0.35 ? "FILLED" : "NEW") : orderStatusRoll < 0.35 ? "FILLED" : "NEW";
+      const status: Order["status"] = orderStatusRoll < 0.35 ? "FILLED" : "NEW";
       const desiredQty = 0.001;
       let normalizedQty = desiredQty;
       try {
         const check = await this.marketData.validateMarketOrderQty(candidateSymbol, desiredQty);
         if (!check.ok) {
-          if (!liveTrading && check.requiredQty) {
+          if (check.requiredQty) {
             const req = Number.parseFloat(check.requiredQty);
             if (Number.isFinite(req) && req > 0) {
               normalizedQty = req;
@@ -216,67 +465,50 @@ export class BotEngineService {
               return;
             }
           } else {
-          const reason = check.reason ?? "Binance min order constraints";
-          const details =
-            check.minNotional || check.notional || check.price
-              ? ` (${[
-                  check.minNotional ? `minNotional ${check.minNotional}` : null,
-                  check.notional ? `notional ${check.notional}` : null,
-                  check.price ? `price ${check.price}` : null
-                ]
-                  .filter(Boolean)
-                  .join(" · ")})`
-              : "";
-          const summary = `Skip ${candidateSymbol}: ${reason}${details}`;
-          const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
-          const next = {
-            ...current,
-            activeOrders: filled.activeOrders,
-            orderHistory: filled.orderHistory,
-            decisions: alreadyLogged
-              ? current.decisions
-              : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
-          } satisfies BotState;
-          this.save(next);
-          return;
+            const reason = check.reason ?? "Binance min order constraints";
+            const details =
+              check.minNotional || check.notional || check.price
+                ? ` (${[
+                    check.minNotional ? `minNotional ${check.minNotional}` : null,
+                    check.notional ? `notional ${check.notional}` : null,
+                    check.price ? `price ${check.price}` : null
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")})`
+                : "";
+            const summary = `Skip ${candidateSymbol}: ${reason}${details}`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+            } satisfies BotState;
+            this.save(next);
+            return;
           }
         }
         if (check.normalizedQty) {
           normalizedQty = Number.parseFloat(check.normalizedQty);
         }
-      } catch (err) {
-        if (liveTrading) {
-          const summary = `Skip ${candidateSymbol}: Cannot validate Binance min order rules (${err instanceof Error ? err.message : String(err)})`;
-          const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
-          const next = {
-            ...current,
-            activeOrders: filled.activeOrders,
-            orderHistory: filled.orderHistory,
-            decisions: alreadyLogged
-              ? current.decisions
-              : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
-          } satisfies BotState;
-          this.save(next);
-          return;
-        }
+      } catch {
+        // ignore in paper mode
       }
 
       const order: Order = {
         id: crypto.randomUUID(),
         ts: new Date().toISOString(),
         symbol: candidateSymbol,
-        side: Math.random() > 0.5 ? "BUY" : "SELL",
+        side: "BUY",
         type: "MARKET",
         status,
         qty: normalizedQty
       };
 
       const decisionSummary =
-        status === "REJECTED"
-          ? `Order rejected (stub) for ${candidateSymbol}`
-          : status === "FILLED"
-            ? `Order filled (stub) for ${candidateSymbol}`
-            : `Placed a stub order candidate for ${candidateSymbol}`;
+        status === "FILLED" ? `Order filled (stub) for ${candidateSymbol}` : `Placed a stub order candidate for ${candidateSymbol}`;
 
       let nextState: BotState = {
         ...current,
@@ -284,16 +516,17 @@ export class BotEngineService {
           {
             id: crypto.randomUUID(),
             ts: new Date().toISOString(),
-            kind: liveTrading ? "TRADE" : "PAPER",
+            kind: "PAPER",
             summary:
               aiEnabled && aiConfidence !== null
-                ? `${decisionSummary} (${liveTrading ? "live" : "paper"} · AI ${aiConfidence}%)`
-                : `${decisionSummary} (${liveTrading ? "live" : "paper"})`
+                ? `${decisionSummary} (paper · AI ${aiConfidence}%)`
+                : `${decisionSummary} (paper)`
           },
           ...current.decisions
         ].slice(0, 200),
         activeOrders: filled.activeOrders,
-        orderHistory: filled.orderHistory
+        orderHistory: filled.orderHistory,
+        lastError: undefined
       };
 
       if (status === "NEW") {
@@ -302,21 +535,7 @@ export class BotEngineService {
         nextState = { ...nextState, orderHistory: [order, ...nextState.orderHistory].slice(0, 200) };
       }
 
-      if (status === "REJECTED" && config?.advanced.autoBlacklistEnabled) {
-        const ttlMinutes = config.advanced.autoBlacklistTtlMinutes ?? 180;
-        const now = new Date();
-        nextState = this.addSymbolBlacklist(nextState, {
-          symbol: candidateSymbol,
-          reason: "Order rejected (stub)",
-          createdAt: now.toISOString(),
-          expiresAt: new Date(now.getTime() + ttlMinutes * 60_000).toISOString()
-        });
-      }
-
-      const next: BotState = {
-        ...nextState
-      };
-      this.save(next);
+      this.save(nextState);
     } finally {
       this.tickInFlight = false;
     }

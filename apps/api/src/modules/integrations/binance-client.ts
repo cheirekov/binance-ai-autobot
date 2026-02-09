@@ -7,6 +7,8 @@ export type BinanceClientOptions = {
   timeoutMs?: number;
 };
 
+export type BinanceHttpMethod = "GET" | "POST" | "DELETE";
+
 export class BinanceClient {
   private readonly baseUrl: string;
   private readonly apiKey?: string;
@@ -59,6 +61,37 @@ export class BinanceClient {
     return await this.request("/api/v3/klines", { query: { symbol, interval, limit } });
   }
 
+  async createOrder(params: {
+    symbol: string;
+    side: "BUY" | "SELL";
+    type: "MARKET" | "LIMIT";
+    quantity?: string;
+    quoteOrderQty?: string;
+    price?: string;
+    timeInForce?: "GTC" | "IOC" | "FOK";
+    newClientOrderId?: string;
+    newOrderRespType?: "ACK" | "RESULT" | "FULL";
+  }): Promise<unknown> {
+    return await this.request("/api/v3/order", { method: "POST", signed: true, query: params });
+  }
+
+  async cancelOrder(params: {
+    symbol: string;
+    orderId?: string | number;
+    origClientOrderId?: string;
+    newClientOrderId?: string;
+  }): Promise<unknown> {
+    return await this.request("/api/v3/order", { method: "DELETE", signed: true, query: params });
+  }
+
+  async getOrder(params: { symbol: string; orderId?: string | number; origClientOrderId?: string }): Promise<unknown> {
+    return await this.request("/api/v3/order", { signed: true, query: params });
+  }
+
+  async openOrders(symbol?: string): Promise<unknown> {
+    return await this.request("/api/v3/openOrders", { signed: true, query: symbol ? { symbol } : undefined });
+  }
+
   private sign(queryString: string): string {
     if (!this.apiSecret) {
       throw new Error("Missing Binance apiSecret for signed request");
@@ -69,6 +102,7 @@ export class BinanceClient {
   private async request<T>(
     path: string,
     options?: {
+      method?: BinanceHttpMethod;
       signed?: boolean;
       query?: Record<string, string | number | boolean | undefined>;
     }
@@ -95,8 +129,9 @@ export class BinanceClient {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
+      const method: BinanceHttpMethod = options?.method ?? "GET";
       const res = await fetch(url, {
-        method: "GET",
+        method,
         headers: {
           ...(this.apiKey ? { "X-MBX-APIKEY": this.apiKey } : {})
         },
