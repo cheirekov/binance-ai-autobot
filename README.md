@@ -25,6 +25,14 @@ After setup: use `Settings` in the UI to adjust Basic/Advanced options.
 - `pnpm install`
 - `pnpm dev`
 
+## Support bundle (safe to share)
+
+If you run the bot on a remote server and want to share debug info **without secrets**:
+
+- `bash scripts/collect-feedback.sh`
+
+This writes `autobot-feedback-*.tgz` containing state/universe/news/logs plus a redacted config (it does **not** include `data/config.json`).
+
 ## Docs
 
 - `docs/AI_CONTEXT.md`

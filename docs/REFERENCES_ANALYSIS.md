@@ -135,6 +135,8 @@ Relevant files for study:
 - Keep our current UI + config format.
 - Implement a real execution layer (paper/live) behind a single interface.
 
+Status: **in progress** — the API now uses `ccxt` for Binance Spot balances + market order placement (demo trading for Spot testnet). Market-data/limits are still fetched via direct REST and will be unified next.
+
 Pros: single language/runtime; easiest to dockerize; fastest iteration.  
 Cons: CCXT adds weight; still need to implement strategy logic ourselves.
 

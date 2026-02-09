@@ -2,11 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import { ConfigService } from "../config/config.service";
 import { resolveBinanceBaseUrl } from "./binance-base-url";
-import { BinanceClient } from "./binance-client";
-
-type BinanceAccountResponse = {
-  balances?: Array<{ asset: string; free: string; locked: string }>;
-};
+import { CcxtBinanceAdapter } from "./ccxt-binance-adapter";
 
 export type BinanceBalanceSnapshot = {
   asset: string;
@@ -41,6 +37,8 @@ export function isBinanceTestnetBaseUrl(baseUrl: string): boolean {
 
 @Injectable()
 export class BinanceTradingService {
+  private adapterCache: { key: string; adapter: CcxtBinanceAdapter } | null = null;
+
   constructor(private readonly configService: ConfigService) {}
 
   getBaseUrl(): string {
@@ -48,7 +46,7 @@ export class BinanceTradingService {
     return resolveBinanceBaseUrl(cfg);
   }
 
-  private get client(): BinanceClient {
+  private get adapter(): CcxtBinanceAdapter {
     const config = this.configService.load();
     if (!config) {
       throw new Error("Bot is not initialized.");
@@ -58,43 +56,27 @@ export class BinanceTradingService {
     }
 
     const baseUrl = resolveBinanceBaseUrl(config);
-    return new BinanceClient({
-      baseUrl,
-      apiKey: config.basic.binance.apiKey,
-      apiSecret: config.basic.binance.apiSecret,
-      timeoutMs: 12_000
-    });
+    const key = `${config.advanced.binanceEnvironment}|${baseUrl}|${config.basic.binance.apiKey}`;
+    if (this.adapterCache?.key !== key) {
+      this.adapterCache = {
+        key,
+        adapter: new CcxtBinanceAdapter({
+          env: config.advanced.binanceEnvironment,
+          baseUrl,
+          apiKey: config.basic.binance.apiKey,
+          apiSecret: config.basic.binance.apiSecret,
+          timeoutMs: 12_000
+        })
+      };
+    }
+    return this.adapterCache.adapter;
   }
 
   async getBalances(): Promise<BinanceBalanceSnapshot[]> {
-    const account = (await this.client.account()) as BinanceAccountResponse;
-    const balances = account.balances ?? [];
-
-    const out: BinanceBalanceSnapshot[] = [];
-    for (const b of balances) {
-      const free = Number.parseFloat(b.free);
-      const locked = Number.parseFloat(b.locked);
-      const total = (Number.isFinite(free) ? free : 0) + (Number.isFinite(locked) ? locked : 0);
-      if (total <= 0) continue;
-      out.push({
-        asset: b.asset,
-        free: Number.isFinite(free) ? free : 0,
-        locked: Number.isFinite(locked) ? locked : 0,
-        total
-      });
-    }
-    return out;
+    return await this.adapter.getBalances();
   }
 
   async placeSpotMarketOrder(params: { symbol: string; side: "BUY" | "SELL"; quantity: string }): Promise<BinanceMarketOrderResponse> {
-    const res = (await this.client.createOrder({
-      symbol: params.symbol,
-      side: params.side,
-      type: "MARKET",
-      quantity: params.quantity,
-      newOrderRespType: "FULL"
-    })) as BinanceMarketOrderResponse;
-    return res;
+    return await this.adapter.placeSpotMarketOrder({ symbolId: params.symbol, side: params.side, quantity: params.quantity });
   }
 }
-

@@ -31,9 +31,10 @@ Mounted path: `./data` on host → `/data` in containers.
 
 ## Bot engine (current)
 
-The bot engine is a **stub** to enable UI wiring:
+The bot engine is an early-stage engine to enable UI wiring + safe execution:
 
 - `POST /bot/start` → phase: `EXAMINING` then `TRADING`
-- Periodically appends decisions and creates stub orders.
+- In paper mode: periodically appends decisions and creates stub orders.
+- In live mode (Spot testnet only by default): can place real Spot `MARKET` orders using CCXT (demo trading) with safety caps/cooldowns.
 
 This is intentionally replaceable with a real strategy engine later.

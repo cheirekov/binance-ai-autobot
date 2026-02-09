@@ -11,3 +11,6 @@ data/
 # Logs & coverage
 coverage/
 *.log
+
+# Debug/support bundles (generated locally)
+autobot-feedback-*.tgz

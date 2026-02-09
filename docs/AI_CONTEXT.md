@@ -18,6 +18,7 @@ Bootstrap scaffolding:
 - `/integrations/*` endpoints (Binance/OpenAI status)
 - `/news/latest` endpoint (RSS aggregation + disk cache)
 - Spot **testnet** live execution (minimal): the bot can place Spot `MARKET` orders when `liveTrading=true` and Advanced → Binance environment is `SPOT_TESTNET` (mainnet is blocked by default).
+- Live Spot execution uses **CCXT** (Binance demo trading mode) for balances + order placement; market data/limits are still fetched via direct REST (`BinanceClient`) for now.
 
 ## Local references (for study)
 
