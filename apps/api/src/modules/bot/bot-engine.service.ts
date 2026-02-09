@@ -272,8 +272,12 @@ export class BotEngineService {
 
           const maxPositionPct = config?.derived.maxPositionPct ?? 1;
           const notionalCap = Number.parseFloat(process.env.LIVE_TRADE_NOTIONAL_CAP ?? "25");
+          const slippageBuffer = Number.parseFloat(process.env.LIVE_TRADE_SLIPPAGE_BUFFER ?? "1.005");
+          const bufferFactor = Number.isFinite(slippageBuffer) && slippageBuffer > 0 ? slippageBuffer : 1;
           const rawTargetNotional = quoteFree * (maxPositionPct / 100);
-          const targetNotional = Math.min(rawTargetNotional, Number.isFinite(notionalCap) && notionalCap > 0 ? notionalCap : rawTargetNotional, quoteFree);
+          const enforcedCap = Number.isFinite(notionalCap) && notionalCap > 0 ? notionalCap : null;
+          const capForSizing = enforcedCap ? enforcedCap / bufferFactor : null;
+          const targetNotional = Math.min(rawTargetNotional, capForSizing ?? rawTargetNotional, quoteFree);
           const desiredQty = targetNotional / price;
 
           const check = await this.marketData.validateMarketOrderQty(candidateSymbol, desiredQty);
@@ -300,11 +304,11 @@ export class BotEngineService {
             throw new Error(`Invalid normalized quantity: ${qtyStr}`);
           }
 
-          const slippageBuffer = Number.parseFloat(process.env.LIVE_TRADE_SLIPPAGE_BUFFER ?? "1.005");
-          const bufferedCost = qty * price * (Number.isFinite(slippageBuffer) && slippageBuffer > 0 ? slippageBuffer : 1);
-          const enforcedCap = Number.isFinite(notionalCap) && notionalCap > 0 ? notionalCap : null;
-          if (enforcedCap && Number.isFinite(bufferedCost) && bufferedCost > enforcedCap) {
-            const summary = `Skip ${candidateSymbol}: Would exceed live notional cap (${bufferedCost.toFixed(4)} > ${enforcedCap.toFixed(4)} ${homeStable})`;
+          const bufferedCost = qty * price * bufferFactor;
+          if (enforcedCap && Number.isFinite(bufferedCost)) {
+            const capTolerance = Math.max(0.01, enforcedCap * 0.001);
+            if (bufferedCost > enforcedCap + capTolerance) {
+              const summary = `Skip ${candidateSymbol}: Would exceed live notional cap (cap ${enforcedCap.toFixed(2)} ${homeStable})`;
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
             const next = {
               ...current,
@@ -312,11 +316,27 @@ export class BotEngineService {
               orderHistory: filled.orderHistory,
               decisions: alreadyLogged
                 ? current.decisions
-                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200),
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        bufferedCost: Number(bufferedCost.toFixed(6)),
+                        cap: Number(enforcedCap.toFixed(6)),
+                        price: Number(price.toFixed(8)),
+                        qty: Number(qty.toFixed(8)),
+                        bufferFactor
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
               lastError: undefined
             } satisfies BotState;
             this.save(next);
             return;
+            }
           }
           if (Number.isFinite(bufferedCost) && bufferedCost > quoteFree) {
             const summary = `Skip ${candidateSymbol}: Insufficient ${homeStable} for estimated cost (${bufferedCost.toFixed(4)} > ${quoteFree.toFixed(4)})`;
