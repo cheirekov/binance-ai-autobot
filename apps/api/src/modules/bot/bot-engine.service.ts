@@ -172,7 +172,12 @@ export class BotEngineService {
       const candidateSymbol = await (async () => {
         try {
           const snap = await this.universe.getLatest();
-          const best = snap.candidates?.find((c) => c.symbol && !this.isSymbolBlocked(c.symbol, current));
+          const best = snap.candidates?.find((c) => {
+            if (!c.symbol) return false;
+            if (this.isSymbolBlocked(c.symbol, current)) return false;
+            if (liveTrading && c.quoteAsset && c.quoteAsset.toUpperCase() !== homeStable) return false;
+            return true;
+          });
           return best?.symbol ?? `BTC${homeStable}`;
         } catch {
           return `BTC${homeStable}`;
@@ -309,33 +314,33 @@ export class BotEngineService {
             const capTolerance = Math.max(0.01, enforcedCap * 0.001);
             if (bufferedCost > enforcedCap + capTolerance) {
               const summary = `Skip ${candidateSymbol}: Would exceed live notional cap (cap ${enforcedCap.toFixed(2)} ${homeStable})`;
-            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
-            const next = {
-              ...current,
-              activeOrders: filled.activeOrders,
-              orderHistory: filled.orderHistory,
-              decisions: alreadyLogged
-                ? current.decisions
-                : [
-                    {
-                      id: crypto.randomUUID(),
-                      ts: new Date().toISOString(),
-                      kind: "SKIP",
-                      summary,
-                      details: {
-                        bufferedCost: Number(bufferedCost.toFixed(6)),
-                        cap: Number(enforcedCap.toFixed(6)),
-                        price: Number(price.toFixed(8)),
-                        qty: Number(qty.toFixed(8)),
-                        bufferFactor
-                      }
-                    },
-                    ...current.decisions
-                  ].slice(0, 200),
-              lastError: undefined
-            } satisfies BotState;
-            this.save(next);
-            return;
+              const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+              const next = {
+                ...current,
+                activeOrders: filled.activeOrders,
+                orderHistory: filled.orderHistory,
+                decisions: alreadyLogged
+                  ? current.decisions
+                  : [
+                      {
+                        id: crypto.randomUUID(),
+                        ts: new Date().toISOString(),
+                        kind: "SKIP",
+                        summary,
+                        details: {
+                          bufferedCost: Number(bufferedCost.toFixed(6)),
+                          cap: Number(enforcedCap.toFixed(6)),
+                          price: Number(price.toFixed(8)),
+                          qty: Number(qty.toFixed(8)),
+                          bufferFactor
+                        }
+                      },
+                      ...current.decisions
+                    ].slice(0, 200),
+                lastError: undefined
+              } satisfies BotState;
+              this.save(next);
+              return;
             }
           }
           if (Number.isFinite(bufferedCost) && bufferedCost > quoteFree) {

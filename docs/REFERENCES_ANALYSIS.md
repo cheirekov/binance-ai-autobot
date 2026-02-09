@@ -9,6 +9,7 @@ This repo now contains several third‑party codebases under `references/` for *
 | Folder | What it is | Language | License (as found locally) | Can we copy code into this repo? |
 |---|---|---:|---|---|
 | `references/freqtrade-stable` | Freqtrade trading bot framework | Python | **GPLv3** (`LICENSE`) | **No** (unless this repo becomes GPLv3‑compatible) |
+| `references/freqtrade-develop` | Freqtrade trading bot framework (develop branch) | Python | **GPLv3** (`LICENSE`) | **No** (unless this repo becomes GPLv3‑compatible) |
 | `references/jesse-master` | Jesse algo trading framework | Python | **MIT** (`LICENSE`) | Yes (with attribution) |
 | `references/ccxt-master` | CCXT multi‑exchange trading API | JS/TS/Python/etc | **MIT** (`LICENSE.txt`) | Prefer using the published `ccxt` package; copying is allowed with attribution |
 | `references/crypto-trading-open-main` | Multi‑exchange trading system (grid/arbitrage/etc) | Python | **No license file found** (author permission required) | Only if the author explicitly grants permission; recommended to add a license file before redistribution |
@@ -34,6 +35,8 @@ For our project:
 
 - Hyperopt-like optimization is valuable but **not MVP** (we need deterministic paper trading + realistic fills/fees first).
 - FreqAI-like prediction is also valuable, but it’s a **big subsystem** (data pipeline + model lifecycle).
+
+> Note: `references/freqtrade-develop` also contains a `LICENSE.txt` that looks like CCXT’s MIT license. That does **not** change Freqtrade’s project license (GPLv3 via `LICENSE`). Treat Freqtrade as GPLv3 and do not copy code into this repo.
 
 ### 1) Exchange connectivity & reliability patterns
 

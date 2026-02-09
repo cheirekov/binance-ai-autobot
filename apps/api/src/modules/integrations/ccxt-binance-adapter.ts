@@ -65,6 +65,29 @@ function asNumberOrString(v: unknown): number | string | null {
   return null;
 }
 
+function pickSpotMarket(entry: unknown): { symbol?: string } | null {
+  if (!entry) return null;
+  if (!Array.isArray(entry)) {
+    const rec = asRecord(entry);
+    return rec ? (rec as { symbol?: string }) : null;
+  }
+
+  const markets = entry.map((v) => asRecord(v)).filter(Boolean) as Array<Record<string, unknown>>;
+
+  const isSpot = (m: Record<string, unknown>): boolean => {
+    const spotFlag = m.spot;
+    const type = m.type;
+    const contract = m.contract;
+    if (typeof spotFlag === "boolean") return spotFlag;
+    if (typeof type === "string" && type.toLowerCase() === "spot") return true;
+    if (typeof contract === "boolean") return !contract;
+    return false;
+  };
+
+  const best = markets.find(isSpot) ?? markets[0];
+  return best ? (best as { symbol?: string }) : null;
+}
+
 function mapCcxtStatusToBinance(status: unknown, rawStatus: unknown): string | undefined {
   if (typeof rawStatus === "string" && rawStatus.trim()) {
     return rawStatus.trim().toUpperCase();
@@ -94,7 +117,7 @@ type CcxtExchangeMinimal = {
 type BinanceLikeCcxtExchange = CcxtExchangeMinimal & {
   enableDemoTrading?: (enable: boolean) => void;
   urls?: { api?: Record<string, unknown> };
-  markets_by_id?: Record<string, { symbol?: string }>;
+  markets_by_id?: Record<string, unknown>;
   close?: () => Promise<void> | void;
 };
 
@@ -154,7 +177,8 @@ export class CcxtBinanceAdapter {
     if (id.includes("/")) return id;
 
     await this.ensureMarketsLoaded();
-    const market = this.exchange.markets_by_id?.[id];
+    const entry = this.exchange.markets_by_id?.[id];
+    const market = pickSpotMarket(entry);
     const symbol = typeof market?.symbol === "string" ? market.symbol : null;
     if (!symbol) {
       throw new Error(`Unknown symbol (ccxt): ${id}`);
@@ -193,8 +217,8 @@ export class CcxtBinanceAdapter {
     const side = params.side.toLowerCase();
     const order = asRecord(
       await this.exchange.createOrder(symbol, "market", side, amount, undefined, {
-      // Best-effort: Binance supports FULL to return fills; ccxt forwards unknown params.
-      newOrderRespType: "FULL"
+        // Best-effort: Binance supports FULL to return fills; ccxt forwards unknown params.
+        newOrderRespType: "FULL"
       })
     );
 
