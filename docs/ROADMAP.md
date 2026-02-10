@@ -40,6 +40,8 @@
 - Hardening updates:
   - Recoverable Binance sizing errors (`NOTIONAL`/lot-size) skip without auto-blacklist
   - Conversion top-up reserve hysteresis to reduce repetitive quote-asset churn
+  - Derived risk limits enforced at runtime (`maxOpenPositions`, `maxPositionPct`)
+  - Basic live exit path (`take-profit` / `stop-loss`) to avoid buy-only behavior
 - Spot mainnet live trading (requires additional safeguards + explicit opt-in)
 
 ## Phase 4 — Advanced bots

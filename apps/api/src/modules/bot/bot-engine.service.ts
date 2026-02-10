@@ -11,6 +11,7 @@ import { BinanceMarketDataService } from "../integrations/binance-market-data.se
 import {
   BinanceTradingService,
   isBinanceTestnetBaseUrl,
+  type BinanceBalanceSnapshot,
   type BinanceMarketOrderResponse
 } from "../integrations/binance-trading.service";
 import { ConversionRouterService } from "../integrations/conversion-router.service";
@@ -22,6 +23,14 @@ function atomicWriteFile(filePath: string, data: string): void {
   fs.writeFileSync(tmpPath, data, { encoding: "utf-8" });
   fs.renameSync(tmpPath, filePath);
 }
+
+type ManagedPosition = {
+  symbol: string;
+  netQty: number;
+  costQuote: number;
+  lastBuyTs?: string;
+  lastSellTs?: string;
+};
 
 @Injectable()
 export class BotEngineService {
@@ -182,6 +191,123 @@ export class BotEngineService {
     }
 
     return null;
+  }
+
+  private getManagedPositions(state: BotState): Map<string, ManagedPosition> {
+    const positions = new Map<string, ManagedPosition>();
+    const filledOrders = [...state.orderHistory]
+      .filter((o) => o.status === "FILLED")
+      .sort((a, b) => {
+        const ta = Date.parse(a.ts);
+        const tb = Date.parse(b.ts);
+        if (!Number.isFinite(ta) && !Number.isFinite(tb)) return 0;
+        if (!Number.isFinite(ta)) return -1;
+        if (!Number.isFinite(tb)) return 1;
+        return ta - tb;
+      });
+
+    for (const order of filledOrders) {
+      const symbol = order.symbol.trim().toUpperCase();
+      const position = positions.get(symbol) ?? {
+        symbol,
+        netQty: 0,
+        costQuote: 0,
+        lastBuyTs: undefined,
+        lastSellTs: undefined
+      };
+
+      const qty = Number.isFinite(order.qty) ? Math.max(0, order.qty) : 0;
+      const notional = Number.isFinite(order.price) ? qty * (order.price ?? 0) : 0;
+      if (qty <= 0) continue;
+
+      if (order.side === "BUY") {
+        position.netQty += qty;
+        if (Number.isFinite(notional) && notional > 0) {
+          position.costQuote += notional;
+        }
+        position.lastBuyTs = order.ts;
+      } else {
+        const reduceQty = Math.min(qty, position.netQty);
+        const avgCost = position.netQty > 0 ? position.costQuote / position.netQty : 0;
+        position.netQty -= reduceQty;
+        if (Number.isFinite(avgCost) && avgCost > 0) {
+          position.costQuote = Math.max(0, position.costQuote - avgCost * reduceQty);
+        }
+        if (position.netQty <= 1e-12) {
+          position.netQty = 0;
+          position.costQuote = 0;
+        }
+        position.lastSellTs = order.ts;
+      }
+
+      positions.set(symbol, position);
+    }
+
+    return positions;
+  }
+
+  private async getPairPrice(baseAsset: string, quoteAsset: string): Promise<number | null> {
+    const base = baseAsset.trim().toUpperCase();
+    const quote = quoteAsset.trim().toUpperCase();
+    if (!base || !quote) return null;
+    if (base === quote) return 1;
+
+    try {
+      const direct = Number.parseFloat(await this.marketData.getTickerPrice(`${base}${quote}`));
+      if (Number.isFinite(direct) && direct > 0) return direct;
+    } catch {
+      // ignore
+    }
+
+    try {
+      const inverse = Number.parseFloat(await this.marketData.getTickerPrice(`${quote}${base}`));
+      if (Number.isFinite(inverse) && inverse > 0) return 1 / inverse;
+    } catch {
+      // ignore
+    }
+
+    return null;
+  }
+
+  private async estimateAssetValueInHome(
+    asset: string,
+    amount: number,
+    homeStable: string,
+    bridgeAssets: string[]
+  ): Promise<number | null> {
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+    const normalizedAsset = asset.trim().toUpperCase();
+    const normalizedHome = homeStable.trim().toUpperCase();
+    if (!normalizedAsset || !normalizedHome) return null;
+    if (normalizedAsset === normalizedHome) return amount;
+
+    const direct = await this.getPairPrice(normalizedAsset, normalizedHome);
+    if (direct) return amount * direct;
+
+    for (const bridge of bridgeAssets) {
+      const normalizedBridge = bridge.trim().toUpperCase();
+      if (!normalizedBridge || normalizedBridge === normalizedAsset || normalizedBridge === normalizedHome) continue;
+      const p1 = await this.getPairPrice(normalizedAsset, normalizedBridge);
+      if (!p1) continue;
+      const p2 = await this.getPairPrice(normalizedBridge, normalizedHome);
+      if (!p2) continue;
+      return amount * p1 * p2;
+    }
+
+    return null;
+  }
+
+  private async estimateWalletTotalInHome(balances: BinanceBalanceSnapshot[], homeStable: string): Promise<number> {
+    const bridgeAssets = [homeStable, "USDT", "USDC", "BTC", "ETH", "BNB"];
+    let total = 0;
+    for (const balance of balances) {
+      const qty = Number.isFinite(balance.total) ? balance.total : balance.free + balance.locked;
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+      const value = await this.estimateAssetValueInHome(balance.asset, qty, homeStable, bridgeAssets);
+      if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) continue;
+      total += value;
+    }
+    return total;
   }
 
   start(): void {
@@ -410,6 +536,7 @@ export class BotEngineService {
             this.save(next);
             return;
           }
+          const candidateBaseAsset = rules.baseAsset.toUpperCase();
 
           const mapStatus = (s: string | undefined): Order["status"] => {
             const st = (s ?? "").toUpperCase();
@@ -520,6 +647,111 @@ export class BotEngineService {
             return;
           }
 
+          const managedPositions = this.getManagedPositions(current);
+          const managedOpenHomeSymbols = [...managedPositions.values()].filter((p) => p.netQty > 0 && p.symbol.endsWith(homeStable));
+          const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
+          const candidateIsOpen = (managedPositions.get(candidateSymbol)?.netQty ?? 0) > 0;
+
+          const rebalanceSellCooldownMs =
+            config?.advanced.liveTradeRebalanceSellCooldownMs ??
+            Number.parseInt(process.env.LIVE_TRADE_REBALANCE_SELL_COOLDOWN_MS ?? "900000", 10);
+          const risk = Math.max(0, Math.min(100, config?.basic.risk ?? 50));
+          const takeProfitPct = 0.5 + (risk / 100) * 1.5; // 0.5% .. 2.0%
+          const stopLossPct = -(1 + (risk / 100) * 2); // -1.0% .. -3.0%
+
+          for (const position of managedOpenHomeSymbols) {
+            const baseAsset = position.symbol.slice(0, Math.max(0, position.symbol.length - homeStable.length));
+            if (!baseAsset) continue;
+            const baseFree = balances.find((b) => b.asset.toUpperCase() === baseAsset.toUpperCase())?.free ?? 0;
+            if (!Number.isFinite(baseFree) || baseFree <= 0) continue;
+
+            if (Number.isFinite(rebalanceSellCooldownMs) && rebalanceSellCooldownMs > 0 && position.lastBuyTs) {
+              const lastBuyAt = Date.parse(position.lastBuyTs);
+              if (Number.isFinite(lastBuyAt) && Date.now() - lastBuyAt < rebalanceSellCooldownMs) {
+                continue;
+              }
+            }
+
+            const avgEntryPrice = position.netQty > 0 ? position.costQuote / position.netQty : Number.NaN;
+            if (!Number.isFinite(avgEntryPrice) || avgEntryPrice <= 0) continue;
+
+            const nowPriceStr = await this.marketData.getTickerPrice(position.symbol);
+            const nowPrice = Number.parseFloat(nowPriceStr);
+            if (!Number.isFinite(nowPrice) || nowPrice <= 0) continue;
+
+            const pnlPct = ((nowPrice - avgEntryPrice) / avgEntryPrice) * 100;
+            const shouldTakeProfit = pnlPct >= takeProfitPct;
+            const shouldStopLoss = pnlPct <= stopLossPct;
+            if (!shouldTakeProfit && !shouldStopLoss) continue;
+
+            const sellQtyDesired = Math.min(position.netQty, baseFree);
+            if (!Number.isFinite(sellQtyDesired) || sellQtyDesired <= 0) continue;
+
+            const sellCheck = await this.marketData.validateMarketOrderQty(position.symbol, sellQtyDesired);
+            let sellQtyStr = sellCheck.ok ? sellCheck.normalizedQty : undefined;
+            if (!sellQtyStr && sellCheck.requiredQty) {
+              const requiredQty = Number.parseFloat(sellCheck.requiredQty);
+              if (Number.isFinite(requiredQty) && requiredQty > 0 && requiredQty <= sellQtyDesired) {
+                sellQtyStr = sellCheck.requiredQty;
+              }
+            }
+            if (!sellQtyStr) continue;
+
+            const sellQty = Number.parseFloat(sellQtyStr);
+            if (!Number.isFinite(sellQty) || sellQty <= 0) continue;
+
+            const sellRes = await this.trading.placeSpotMarketOrder({
+              symbol: position.symbol,
+              side: "SELL",
+              quantity: sellQtyStr
+            });
+            persistLiveTrade({
+              symbol: position.symbol,
+              side: "SELL",
+              requestedQty: sellQtyStr,
+              fallbackQty: sellQty,
+              response: sellRes,
+              reason: shouldTakeProfit ? "take-profit-exit" : "stop-loss-exit",
+              details: {
+                mode: "position-exit",
+                pnlPct: Number(pnlPct.toFixed(4)),
+                avgEntryPrice: Number(avgEntryPrice.toFixed(8)),
+                marketPrice: Number(nowPrice.toFixed(8)),
+                takeProfitPct: Number(takeProfitPct.toFixed(4)),
+                stopLossPct: Number(stopLossPct.toFixed(4))
+              }
+            });
+            return;
+          }
+
+          if (managedOpenHomeSymbols.length >= maxOpenPositions && !candidateIsOpen) {
+            const summary = `Skip ${candidateSymbol}: Max open positions reached (${maxOpenPositions})`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        openPositions: managedOpenHomeSymbols.length,
+                        maxOpenPositions
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
+
           const priceStr = await this.marketData.getTickerPrice(candidateSymbol);
           const price = Number.parseFloat(priceStr);
           if (!Number.isFinite(price) || price <= 0) {
@@ -532,10 +764,61 @@ export class BotEngineService {
           const slippageBuffer =
             config?.advanced.liveTradeSlippageBuffer ?? Number.parseFloat(process.env.LIVE_TRADE_SLIPPAGE_BUFFER ?? "1.005");
           const bufferFactor = Number.isFinite(slippageBuffer) && slippageBuffer > 0 ? slippageBuffer : 1;
-          const rawTargetNotional = quoteFree * (maxPositionPct / 100);
+          const walletTotalHome = await this.estimateWalletTotalInHome(balances, homeStable);
+          const candidateBaseTotal = balances.find((b) => b.asset.toUpperCase() === candidateBaseAsset)?.total ?? 0;
+          const currentCandidateNotional =
+            Number.isFinite(candidateBaseTotal) && candidateBaseTotal > 0 ? candidateBaseTotal * price : 0;
+          const maxSymbolNotional = walletTotalHome * (maxPositionPct / 100);
+          const remainingSymbolNotional = Math.max(0, maxSymbolNotional - currentCandidateNotional);
+
+          if (remainingSymbolNotional <= 0) {
+            const summary = `Skip ${candidateSymbol}: Max symbol exposure reached (${maxPositionPct.toFixed(2)}%)`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        maxPositionPct,
+                        walletTotalHome: Number(walletTotalHome.toFixed(6)),
+                        currentCandidateNotional: Number(currentCandidateNotional.toFixed(6))
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
+
+          const rawTargetNotional = walletTotalHome * (maxPositionPct / 100);
           const enforcedCap = Number.isFinite(notionalCap) && notionalCap > 0 ? notionalCap : null;
           const capForSizing = enforcedCap ? enforcedCap / bufferFactor : null;
-          const targetNotional = Math.min(rawTargetNotional, capForSizing ?? rawTargetNotional, quoteFree);
+          const targetNotional = Math.min(rawTargetNotional, capForSizing ?? rawTargetNotional, quoteFree, remainingSymbolNotional);
+          if (!Number.isFinite(targetNotional) || targetNotional <= 0) {
+            const summary = `Skip ${candidateSymbol}: Target notional is zero`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
           const desiredQty = targetNotional / price;
 
           const check = await this.marketData.validateMarketOrderQty(candidateSymbol, desiredQty);
@@ -666,10 +949,6 @@ export class BotEngineService {
               }
             }
 
-            const candidateBaseAsset = rules.baseAsset.toUpperCase();
-            const rebalanceSellCooldownMs =
-              config?.advanced.liveTradeRebalanceSellCooldownMs ??
-              Number.parseInt(process.env.LIVE_TRADE_REBALANCE_SELL_COOLDOWN_MS ?? "900000", 10);
             const hasRecentCandidateBuy =
               Number.isFinite(rebalanceSellCooldownMs) && rebalanceSellCooldownMs > 0
                 ? current.orderHistory.some((o) => {

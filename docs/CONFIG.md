@@ -74,6 +74,13 @@ Runtime safety values are stored in `config.json` and configurable from UI Advan
   - low target = `conversionTopUpMinTarget * conversionTopUpReserveMultiplier`
   - high target = `low * 2`
   - when quote balance falls below low, conversion aims toward high (bounded by available source assets)
+- Derived risk controls now enforce runtime position limits:
+  - `maxOpenPositions` limits concurrently open bot-managed symbols (quote = home stable)
+  - `maxPositionPct` caps both new symbol exposure and target notional sizing per symbol
+- Basic exit path is enabled for live mode:
+  - uses bot-managed average entry price per symbol
+  - triggers `SELL` on take-profit / stop-loss thresholds derived from Basic risk
+  - respects `liveTradeRebalanceSellCooldownMs` to avoid immediate buy/sell churn
 - Binance sizing filter rejects (`-1013` / `NOTIONAL` / lot-size) are treated as recoverable sizing events and are not auto-blacklisted.
 
 Environment variables remain as fallback defaults:
