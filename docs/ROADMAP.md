@@ -37,6 +37,9 @@
 - Explicit user acknowledgement + safety checks
 - Limits (max daily loss, max order size, cooldowns, circuit breakers)
 - Spot **testnet** live trading (minimal `MARKET` order path; mainnet blocked by default)
+- Hardening updates:
+  - Recoverable Binance sizing errors (`NOTIONAL`/lot-size) skip without auto-blacklist
+  - Conversion top-up reserve hysteresis to reduce repetitive quote-asset churn
 - Spot mainnet live trading (requires additional safeguards + explicit opt-in)
 
 ## Phase 4 — Advanced bots

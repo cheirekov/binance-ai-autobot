@@ -70,6 +70,11 @@ Runtime safety values are stored in `config.json` and configurable from UI Advan
 
 - `followRiskProfile=true` keeps these values aligned with Basic risk slider.
 - `followRiskProfile=false` allows manual override from Advanced.
+- Conversion top-up anti-churn uses reserve hysteresis:
+  - low target = `conversionTopUpMinTarget * conversionTopUpReserveMultiplier`
+  - high target = `low * 2`
+  - when quote balance falls below low, conversion aims toward high (bounded by available source assets)
+- Binance sizing filter rejects (`-1013` / `NOTIONAL` / lot-size) are treated as recoverable sizing events and are not auto-blacklisted.
 
 Environment variables remain as fallback defaults:
 

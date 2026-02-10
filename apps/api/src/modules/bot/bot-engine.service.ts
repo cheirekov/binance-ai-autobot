@@ -96,6 +96,35 @@ export class BotEngineService {
     return { ...state, symbolBlacklist: next.slice(0, 200) };
   }
 
+  private extractBinanceErrorMessage(rawMessage: string): string {
+    const match = rawMessage.match(/\{.*\}/);
+    if (!match) return rawMessage;
+    try {
+      const parsed = JSON.parse(match[0]) as { msg?: unknown };
+      if (typeof parsed.msg === "string" && parsed.msg.trim()) {
+        return parsed.msg.trim();
+      }
+    } catch {
+      // fall through
+    }
+    return rawMessage;
+  }
+
+  private isSizingFilterError(rawMessage: string): boolean {
+    const message = rawMessage.toUpperCase();
+    return (
+      message.includes("\"CODE\":-1013") ||
+      message.includes("FILTER FAILURE: NOTIONAL") ||
+      message.includes("MIN_NOTIONAL") ||
+      message.includes("LOT_SIZE") ||
+      message.includes("MARKET_LOT_SIZE")
+    );
+  }
+
+  private shouldAutoBlacklistError(rawMessage: string): boolean {
+    return !this.isSizingFilterError(rawMessage);
+  }
+
   private getRecentSymbolOrders(state: BotState, symbol: string): Order[] {
     const normalized = symbol.trim().toUpperCase();
     return [...state.activeOrders, ...state.orderHistory]
@@ -586,7 +615,10 @@ export class BotEngineService {
               : Number.isFinite(configuredMinTopUpTarget) && configuredMinTopUpTarget > 0
                 ? configuredMinTopUpTarget
                 : 5;
-            const conversionTarget = Math.max(shortfall * conversionTopUpReserveMultiplier, floorTopUpTarget);
+            const reserveLowTarget = floorTopUpTarget * conversionTopUpReserveMultiplier;
+            const reserveHighTarget = reserveLowTarget * 2;
+            const reserveTopUpNeeded = quoteFree < reserveLowTarget ? Math.max(0, reserveHighTarget - quoteFree) : 0;
+            const conversionTarget = Math.max(shortfall * conversionTopUpReserveMultiplier, floorTopUpTarget, reserveTopUpNeeded);
             const conversionTopUpCooldownMs = Math.max(
               0,
               config?.advanced.conversionTopUpCooldownMs ??
@@ -619,7 +651,10 @@ export class BotEngineService {
                             remainingMs: Math.max(0, Math.round(conversionTopUpCooldownMs - (Date.now() - lastConversionAt))),
                             shortfall: Number(shortfall.toFixed(6)),
                             conversionTarget: Number(conversionTarget.toFixed(6)),
-                            floorTopUpTarget: Number(floorTopUpTarget.toFixed(6))
+                            floorTopUpTarget: Number(floorTopUpTarget.toFixed(6)),
+                            reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
+                            reserveHighTarget: Number(reserveHighTarget.toFixed(6)),
+                            reserveTopUpNeeded: Number(reserveTopUpNeeded.toFixed(6))
                           }
                         },
                         ...current.decisions
@@ -683,6 +718,9 @@ export class BotEngineService {
                     shortfall: Number(shortfall.toFixed(6)),
                     conversionTarget: Number(conversionTarget.toFixed(6)),
                     floorTopUpTarget: Number(floorTopUpTarget.toFixed(6)),
+                    reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
+                    reserveHighTarget: Number(reserveHighTarget.toFixed(6)),
+                    reserveTopUpNeeded: Number(reserveTopUpNeeded.toFixed(6)),
                     reserveMultiplier: conversionTopUpReserveMultiplier,
                     sourceAsset,
                     route: leg.route,
@@ -717,6 +755,9 @@ export class BotEngineService {
                         shortfall: Number(shortfall.toFixed(6)),
                         conversionTarget: Number(conversionTarget.toFixed(6)),
                         floorTopUpTarget: Number(floorTopUpTarget.toFixed(6)),
+                        reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
+                        reserveHighTarget: Number(reserveHighTarget.toFixed(6)),
+                        reserveTopUpNeeded: Number(reserveTopUpNeeded.toFixed(6)),
                         reserveMultiplier: conversionTopUpReserveMultiplier,
                         price: Number(price.toFixed(8)),
                         qty: Number(qty.toFixed(8)),
@@ -731,19 +772,47 @@ export class BotEngineService {
             return;
           }
 
-          const res = await this.trading.placeSpotMarketOrder({ symbol: candidateSymbol, side: "BUY", quantity: qtyStr });
-          persistLiveTrade({
-            symbol: candidateSymbol,
-            side: "BUY",
-            requestedQty: qtyStr,
-            fallbackQty: qty,
-            response: res,
-            reason: "entry"
-          });
+          let entryQtyStr = qtyStr;
+          let entryQty = qty;
+          let retriedSizing = false;
+          while (true) {
+            try {
+              const res = await this.trading.placeSpotMarketOrder({ symbol: candidateSymbol, side: "BUY", quantity: entryQtyStr });
+              persistLiveTrade({
+                symbol: candidateSymbol,
+                side: "BUY",
+                requestedQty: entryQtyStr,
+                fallbackQty: entryQty,
+                response: res,
+                reason: retriedSizing ? "entry-retry-sizing" : "entry"
+              });
+              break;
+            } catch (entryErr) {
+              const msg = entryErr instanceof Error ? entryErr.message : String(entryErr);
+              const canRetrySizing = !retriedSizing && this.isSizingFilterError(msg);
+              if (!canRetrySizing) {
+                throw entryErr;
+              }
+
+              const retryCheck = await this.marketData.validateMarketOrderQty(candidateSymbol, entryQty * 1.03);
+              const retryQtyStr = retryCheck.ok ? retryCheck.normalizedQty : retryCheck.requiredQty;
+              const retryQty = retryQtyStr ? Number.parseFloat(retryQtyStr) : Number.NaN;
+              const retryBufferedCost = retryQty * price * bufferFactor;
+              if (!retryQtyStr || !Number.isFinite(retryQty) || retryQty <= entryQty || retryBufferedCost > quoteFree) {
+                throw entryErr;
+              }
+
+              entryQtyStr = retryQtyStr;
+              entryQty = retryQty;
+              retriedSizing = true;
+            }
+          }
           return;
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          const summary = `Order rejected for ${candidateSymbol} (${envLabel}): ${msg}`;
+          const summary = this.isSizingFilterError(msg)
+            ? `Skip ${candidateSymbol}: Binance sizing filter (${this.extractBinanceErrorMessage(msg)})`
+            : `Order rejected for ${candidateSymbol} (${envLabel}): ${msg}`;
           const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
           let nextState: BotState = {
             ...current,
@@ -755,7 +824,7 @@ export class BotEngineService {
               : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
           };
 
-          if (config?.advanced.autoBlacklistEnabled) {
+          if (config?.advanced.autoBlacklistEnabled && this.shouldAutoBlacklistError(msg)) {
             const ttlMinutes = config.advanced.autoBlacklistTtlMinutes ?? 180;
             const now = new Date();
             nextState = this.addSymbolBlacklist(nextState, {
