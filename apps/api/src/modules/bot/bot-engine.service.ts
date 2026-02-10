@@ -8,7 +8,11 @@ import { BotStateSchema, defaultBotState } from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
 import { BinanceMarketDataService } from "../integrations/binance-market-data.service";
-import { BinanceTradingService, isBinanceTestnetBaseUrl } from "../integrations/binance-trading.service";
+import {
+  BinanceTradingService,
+  isBinanceTestnetBaseUrl,
+  type BinanceMarketOrderResponse
+} from "../integrations/binance-trading.service";
 import { UniverseService } from "../universe/universe.service";
 
 function atomicWriteFile(filePath: string, data: string): void {
@@ -251,10 +255,109 @@ export class BotEngineService {
             return;
           }
 
+          const mapStatus = (s: string | undefined): Order["status"] => {
+            const st = (s ?? "").toUpperCase();
+            if (st === "FILLED") return "FILLED";
+            if (st === "NEW" || st === "PARTIALLY_FILLED") return "NEW";
+            if (st === "CANCELED" || st === "EXPIRED") return "CANCELED";
+            return "REJECTED";
+          };
+
+          const chooseQtyWithin = (candidates: Array<string | undefined>, maxQty: number): string | null => {
+            for (const candidate of candidates) {
+              if (!candidate) continue;
+              const parsed = Number.parseFloat(candidate);
+              if (!Number.isFinite(parsed) || parsed <= 0) continue;
+              if (parsed <= maxQty + 1e-12) return candidate;
+            }
+            return null;
+          };
+
+          const persistLiveTrade = (params: {
+            symbol: string;
+            side: "BUY" | "SELL";
+            requestedQty: string;
+            fallbackQty: number;
+            response: BinanceMarketOrderResponse;
+            reason: string;
+            details?: Record<string, unknown>;
+          }): void => {
+            const { symbol, side, requestedQty, fallbackQty, response, reason, details } = params;
+            const avgPrice = (() => {
+              const fills = response.fills ?? [];
+              let qtySum = 0;
+              let costSum = 0;
+              for (const f of fills) {
+                const fp = Number.parseFloat(f.price ?? "");
+                const fq = Number.parseFloat(f.qty ?? "");
+                if (!Number.isFinite(fp) || !Number.isFinite(fq) || fq <= 0) continue;
+                qtySum += fq;
+                costSum += fp * fq;
+              }
+              if (qtySum <= 0) return undefined;
+              const ap = costSum / qtySum;
+              return Number.isFinite(ap) && ap > 0 ? ap : undefined;
+            })();
+
+            const executedQty = Number.parseFloat(response.executedQty ?? "");
+            const origQty = Number.parseFloat(response.origQty ?? "");
+            const finalQty =
+              Number.isFinite(executedQty) && executedQty > 0
+                ? executedQty
+                : Number.isFinite(origQty) && origQty > 0
+                  ? origQty
+                  : fallbackQty;
+
+            const order: Order = {
+              id: response.orderId !== undefined ? String(response.orderId) : crypto.randomUUID(),
+              ts: new Date().toISOString(),
+              symbol,
+              side,
+              type: "MARKET",
+              status: mapStatus(response.status),
+              qty: finalQty,
+              ...(avgPrice ? { price: avgPrice } : {})
+            };
+
+            const decisionSummary = `Binance ${envLabel} ${side} MARKET ${symbol} qty ${requestedQty} → ${order.status} (orderId ${order.id} · ${reason})`;
+
+            let nextState: BotState = {
+              ...current,
+              lastError: undefined,
+              decisions: [
+                {
+                  id: crypto.randomUUID(),
+                  ts: new Date().toISOString(),
+                  kind: "TRADE",
+                  summary: decisionSummary,
+                  details: {
+                    baseUrl,
+                    orderId: order.id,
+                    status: response.status,
+                    executedQty: response.executedQty,
+                    cummulativeQuoteQty: response.cummulativeQuoteQty,
+                    ...details
+                  }
+                },
+                ...current.decisions
+              ].slice(0, 200),
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory
+            };
+
+            if (order.status === "NEW") {
+              nextState = { ...nextState, activeOrders: [order, ...nextState.activeOrders].slice(0, 50) };
+            } else {
+              nextState = { ...nextState, orderHistory: [order, ...nextState.orderHistory].slice(0, 200) };
+            }
+
+            this.save(nextState);
+          };
+
           const balances = await this.trading.getBalances();
           const quoteFree = balances.find((b) => b.asset === homeStable)?.free ?? 0;
-          if (!Number.isFinite(quoteFree) || quoteFree <= 0) {
-            const summary = `Skip ${candidateSymbol}: No ${homeStable} balance available`;
+          if (!Number.isFinite(quoteFree) || quoteFree < 0) {
+            const summary = `Skip ${candidateSymbol}: Invalid ${homeStable} balance`;
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
             const next = {
               ...current,
@@ -286,7 +389,16 @@ export class BotEngineService {
           const desiredQty = targetNotional / price;
 
           const check = await this.marketData.validateMarketOrderQty(candidateSymbol, desiredQty);
-          const qtyStr = check.ok ? check.normalizedQty : check.requiredQty;
+          let qtyStr = check.ok ? check.normalizedQty : check.requiredQty;
+          if (!qtyStr) {
+            const minQtyHint = [rules.marketLotSize?.minQty, rules.lotSize?.minQty]
+              .map((v) => (typeof v === "string" ? Number.parseFloat(v) : Number.NaN))
+              .find((v) => Number.isFinite(v) && v > 0);
+            if (typeof minQtyHint === "number" && Number.isFinite(minQtyHint) && minQtyHint > 0) {
+              const minCheck = await this.marketData.validateMarketOrderQty(candidateSymbol, minQtyHint);
+              qtyStr = minCheck.ok ? minCheck.normalizedQty : minCheck.requiredQty;
+            }
+          }
           if (!qtyStr) {
             const reason = check.reason ?? "Binance min order constraints";
             const summary = `Skip ${candidateSymbol}: ${reason}`;
@@ -344,6 +456,156 @@ export class BotEngineService {
             }
           }
           if (Number.isFinite(bufferedCost) && bufferedCost > quoteFree) {
+            const shortfall = bufferedCost - quoteFree;
+
+            const candidateBaseAsset = rules.baseAsset.toUpperCase();
+            const candidateBaseFree = balances.find((b) => b.asset.toUpperCase() === candidateBaseAsset)?.free ?? 0;
+            if (candidateBaseFree > 0 && Number.isFinite(shortfall) && shortfall > 0) {
+              const desiredSellQty = Math.min(candidateBaseFree, shortfall / price);
+              if (Number.isFinite(desiredSellQty) && desiredSellQty > 0) {
+                const sellCheck = await this.marketData.validateMarketOrderQty(candidateSymbol, desiredSellQty);
+                const sellQtyStr = chooseQtyWithin(
+                  [sellCheck.ok ? sellCheck.normalizedQty : undefined, sellCheck.requiredQty],
+                  candidateBaseFree
+                );
+                if (sellQtyStr) {
+                  const sellQty = Number.parseFloat(sellQtyStr);
+                  if (Number.isFinite(sellQty) && sellQty > 0) {
+                    const sellRes = await this.trading.placeSpotMarketOrder({
+                      symbol: candidateSymbol,
+                      side: "SELL",
+                      quantity: sellQtyStr
+                    });
+                    persistLiveTrade({
+                      symbol: candidateSymbol,
+                      side: "SELL",
+                      requestedQty: sellQtyStr,
+                      fallbackQty: sellQty,
+                      response: sellRes,
+                      reason: "rebalance quote shortfall",
+                      details: {
+                        shortfall: Number(shortfall.toFixed(6)),
+                        availableQuote: Number(quoteFree.toFixed(6)),
+                        targetCost: Number(bufferedCost.toFixed(6))
+                      }
+                    });
+                    return;
+                  }
+                }
+              }
+            }
+
+            const sourceBalances = balances
+              .filter((b) => b.asset.toUpperCase() !== homeStable && b.free > 0)
+              .sort((a, b) => b.free - a.free);
+
+            for (const source of sourceBalances) {
+              const sourceAsset = source.asset.toUpperCase();
+              const sourceFree = source.free;
+              if (sourceFree <= 0) continue;
+
+              const directSellSymbol = `${sourceAsset}${homeStable}`;
+              try {
+                const directSellRules = await this.marketData.getSymbolRules(directSellSymbol);
+                if (
+                  directSellRules.baseAsset.toUpperCase() === sourceAsset &&
+                  directSellRules.quoteAsset.toUpperCase() === homeStable
+                ) {
+                  const directPrice = Number.parseFloat(await this.marketData.getTickerPrice(directSellSymbol));
+                  if (Number.isFinite(directPrice) && directPrice > 0) {
+                    const desiredSourceSellQty = Math.min(sourceFree, shortfall / directPrice);
+                    if (Number.isFinite(desiredSourceSellQty) && desiredSourceSellQty > 0) {
+                      const directCheck = await this.marketData.validateMarketOrderQty(directSellSymbol, desiredSourceSellQty);
+                      const directQtyStr = chooseQtyWithin(
+                        [directCheck.ok ? directCheck.normalizedQty : undefined, directCheck.requiredQty],
+                        sourceFree
+                      );
+                      if (directQtyStr) {
+                        const directQty = Number.parseFloat(directQtyStr);
+                        if (Number.isFinite(directQty) && directQty > 0) {
+                          const directRes = await this.trading.placeSpotMarketOrder({
+                            symbol: directSellSymbol,
+                            side: "SELL",
+                            quantity: directQtyStr
+                          });
+                          persistLiveTrade({
+                            symbol: directSellSymbol,
+                            side: "SELL",
+                            requestedQty: directQtyStr,
+                            fallbackQty: directQty,
+                            response: directRes,
+                            reason: `topup ${homeStable} from ${sourceAsset}`,
+                            details: {
+                              shortfall: Number(shortfall.toFixed(6)),
+                              sourceAsset,
+                              mode: "sell-source-for-home"
+                            }
+                          });
+                          return;
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch {
+                // best effort; try inverse pair
+              }
+
+              const inverseBuySymbol = `${homeStable}${sourceAsset}`;
+              try {
+                const inverseBuyRules = await this.marketData.getSymbolRules(inverseBuySymbol);
+                if (
+                  inverseBuyRules.baseAsset.toUpperCase() === homeStable &&
+                  inverseBuyRules.quoteAsset.toUpperCase() === sourceAsset
+                ) {
+                  const desiredHomeQty = shortfall;
+                  if (Number.isFinite(desiredHomeQty) && desiredHomeQty > 0) {
+                    const inverseCheck = await this.marketData.validateMarketOrderQty(inverseBuySymbol, desiredHomeQty);
+                    const inverseQtyStr = chooseQtyWithin(
+                      [inverseCheck.ok ? inverseCheck.normalizedQty : undefined, inverseCheck.requiredQty],
+                      Number.POSITIVE_INFINITY
+                    );
+                    if (inverseQtyStr) {
+                      const inverseQty = Number.parseFloat(inverseQtyStr);
+                      const inversePrice = Number.parseFloat(await this.marketData.getTickerPrice(inverseBuySymbol));
+                      const estimatedSourceCost = inverseQty * inversePrice * bufferFactor;
+                      if (
+                        Number.isFinite(inverseQty) &&
+                        inverseQty > 0 &&
+                        Number.isFinite(inversePrice) &&
+                        inversePrice > 0 &&
+                        Number.isFinite(estimatedSourceCost) &&
+                        estimatedSourceCost <= sourceFree + 1e-8
+                      ) {
+                        const inverseRes = await this.trading.placeSpotMarketOrder({
+                          symbol: inverseBuySymbol,
+                          side: "BUY",
+                          quantity: inverseQtyStr
+                        });
+                        persistLiveTrade({
+                          symbol: inverseBuySymbol,
+                          side: "BUY",
+                          requestedQty: inverseQtyStr,
+                          fallbackQty: inverseQty,
+                          response: inverseRes,
+                          reason: `topup ${homeStable} with ${sourceAsset}`,
+                          details: {
+                            shortfall: Number(shortfall.toFixed(6)),
+                            sourceAsset,
+                            estimatedSourceCost: Number(estimatedSourceCost.toFixed(6)),
+                            mode: "buy-home-with-source"
+                          }
+                        });
+                        return;
+                      }
+                    }
+                  }
+                }
+              } catch {
+                // no compatible inverse pair for this source asset
+              }
+            }
+
             const summary = `Skip ${candidateSymbol}: Insufficient ${homeStable} for estimated cost`;
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
             const next = {
@@ -361,6 +623,7 @@ export class BotEngineService {
                       details: {
                         bufferedCost: Number(bufferedCost.toFixed(6)),
                         availableQuote: Number(quoteFree.toFixed(6)),
+                        shortfall: Number(shortfall.toFixed(6)),
                         price: Number(price.toFixed(8)),
                         qty: Number(qty.toFixed(8)),
                         bufferFactor
@@ -375,78 +638,14 @@ export class BotEngineService {
           }
 
           const res = await this.trading.placeSpotMarketOrder({ symbol: candidateSymbol, side: "BUY", quantity: qtyStr });
-
-          const mapStatus = (s: string | undefined): Order["status"] => {
-            const st = (s ?? "").toUpperCase();
-            if (st === "FILLED") return "FILLED";
-            if (st === "NEW" || st === "PARTIALLY_FILLED") return "NEW";
-            if (st === "CANCELED" || st === "EXPIRED") return "CANCELED";
-            return "REJECTED";
-          };
-
-          const avgPrice = (() => {
-            const fills = res.fills ?? [];
-            let qtySum = 0;
-            let costSum = 0;
-            for (const f of fills) {
-              const fp = Number.parseFloat(f.price ?? "");
-              const fq = Number.parseFloat(f.qty ?? "");
-              if (!Number.isFinite(fp) || !Number.isFinite(fq) || fq <= 0) continue;
-              qtySum += fq;
-              costSum += fp * fq;
-            }
-            if (qtySum <= 0) return undefined;
-            const ap = costSum / qtySum;
-            return Number.isFinite(ap) && ap > 0 ? ap : undefined;
-          })();
-
-          const executedQty = Number.parseFloat(res.executedQty ?? "");
-          const origQty = Number.parseFloat(res.origQty ?? "");
-          const finalQty = Number.isFinite(executedQty) && executedQty > 0 ? executedQty : Number.isFinite(origQty) && origQty > 0 ? origQty : qty;
-
-          const order: Order = {
-            id: res.orderId !== undefined ? String(res.orderId) : crypto.randomUUID(),
-            ts: new Date().toISOString(),
+          persistLiveTrade({
             symbol: candidateSymbol,
             side: "BUY",
-            type: "MARKET",
-            status: mapStatus(res.status),
-            qty: finalQty,
-            ...(avgPrice ? { price: avgPrice } : {})
-          };
-
-          const decisionSummary = `Binance ${envLabel} BUY MARKET ${candidateSymbol} qty ${qtyStr} → ${order.status} (orderId ${order.id})`;
-
-          let nextState: BotState = {
-            ...current,
-            lastError: undefined,
-            decisions: [
-              {
-                id: crypto.randomUUID(),
-                ts: new Date().toISOString(),
-                kind: "TRADE",
-                summary: decisionSummary,
-                details: {
-                  baseUrl,
-                  orderId: order.id,
-                  status: res.status,
-                  executedQty: res.executedQty,
-                  cummulativeQuoteQty: res.cummulativeQuoteQty
-                }
-              },
-              ...current.decisions
-            ].slice(0, 200),
-            activeOrders: filled.activeOrders,
-            orderHistory: filled.orderHistory
-          };
-
-          if (order.status === "NEW") {
-            nextState = { ...nextState, activeOrders: [order, ...nextState.activeOrders].slice(0, 50) };
-          } else {
-            nextState = { ...nextState, orderHistory: [order, ...nextState.orderHistory].slice(0, 200) };
-          }
-
-          this.save(nextState);
+            requestedQty: qtyStr,
+            fallbackQty: qty,
+            response: res,
+            reason: "entry"
+          });
           return;
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
