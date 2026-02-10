@@ -29,7 +29,8 @@ const AdvancedUpdateSchema = z.object({
   symbolEntryCooldownMs: z.number().int().min(0).max(86_400_000).optional(),
   maxConsecutiveEntriesPerSymbol: z.number().int().min(1).max(50).optional(),
   conversionTopUpReserveMultiplier: z.number().min(1).max(10).optional(),
-  conversionTopUpCooldownMs: z.number().int().min(0).max(86_400_000).optional()
+  conversionTopUpCooldownMs: z.number().int().min(0).max(86_400_000).optional(),
+  conversionTopUpMinTarget: z.number().min(1).max(100_000).optional()
 });
 
 const BasicUpdateSchema = z.object({
@@ -103,6 +104,7 @@ export class ConfigController {
       maxConsecutiveEntriesPerSymbol: number;
       conversionTopUpReserveMultiplier: number;
       conversionTopUpCooldownMs: number;
+      conversionTopUpMinTarget: number;
     };
   } {
     const config = this.configService.load();
@@ -152,7 +154,8 @@ export class ConfigController {
         symbolEntryCooldownMs: config.advanced.symbolEntryCooldownMs,
         maxConsecutiveEntriesPerSymbol: config.advanced.maxConsecutiveEntriesPerSymbol,
         conversionTopUpReserveMultiplier: config.advanced.conversionTopUpReserveMultiplier,
-        conversionTopUpCooldownMs: config.advanced.conversionTopUpCooldownMs
+        conversionTopUpCooldownMs: config.advanced.conversionTopUpCooldownMs,
+        conversionTopUpMinTarget: config.advanced.conversionTopUpMinTarget
       }
     };
   }

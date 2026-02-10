@@ -48,6 +48,7 @@ export type PublicConfig = {
     maxConsecutiveEntriesPerSymbol: number;
     conversionTopUpReserveMultiplier: number;
     conversionTopUpCooldownMs: number;
+    conversionTopUpMinTarget: number;
   };
 };
 

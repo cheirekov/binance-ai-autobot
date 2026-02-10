@@ -42,6 +42,7 @@ export function SettingsAdvanced(): JSX.Element {
   const [maxConsecutiveEntriesPerSymbol, setMaxConsecutiveEntriesPerSymbol] = useState(3);
   const [conversionTopUpReserveMultiplier, setConversionTopUpReserveMultiplier] = useState(2);
   const [conversionTopUpCooldownMs, setConversionTopUpCooldownMs] = useState(90000);
+  const [conversionTopUpMinTarget, setConversionTopUpMinTarget] = useState(5);
 
   const [rotatingApiKey, setRotatingApiKey] = useState(false);
   const [rotatedApiKey, setRotatedApiKey] = useState<string | null>(null);
@@ -80,6 +81,7 @@ export function SettingsAdvanced(): JSX.Element {
     setMaxConsecutiveEntriesPerSymbol(config.advanced.maxConsecutiveEntriesPerSymbol);
     setConversionTopUpReserveMultiplier(config.advanced.conversionTopUpReserveMultiplier);
     setConversionTopUpCooldownMs(config.advanced.conversionTopUpCooldownMs);
+    setConversionTopUpMinTarget(config.advanced.conversionTopUpMinTarget);
   }, [config?.advanced]);
 
   async function onExport(): Promise<void> {
@@ -173,7 +175,8 @@ export function SettingsAdvanced(): JSX.Element {
         symbolEntryCooldownMs,
         maxConsecutiveEntriesPerSymbol,
         conversionTopUpReserveMultiplier,
-        conversionTopUpCooldownMs
+        conversionTopUpCooldownMs,
+        conversionTopUpMinTarget
       });
       setSavedAt(new Date().toISOString());
     } catch (e) {
@@ -326,6 +329,7 @@ export function SettingsAdvanced(): JSX.Element {
               />
             </div>
           </div>
+
         </div>
 
         <div className="card">
@@ -583,6 +587,24 @@ export function SettingsAdvanced(): JSX.Element {
                 }}
               />
             </div>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label className="label">Conversion top-up minimum target ({config.basic?.homeStableCoin ?? "USDC"})</label>
+            <input
+              className="field"
+              type="number"
+              min={1}
+              max={100000}
+              step={0.01}
+              value={conversionTopUpMinTarget}
+              disabled={followRiskProfile}
+              onChange={(e) => {
+                const next = Number.parseFloat(e.target.value);
+                if (Number.isFinite(next)) setConversionTopUpMinTarget(next);
+              }}
+            />
+            <div className="subtitle">When shortfall is tiny, conversion still targets at least this amount to satisfy exchange minimums.</div>
           </div>
         </div>
 

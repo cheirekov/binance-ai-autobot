@@ -51,6 +51,7 @@ On API startup, an automatic migration normalizes existing `config.json` to the 
   - `maxConsecutiveEntriesPerSymbol`
   - `conversionTopUpReserveMultiplier`
   - `conversionTopUpCooldownMs`
+  - `conversionTopUpMinTarget`
 
 ## Derived defaults
 

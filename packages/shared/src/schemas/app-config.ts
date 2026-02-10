@@ -97,7 +97,8 @@ export const AdvancedSettingsSchema = z.object({
   symbolEntryCooldownMs: z.number().int().min(0).max(86_400_000).default(120_000),
   maxConsecutiveEntriesPerSymbol: z.number().int().min(1).max(50).default(3),
   conversionTopUpReserveMultiplier: z.number().min(1).max(10).default(2),
-  conversionTopUpCooldownMs: z.number().int().min(0).max(86_400_000).default(90_000)
+  conversionTopUpCooldownMs: z.number().int().min(0).max(86_400_000).default(90_000),
+  conversionTopUpMinTarget: z.number().min(1).max(100_000).default(5)
 });
 export type AdvancedSettings = z.infer<typeof AdvancedSettingsSchema>;
 

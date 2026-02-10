@@ -137,6 +137,7 @@ export class ConfigService {
         followRiskProfile: true,
         excludeStableStablePairs: true,
         enforceRegionPolicy: true,
+        conversionTopUpMinTarget: 5,
         ...riskProfile
       },
       expert: {},
@@ -213,6 +214,7 @@ export class ConfigService {
     maxConsecutiveEntriesPerSymbol?: number;
     conversionTopUpReserveMultiplier?: number;
     conversionTopUpCooldownMs?: number;
+    conversionTopUpMinTarget?: number;
   }): AppConfig {
     const current = this.load();
     if (!current) {

@@ -579,7 +579,14 @@ export class BotEngineService {
           if (Number.isFinite(bufferedCost) && bufferedCost > quoteFree) {
             const shortfall = bufferedCost - quoteFree;
             const conversionTopUpReserveMultiplier = Math.max(1, config?.advanced.conversionTopUpReserveMultiplier ?? 2);
-            const conversionTarget = shortfall * conversionTopUpReserveMultiplier;
+            const minOrderNotional = check.minNotional ? Number.parseFloat(check.minNotional) : Number.NaN;
+            const configuredMinTopUpTarget = config?.advanced.conversionTopUpMinTarget ?? 5;
+            const floorTopUpTarget = Number.isFinite(minOrderNotional) && minOrderNotional > 0
+              ? minOrderNotional
+              : Number.isFinite(configuredMinTopUpTarget) && configuredMinTopUpTarget > 0
+                ? configuredMinTopUpTarget
+                : 5;
+            const conversionTarget = Math.max(shortfall * conversionTopUpReserveMultiplier, floorTopUpTarget);
             const conversionTopUpCooldownMs = Math.max(
               0,
               config?.advanced.conversionTopUpCooldownMs ??
@@ -611,7 +618,8 @@ export class BotEngineService {
                             conversionTopUpCooldownMs,
                             remainingMs: Math.max(0, Math.round(conversionTopUpCooldownMs - (Date.now() - lastConversionAt))),
                             shortfall: Number(shortfall.toFixed(6)),
-                            conversionTarget: Number(conversionTarget.toFixed(6))
+                            conversionTarget: Number(conversionTarget.toFixed(6)),
+                            floorTopUpTarget: Number(floorTopUpTarget.toFixed(6))
                           }
                         },
                         ...current.decisions
@@ -674,6 +682,7 @@ export class BotEngineService {
                   details: {
                     shortfall: Number(shortfall.toFixed(6)),
                     conversionTarget: Number(conversionTarget.toFixed(6)),
+                    floorTopUpTarget: Number(floorTopUpTarget.toFixed(6)),
                     reserveMultiplier: conversionTopUpReserveMultiplier,
                     sourceAsset,
                     route: leg.route,
@@ -706,6 +715,9 @@ export class BotEngineService {
                         bufferedCost: Number(bufferedCost.toFixed(6)),
                         availableQuote: Number(quoteFree.toFixed(6)),
                         shortfall: Number(shortfall.toFixed(6)),
+                        conversionTarget: Number(conversionTarget.toFixed(6)),
+                        floorTopUpTarget: Number(floorTopUpTarget.toFixed(6)),
+                        reserveMultiplier: conversionTopUpReserveMultiplier,
                         price: Number(price.toFixed(8)),
                         qty: Number(qty.toFixed(8)),
                         bufferFactor
