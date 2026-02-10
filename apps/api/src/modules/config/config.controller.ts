@@ -15,7 +15,15 @@ const AdvancedUpdateSchema = z.object({
   uiPort: z.number().int().min(1).max(65535).optional(),
   neverTradeSymbols: z.array(z.string().min(1)).optional(),
   autoBlacklistEnabled: z.boolean().optional(),
-  autoBlacklistTtlMinutes: z.number().int().min(1).max(43200).optional()
+  autoBlacklistTtlMinutes: z.number().int().min(1).max(43200).optional(),
+  followRiskProfile: z.boolean().optional(),
+  liveTradeCooldownMs: z.number().int().min(5_000).max(86_400_000).optional(),
+  liveTradeNotionalCap: z.number().min(1).max(1_000_000).optional(),
+  liveTradeSlippageBuffer: z.number().min(1).max(1.1).optional(),
+  liveTradeRebalanceSellCooldownMs: z.number().int().min(0).max(86_400_000).optional(),
+  conversionBuyBuffer: z.number().min(1).max(1.1).optional(),
+  conversionSellBuffer: z.number().min(1).max(1.1).optional(),
+  conversionFeeBuffer: z.number().min(1).max(1.1).optional()
 });
 
 const BasicUpdateSchema = z.object({
@@ -75,6 +83,14 @@ export class ConfigController {
       neverTradeSymbols: string[];
       autoBlacklistEnabled: boolean;
       autoBlacklistTtlMinutes: number;
+      followRiskProfile: boolean;
+      liveTradeCooldownMs: number;
+      liveTradeNotionalCap: number;
+      liveTradeSlippageBuffer: number;
+      liveTradeRebalanceSellCooldownMs: number;
+      conversionBuyBuffer: number;
+      conversionSellBuffer: number;
+      conversionFeeBuffer: number;
     };
   } {
     const config = this.configService.load();
@@ -110,7 +126,15 @@ export class ConfigController {
         apiKeyHint: config.advanced.apiKey.slice(-6),
         neverTradeSymbols: config.advanced.neverTradeSymbols,
         autoBlacklistEnabled: config.advanced.autoBlacklistEnabled,
-        autoBlacklistTtlMinutes: config.advanced.autoBlacklistTtlMinutes
+        autoBlacklistTtlMinutes: config.advanced.autoBlacklistTtlMinutes,
+        followRiskProfile: config.advanced.followRiskProfile,
+        liveTradeCooldownMs: config.advanced.liveTradeCooldownMs,
+        liveTradeNotionalCap: config.advanced.liveTradeNotionalCap,
+        liveTradeSlippageBuffer: config.advanced.liveTradeSlippageBuffer,
+        liveTradeRebalanceSellCooldownMs: config.advanced.liveTradeRebalanceSellCooldownMs,
+        conversionBuyBuffer: config.advanced.conversionBuyBuffer,
+        conversionSellBuffer: config.advanced.conversionSellBuffer,
+        conversionFeeBuffer: config.advanced.conversionFeeBuffer
       }
     };
   }

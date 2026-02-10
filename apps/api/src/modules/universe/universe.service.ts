@@ -59,6 +59,13 @@ function safeNumber(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function clampNumber(v: number | null, min: number, max: number): number | null {
+  if (v === null || !Number.isFinite(v)) return null;
+  if (v < min) return min;
+  if (v > max) return max;
+  return v;
+}
+
 function computeRsi(closes: number[], period = 14): number | null {
   if (closes.length < period + 1) return null;
   let gain = 0;
@@ -367,9 +374,9 @@ export class UniverseService {
           closes.push(c);
         }
 
-        const rsi14 = computeRsi(closes, 14);
-        const adx14 = computeAdx(highs, lows, closes, 14);
-        const atrPct14 = computeAtrPct(highs, lows, closes, 14);
+        const rsi14 = clampNumber(computeRsi(closes, 14), 0, 100);
+        const adx14 = clampNumber(computeAdx(highs, lows, closes, 14), 0, 100);
+        const atrPct14 = clampNumber(computeAtrPct(highs, lows, closes, 14), 0, 1000);
 
         const volumeScore = Math.log10(Math.max(1, s.quoteVolume24h));
         const trendScore = adx14 ? Math.min(adx14 / 50, 1) : 0;

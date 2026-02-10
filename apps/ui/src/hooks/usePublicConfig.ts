@@ -34,6 +34,14 @@ export type PublicConfig = {
     neverTradeSymbols: string[];
     autoBlacklistEnabled: boolean;
     autoBlacklistTtlMinutes: number;
+    followRiskProfile: boolean;
+    liveTradeCooldownMs: number;
+    liveTradeNotionalCap: number;
+    liveTradeSlippageBuffer: number;
+    liveTradeRebalanceSellCooldownMs: number;
+    conversionBuyBuffer: number;
+    conversionSellBuffer: number;
+    conversionFeeBuffer: number;
   };
 };
 

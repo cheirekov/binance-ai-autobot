@@ -83,7 +83,15 @@ export const AdvancedSettingsSchema = z.object({
   uiPort: z.number().int().min(1).max(65535),
   neverTradeSymbols: z.array(z.string().min(1)).default([]),
   autoBlacklistEnabled: z.boolean().default(true),
-  autoBlacklistTtlMinutes: z.number().int().min(1).max(43200).default(180)
+  autoBlacklistTtlMinutes: z.number().int().min(1).max(43200).default(180),
+  followRiskProfile: z.boolean().default(true),
+  liveTradeCooldownMs: z.number().int().min(5_000).max(86_400_000).default(60_000),
+  liveTradeNotionalCap: z.number().min(1).max(1_000_000).default(25),
+  liveTradeSlippageBuffer: z.number().min(1).max(1.1).default(1.005),
+  liveTradeRebalanceSellCooldownMs: z.number().int().min(0).max(86_400_000).default(900_000),
+  conversionBuyBuffer: z.number().min(1).max(1.1).default(1.005),
+  conversionSellBuffer: z.number().min(1).max(1.1).default(1.002),
+  conversionFeeBuffer: z.number().min(1).max(1.1).default(1.002)
 });
 export type AdvancedSettings = z.infer<typeof AdvancedSettingsSchema>;
 
@@ -113,6 +121,40 @@ export type AppConfig = z.infer<typeof AppConfigSchema>;
 export function defaultHomeStableCoin(traderRegion: TraderRegion): string {
   // NOTE: This is a *default only*. Regulation and product availability must be verified by the user.
   return traderRegion === "EEA" ? "USDC" : "USDT";
+}
+
+function clampRisk(risk: number): number {
+  if (!Number.isFinite(risk)) return 0;
+  return Math.max(0, Math.min(100, risk));
+}
+
+function round(value: number, decimals: number): number {
+  const pow = 10 ** decimals;
+  return Math.round(value * pow) / pow;
+}
+
+export function deriveAdvancedRiskProfile(risk: number): Pick<
+  AdvancedSettings,
+  | "liveTradeCooldownMs"
+  | "liveTradeNotionalCap"
+  | "liveTradeSlippageBuffer"
+  | "liveTradeRebalanceSellCooldownMs"
+  | "conversionBuyBuffer"
+  | "conversionSellBuffer"
+  | "conversionFeeBuffer"
+> {
+  const r = clampRisk(risk);
+  const t = r / 100;
+
+  return {
+    liveTradeCooldownMs: Math.round(120_000 - t * 90_000), // 120s -> 30s
+    liveTradeNotionalCap: round(10 + t * 25, 2), // 10 -> 35
+    liveTradeSlippageBuffer: round(1.008 - t * 0.006, 4), // 1.008 -> 1.002
+    liveTradeRebalanceSellCooldownMs: Math.round(1_800_000 - t * 1_500_000), // 30m -> 5m
+    conversionBuyBuffer: round(1.008 - t * 0.006, 4), // 1.008 -> 1.002
+    conversionSellBuffer: round(1.003 - t * 0.002, 4), // 1.003 -> 1.001
+    conversionFeeBuffer: round(1.003 - t * 0.002, 4) // 1.003 -> 1.001
+  };
 }
 
 export function deriveSettings(basic: Pick<BasicSettings, "risk" | "tradeMode">): DerivedSettings {

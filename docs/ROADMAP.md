@@ -8,6 +8,7 @@
 - API key protection + UI server-side key injection
 - Onboarding (Basic) + dashboard (status/decisions/orders) skeleton
 - Settings UI (Basic/Advanced) + integration status endpoints
+- Config export/import + advanced execution policy controls (risk-linked by default, manual override available)
 - RSS aggregation endpoint with disk cache (not yet used for trading)
 
 ## Phase 0.5 — Reference review + POC selection (now)

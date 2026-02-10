@@ -173,7 +173,7 @@ export function SettingsBasic(): JSX.Element {
       <div className="row cols-2">
         <div>
           <label className="label">Risk</label>
-          <input className="field" type="range" min={0} max={100} value={risk} onChange={(e) => setRisk(Number.parseInt(e.target.value, 10))} />
+          <input className="field range" type="range" min={0} max={100} value={risk} onChange={(e) => setRisk(Number.parseInt(e.target.value, 10))} />
           <div className="subtitle">
             Risk: <b>{risk}</b> — Derived: max positions <b>{derivedHint.maxOpenPositions}</b>, max position size <b>{derivedHint.maxPositionPct}%</b>
           </div>
@@ -213,7 +213,7 @@ export function SettingsBasic(): JSX.Element {
         <div>
           <label className="label">AI min trade confidence (%)</label>
           <input
-            className="field"
+            className="field range"
             type="range"
             min={0}
             max={100}

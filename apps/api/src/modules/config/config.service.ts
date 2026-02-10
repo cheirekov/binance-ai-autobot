@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { BadRequestException, Injectable } from "@nestjs/common";
 import type { AppConfig, BasicSetupRequest, DerivedSettings } from "@autobot/shared";
-import { AppConfigSchema, CONFIG_VERSION, defaultHomeStableCoin, deriveSettings } from "@autobot/shared";
+import { AppConfigSchema, CONFIG_VERSION, defaultHomeStableCoin, deriveAdvancedRiskProfile, deriveSettings } from "@autobot/shared";
 import bcrypt from "bcryptjs";
 
 type Writeable<T> = { -readonly [K in keyof T]: T[K] };
@@ -65,6 +65,7 @@ export class ConfigService {
     const passwordHash = bcrypt.hashSync(request.uiPassword, 12);
 
     const derived: DerivedSettings = deriveSettings({ risk: request.risk, tradeMode: request.tradeMode });
+    const riskProfile = deriveAdvancedRiskProfile(request.risk);
 
     const config: Writeable<AppConfig> = {
       version: CONFIG_VERSION,
@@ -98,7 +99,9 @@ export class ConfigService {
         uiPort: Number.parseInt(process.env.UI_PORT ?? "4173", 10),
         neverTradeSymbols: [],
         autoBlacklistEnabled: true,
-        autoBlacklistTtlMinutes: 180
+        autoBlacklistTtlMinutes: 180,
+        followRiskProfile: true,
+        ...riskProfile
       },
       expert: {},
       derived
@@ -130,10 +133,18 @@ export class ConfigService {
     }
 
     const derived = deriveSettings({ risk: nextBasic.risk, tradeMode: nextBasic.tradeMode });
+    const nextAdvanced = current.advanced.followRiskProfile
+      ? {
+          ...current.advanced,
+          ...deriveAdvancedRiskProfile(nextBasic.risk)
+        }
+      : current.advanced;
+
     const next = AppConfigSchema.parse({
       ...current,
       updatedAt: new Date().toISOString(),
       basic: nextBasic,
+      advanced: nextAdvanced,
       derived
     });
 
@@ -152,6 +163,14 @@ export class ConfigService {
     neverTradeSymbols?: string[];
     autoBlacklistEnabled?: boolean;
     autoBlacklistTtlMinutes?: number;
+    followRiskProfile?: boolean;
+    liveTradeCooldownMs?: number;
+    liveTradeNotionalCap?: number;
+    liveTradeSlippageBuffer?: number;
+    liveTradeRebalanceSellCooldownMs?: number;
+    conversionBuyBuffer?: number;
+    conversionSellBuffer?: number;
+    conversionFeeBuffer?: number;
   }): AppConfig {
     const current = this.load();
     if (!current) {
@@ -195,7 +214,7 @@ export class ConfigService {
       return trimmed;
     })();
 
-    const nextAdvanced = {
+    const nextAdvancedBase = {
       ...current.advanced,
       ...patch,
       ...(apiBaseUrl === undefined && patch.apiBaseUrl !== undefined ? { apiBaseUrl: undefined } : {}),
@@ -206,6 +225,13 @@ export class ConfigService {
       ...(uiHost ? { uiHost } : {}),
       ...(neverTradeSymbols ? { neverTradeSymbols } : {})
     };
+
+    const nextAdvanced = nextAdvancedBase.followRiskProfile
+      ? {
+          ...nextAdvancedBase,
+          ...deriveAdvancedRiskProfile(current.basic.risk)
+        }
+      : nextAdvancedBase;
 
     const next = AppConfigSchema.parse({
       ...current,
@@ -289,12 +315,21 @@ export class ConfigService {
 
   importConfig(config: AppConfig): AppConfig {
     const derived = deriveSettings({ risk: config.basic.risk, tradeMode: config.basic.tradeMode });
-    const next = AppConfigSchema.parse({
+    const parsed = AppConfigSchema.parse({
       ...config,
       version: CONFIG_VERSION,
       updatedAt: new Date().toISOString(),
       derived
     });
+    const next = parsed.advanced.followRiskProfile
+      ? AppConfigSchema.parse({
+          ...parsed,
+          advanced: {
+            ...parsed.advanced,
+            ...deriveAdvancedRiskProfile(parsed.basic.risk)
+          }
+        })
+      : parsed;
     this.save(next);
     return next;
   }

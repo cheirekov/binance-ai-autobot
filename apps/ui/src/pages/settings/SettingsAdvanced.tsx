@@ -28,6 +28,14 @@ export function SettingsAdvanced(): JSX.Element {
   const [neverTradeSymbolsText, setNeverTradeSymbolsText] = useState("");
   const [autoBlacklistEnabled, setAutoBlacklistEnabled] = useState(true);
   const [autoBlacklistTtlMinutes, setAutoBlacklistTtlMinutes] = useState(180);
+  const [followRiskProfile, setFollowRiskProfile] = useState(true);
+  const [liveTradeCooldownMs, setLiveTradeCooldownMs] = useState(60000);
+  const [liveTradeNotionalCap, setLiveTradeNotionalCap] = useState(25);
+  const [liveTradeSlippageBuffer, setLiveTradeSlippageBuffer] = useState(1.005);
+  const [liveTradeRebalanceSellCooldownMs, setLiveTradeRebalanceSellCooldownMs] = useState(900000);
+  const [conversionBuyBuffer, setConversionBuyBuffer] = useState(1.005);
+  const [conversionSellBuffer, setConversionSellBuffer] = useState(1.002);
+  const [conversionFeeBuffer, setConversionFeeBuffer] = useState(1.002);
 
   const [rotatingApiKey, setRotatingApiKey] = useState(false);
   const [rotatedApiKey, setRotatedApiKey] = useState<string | null>(null);
@@ -52,6 +60,14 @@ export function SettingsAdvanced(): JSX.Element {
     setNeverTradeSymbolsText((config.advanced.neverTradeSymbols ?? []).join("\n"));
     setAutoBlacklistEnabled(config.advanced.autoBlacklistEnabled);
     setAutoBlacklistTtlMinutes(config.advanced.autoBlacklistTtlMinutes);
+    setFollowRiskProfile(config.advanced.followRiskProfile);
+    setLiveTradeCooldownMs(config.advanced.liveTradeCooldownMs);
+    setLiveTradeNotionalCap(config.advanced.liveTradeNotionalCap);
+    setLiveTradeSlippageBuffer(config.advanced.liveTradeSlippageBuffer);
+    setLiveTradeRebalanceSellCooldownMs(config.advanced.liveTradeRebalanceSellCooldownMs);
+    setConversionBuyBuffer(config.advanced.conversionBuyBuffer);
+    setConversionSellBuffer(config.advanced.conversionSellBuffer);
+    setConversionFeeBuffer(config.advanced.conversionFeeBuffer);
   }, [config?.advanced]);
 
   async function onExport(): Promise<void> {
@@ -131,7 +147,15 @@ export function SettingsAdvanced(): JSX.Element {
         uiPort,
         neverTradeSymbols,
         autoBlacklistEnabled,
-        autoBlacklistTtlMinutes
+        autoBlacklistTtlMinutes,
+        followRiskProfile,
+        liveTradeCooldownMs,
+        liveTradeNotionalCap,
+        liveTradeSlippageBuffer,
+        liveTradeRebalanceSellCooldownMs,
+        conversionBuyBuffer,
+        conversionSellBuffer,
+        conversionFeeBuffer
       });
       setSavedAt(new Date().toISOString());
     } catch (e) {
@@ -308,6 +332,146 @@ export function SettingsAdvanced(): JSX.Element {
             placeholder="https://api.binance.com"
           />
           <div className="subtitle">Leave empty to use the selected environment default.</div>
+        </div>
+
+        <div className="card">
+          <div className="title">Execution policy</div>
+          <div className="subtitle">
+            These controls are part of <code>config.json</code> and exported/imported with the rest of your settings.
+          </div>
+
+          <label className="label" style={{ marginTop: 12 }}>
+            Follow Basic risk profile
+          </label>
+          <select className="field" value={followRiskProfile ? "on" : "off"} onChange={(e) => setFollowRiskProfile(e.target.value === "on")}>
+            <option value="on">On (recommended)</option>
+            <option value="off">Off (manual override)</option>
+          </select>
+          <div className="subtitle">
+            {followRiskProfile
+              ? `Managed by Basic risk slider (current risk ${config.basic?.risk ?? "?"}).`
+              : "Manual mode: these values stay fixed until you change them here."}
+          </div>
+
+          <div className="row cols-2" style={{ marginTop: 12 }}>
+            <div>
+              <label className="label">Live trade cooldown (ms)</label>
+              <input
+                className="field"
+                type="number"
+                min={5000}
+                max={86400000}
+                value={liveTradeCooldownMs}
+                disabled={followRiskProfile}
+                onChange={(e) => {
+                  const next = Number.parseInt(e.target.value, 10);
+                  if (Number.isFinite(next)) setLiveTradeCooldownMs(next);
+                }}
+              />
+            </div>
+            <div>
+              <label className="label">Live trade notional cap</label>
+              <input
+                className="field"
+                type="number"
+                min={1}
+                max={1000000}
+                step={0.01}
+                value={liveTradeNotionalCap}
+                disabled={followRiskProfile}
+                onChange={(e) => {
+                  const next = Number.parseFloat(e.target.value);
+                  if (Number.isFinite(next)) setLiveTradeNotionalCap(next);
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="row cols-2" style={{ marginTop: 12 }}>
+            <div>
+              <label className="label">Slippage buffer</label>
+              <input
+                className="field"
+                type="number"
+                min={1}
+                max={1.1}
+                step={0.0001}
+                value={liveTradeSlippageBuffer}
+                disabled={followRiskProfile}
+                onChange={(e) => {
+                  const next = Number.parseFloat(e.target.value);
+                  if (Number.isFinite(next)) setLiveTradeSlippageBuffer(next);
+                }}
+              />
+            </div>
+            <div>
+              <label className="label">Rebalance sell cooldown (ms)</label>
+              <input
+                className="field"
+                type="number"
+                min={0}
+                max={86400000}
+                value={liveTradeRebalanceSellCooldownMs}
+                disabled={followRiskProfile}
+                onChange={(e) => {
+                  const next = Number.parseInt(e.target.value, 10);
+                  if (Number.isFinite(next)) setLiveTradeRebalanceSellCooldownMs(next);
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="row cols-2" style={{ marginTop: 12 }}>
+            <div>
+              <label className="label">Conversion buy buffer</label>
+              <input
+                className="field"
+                type="number"
+                min={1}
+                max={1.1}
+                step={0.0001}
+                value={conversionBuyBuffer}
+                disabled={followRiskProfile}
+                onChange={(e) => {
+                  const next = Number.parseFloat(e.target.value);
+                  if (Number.isFinite(next)) setConversionBuyBuffer(next);
+                }}
+              />
+            </div>
+            <div>
+              <label className="label">Conversion sell buffer</label>
+              <input
+                className="field"
+                type="number"
+                min={1}
+                max={1.1}
+                step={0.0001}
+                value={conversionSellBuffer}
+                disabled={followRiskProfile}
+                onChange={(e) => {
+                  const next = Number.parseFloat(e.target.value);
+                  if (Number.isFinite(next)) setConversionSellBuffer(next);
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label className="label">Conversion fee buffer</label>
+            <input
+              className="field"
+              type="number"
+              min={1}
+              max={1.1}
+              step={0.0001}
+              value={conversionFeeBuffer}
+              disabled={followRiskProfile}
+              onChange={(e) => {
+                const next = Number.parseFloat(e.target.value);
+                if (Number.isFinite(next)) setConversionFeeBuffer(next);
+              }}
+            />
+          </div>
         </div>
 
         <div className="card">

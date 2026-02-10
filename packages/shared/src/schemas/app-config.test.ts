@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveSettings } from "./app-config";
+import { deriveAdvancedRiskProfile, deriveSettings } from "./app-config";
 
 describe("deriveSettings", () => {
   it("maps risk to sane defaults", () => {
@@ -9,5 +9,19 @@ describe("deriveSettings", () => {
     expect(deriveSettings({ risk: 0, tradeMode: "SPOT_GRID" }).allowGrid).toBe(true);
     expect(deriveSettings({ risk: 0, tradeMode: "SPOT" }).allowFutures).toBe(false);
     expect(deriveSettings({ risk: 100, tradeMode: "SPOT" }).allowSpot).toBe(true);
+  });
+});
+
+describe("deriveAdvancedRiskProfile", () => {
+  it("stays within safe ranges", () => {
+    const low = deriveAdvancedRiskProfile(0);
+    const high = deriveAdvancedRiskProfile(100);
+
+    expect(low.liveTradeCooldownMs).toBeGreaterThan(high.liveTradeCooldownMs);
+    expect(low.liveTradeNotionalCap).toBeLessThan(high.liveTradeNotionalCap);
+    expect(low.liveTradeSlippageBuffer).toBeGreaterThan(high.liveTradeSlippageBuffer);
+    expect(low.conversionBuyBuffer).toBeGreaterThan(high.conversionBuyBuffer);
+    expect(low.conversionSellBuffer).toBeGreaterThanOrEqual(high.conversionSellBuffer);
+    expect(low.conversionFeeBuffer).toBeGreaterThanOrEqual(high.conversionFeeBuffer);
   });
 });

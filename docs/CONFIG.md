@@ -34,6 +34,15 @@ Default:
 - Binance environment (Mainnet / Spot testnet) + optional base URL override
   - Mainnet default: `https://api.binance.com`
   - Spot testnet default: `https://demo-api.binance.com`
+- Execution policy controls (saved in `config.json`, included in export/import):
+  - `followRiskProfile` (recommended): when enabled, runtime safety limits are auto-derived from Basic risk
+  - `liveTradeCooldownMs`
+  - `liveTradeNotionalCap`
+  - `liveTradeSlippageBuffer`
+  - `liveTradeRebalanceSellCooldownMs`
+  - `conversionBuyBuffer`
+  - `conversionSellBuffer`
+  - `conversionFeeBuffer`
 
 ## Derived defaults
 
@@ -46,11 +55,20 @@ Current derived fields include:
 - `maxPositionPct`
 - `allowSpot`, `allowGrid`, `allowFutures`
 
-## Live execution safety (env)
+## Live execution safety (config-first)
 
-In addition to UI settings, Docker `.env` variables provide hard safety rails:
+Runtime safety values are stored in `config.json` and configurable from UI Advanced.
+
+- `followRiskProfile=true` keeps these values aligned with Basic risk slider.
+- `followRiskProfile=false` allows manual override from Advanced.
+
+Environment variables remain as fallback defaults:
 
 - `ALLOW_MAINNET_LIVE_TRADING` (default `false`): blocks MAINNET live orders unless explicitly enabled.
-- `LIVE_TRADE_COOLDOWN_MS` (default `60000`): minimum time between real orders.
-- `LIVE_TRADE_NOTIONAL_CAP` (default `25`): max quote notional per order.
-- `LIVE_TRADE_SLIPPAGE_BUFFER` (default `1.005`): conservative buffer used only for a balance check.
+- `LIVE_TRADE_COOLDOWN_MS`
+- `LIVE_TRADE_NOTIONAL_CAP`
+- `LIVE_TRADE_SLIPPAGE_BUFFER`
+- `LIVE_TRADE_REBALANCE_SELL_COOLDOWN_MS`
+- `CONVERSION_BUY_BUFFER`
+- `CONVERSION_SELL_BUFFER`
+- `CONVERSION_FEE_BUFFER`

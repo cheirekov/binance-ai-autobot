@@ -36,5 +36,7 @@ The bot engine is an early-stage engine to enable UI wiring + safe execution:
 - `POST /bot/start` → phase: `EXAMINING` then `TRADING`
 - In paper mode: periodically appends decisions and creates stub orders.
 - In live mode (Spot testnet only by default): can place real Spot `MARKET` orders using CCXT (demo trading) with safety caps/cooldowns.
+- If home-stable balance is insufficient, a conversion router attempts direct or two-hop conversion from other assets before skipping the trade.
+- Runtime execution controls are config-driven (export/import safe) and can follow the Basic risk profile automatically.
 
 This is intentionally replaceable with a real strategy engine later.

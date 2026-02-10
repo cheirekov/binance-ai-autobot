@@ -210,7 +210,7 @@ export function OnboardingBasic(): JSX.Element {
         <div>
           <label className="label">AI min trade confidence (%)</label>
           <input
-            className="field"
+            className="field range"
             type="range"
             min={0}
             max={100}
@@ -276,7 +276,7 @@ export function OnboardingBasic(): JSX.Element {
         <div>
           <label className="label">Risk (safe → “I’m feeling crazy today”)</label>
           <input
-            className="field"
+            className="field range"
             type="range"
             min={0}
             max={100}
