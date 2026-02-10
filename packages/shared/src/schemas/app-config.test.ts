@@ -23,5 +23,9 @@ describe("deriveAdvancedRiskProfile", () => {
     expect(low.conversionBuyBuffer).toBeGreaterThan(high.conversionBuyBuffer);
     expect(low.conversionSellBuffer).toBeGreaterThanOrEqual(high.conversionSellBuffer);
     expect(low.conversionFeeBuffer).toBeGreaterThanOrEqual(high.conversionFeeBuffer);
+    expect(low.symbolEntryCooldownMs).toBeGreaterThan(high.symbolEntryCooldownMs);
+    expect(low.maxConsecutiveEntriesPerSymbol).toBeLessThanOrEqual(high.maxConsecutiveEntriesPerSymbol);
+    expect(low.conversionTopUpReserveMultiplier).toBeGreaterThan(high.conversionTopUpReserveMultiplier);
+    expect(low.conversionTopUpCooldownMs).toBeGreaterThan(high.conversionTopUpCooldownMs);
   });
 });

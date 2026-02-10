@@ -14,6 +14,7 @@ import {
   type BinanceMarketOrderResponse
 } from "../integrations/binance-trading.service";
 import { ConversionRouterService } from "../integrations/conversion-router.service";
+import { getPairPolicyBlockReason } from "../policy/trading-policy";
 import { UniverseService } from "../universe/universe.service";
 
 function atomicWriteFile(filePath: string, data: string): void {
@@ -93,6 +94,65 @@ export class BotEngineService {
   private addSymbolBlacklist(state: BotState, entry: SymbolBlacklistEntry): BotState {
     const next = [entry, ...(state.symbolBlacklist ?? [])];
     return { ...state, symbolBlacklist: next.slice(0, 200) };
+  }
+
+  private getRecentSymbolOrders(state: BotState, symbol: string): Order[] {
+    const normalized = symbol.trim().toUpperCase();
+    return [...state.activeOrders, ...state.orderHistory]
+      .filter((o) => o.symbol.trim().toUpperCase() === normalized && (o.status === "NEW" || o.status === "FILLED"))
+      .sort((a, b) => {
+        const ta = Date.parse(a.ts);
+        const tb = Date.parse(b.ts);
+        if (!Number.isFinite(ta) && !Number.isFinite(tb)) return 0;
+        if (!Number.isFinite(ta)) return 1;
+        if (!Number.isFinite(tb)) return -1;
+        return tb - ta;
+      });
+  }
+
+  private getEntryGuard(params: { symbol: string; state: BotState }): { summary: string; details?: Record<string, unknown> } | null {
+    const config = this.configService.load();
+    if (!config) return null;
+
+    const history = this.getRecentSymbolOrders(params.state, params.symbol);
+    const cooldownMs = config.advanced.symbolEntryCooldownMs;
+    if (cooldownMs > 0) {
+      const lastBuy = history.find((o) => o.side === "BUY");
+      const lastBuyAt = lastBuy ? Date.parse(lastBuy.ts) : Number.NaN;
+      if (Number.isFinite(lastBuyAt)) {
+        const elapsed = Date.now() - lastBuyAt;
+        if (elapsed < cooldownMs) {
+          return {
+            summary: "Entry cooldown active",
+            details: {
+              cooldownMs,
+              remainingMs: Math.max(0, Math.round(cooldownMs - elapsed)),
+              lastBuyTs: lastBuy?.ts
+            }
+          };
+        }
+      }
+    }
+
+    const maxConsecutiveEntries = config.advanced.maxConsecutiveEntriesPerSymbol;
+    if (maxConsecutiveEntries > 0) {
+      let consecutiveBuys = 0;
+      for (const order of history) {
+        if (order.side === "SELL") break;
+        if (order.side === "BUY") consecutiveBuys += 1;
+      }
+      if (consecutiveBuys >= maxConsecutiveEntries) {
+        return {
+          summary: `Max consecutive entries reached (${maxConsecutiveEntries})`,
+          details: {
+            consecutiveBuys,
+            maxConsecutiveEntries
+          }
+        };
+      }
+    }
+
+    return null;
   }
 
   start(): void {
@@ -181,6 +241,17 @@ export class BotEngineService {
           const best = snap.candidates?.find((c) => {
             if (!c.symbol) return false;
             if (this.isSymbolBlocked(c.symbol, current)) return false;
+            const policyReason = getPairPolicyBlockReason({
+              symbol: c.symbol,
+              baseAsset: c.baseAsset,
+              quoteAsset: c.quoteAsset,
+              traderRegion: config?.basic.traderRegion ?? "NON_EEA",
+              neverTradeSymbols: config?.advanced.neverTradeSymbols,
+              excludeStableStablePairs: config?.advanced.excludeStableStablePairs,
+              enforceRegionPolicy: config?.advanced.enforceRegionPolicy
+            });
+            if (policyReason) return false;
+            if (this.getEntryGuard({ symbol: c.symbol, state: current })) return false;
             if (liveTrading && c.quoteAsset && c.quoteAsset.toUpperCase() !== homeStable) return false;
             return true;
           });
@@ -200,6 +271,31 @@ export class BotEngineService {
           decisions: alreadyLogged
             ? current.decisions
             : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+        } satisfies BotState;
+        this.save(next);
+        return;
+      }
+
+      const entryGuard = this.getEntryGuard({ symbol: candidateSymbol, state: current });
+      if (entryGuard) {
+        const summary = `Skip ${candidateSymbol}: ${entryGuard.summary}`;
+        const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+        const next = {
+          ...current,
+          activeOrders: filled.activeOrders,
+          orderHistory: filled.orderHistory,
+          decisions: alreadyLogged
+            ? current.decisions
+            : [
+                {
+                  id: crypto.randomUUID(),
+                  ts: new Date().toISOString(),
+                  kind: "SKIP",
+                  summary,
+                  details: entryGuard.details
+                },
+                ...current.decisions
+              ].slice(0, 200)
         } satisfies BotState;
         this.save(next);
         return;
@@ -248,6 +344,29 @@ export class BotEngineService {
 
         try {
           const rules = await this.marketData.getSymbolRules(candidateSymbol);
+          const pairPolicyReason = getPairPolicyBlockReason({
+            symbol: candidateSymbol,
+            baseAsset: rules.baseAsset,
+            quoteAsset: rules.quoteAsset,
+            traderRegion: config?.basic.traderRegion ?? "NON_EEA",
+            neverTradeSymbols: config?.advanced.neverTradeSymbols,
+            excludeStableStablePairs: config?.advanced.excludeStableStablePairs,
+            enforceRegionPolicy: config?.advanced.enforceRegionPolicy
+          });
+          if (pairPolicyReason) {
+            const summary = `Skip ${candidateSymbol}: ${pairPolicyReason}`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
           if (rules.quoteAsset !== homeStable) {
             const summary = `Skip ${candidateSymbol}: Quote asset ${rules.quoteAsset} ≠ home stable ${homeStable}`;
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
@@ -334,6 +453,7 @@ export class BotEngineService {
                     status: response.status,
                     executedQty: response.executedQty,
                     cummulativeQuoteQty: response.cummulativeQuoteQty,
+                    reason,
                     ...details
                   }
                 },
@@ -458,6 +578,51 @@ export class BotEngineService {
           }
           if (Number.isFinite(bufferedCost) && bufferedCost > quoteFree) {
             const shortfall = bufferedCost - quoteFree;
+            const conversionTopUpReserveMultiplier = Math.max(1, config?.advanced.conversionTopUpReserveMultiplier ?? 2);
+            const conversionTarget = shortfall * conversionTopUpReserveMultiplier;
+            const conversionTopUpCooldownMs = Math.max(
+              0,
+              config?.advanced.conversionTopUpCooldownMs ??
+                Number.parseInt(process.env.CONVERSION_TOP_UP_COOLDOWN_MS ?? "90000", 10)
+            );
+            if (conversionTopUpCooldownMs > 0) {
+              const lastConversionTrade = current.decisions.find((d) => {
+                if (d.kind !== "TRADE") return false;
+                const details = d.details as Record<string, unknown> | undefined;
+                return details?.mode === "conversion-router";
+              });
+              const lastConversionAt = lastConversionTrade ? Date.parse(lastConversionTrade.ts) : Number.NaN;
+              if (Number.isFinite(lastConversionAt) && Date.now() - lastConversionAt < conversionTopUpCooldownMs) {
+                const summary = `Skip ${candidateSymbol}: Conversion cooldown active`;
+                const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+                const next = {
+                  ...current,
+                  activeOrders: filled.activeOrders,
+                  orderHistory: filled.orderHistory,
+                  decisions: alreadyLogged
+                    ? current.decisions
+                    : [
+                        {
+                          id: crypto.randomUUID(),
+                          ts: new Date().toISOString(),
+                          kind: "SKIP",
+                          summary,
+                          details: {
+                            conversionTopUpCooldownMs,
+                            remainingMs: Math.max(0, Math.round(conversionTopUpCooldownMs - (Date.now() - lastConversionAt))),
+                            shortfall: Number(shortfall.toFixed(6)),
+                            conversionTarget: Number(conversionTarget.toFixed(6))
+                          }
+                        },
+                        ...current.decisions
+                      ].slice(0, 200),
+                  lastError: undefined
+                } satisfies BotState;
+                this.save(next);
+                return;
+              }
+            }
+
             const candidateBaseAsset = rules.baseAsset.toUpperCase();
             const rebalanceSellCooldownMs =
               config?.advanced.liveTradeRebalanceSellCooldownMs ??
@@ -492,7 +657,7 @@ export class BotEngineService {
                 sourceAsset,
                 sourceFree,
                 targetAsset: homeStable,
-                requiredTarget: shortfall,
+                requiredTarget: conversionTarget,
                 allowTwoHop: true
               });
               if (!conversion.ok || conversion.legs.length === 0) continue;
@@ -508,6 +673,8 @@ export class BotEngineService {
                   reason: `${leg.reason}${leg.bridgeAsset ? ` via ${leg.bridgeAsset}` : ""}`,
                   details: {
                     shortfall: Number(shortfall.toFixed(6)),
+                    conversionTarget: Number(conversionTarget.toFixed(6)),
+                    reserveMultiplier: conversionTopUpReserveMultiplier,
                     sourceAsset,
                     route: leg.route,
                     bridgeAsset: leg.bridgeAsset,

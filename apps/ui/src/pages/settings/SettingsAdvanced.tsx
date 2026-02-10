@@ -36,6 +36,12 @@ export function SettingsAdvanced(): JSX.Element {
   const [conversionBuyBuffer, setConversionBuyBuffer] = useState(1.005);
   const [conversionSellBuffer, setConversionSellBuffer] = useState(1.002);
   const [conversionFeeBuffer, setConversionFeeBuffer] = useState(1.002);
+  const [excludeStableStablePairs, setExcludeStableStablePairs] = useState(true);
+  const [enforceRegionPolicy, setEnforceRegionPolicy] = useState(true);
+  const [symbolEntryCooldownMs, setSymbolEntryCooldownMs] = useState(120000);
+  const [maxConsecutiveEntriesPerSymbol, setMaxConsecutiveEntriesPerSymbol] = useState(3);
+  const [conversionTopUpReserveMultiplier, setConversionTopUpReserveMultiplier] = useState(2);
+  const [conversionTopUpCooldownMs, setConversionTopUpCooldownMs] = useState(90000);
 
   const [rotatingApiKey, setRotatingApiKey] = useState(false);
   const [rotatedApiKey, setRotatedApiKey] = useState<string | null>(null);
@@ -68,6 +74,12 @@ export function SettingsAdvanced(): JSX.Element {
     setConversionBuyBuffer(config.advanced.conversionBuyBuffer);
     setConversionSellBuffer(config.advanced.conversionSellBuffer);
     setConversionFeeBuffer(config.advanced.conversionFeeBuffer);
+    setExcludeStableStablePairs(config.advanced.excludeStableStablePairs);
+    setEnforceRegionPolicy(config.advanced.enforceRegionPolicy);
+    setSymbolEntryCooldownMs(config.advanced.symbolEntryCooldownMs);
+    setMaxConsecutiveEntriesPerSymbol(config.advanced.maxConsecutiveEntriesPerSymbol);
+    setConversionTopUpReserveMultiplier(config.advanced.conversionTopUpReserveMultiplier);
+    setConversionTopUpCooldownMs(config.advanced.conversionTopUpCooldownMs);
   }, [config?.advanced]);
 
   async function onExport(): Promise<void> {
@@ -155,7 +167,13 @@ export function SettingsAdvanced(): JSX.Element {
         liveTradeRebalanceSellCooldownMs,
         conversionBuyBuffer,
         conversionSellBuffer,
-        conversionFeeBuffer
+        conversionFeeBuffer,
+        excludeStableStablePairs,
+        enforceRegionPolicy,
+        symbolEntryCooldownMs,
+        maxConsecutiveEntriesPerSymbol,
+        conversionTopUpReserveMultiplier,
+        conversionTopUpCooldownMs
       });
       setSavedAt(new Date().toISOString());
     } catch (e) {
@@ -471,6 +489,100 @@ export function SettingsAdvanced(): JSX.Element {
                 if (Number.isFinite(next)) setConversionFeeBuffer(next);
               }}
             />
+          </div>
+
+          <div className="row cols-2" style={{ marginTop: 12 }}>
+            <div>
+              <label className="label">Exclude stable/stable pairs</label>
+              <select
+                className="field"
+                value={excludeStableStablePairs ? "on" : "off"}
+                onChange={(e) => setExcludeStableStablePairs(e.target.value === "on")}
+              >
+                <option value="on">On (recommended)</option>
+                <option value="off">Off</option>
+              </select>
+              <div className="subtitle">Skips pairs like USDT/USDC and FDUSD/USDC.</div>
+            </div>
+            <div>
+              <label className="label">Enforce regional policy</label>
+              <select
+                className="field"
+                value={enforceRegionPolicy ? "on" : "off"}
+                onChange={(e) => setEnforceRegionPolicy(e.target.value === "on")}
+              >
+                <option value="on">On (recommended)</option>
+                <option value="off">Off</option>
+              </select>
+              <div className="subtitle">Applies the EEA quote-asset restrictions in bot policy.</div>
+            </div>
+          </div>
+
+          <div className="row cols-2" style={{ marginTop: 12 }}>
+            <div>
+              <label className="label">Symbol entry cooldown (ms)</label>
+              <input
+                className="field"
+                type="number"
+                min={0}
+                max={86400000}
+                value={symbolEntryCooldownMs}
+                disabled={followRiskProfile}
+                onChange={(e) => {
+                  const next = Number.parseInt(e.target.value, 10);
+                  if (Number.isFinite(next)) setSymbolEntryCooldownMs(next);
+                }}
+              />
+            </div>
+            <div>
+              <label className="label">Max consecutive entries / symbol</label>
+              <input
+                className="field"
+                type="number"
+                min={1}
+                max={50}
+                value={maxConsecutiveEntriesPerSymbol}
+                disabled={followRiskProfile}
+                onChange={(e) => {
+                  const next = Number.parseInt(e.target.value, 10);
+                  if (Number.isFinite(next)) setMaxConsecutiveEntriesPerSymbol(next);
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="row cols-2" style={{ marginTop: 12 }}>
+            <div>
+              <label className="label">Conversion top-up reserve multiplier</label>
+              <input
+                className="field"
+                type="number"
+                min={1}
+                max={10}
+                step={0.01}
+                value={conversionTopUpReserveMultiplier}
+                disabled={followRiskProfile}
+                onChange={(e) => {
+                  const next = Number.parseFloat(e.target.value);
+                  if (Number.isFinite(next)) setConversionTopUpReserveMultiplier(next);
+                }}
+              />
+            </div>
+            <div>
+              <label className="label">Conversion top-up cooldown (ms)</label>
+              <input
+                className="field"
+                type="number"
+                min={0}
+                max={86400000}
+                value={conversionTopUpCooldownMs}
+                disabled={followRiskProfile}
+                onChange={(e) => {
+                  const next = Number.parseInt(e.target.value, 10);
+                  if (Number.isFinite(next)) setConversionTopUpCooldownMs(next);
+                }}
+              />
+            </div>
           </div>
         </div>
 

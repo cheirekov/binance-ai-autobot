@@ -45,6 +45,12 @@ On API startup, an automatic migration normalizes existing `config.json` to the 
   - `conversionBuyBuffer`
   - `conversionSellBuffer`
   - `conversionFeeBuffer`
+  - `excludeStableStablePairs`
+  - `enforceRegionPolicy`
+  - `symbolEntryCooldownMs`
+  - `maxConsecutiveEntriesPerSymbol`
+  - `conversionTopUpReserveMultiplier`
+  - `conversionTopUpCooldownMs`
 
 ## Derived defaults
 

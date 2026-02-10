@@ -91,7 +91,13 @@ export const AdvancedSettingsSchema = z.object({
   liveTradeRebalanceSellCooldownMs: z.number().int().min(0).max(86_400_000).default(900_000),
   conversionBuyBuffer: z.number().min(1).max(1.1).default(1.005),
   conversionSellBuffer: z.number().min(1).max(1.1).default(1.002),
-  conversionFeeBuffer: z.number().min(1).max(1.1).default(1.002)
+  conversionFeeBuffer: z.number().min(1).max(1.1).default(1.002),
+  excludeStableStablePairs: z.boolean().default(true),
+  enforceRegionPolicy: z.boolean().default(true),
+  symbolEntryCooldownMs: z.number().int().min(0).max(86_400_000).default(120_000),
+  maxConsecutiveEntriesPerSymbol: z.number().int().min(1).max(50).default(3),
+  conversionTopUpReserveMultiplier: z.number().min(1).max(10).default(2),
+  conversionTopUpCooldownMs: z.number().int().min(0).max(86_400_000).default(90_000)
 });
 export type AdvancedSettings = z.infer<typeof AdvancedSettingsSchema>;
 
@@ -142,6 +148,10 @@ export function deriveAdvancedRiskProfile(risk: number): Pick<
   | "conversionBuyBuffer"
   | "conversionSellBuffer"
   | "conversionFeeBuffer"
+  | "symbolEntryCooldownMs"
+  | "maxConsecutiveEntriesPerSymbol"
+  | "conversionTopUpReserveMultiplier"
+  | "conversionTopUpCooldownMs"
 > {
   const r = clampRisk(risk);
   const t = r / 100;
@@ -153,7 +163,11 @@ export function deriveAdvancedRiskProfile(risk: number): Pick<
     liveTradeRebalanceSellCooldownMs: Math.round(1_800_000 - t * 1_500_000), // 30m -> 5m
     conversionBuyBuffer: round(1.008 - t * 0.006, 4), // 1.008 -> 1.002
     conversionSellBuffer: round(1.003 - t * 0.002, 4), // 1.003 -> 1.001
-    conversionFeeBuffer: round(1.003 - t * 0.002, 4) // 1.003 -> 1.001
+    conversionFeeBuffer: round(1.003 - t * 0.002, 4), // 1.003 -> 1.001
+    symbolEntryCooldownMs: Math.round(180_000 - t * 120_000), // 180s -> 60s
+    maxConsecutiveEntriesPerSymbol: Math.max(1, Math.round(2 + t * 2)), // 2 -> 4
+    conversionTopUpReserveMultiplier: round(3 - t * 1, 2), // 3.0 -> 2.0
+    conversionTopUpCooldownMs: Math.round(240_000 - t * 150_000) // 240s -> 90s
   };
 }
 

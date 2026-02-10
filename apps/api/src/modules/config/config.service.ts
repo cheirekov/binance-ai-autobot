@@ -135,6 +135,8 @@ export class ConfigService {
         autoBlacklistEnabled: true,
         autoBlacklistTtlMinutes: 180,
         followRiskProfile: true,
+        excludeStableStablePairs: true,
+        enforceRegionPolicy: true,
         ...riskProfile
       },
       expert: {},
@@ -205,6 +207,12 @@ export class ConfigService {
     conversionBuyBuffer?: number;
     conversionSellBuffer?: number;
     conversionFeeBuffer?: number;
+    excludeStableStablePairs?: boolean;
+    enforceRegionPolicy?: boolean;
+    symbolEntryCooldownMs?: number;
+    maxConsecutiveEntriesPerSymbol?: number;
+    conversionTopUpReserveMultiplier?: number;
+    conversionTopUpCooldownMs?: number;
   }): AppConfig {
     const current = this.load();
     if (!current) {

@@ -23,7 +23,13 @@ const AdvancedUpdateSchema = z.object({
   liveTradeRebalanceSellCooldownMs: z.number().int().min(0).max(86_400_000).optional(),
   conversionBuyBuffer: z.number().min(1).max(1.1).optional(),
   conversionSellBuffer: z.number().min(1).max(1.1).optional(),
-  conversionFeeBuffer: z.number().min(1).max(1.1).optional()
+  conversionFeeBuffer: z.number().min(1).max(1.1).optional(),
+  excludeStableStablePairs: z.boolean().optional(),
+  enforceRegionPolicy: z.boolean().optional(),
+  symbolEntryCooldownMs: z.number().int().min(0).max(86_400_000).optional(),
+  maxConsecutiveEntriesPerSymbol: z.number().int().min(1).max(50).optional(),
+  conversionTopUpReserveMultiplier: z.number().min(1).max(10).optional(),
+  conversionTopUpCooldownMs: z.number().int().min(0).max(86_400_000).optional()
 });
 
 const BasicUpdateSchema = z.object({
@@ -91,6 +97,12 @@ export class ConfigController {
       conversionBuyBuffer: number;
       conversionSellBuffer: number;
       conversionFeeBuffer: number;
+      excludeStableStablePairs: boolean;
+      enforceRegionPolicy: boolean;
+      symbolEntryCooldownMs: number;
+      maxConsecutiveEntriesPerSymbol: number;
+      conversionTopUpReserveMultiplier: number;
+      conversionTopUpCooldownMs: number;
     };
   } {
     const config = this.configService.load();
@@ -134,7 +146,13 @@ export class ConfigController {
         liveTradeRebalanceSellCooldownMs: config.advanced.liveTradeRebalanceSellCooldownMs,
         conversionBuyBuffer: config.advanced.conversionBuyBuffer,
         conversionSellBuffer: config.advanced.conversionSellBuffer,
-        conversionFeeBuffer: config.advanced.conversionFeeBuffer
+        conversionFeeBuffer: config.advanced.conversionFeeBuffer,
+        excludeStableStablePairs: config.advanced.excludeStableStablePairs,
+        enforceRegionPolicy: config.advanced.enforceRegionPolicy,
+        symbolEntryCooldownMs: config.advanced.symbolEntryCooldownMs,
+        maxConsecutiveEntriesPerSymbol: config.advanced.maxConsecutiveEntriesPerSymbol,
+        conversionTopUpReserveMultiplier: config.advanced.conversionTopUpReserveMultiplier,
+        conversionTopUpCooldownMs: config.advanced.conversionTopUpCooldownMs
       }
     };
   }

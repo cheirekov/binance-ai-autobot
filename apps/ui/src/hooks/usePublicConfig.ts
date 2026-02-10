@@ -42,6 +42,12 @@ export type PublicConfig = {
     conversionBuyBuffer: number;
     conversionSellBuffer: number;
     conversionFeeBuffer: number;
+    excludeStableStablePairs: boolean;
+    enforceRegionPolicy: boolean;
+    symbolEntryCooldownMs: number;
+    maxConsecutiveEntriesPerSymbol: number;
+    conversionTopUpReserveMultiplier: number;
+    conversionTopUpCooldownMs: number;
   };
 };
 

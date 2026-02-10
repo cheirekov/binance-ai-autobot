@@ -8,6 +8,7 @@ import { UNIVERSE_VERSION, UniverseSnapshotSchema } from "@autobot/shared";
 import { ConfigService } from "../config/config.service";
 import { resolveBinanceBaseUrl } from "../integrations/binance-base-url";
 import { BinanceClient } from "../integrations/binance-client";
+import { getPairPolicyBlockReason } from "../policy/trading-policy";
 
 type ExchangeInfoResponse = {
   symbols?: Array<{
@@ -270,6 +271,10 @@ export class UniverseService {
     ]);
 
     const errors: Array<{ symbol?: string; error: string }> = [];
+    const traderRegion = config?.basic.traderRegion ?? "NON_EEA";
+    const neverTradeSymbols = config?.advanced.neverTradeSymbols ?? [];
+    const excludeStableStablePairs = config?.advanced.excludeStableStablePairs ?? true;
+    const enforceRegionPolicy = config?.advanced.enforceRegionPolicy ?? true;
 
     let exchangeInfo: ExchangeInfoResponse;
     try {
@@ -311,6 +316,16 @@ export class UniverseService {
     const spotSymbols = rawSymbols.filter((s) => {
       if (!s || s.status !== "TRADING") return false;
       if (!quoteAssets.includes(s.quoteAsset)) return false;
+      const policyReason = getPairPolicyBlockReason({
+        symbol: s.symbol,
+        baseAsset: s.baseAsset,
+        quoteAsset: s.quoteAsset,
+        traderRegion,
+        neverTradeSymbols,
+        excludeStableStablePairs,
+        enforceRegionPolicy
+      });
+      if (policyReason) return false;
       if (Array.isArray(s.permissions) && s.permissions.length > 0) {
         return s.permissions.includes("SPOT");
       }
