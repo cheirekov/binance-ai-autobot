@@ -116,6 +116,8 @@ export function DashboardPage(): JSX.Element {
   const walletTotal = wallet.wallet?.totalEstimatedHome;
   const walletTopAssets = wallet.wallet?.assets?.slice(0, 10) ?? [];
   const walletUnpricedCount = wallet.wallet ? wallet.wallet.assets.filter((a) => a.estValueHome === undefined).length : 0;
+  const universeCandidates = universe.snapshot?.candidates ?? [];
+  const universeRows = universeCandidates.slice(0, 40);
 
   async function rescanUniverse(): Promise<void> {
     setUniverseMsg(null);
@@ -239,7 +241,7 @@ export function DashboardPage(): JSX.Element {
           ) : universe.snapshot ? (
             <>
               Last scan: {new Date(universe.snapshot.finishedAt).toLocaleTimeString()} · {universe.snapshot.interval} ·{" "}
-              {universe.snapshot.quoteAssets.join(", ")} · {universe.snapshot.baseUrl}
+              {universe.snapshot.quoteAssets.join(", ")} · {universe.snapshot.baseUrl} · Candidates: {universeCandidates.length}
             </>
           ) : (
             <>No scan yet.</>
@@ -279,7 +281,7 @@ export function DashboardPage(): JSX.Element {
               </tr>
             </thead>
             <tbody>
-              {(universe.snapshot?.candidates ?? []).slice(0, 12).map((c) => (
+              {universeRows.map((c) => (
                 <tr key={c.symbol}>
                   <td>{c.symbol}</td>
                   <td>{c.strategyHint ?? "—"}</td>
@@ -292,7 +294,7 @@ export function DashboardPage(): JSX.Element {
                   <td>{c.atrPct14 === undefined ? "—" : c.atrPct14.toFixed(2)}</td>
                 </tr>
               ))}
-              {(universe.snapshot?.candidates?.length ?? 0) === 0 ? (
+              {universeRows.length === 0 ? (
                 <tr>
                   <td colSpan={7} style={{ color: "var(--muted)" }}>
                     No candidates yet. Start the bot to trigger an examine scan, or press Rescan.

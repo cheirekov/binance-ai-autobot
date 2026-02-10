@@ -344,7 +344,7 @@ export class BotEngineService {
             }
           }
           if (Number.isFinite(bufferedCost) && bufferedCost > quoteFree) {
-            const summary = `Skip ${candidateSymbol}: Insufficient ${homeStable} for estimated cost (${bufferedCost.toFixed(4)} > ${quoteFree.toFixed(4)})`;
+            const summary = `Skip ${candidateSymbol}: Insufficient ${homeStable} for estimated cost`;
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
             const next = {
               ...current,
@@ -352,7 +352,22 @@ export class BotEngineService {
               orderHistory: filled.orderHistory,
               decisions: alreadyLogged
                 ? current.decisions
-                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200),
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        bufferedCost: Number(bufferedCost.toFixed(6)),
+                        availableQuote: Number(quoteFree.toFixed(6)),
+                        price: Number(price.toFixed(8)),
+                        qty: Number(qty.toFixed(8)),
+                        bufferFactor
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
               lastError: undefined
             } satisfies BotState;
             this.save(next);
