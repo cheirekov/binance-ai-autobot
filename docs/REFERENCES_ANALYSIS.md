@@ -163,3 +163,29 @@ Not recommended unless we explicitly accept GPLv3 implications for the whole pro
    - `Portfolio` (balances, valuation)
    - `OrderExecutor` (paper/live)
 3) Update roadmap + architecture docs for the chosen POC.
+
+## PM/BA tracking guardrails (to avoid drift)
+
+This project now follows an explicit “reference -> requirement -> implementation” checkpoint before each milestone:
+
+1) **Reference extraction** (what pattern we are borrowing, with file path in `references/`).
+2) **BA requirement mapping** (which user requirement this pattern addresses).
+3) **Implementation ticket** (which module/file is changed in this repo).
+4) **Validation artifact** (which log/snapshot proves behavior on testnet).
+
+Current applied mappings:
+
+- **Market filter enforcement (minQty/minNotional/stepSize)**
+  - Reference pattern: Freqtrade market-limit handling (`references/freqtrade-stable/freqtrade/exchange/exchange.py`)
+  - Requirement: no invalid small orders / clear skip reasons
+  - Implemented: `apps/api/src/modules/integrations/binance-market-data.service.ts`
+
+- **Conversion routing before skip**
+  - Reference pattern: multi-step exchange routing/adapters (`references/crypto-trading-open-main/core/adapters/exchanges/adapters/binance.py`)
+  - Requirement: top up home stable before skipping trades
+  - Implemented: `apps/api/src/modules/integrations/conversion-router.service.ts`, `apps/api/src/modules/bot/bot-engine.service.ts`
+
+- **Risk policy as hard guard with AI as gated input**
+  - Reference pattern: strategy/risk separation (Freqtrade/Jesse conceptual)
+  - Requirement: AI and engine should not “fight”; risk remains authoritative
+  - Implemented: `apps/api/src/modules/bot/bot-engine.service.ts`, `packages/shared/src/schemas/app-config.ts`

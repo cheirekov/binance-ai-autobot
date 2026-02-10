@@ -6,6 +6,7 @@ import type { RequestHandler } from "express";
 import { json } from "express";
 
 import { AppModule } from "./modules/app.module";
+import { ConfigService } from "./modules/config/config.service";
 import { createLogger } from "./modules/logging/pino-logger";
 
 async function bootstrap(): Promise<void> {
@@ -28,6 +29,12 @@ async function bootstrap(): Promise<void> {
     debug: (message) => logger.debug({ msg: message }),
     verbose: (message) => logger.trace({ msg: message })
   });
+
+  const configService = app.get(ConfigService);
+  const migration = configService.migrateOnStartup();
+  if (migration.migrated) {
+    logger.info({ msg: "Config startup migration applied", reason: migration.reason });
+  }
 
   const port = Number.parseInt(process.env.PORT ?? "8148", 10);
   await app.listen(port, "0.0.0.0");

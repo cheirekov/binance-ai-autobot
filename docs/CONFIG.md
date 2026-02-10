@@ -11,6 +11,8 @@ Default:
 - local (non-Docker): `./data/config.json`
 - Docker: `/data/config.json`
 
+On API startup, an automatic migration normalizes existing `config.json` to the current schema defaults. This keeps older exports compatible without manual edits.
+
 ## Basic onboarding inputs (current)
 
 - Binance API key + secret

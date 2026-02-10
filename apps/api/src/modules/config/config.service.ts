@@ -32,6 +32,40 @@ export class ConfigService {
     return fs.existsSync(this.configPath);
   }
 
+  migrateOnStartup(): { migrated: boolean; reason: "not_initialized" | "up_to_date" | "normalized" } {
+    if (!fs.existsSync(this.configPath)) {
+      this.cachedConfig = null;
+      this.cachedMtimeMs = null;
+      return { migrated: false, reason: "not_initialized" };
+    }
+
+    const raw = fs.readFileSync(this.configPath, "utf-8");
+    const parsed = AppConfigSchema.parse(JSON.parse(raw));
+    const normalized = parsed.advanced.followRiskProfile
+      ? AppConfigSchema.parse({
+          ...parsed,
+          advanced: {
+            ...parsed.advanced,
+            ...deriveAdvancedRiskProfile(parsed.basic.risk)
+          }
+        })
+      : parsed;
+
+    const nextJson = JSON.stringify(normalized, null, 2);
+    if (raw.trim() === nextJson.trim()) {
+      const stat = fs.statSync(this.configPath);
+      this.cachedConfig = normalized;
+      this.cachedMtimeMs = stat.mtimeMs;
+      return { migrated: false, reason: "up_to_date" };
+    }
+
+    atomicWriteFile(this.configPath, nextJson);
+    const stat = fs.statSync(this.configPath);
+    this.cachedConfig = normalized;
+    this.cachedMtimeMs = stat.mtimeMs;
+    return { migrated: true, reason: "normalized" };
+  }
+
   load(): AppConfig | null {
     if (!fs.existsSync(this.configPath)) {
       this.cachedConfig = null;
