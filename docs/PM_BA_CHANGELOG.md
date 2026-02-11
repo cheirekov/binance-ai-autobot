@@ -60,3 +60,124 @@ This log is mandatory for every implementation patch batch.
 - Validation evidence: Docker CI passed (`lint`, `test`, `build`).
 - Runtime test request: generate next bundle and confirm `meta/docs/` contains board/changelog snapshots.
 - Follow-up: enforce board/changelog updates before each feature batch (starting with T-003 adaptive exits).
+
+## Backfilled history (from commit review)
+
+## 2026-02-04 09:00 UTC — T-000/T-009 Foundation + security baseline
+- Scope: establish runnable monorepo and baseline remote safety.
+- BA requirement mapping: dockerized API/UI, protected endpoints, onboarding-first usage.
+- PM milestone mapping: foundation readiness for MVP iterations.
+- Technical changes:
+  - Initial monorepo/docs and workspace wiring (`548022a`, `39858e9`).
+  - API default host/port normalization for deployment (`c961f93`).
+  - API key + UI auth operational paths and diagnostics (`cd57672`, `8852c2b`, `eb87070`).
+- Risk slider impact: none.
+- Validation evidence: subsequent CI and runtime sessions passed startup/auth flows.
+- Runtime test request: verify `/health` and protected endpoints remain consistent after restart.
+- Follow-up: keep API health exposure policy explicit for remote deployments.
+
+## 2026-02-04 11:30 UTC — T-010 Config lifecycle features
+- Scope: remove manual file edits and support portable bot configuration.
+- BA requirement mapping: update credentials in UI, support import/export, rotate API key.
+- PM milestone mapping: operator usability and deployment portability.
+- Technical changes:
+  - Config import/export and UI auth update APIs (`8852c2b`).
+  - Advanced host/port and API key rotation (`eb87070`).
+  - Binance credential update endpoint + UI flow (`0feb106`).
+- Risk slider impact: none.
+- Validation evidence: feature available via settings endpoints and UI.
+- Runtime test request: export config, import into fresh deployment, verify startup parity.
+- Follow-up: ensure all new advanced controls remain JSON-export compatible.
+
+## 2026-02-04 13:00 UTC — T-012 Market filter reliability
+- Scope: reduce order rejects and improve sizing diagnostics.
+- BA requirement mapping: account for Binance minimums and avoid false “broken bot” behavior.
+- PM milestone mapping: execution correctness under exchange constraints.
+- Technical changes:
+  - Min-notional required qty hints (`a405a16`).
+  - Order qty validation + tick overlap prevention (`502b0c6`).
+  - Feed normalization and timeout safety for news ingestion (`2581c20`).
+- Risk slider impact: none.
+- Validation evidence: fewer invalid-order paths and clearer skip messages.
+- Runtime test request: confirm skips include market-constraint context (`minNotional`, `qty`, `price`).
+- Follow-up: keep minQty/stepSize details visible in diagnostics.
+
+## 2026-02-04 15:00 UTC — T-015 Portfolio + paper visibility baseline
+- Scope: expose wallet/decision/order context in UI during paper/live iterations.
+- BA requirement mapping: user-visible bot reasoning and wallet awareness.
+- PM milestone mapping: observability for iterative tuning.
+- Technical changes:
+  - Portfolio module + paper-trading decision flow (`6dc2c54`).
+  - Universe integration and URL validation (`f49d905`).
+  - UI visual cleanup and responsiveness adjustments (`f6cccbf`).
+- Risk slider impact: none.
+- Validation evidence: dashboard paths are active and used in later test bundles.
+- Runtime test request: confirm decisions/orders/wallet panels update during run.
+- Follow-up: improve realized/unrealized PnL accounting (tracked by T-007).
+
+## 2026-02-09 10:00 UTC — T-011 Live Spot execution hardening
+- Scope: move from stub-only toward real Spot testnet execution with safety controls.
+- BA requirement mapping: live testnet trading capability with controlled risk.
+- PM milestone mapping: live-path MVP readiness.
+- Technical changes:
+  - CCXT Binance trading adapter adoption (`d3bbfe5`).
+  - Mainnet live trade gating and safety caps (`5d837b2`).
+  - Slippage-adjusted notional cap and quote filtering in live mode (`36706d8`, `6bccd1f`).
+  - Skip cost diagnostics and candidate visibility (`6c308d6`).
+  - Market order status/qty persistence fixes (`b29f855`).
+- Risk slider impact: moderate (through derived limits and notional guard behavior).
+- Validation evidence: repeated testnet sessions with live fills and persisted order history.
+- Runtime test request: verify live mode only in Spot testnet unless explicitly allowed.
+- Follow-up: adaptive exits and daily risk guardrails.
+
+## 2026-02-10 12:00 UTC — T-013/T-017 Conversion and migration hardening
+- Scope: improve autonomous quote top-up behavior and upgrade safety.
+- BA requirement mapping: bot should recover quote liquidity and survive schema evolution.
+- PM milestone mapping: stable long-running iteration cycle.
+- Technical changes:
+  - Startup config migration + risk-profile normalization (`143a0de`).
+  - Conversion top-up floor and richer diagnostics (`296fd6b`).
+- Risk slider impact: low-to-moderate via follow-risk-profile defaults on migration.
+- Validation evidence: Docker CI explicitly recorded green in migration commit context.
+- Runtime test request: restart with existing config and verify no manual repair needed.
+- Follow-up: wallet policy v1 sweep/cleanup is tracked in T-004.
+
+## 2026-02-11 14:40 UTC — Commit hygiene review corrective action
+- Scope: address inconsistent commit subjects that reduce traceability.
+- BA requirement mapping: reduce process loops and context-loss confusion.
+- PM milestone mapping: governance hardening for predictable delivery.
+- Technical changes:
+  - Reviewed last commit range and identified non-actionable subjects (`773e187`, `ca07630`, `2e7692c`, `163bdb1`, `bcf4fbd`, `de85893`, `ef19148`).
+  - Added hard commit quality rules in team operating process.
+- Risk slider impact: none.
+- Validation evidence: governance docs updated and enforced in current branch.
+- Runtime test request: none.
+- Follow-up: all new commits must use structured actionable subjects.
+
+## 2026-02-11 16:25 UTC — Retrospective backfill + board coverage repair
+- Scope: backfill PM/BA artifacts so implemented work is visible and auditable.
+- BA requirement mapping: avoid loop/repeat cycles and preserve continuity across sessions.
+- PM milestone mapping: governance completion for M1 execution.
+- Technical changes:
+  - Expanded `docs/DELIVERY_BOARD.md` with completed historical tickets from commit history.
+  - Added retrospective entries for commit clusters (foundation, config, live execution, migration, process).
+  - Added ticket `T-020` to eliminate hidden env fallback behavior in trading paths.
+- Risk slider impact: none (documentation/governance update).
+- Validation evidence: Docker CI passed (`lint`, `test`, `build`) after updates.
+- Runtime test request: next feedback bundle should include updated board/changelog snapshots.
+- Follow-up: execute `T-003` and `T-020` in the next implementation batch.
+
+## 2026-02-11 16:45 UTC — T-021 Reference-driven transient backoff adoption
+- Scope: adopt risk-control behavior from `crypto-trading-open-main` for transient exchange faults.
+- BA requirement mapping: autonomous bot must handle noisy network/rate-limit periods without retry floods.
+- PM milestone mapping: M1 live path hardening and runtime stability.
+- Technical changes:
+  - Added transient exchange error backoff state in bot engine.
+  - Added exponential pause logic on transient errors (timeout/network/429 families).
+  - Added pre-trade backoff gate so live loop skips cleanly while backoff is active.
+  - Added auto-clear on successful trade execution.
+  - Added decision details for backoff diagnostics (`backoffMs`, `pauseUntil`, `errorCount`).
+- Risk slider impact: none (error handling path only; no sizing/risk formula changes).
+- Validation evidence: Docker CI passed (`lint`, `test`, `build`).
+- Runtime test request: during API/network instability, verify decisions show backoff activation instead of repeated immediate retries.
+- Follow-up: make backoff tuning config-driven in Advanced settings as part of `T-020`.

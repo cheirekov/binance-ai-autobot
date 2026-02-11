@@ -215,3 +215,10 @@ Current applied mappings:
   - Reference pattern: network/timeout/rate-limit errors treated as recoverable, not strategy failures.
   - Requirement: avoid noisy temporary blacklists and confusing error strings in UI/state.
   - Implemented: `apps/api/src/modules/bot/bot-engine.service.ts`
+
+- **Transient error exponential backoff (new)**
+  - Reference pattern: exchange fault backoff controller with escalating pause windows and auto-recovery.
+    - `references/crypto-trading-open-main/core/services/arbitrage_monitor_v2/risk_control/error_backoff_controller.py`
+    - `references/crypto-trading-open-main/core/services/arbitrage_monitor_v2/risk_control/network_state.py`
+  - Requirement: during network/rate-limit turbulence, bot should pause retries briefly instead of hammering exchange APIs.
+  - Implemented: `apps/api/src/modules/bot/bot-engine.service.ts`

@@ -22,6 +22,9 @@ Purpose: keep execution stable across long-running sessions and context resets.
 10. Avoid micro-churn. Group related fixes into a single testable batch.
 11. If scope changes, update board/changelog before additional code changes.
 12. If a decision is postponed, capture reason + owner + trigger for revisit.
+13. Commit messages must be actionable and structured. Disallow generic subjects (`Implemented`, `Patched`, `Code changes`, `What changed`).
+14. Commit subject format: `<type>(<scope>): <outcome>` (preferred) or concise imperative summary.
+15. Keep commit subject <= 72 chars and include details in body when needed.
 
 ## Delivery workflow (mandatory)
 
@@ -31,6 +34,20 @@ Purpose: keep execution stable across long-running sessions and context resets.
 4. Run `docker compose -f docker-compose.ci.yml run --rm ci`.
 5. Add a structured entry in `docs/PM_BA_CHANGELOG.md`.
 6. Mark ticket `DONE` (or `BLOCKED` with reason and next action).
+
+## Commit subject examples
+
+Good:
+
+- `feat(bot): add exposure-aware candidate fallback`
+- `fix(ui): prevent table header letter wrapping`
+- `feat(config): support binance credential rotation`
+
+Bad:
+
+- `Implemented`
+- `Patched`
+- `What changed`
 
 ## Definition of done
 

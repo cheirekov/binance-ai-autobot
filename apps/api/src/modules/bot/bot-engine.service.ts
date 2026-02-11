@@ -154,6 +154,14 @@ type TickTelemetryContext = {
   maxPositionPct?: number;
 };
 
+type TransientExchangeBackoffState = {
+  errorCount: number;
+  lastErrorAtMs: number;
+  pauseUntilMs: number;
+  lastErrorCode?: string;
+  lastErrorMessage?: string;
+};
+
 export type BotRunStatsResponse = {
   generatedAt: string;
   kpi: BaselineRunStats | null;
@@ -175,6 +183,7 @@ export class BotEngineService {
   private examineTimer: NodeJS.Timeout | null = null;
   private tickInFlight = false;
   private lastBaselineFingerprint: string | null = null;
+  private transientExchangeBackoffState: TransientExchangeBackoffState | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -301,6 +310,97 @@ export class BotEngineService {
     if (this.isSizingFilterError(rawMessage)) return false;
     if (this.isTransientExchangeError(rawMessage)) return false;
     return true;
+  }
+
+  private extractExchangeErrorCode(rawMessage: string): string | undefined {
+    const quotedCode = rawMessage.match(/"code"\s*:\s*(-?\d+)/i);
+    if (quotedCode && quotedCode[1]) return quotedCode[1];
+
+    const plainCode = rawMessage.match(/\bcode\s*(-?\d+)\b/i);
+    if (plainCode && plainCode[1]) return plainCode[1];
+
+    if (rawMessage.includes("429") || rawMessage.toUpperCase().includes("TOO MANY REQUESTS")) return "429";
+    if (rawMessage.toUpperCase().includes("ETIMEDOUT")) return "ETIMEDOUT";
+    if (rawMessage.toUpperCase().includes("ECONNRESET")) return "ECONNRESET";
+    return undefined;
+  }
+
+  private getTransientBackoffInfo(): {
+    active: boolean;
+    remainingMs: number;
+    errorCount: number;
+    pauseUntilIso?: string;
+    lastErrorCode?: string;
+    lastErrorMessage?: string;
+  } {
+    const state = this.transientExchangeBackoffState;
+    if (!state) {
+      return {
+        active: false,
+        remainingMs: 0,
+        errorCount: 0
+      };
+    }
+
+    const now = Date.now();
+    const resetWindowMs = 30 * 60 * 1000;
+    if (now - state.lastErrorAtMs > resetWindowMs) {
+      this.transientExchangeBackoffState = null;
+      return {
+        active: false,
+        remainingMs: 0,
+        errorCount: 0
+      };
+    }
+
+    const remainingMs = Math.max(0, state.pauseUntilMs - now);
+    return {
+      active: remainingMs > 0,
+      remainingMs,
+      errorCount: state.errorCount,
+      pauseUntilIso: new Date(state.pauseUntilMs).toISOString(),
+      lastErrorCode: state.lastErrorCode,
+      lastErrorMessage: state.lastErrorMessage
+    };
+  }
+
+  private registerTransientExchangeError(rawMessage: string, safeMessage: string): {
+    pauseMs: number;
+    pauseUntilIso: string;
+    errorCount: number;
+    lastErrorCode?: string;
+  } {
+    const now = Date.now();
+    const minBackoffMs = 30_000;
+    const maxBackoffMs = 600_000;
+    const resetWindowMs = 30 * 60 * 1000;
+    const multiplier = 2;
+
+    const previous = this.transientExchangeBackoffState;
+    const withinResetWindow = previous && now - previous.lastErrorAtMs <= resetWindowMs;
+    const errorCount = withinResetWindow ? previous.errorCount + 1 : 1;
+    const pauseMs = Math.min(maxBackoffMs, Math.round(minBackoffMs * multiplier ** Math.max(0, errorCount - 1)));
+    const pauseUntilMs = now + pauseMs;
+    const lastErrorCode = this.extractExchangeErrorCode(rawMessage);
+
+    this.transientExchangeBackoffState = {
+      errorCount,
+      lastErrorAtMs: now,
+      pauseUntilMs,
+      lastErrorCode,
+      lastErrorMessage: safeMessage
+    };
+
+    return {
+      pauseMs,
+      pauseUntilIso: new Date(pauseUntilMs).toISOString(),
+      errorCount,
+      ...(lastErrorCode ? { lastErrorCode } : {})
+    };
+  }
+
+  private clearTransientExchangeBackoff(): void {
+    this.transientExchangeBackoffState = null;
   }
 
   private getRecentSymbolOrders(state: BotState, symbol: string): Order[] {
@@ -1183,6 +1283,38 @@ export class BotEngineService {
           }
         }
 
+        const transientBackoff = this.getTransientBackoffInfo();
+        if (transientBackoff.active) {
+          const summary = `Skip ${candidateSymbol}: Transient exchange backoff active`;
+          const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+          const next = {
+            ...current,
+            activeOrders: filled.activeOrders,
+            orderHistory: filled.orderHistory,
+            decisions: alreadyLogged
+              ? current.decisions
+              : [
+                  {
+                    id: crypto.randomUUID(),
+                    ts: new Date().toISOString(),
+                    kind: "SKIP",
+                    summary,
+                    details: {
+                      remainingMs: transientBackoff.remainingMs,
+                      errorCount: transientBackoff.errorCount,
+                      pauseUntil: transientBackoff.pauseUntilIso,
+                      lastErrorCode: transientBackoff.lastErrorCode,
+                      lastErrorMessage: transientBackoff.lastErrorMessage
+                    }
+                  },
+                  ...current.decisions
+                ].slice(0, 200),
+            lastError: undefined
+          } satisfies BotState;
+          this.save(next);
+          return;
+        }
+
         try {
           const mapStatus = (s: string | undefined): Order["status"] => {
             const st = (s ?? "").toUpperCase();
@@ -1271,6 +1403,7 @@ export class BotEngineService {
               nextState = { ...nextState, orderHistory: [order, ...nextState.orderHistory].slice(0, 200) };
             }
 
+            this.clearTransientExchangeBackoff();
             this.save(nextState);
             current = nextState;
           };
@@ -1860,12 +1993,30 @@ export class BotEngineService {
         } catch (err) {
           const rawMsg = err instanceof Error ? err.message : String(err);
           const safeMsg = this.sanitizeUserErrorMessage(rawMsg);
+          const transient = this.isTransientExchangeError(rawMsg);
+          const backoffDetails = transient ? this.registerTransientExchangeError(rawMsg, safeMsg) : null;
           const summary = this.isSizingFilterError(rawMsg)
             ? `Skip ${candidateSymbol}: Binance sizing filter (${safeMsg})`
-            : this.isTransientExchangeError(rawMsg)
+            : transient
               ? `Skip ${candidateSymbol}: Temporary exchange/network issue (${safeMsg})`
               : `Order rejected for ${candidateSymbol} (${envLabel}): ${safeMsg}`;
           const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+          const skipDecision = {
+            id: crypto.randomUUID(),
+            ts: new Date().toISOString(),
+            kind: "SKIP",
+            summary,
+            ...(backoffDetails
+              ? {
+                  details: {
+                    backoffMs: backoffDetails.pauseMs,
+                    pauseUntil: backoffDetails.pauseUntilIso,
+                    errorCount: backoffDetails.errorCount,
+                    lastErrorCode: backoffDetails.lastErrorCode
+                  }
+                }
+              : {})
+          } satisfies Decision;
           let nextState: BotState = {
             ...current,
             lastError: safeMsg,
@@ -1873,7 +2024,7 @@ export class BotEngineService {
             orderHistory: filled.orderHistory,
             decisions: alreadyLogged
               ? current.decisions
-              : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+              : [skipDecision, ...current.decisions].slice(0, 200)
           };
 
           if (config?.advanced.autoBlacklistEnabled && this.shouldAutoBlacklistError(rawMsg)) {
