@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
 import type { BotState } from "@autobot/shared";
 
-import { BotEngineService } from "./bot-engine.service";
+import { BotEngineService, type BotRunStatsResponse } from "./bot-engine.service";
 
 @Controller()
 export class BotController {
@@ -10,6 +10,11 @@ export class BotController {
   @Get("bot/status")
   getStatus(): BotState {
     return this.botEngine.getState();
+  }
+
+  @Get("bot/run-stats")
+  getRunStats(): BotRunStatsResponse {
+    return this.botEngine.getRunStats();
   }
 
   @Post("bot/start")

@@ -6,6 +6,7 @@ import { useApiHealth } from "../hooks/useApiHealth";
 import { useIntegrationsStatus } from "../hooks/useIntegrationsStatus";
 import { usePortfolioWallet } from "../hooks/usePortfolioWallet";
 import { usePublicConfig } from "../hooks/usePublicConfig";
+import { useRunStats } from "../hooks/useRunStats";
 import { useUniverseSnapshot } from "../hooks/useUniverseSnapshot";
 
 type BotState = {
@@ -39,6 +40,7 @@ export function DashboardPage(): JSX.Element {
   const integrations = useIntegrationsStatus();
   const wallet = usePortfolioWallet();
   const universe = useUniverseSnapshot();
+  const runStats = useRunStats();
 
   const phasePill = useMemo(() => {
     if (!state) return "…";
@@ -118,6 +120,9 @@ export function DashboardPage(): JSX.Element {
   const walletUnpricedCount = wallet.wallet ? wallet.wallet.assets.filter((a) => a.estValueHome === undefined).length : 0;
   const universeCandidates = universe.snapshot?.candidates ?? [];
   const universeRows = universeCandidates.slice(0, 40);
+  const latestAdaptiveEvent = runStats.stats?.adaptiveShadowTail?.length
+    ? runStats.stats.adaptiveShadowTail[runStats.stats.adaptiveShadowTail.length - 1]
+    : undefined;
 
   async function rescanUniverse(): Promise<void> {
     setUniverseMsg(null);
@@ -199,6 +204,12 @@ export function DashboardPage(): JSX.Element {
             <span className="pill">Active orders: {state?.activeOrders?.length ?? 0}</span>
             <span className="pill">Decisions: {state?.decisions?.length ?? 0}</span>
             <span className="pill">Blacklisted: {state?.symbolBlacklist?.length ?? 0}</span>
+            <span className="pill">Trades: {runStats.stats?.kpi?.totals.trades ?? "—"}</span>
+            <span className="pill">Skips: {runStats.stats?.kpi?.totals.skips ?? "—"}</span>
+            <span className="pill">
+              Buys/Sells:{" "}
+              {runStats.stats?.kpi ? `${runStats.stats.kpi.totals.buys}/${runStats.stats.kpi.totals.sells}` : "—"}
+            </span>
           </div>
 
           {(state?.symbolBlacklist?.length ?? 0) > 0 ? (
@@ -369,19 +380,56 @@ export function DashboardPage(): JSX.Element {
 
         <div className="card">
           <div className="title">PnL</div>
-          <div className="subtitle">Coming soon: PnL requires a persisted trade ledger (fills + commissions + conversion at fill time).</div>
+          <div className="subtitle">Baseline from persisted fills (commissions/funding still not included).</div>
           <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <span className="pill">
-              Realized: <b>—</b>
+              Realized:{" "}
+              <b>
+                {runStats.stats?.kpi
+                  ? `${runStats.stats.kpi.totals.realizedPnl.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${homeStableCoin}`
+                  : "—"}
+              </b>
             </span>
             <span className="pill">
-              Unrealized: <b>—</b>
+              Open exposure:{" "}
+              <b>
+                {runStats.stats?.kpi
+                  ? `${runStats.stats.kpi.totals.openExposureCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${homeStableCoin}`
+                  : "—"}
+              </b>
             </span>
             <span className="pill">
               Currency: <b>{homeStableCoin}</b>
             </span>
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div className="title">Adaptive policy (shadow)</div>
+        <div className="subtitle">
+          Two-track mode: baseline execution is active, adaptive policy is logging recommendations only.
+        </div>
+        <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span className="pill">
+            Runtime:{" "}
+            <b>
+              {runStats.stats?.kpi
+                ? `${Math.floor(runStats.stats.kpi.runtimeSeconds / 3600)}h ${Math.floor((runStats.stats.kpi.runtimeSeconds % 3600) / 60)}m`
+                : "—"}
+            </b>
+          </span>
+          <span className="pill">
+            Conversions: <b>{runStats.stats?.kpi?.totals.conversions ?? "—"}</b>
+          </span>
+          <span className="pill">
+            Last regime: <b>{latestAdaptiveEvent?.regime.label ?? "—"}</b>
+          </span>
+          <span className="pill">
+            Last strategy: <b>{latestAdaptiveEvent?.strategy.recommended ?? "—"}</b>
+          </span>
+        </div>
+        {runStats.error ? <div className="subtitle" style={{ marginTop: 8 }}>{runStats.error}</div> : null}
       </div>
 
       <div className="row cols-2">
@@ -419,7 +467,10 @@ export function DashboardPage(): JSX.Element {
 
         <div className="card">
           <div className="title">Orders (active)</div>
-          <div className="subtitle">Binance-like view (stub data).</div>
+          <div className="subtitle">
+            {runStats.stats?.notes.activeOrders ??
+              "Spot MARKET orders usually fill immediately, so active orders can remain empty while history grows."}
+          </div>
           <div style={{ marginTop: 10, maxHeight: 380, overflow: "auto" }}>
             <table className="table">
               <thead>

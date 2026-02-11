@@ -6,7 +6,7 @@ Build a **fully-automated**, dockerized Binance trading bot with a simple onboar
 
 This document exists so future GPT/Codex sessions can patch the codebase without re-reading everything.
 
-## Current status (Feb 9, 2026)
+## Current status (Feb 11, 2026)
 
 Bootstrap scaffolding:
 
@@ -19,6 +19,10 @@ Bootstrap scaffolding:
 - `/news/latest` endpoint (RSS aggregation + disk cache)
 - Spot **testnet** live execution (minimal): the bot can place Spot `MARKET` orders when `liveTrading=true` and Advanced → Binance environment is `SPOT_TESTNET` (mainnet is blocked by default).
 - Live Spot execution uses **CCXT** (Binance demo trading mode) for balances + order placement; market data/limits are still fetched via direct REST (`BinanceClient`) for now.
+- Two-track mode:
+  - Baseline live execution remains deterministic.
+  - Adaptive policy runs in shadow mode (regime/strategy recommendations logged, no execution control yet).
+- Baseline KPI and adaptive shadow telemetry are persisted in `data/telemetry/`.
 
 ## Local references (for study)
 
@@ -41,6 +45,13 @@ All runtime state lives under `DATA_DIR` (default: `./data` locally, `/data` in 
 - `config.json` (settings + secrets; gitignored)
 - `state.json` (bot state + decisions + stub orders; gitignored)
 - `logs/` (API logs; gitignored)
+- `telemetry/baseline-kpis.json` (baseline run metrics; gitignored)
+- `telemetry/adaptive-shadow.jsonl` (shadow policy events; gitignored)
+
+## Spot market-order note
+
+- On Spot testnet/mainnet, the current engine uses `MARKET` orders that typically fill immediately.
+- Because of this, `activeOrders` can stay at `0` while `orderHistory` increases in UI and Binance history.
 
 ## API security model
 

@@ -164,6 +164,17 @@ Not recommended unless we explicitly accept GPLv3 implications for the whole pro
    - `OrderExecutor` (paper/live)
 3) Update roadmap + architecture docs for the chosen POC.
 
+## Delivery decision (PM/BA, Feb 11, 2026)
+
+To keep progress measurable while reducing integration risk, we run two tracks in parallel:
+
+1. **Baseline execution track**: production path used for Spot testnet trading and KPI evaluation.
+2. **Adaptive shadow track**: regime + strategy scoring logged on each decision without controlling execution.
+
+Promotion rule:
+
+- Adaptive logic is allowed to influence live execution only after it consistently improves baseline KPIs (drawdown, churn, and trade quality) over multiple testnet windows.
+
 ## PM/BA tracking guardrails (to avoid drift)
 
 This project now follows an explicit “reference -> requirement -> implementation” checkpoint before each milestone:

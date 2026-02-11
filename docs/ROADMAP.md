@@ -1,5 +1,18 @@
 # Roadmap (proposed)
 
+## Delivery mode (updated Feb 11, 2026)
+
+Two-track execution is active:
+
+- **Track A (baseline live path):** deterministic strategy execution on Binance Spot testnet with KPI logging.
+- **Track B (adaptive shadow path):** regime + strategy recommendations are logged only and do not place orders yet.
+
+Planned timeboxes (engineering estimates):
+
+- Track A stabilization + risk hardening (`maxDailyLoss`, re-entry lock, wallet sweep policy): **2-3 working days**
+- Track B adaptive policy v1 (shadow scoring + explainability + promotion gates): **2-4 working days**
+- Controlled promotion (adaptive sizing influence only, then entries): **2-3 working days**
+
 ## Phase 0 — Foundations (done)
 
 - Monorepo + Docker compose (UI + API)
@@ -44,6 +57,7 @@
   - Capital-tier runtime profile for sizing/reserve behavior (`MICRO`/`SMALL`/`STANDARD`)
   - Fee-aware entry gate (estimated edge vs round-trip execution cost)
   - Basic live exit path (`take-profit` / `stop-loss`) to avoid buy-only behavior
+  - Baseline KPI collector + adaptive shadow telemetry persisted to `data/telemetry`
 - Spot mainnet live trading (requires additional safeguards + explicit opt-in)
 
 ## Phase 4 — Advanced bots

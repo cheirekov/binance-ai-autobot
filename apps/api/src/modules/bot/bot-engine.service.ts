@@ -40,14 +40,141 @@ type CapitalProfile = {
   minNetEdgePct: number;
 };
 
+type RegimeLabel = "BULL_TREND" | "BEAR_TREND" | "RANGE" | "NEUTRAL" | "UNKNOWN";
+
+type AdaptiveStrategy = "TREND" | "MEAN_REVERSION" | "GRID";
+
+type AdaptiveRegimeSnapshot = {
+  label: RegimeLabel;
+  confidence: number;
+  inputs: {
+    priceChangePct24h?: number;
+    rsi14?: number;
+    adx14?: number;
+    atrPct14?: number;
+  };
+};
+
+type AdaptiveStrategyScores = {
+  trend: number;
+  meanReversion: number;
+  grid: number;
+  recommended: AdaptiveStrategy;
+};
+
+type AdaptiveShadowEvent = {
+  version: 1;
+  ts: string;
+  tickStartedAt: string;
+  tickDurationMs: number;
+  environment: "LIVE" | "PAPER";
+  homeStableCoin: string;
+  candidateSymbol: string;
+  candidateFeatures?: {
+    score?: number;
+    strategyHint?: string;
+    priceChangePct24h?: number;
+    rsi14?: number;
+    adx14?: number;
+    atrPct14?: number;
+  };
+  regime: AdaptiveRegimeSnapshot;
+  strategy: AdaptiveStrategyScores;
+  risk: {
+    risk: number;
+    maxOpenPositions?: number;
+    maxPositionPct?: number;
+    walletTotalHome?: number;
+  };
+  decision: {
+    kind: string;
+    summary: string;
+    reason?: string;
+    orderId?: string;
+    symbol?: string;
+    side?: "BUY" | "SELL";
+    status?: Order["status"];
+    qty?: number;
+    price?: number;
+  };
+};
+
+type BaselineSymbolStats = {
+  symbol: string;
+  buys: number;
+  sells: number;
+  buyNotional: number;
+  sellNotional: number;
+  netQty: number;
+  avgEntry: number;
+  openCost: number;
+  realizedPnl: number;
+  lastTradeTs?: string;
+};
+
+type BaselineRunStats = {
+  version: 1;
+  generatedAt: string;
+  startedAt: string;
+  runtimeSeconds: number;
+  bot: {
+    running: boolean;
+    phase: BotState["phase"];
+    lastError?: string;
+  };
+  totals: {
+    decisions: number;
+    trades: number;
+    skips: number;
+    filledOrders: number;
+    activeOrders: number;
+    buys: number;
+    sells: number;
+    conversions: number;
+    buyNotional: number;
+    sellNotional: number;
+    realizedPnl: number;
+    openExposureCost: number;
+    openPositions: number;
+  };
+  byDecisionKind: Record<string, number>;
+  topSkipSummaries: Array<{ summary: string; count: number }>;
+  symbols: BaselineSymbolStats[];
+};
+
+type TickTelemetryContext = {
+  tickStartedAtIso: string;
+  homeStableCoin: string;
+  liveTrading: boolean;
+  risk: number;
+  candidateSymbol: string;
+  candidate: UniverseCandidate | null;
+  walletTotalHome?: number;
+  maxOpenPositions?: number;
+  maxPositionPct?: number;
+};
+
+export type BotRunStatsResponse = {
+  generatedAt: string;
+  kpi: BaselineRunStats | null;
+  adaptiveShadowTail: AdaptiveShadowEvent[];
+  notes: {
+    activeOrders: string;
+  };
+};
+
 @Injectable()
 export class BotEngineService {
   private readonly dataDir = process.env.DATA_DIR ?? path.resolve(process.cwd(), "../../data");
   private readonly statePath = path.join(this.dataDir, "state.json");
+  private readonly telemetryDir = path.join(this.dataDir, "telemetry");
+  private readonly baselineStatsPath = path.join(this.telemetryDir, "baseline-kpis.json");
+  private readonly adaptiveShadowPath = path.join(this.telemetryDir, "adaptive-shadow.jsonl");
 
   private loopTimer: NodeJS.Timeout | null = null;
   private examineTimer: NodeJS.Timeout | null = null;
   private tickInFlight = false;
+  private lastBaselineFingerprint: string | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -363,6 +490,393 @@ export class BotEngineService {
     return atrComponent + trendComponent + rsiComponent + scoreComponent;
   }
 
+  private ensureTelemetryDir(): void {
+    fs.mkdirSync(this.telemetryDir, { recursive: true });
+  }
+
+  private clamp01(value: number): number {
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(0, Math.min(1, value));
+  }
+
+  private toRounded(value: number, decimals = 6): number {
+    if (!Number.isFinite(value)) return 0;
+    const power = 10 ** decimals;
+    return Math.round(value * power) / power;
+  }
+
+  private buildRegimeSnapshot(candidate: UniverseCandidate | null): AdaptiveRegimeSnapshot {
+    const inputs = {
+      priceChangePct24h: candidate?.priceChangePct24h,
+      rsi14: candidate?.rsi14,
+      adx14: candidate?.adx14,
+      atrPct14: candidate?.atrPct14
+    };
+
+    const change = typeof inputs.priceChangePct24h === "number" ? inputs.priceChangePct24h : Number.NaN;
+    const rsi = typeof inputs.rsi14 === "number" ? inputs.rsi14 : Number.NaN;
+    const adx = typeof inputs.adx14 === "number" ? inputs.adx14 : Number.NaN;
+    const atr = typeof inputs.atrPct14 === "number" ? inputs.atrPct14 : Number.NaN;
+
+    if (!Number.isFinite(change) || !Number.isFinite(rsi) || !Number.isFinite(adx)) {
+      return {
+        label: "UNKNOWN",
+        confidence: 0.2,
+        inputs
+      };
+    }
+
+    if (adx >= 25 && change <= -1 && rsi <= 45) {
+      const confidence = this.clamp01(0.55 + Math.min(0.35, ((adx - 25) / 40) + Math.abs(change) / 20));
+      return { label: "BEAR_TREND", confidence: this.toRounded(confidence, 4), inputs };
+    }
+    if (adx >= 25 && change >= 1 && rsi >= 55) {
+      const confidence = this.clamp01(0.55 + Math.min(0.35, ((adx - 25) / 40) + Math.abs(change) / 20));
+      return { label: "BULL_TREND", confidence: this.toRounded(confidence, 4), inputs };
+    }
+    if (adx < 20 && rsi >= 40 && rsi <= 60) {
+      const confidence = this.clamp01(0.45 + Math.min(0.3, (20 - adx) / 40 + (Number.isFinite(atr) ? atr / 20 : 0)));
+      return { label: "RANGE", confidence: this.toRounded(confidence, 4), inputs };
+    }
+
+    return {
+      label: "NEUTRAL",
+      confidence: 0.4,
+      inputs
+    };
+  }
+
+  private buildAdaptiveStrategyScores(candidate: UniverseCandidate | null, regime: RegimeLabel): AdaptiveStrategyScores {
+    const adx = Number.isFinite(candidate?.adx14) ? Math.max(0, candidate?.adx14 ?? 0) : 0;
+    const rsi = Number.isFinite(candidate?.rsi14) ? Math.max(0, Math.min(100, candidate?.rsi14 ?? 50)) : 50;
+    const atr = Number.isFinite(candidate?.atrPct14) ? Math.max(0, candidate?.atrPct14 ?? 0) : 0;
+    const change = Number.isFinite(candidate?.priceChangePct24h) ? Math.abs(candidate?.priceChangePct24h ?? 0) : 0;
+
+    let trend = this.clamp01((adx / 45) * 0.65 + (Math.min(8, change) / 8) * 0.35);
+    let meanReversion = this.clamp01((rsi <= 35 || rsi >= 65 ? 0.65 : 0.25) + Math.min(1.2, atr) * 0.25);
+    let grid = this.clamp01((regime === "RANGE" ? 0.65 : 0.25) + Math.min(1.4, atr) * 0.2);
+
+    if (regime === "BEAR_TREND") {
+      trend *= 0.45;
+      meanReversion = this.clamp01(meanReversion + 0.1);
+      grid = this.clamp01(grid + 0.08);
+    } else if (regime === "BULL_TREND") {
+      trend = this.clamp01(trend + 0.12);
+    }
+
+    const candidates: Array<{ strategy: AdaptiveStrategy; score: number }> = [
+      { strategy: "TREND", score: trend },
+      { strategy: "MEAN_REVERSION", score: meanReversion },
+      { strategy: "GRID", score: grid }
+    ];
+    candidates.sort((a, b) => b.score - a.score);
+
+    return {
+      trend: this.toRounded(trend, 4),
+      meanReversion: this.toRounded(meanReversion, 4),
+      grid: this.toRounded(grid, 4),
+      recommended: candidates[0]?.strategy ?? "TREND"
+    };
+  }
+
+  private buildBaselineStats(state: BotState): BaselineRunStats {
+    const nowIso = new Date().toISOString();
+    const decisionList = [...state.decisions];
+    const decisionChronological = [...decisionList].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+    const startedAt = decisionChronological[0]?.ts ?? state.updatedAt;
+    const runtimeSeconds = Math.max(0, Math.round((Date.now() - Date.parse(startedAt)) / 1000));
+
+    const byDecisionKind: Record<string, number> = {};
+    const skipSummaryCounts = new Map<string, number>();
+    let trades = 0;
+    let skips = 0;
+    let conversions = 0;
+
+    for (const decision of decisionList) {
+      byDecisionKind[decision.kind] = (byDecisionKind[decision.kind] ?? 0) + 1;
+      if (decision.kind === "TRADE") {
+        trades += 1;
+        if (decision.summary.toLowerCase().includes("convert ")) {
+          conversions += 1;
+        } else {
+          const details = decision.details as Record<string, unknown> | undefined;
+          if (typeof details?.reason === "string" && details.reason.toLowerCase().includes("convert ")) {
+            conversions += 1;
+          }
+        }
+      }
+      if (decision.kind === "SKIP") {
+        skips += 1;
+        skipSummaryCounts.set(decision.summary, (skipSummaryCounts.get(decision.summary) ?? 0) + 1);
+      }
+    }
+
+    const topSkipSummaries = [...skipSummaryCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([summary, count]) => ({ summary, count }));
+
+    const filledOrders = [...state.orderHistory]
+      .filter((o) => o.status === "FILLED")
+      .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+
+    const symbolMap = new Map<string, BaselineSymbolStats>();
+    let buys = 0;
+    let sells = 0;
+    let buyNotional = 0;
+    let sellNotional = 0;
+
+    for (const order of filledOrders) {
+      const symbol = order.symbol.trim().toUpperCase();
+      const qty = Number.isFinite(order.qty) ? Math.max(0, order.qty) : 0;
+      const price = Number.isFinite(order.price) ? Math.max(0, order.price ?? 0) : 0;
+      const notional = qty > 0 && price > 0 ? qty * price : 0;
+      if (qty <= 0) continue;
+
+      const next = symbolMap.get(symbol) ?? {
+        symbol,
+        buys: 0,
+        sells: 0,
+        buyNotional: 0,
+        sellNotional: 0,
+        netQty: 0,
+        avgEntry: 0,
+        openCost: 0,
+        realizedPnl: 0,
+        lastTradeTs: undefined
+      };
+
+      if (order.side === "BUY") {
+        buys += 1;
+        next.buys += 1;
+        if (notional > 0) {
+          buyNotional += notional;
+          next.buyNotional += notional;
+          next.openCost += notional;
+        }
+        next.netQty += qty;
+      } else {
+        sells += 1;
+        next.sells += 1;
+        if (notional > 0) {
+          sellNotional += notional;
+          next.sellNotional += notional;
+        }
+        const closeQty = Math.min(qty, next.netQty);
+        const avgCost = next.netQty > 0 ? next.openCost / next.netQty : 0;
+        if (closeQty > 0 && avgCost > 0 && price > 0) {
+          next.realizedPnl += (price - avgCost) * closeQty;
+          next.openCost = Math.max(0, next.openCost - avgCost * closeQty);
+          next.netQty = Math.max(0, next.netQty - closeQty);
+        }
+      }
+
+      next.avgEntry = next.netQty > 0 ? next.openCost / next.netQty : 0;
+      next.lastTradeTs = order.ts;
+      symbolMap.set(symbol, next);
+    }
+
+    const symbols = [...symbolMap.values()]
+      .map((s) => ({
+        ...s,
+        buyNotional: this.toRounded(s.buyNotional, 8),
+        sellNotional: this.toRounded(s.sellNotional, 8),
+        netQty: this.toRounded(s.netQty, 8),
+        avgEntry: this.toRounded(s.avgEntry, 8),
+        openCost: this.toRounded(s.openCost, 8),
+        realizedPnl: this.toRounded(s.realizedPnl, 8)
+      }))
+      .sort((a, b) => b.buyNotional + b.sellNotional - (a.buyNotional + a.sellNotional))
+      .slice(0, 40);
+
+    const realizedPnl = this.toRounded(symbols.reduce((sum, s) => sum + s.realizedPnl, 0), 8);
+    const openExposureCost = this.toRounded(symbols.reduce((sum, s) => sum + (s.netQty > 0 ? s.openCost : 0), 0), 8);
+    const openPositions = symbols.filter((s) => s.netQty > 0).length;
+
+    return {
+      version: 1,
+      generatedAt: nowIso,
+      startedAt,
+      runtimeSeconds,
+      bot: {
+        running: state.running,
+        phase: state.phase,
+        ...(state.lastError ? { lastError: state.lastError } : {})
+      },
+      totals: {
+        decisions: decisionList.length,
+        trades,
+        skips,
+        filledOrders: filledOrders.length,
+        activeOrders: state.activeOrders.length,
+        buys,
+        sells,
+        conversions,
+        buyNotional: this.toRounded(buyNotional, 8),
+        sellNotional: this.toRounded(sellNotional, 8),
+        realizedPnl,
+        openExposureCost,
+        openPositions
+      },
+      byDecisionKind,
+      topSkipSummaries,
+      symbols
+    };
+  }
+
+  private persistBaselineStats(state: BotState): void {
+    const fingerprint = JSON.stringify({
+      updatedAt: state.updatedAt,
+      topDecision: state.decisions[0]?.id ?? null,
+      topOrder: state.orderHistory[0]?.id ?? null,
+      activeOrders: state.activeOrders.length,
+      phase: state.phase,
+      running: state.running,
+      lastError: state.lastError ?? null
+    });
+    if (fingerprint === this.lastBaselineFingerprint) return;
+    this.lastBaselineFingerprint = fingerprint;
+
+    this.ensureTelemetryDir();
+    const kpi = this.buildBaselineStats(state);
+    atomicWriteFile(this.baselineStatsPath, JSON.stringify(kpi, null, 2));
+  }
+
+  private appendShadowEvent(event: AdaptiveShadowEvent): void {
+    this.ensureTelemetryDir();
+    fs.appendFileSync(this.adaptiveShadowPath, `${JSON.stringify(event)}\n`, { encoding: "utf-8" });
+  }
+
+  private persistShadowTelemetry(params: {
+    beforeDecisionIds: Set<string>;
+    afterState: BotState;
+    tickContext: TickTelemetryContext;
+    tickStartedAtMs: number;
+  }): void {
+    const { beforeDecisionIds, afterState, tickContext, tickStartedAtMs } = params;
+    const newDecisions = afterState.decisions
+      .filter((decision) => !beforeDecisionIds.has(decision.id))
+      .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+    if (newDecisions.length === 0) return;
+
+    const ordersById = new Map<string, Order>();
+    for (const order of [...afterState.orderHistory, ...afterState.activeOrders]) {
+      ordersById.set(order.id, order);
+    }
+
+    const regime = this.buildRegimeSnapshot(tickContext.candidate);
+    const strategy = this.buildAdaptiveStrategyScores(tickContext.candidate, regime.label);
+    const tickDurationMs = Math.max(0, Date.now() - tickStartedAtMs);
+
+    for (const decision of newDecisions) {
+      const details =
+        decision.details && typeof decision.details === "object" ? (decision.details as Record<string, unknown>) : undefined;
+      const orderId = typeof details?.orderId === "string" ? details.orderId : undefined;
+      const linkedOrder = orderId ? ordersById.get(orderId) : undefined;
+      const reason = typeof details?.reason === "string" ? details.reason : undefined;
+
+      const event: AdaptiveShadowEvent = {
+        version: 1,
+        ts: new Date().toISOString(),
+        tickStartedAt: tickContext.tickStartedAtIso,
+        tickDurationMs,
+        environment: tickContext.liveTrading ? "LIVE" : "PAPER",
+        homeStableCoin: tickContext.homeStableCoin,
+        candidateSymbol: tickContext.candidateSymbol,
+        ...(tickContext.candidate
+          ? {
+              candidateFeatures: {
+                score: tickContext.candidate.score,
+                strategyHint: tickContext.candidate.strategyHint,
+                priceChangePct24h: tickContext.candidate.priceChangePct24h,
+                rsi14: tickContext.candidate.rsi14,
+                adx14: tickContext.candidate.adx14,
+                atrPct14: tickContext.candidate.atrPct14
+              }
+            }
+          : {}),
+        regime,
+        strategy,
+        risk: {
+          risk: tickContext.risk,
+          ...(typeof tickContext.maxOpenPositions === "number" ? { maxOpenPositions: tickContext.maxOpenPositions } : {}),
+          ...(typeof tickContext.maxPositionPct === "number" ? { maxPositionPct: tickContext.maxPositionPct } : {}),
+          ...(typeof tickContext.walletTotalHome === "number" ? { walletTotalHome: this.toRounded(tickContext.walletTotalHome, 8) } : {})
+        },
+        decision: {
+          kind: decision.kind,
+          summary: decision.summary,
+          ...(reason ? { reason } : {}),
+          ...(orderId ? { orderId } : {}),
+          ...(linkedOrder
+            ? {
+                symbol: linkedOrder.symbol,
+                side: linkedOrder.side,
+                status: linkedOrder.status,
+                qty: this.toRounded(linkedOrder.qty, 8),
+                ...(typeof linkedOrder.price === "number" ? { price: this.toRounded(linkedOrder.price, 8) } : {})
+              }
+            : {})
+        }
+      };
+      this.appendShadowEvent(event);
+    }
+  }
+
+  private readAdaptiveShadowTail(maxItems: number): AdaptiveShadowEvent[] {
+    if (!fs.existsSync(this.adaptiveShadowPath)) return [];
+    try {
+      const raw = fs.readFileSync(this.adaptiveShadowPath, "utf-8");
+      const lines = raw
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const tail = lines.slice(Math.max(0, lines.length - maxItems));
+      const parsed: AdaptiveShadowEvent[] = [];
+      for (const line of tail) {
+        try {
+          parsed.push(JSON.parse(line) as AdaptiveShadowEvent);
+        } catch {
+          // ignore invalid lines
+        }
+      }
+      return parsed;
+    } catch {
+      return [];
+    }
+  }
+
+  getRunStats(): BotRunStatsResponse {
+    let kpi: BaselineRunStats | null = null;
+    if (fs.existsSync(this.baselineStatsPath)) {
+      try {
+        const raw = fs.readFileSync(this.baselineStatsPath, "utf-8");
+        kpi = JSON.parse(raw) as BaselineRunStats;
+      } catch {
+        kpi = null;
+      }
+    } else {
+      this.persistBaselineStats(this.getState());
+      if (fs.existsSync(this.baselineStatsPath)) {
+        try {
+          const raw = fs.readFileSync(this.baselineStatsPath, "utf-8");
+          kpi = JSON.parse(raw) as BaselineRunStats;
+        } catch {
+          kpi = null;
+        }
+      }
+    }
+
+    return {
+      generatedAt: new Date().toISOString(),
+      kpi,
+      adaptiveShadowTail: this.readAdaptiveShadowTail(60),
+      notes: {
+        activeOrders: "Spot MARKET orders are usually filled immediately, so active order lists can stay at 0 while order history increases."
+      }
+    };
+  }
+
   start(): void {
     const state = this.getState();
     if (state.running) return;
@@ -395,9 +909,13 @@ export class BotEngineService {
   private async tick(): Promise<void> {
     if (this.tickInFlight) return;
     this.tickInFlight = true;
+    const tickStartedAtMs = Date.now();
+    let beforeDecisionIds = new Set<string>();
+    let tickContext: TickTelemetryContext | null = null;
     try {
       const config = this.configService.load();
       let current = this.pruneExpiredBlacklist(this.getState());
+      beforeDecisionIds = new Set(current.decisions.map((d) => d.id));
       if (!current.running) return;
       if (current.phase !== "TRADING") return;
 
@@ -406,6 +924,17 @@ export class BotEngineService {
       const binanceEnvironment = config?.advanced.binanceEnvironment ?? "MAINNET";
       const allowMainnetLiveTrading = String(process.env.ALLOW_MAINNET_LIVE_TRADING ?? "false").toLowerCase() === "true";
       const liveTrading = liveRequested && (binanceEnvironment === "SPOT_TESTNET" || allowMainnetLiveTrading);
+      const risk = Math.max(0, Math.min(100, config?.basic.risk ?? 50));
+      tickContext = {
+        tickStartedAtIso: new Date(tickStartedAtMs).toISOString(),
+        homeStableCoin: homeStable,
+        liveTrading,
+        risk,
+        candidateSymbol: `BTC${homeStable}`,
+        candidate: null,
+        maxOpenPositions: config?.derived.maxOpenPositions,
+        maxPositionPct: config?.derived.maxPositionPct
+      };
 
       if (liveRequested && !liveTrading) {
         const summary =
@@ -469,6 +998,8 @@ export class BotEngineService {
         }
       })();
       const candidateSymbol = candidateSelection.symbol;
+      tickContext.candidateSymbol = candidateSymbol;
+      tickContext.candidate = candidateSelection.candidate;
       const blockedReason = this.isSymbolBlocked(candidateSymbol, current);
       if (blockedReason) {
         const summary = `Skip ${candidateSymbol}: ${blockedReason}`;
@@ -703,16 +1234,17 @@ export class BotEngineService {
 
           const walletTotalHome = await this.estimateWalletTotalInHome(balances, homeStable);
           const capitalProfile = this.getCapitalProfile(walletTotalHome);
+          tickContext.walletTotalHome = walletTotalHome;
 
           const managedPositions = this.getManagedPositions(current);
           const managedOpenHomeSymbols = [...managedPositions.values()].filter((p) => p.netQty > 0 && p.symbol.endsWith(homeStable));
           const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
+          tickContext.maxOpenPositions = maxOpenPositions;
           const candidateIsOpen = (managedPositions.get(candidateSymbol)?.netQty ?? 0) > 0;
 
           const rebalanceSellCooldownMs =
             config?.advanced.liveTradeRebalanceSellCooldownMs ??
             Number.parseInt(process.env.LIVE_TRADE_REBALANCE_SELL_COOLDOWN_MS ?? "900000", 10);
-          const risk = Math.max(0, Math.min(100, config?.basic.risk ?? 50));
           const takeProfitPct = 0.35 + (risk / 100) * 0.9; // 0.35% .. 1.25%
           const stopLossPct = -(0.8 + (risk / 100) * 1.2); // -0.8% .. -2.0%
 
@@ -816,6 +1348,7 @@ export class BotEngineService {
           }
 
           const maxPositionPct = config?.derived.maxPositionPct ?? 1;
+          tickContext.maxPositionPct = maxPositionPct;
           const notionalCap =
             config?.advanced.liveTradeNotionalCap ?? Number.parseFloat(process.env.LIVE_TRADE_NOTIONAL_CAP ?? "25");
           const slippageBuffer =
@@ -1329,6 +1862,16 @@ export class BotEngineService {
 
       this.save(nextState);
     } finally {
+      const afterState = this.getState();
+      this.persistBaselineStats(afterState);
+      if (tickContext) {
+        this.persistShadowTelemetry({
+          beforeDecisionIds,
+          afterState,
+          tickContext,
+          tickStartedAtMs
+        });
+      }
       this.tickInFlight = false;
     }
   }
@@ -1353,6 +1896,7 @@ export class BotEngineService {
       activeOrders: [],
       orderHistory: [...canceledOrders, ...next.orderHistory].slice(0, 500)
     });
+    this.persistBaselineStats(this.getState());
   }
 
   addDecision(kind: Decision["kind"], summary: Decision["summary"]): void {
@@ -1364,5 +1908,6 @@ export class BotEngineService {
       summary
     };
     this.save({ ...state, decisions: [decision, ...state.decisions].slice(0, 500) });
+    this.persistBaselineStats(this.getState());
   }
 }
