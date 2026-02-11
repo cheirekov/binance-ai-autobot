@@ -17,6 +17,15 @@ type BotState = {
   activeOrders: Array<{ id: string; ts: string; symbol: string; side: string; type: string; status: string; qty: number; price?: number }>;
   orderHistory: Array<{ id: string; ts: string; symbol: string; side: string; type: string; status: string; qty: number; price?: number }>;
   symbolBlacklist?: Array<{ symbol: string; reason: string; createdAt: string; expiresAt: string }>;
+  protectionLocks?: Array<{
+    id: string;
+    type: "COOLDOWN" | "STOPLOSS_GUARD" | "MAX_DRAWDOWN" | "LOW_PROFIT";
+    scope: "GLOBAL" | "SYMBOL";
+    symbol?: string;
+    reason: string;
+    createdAt: string;
+    expiresAt: string;
+  }>;
 };
 
 type PillTone = "neutral" | "ok" | "bad" | "warn";
@@ -204,6 +213,7 @@ export function DashboardPage(): JSX.Element {
             <span className="pill">Active orders: {state?.activeOrders?.length ?? 0}</span>
             <span className="pill">Decisions: {state?.decisions?.length ?? 0}</span>
             <span className="pill">Blacklisted: {state?.symbolBlacklist?.length ?? 0}</span>
+            <span className="pill">Protection locks: {state?.protectionLocks?.length ?? 0}</span>
             <span className="pill">Trades: {runStats.stats?.kpi?.totals.trades ?? "—"}</span>
             <span className="pill">Skips: {runStats.stats?.kpi?.totals.skips ?? "—"}</span>
             <span className="pill">
@@ -230,6 +240,36 @@ export function DashboardPage(): JSX.Element {
                         <td>{e.symbol}</td>
                         <td>{e.reason}</td>
                         <td>{new Date(e.expiresAt).toLocaleTimeString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
+          {(state?.protectionLocks?.length ?? 0) > 0 ? (
+            <div style={{ marginTop: 12 }}>
+              <div className="subtitle">Protection locks (risk guards)</div>
+              <div style={{ marginTop: 8, maxHeight: 150, overflow: "auto" }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Scope</th>
+                      <th>Symbol</th>
+                      <th>Reason</th>
+                      <th>Expires</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(state?.protectionLocks ?? []).slice(0, 8).map((lock) => (
+                      <tr key={lock.id}>
+                        <td>{lock.type}</td>
+                        <td>{lock.scope}</td>
+                        <td>{lock.symbol ?? "ALL"}</td>
+                        <td>{lock.reason}</td>
+                        <td>{new Date(lock.expiresAt).toLocaleTimeString()}</td>
                       </tr>
                     ))}
                   </tbody>

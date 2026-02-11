@@ -20,6 +20,7 @@ Latest implementation update (Feb 11, 2026):
 - Hardened transient exchange/network error handling (no auto-blacklist on timeouts/rate-limit/network noise).
 - Fixed decision/order table column wrapping for desktop and mobile/foldable layouts.
 - Completed deep reference mapping from `references/freqtrade-develop` into concrete tickets for protections, universe filter-chain, adaptive confidence shadowing, and offline calibration (`T-023`..`T-026`).
+- Added protection manager v1 with risk-linked global/per-symbol locks (`COOLDOWN`, `STOPLOSS_GUARD`, `MAX_DRAWDOWN`, `LOW_PROFIT`) and dashboard visibility.
 
 Execution governance update (Feb 11, 2026):
 

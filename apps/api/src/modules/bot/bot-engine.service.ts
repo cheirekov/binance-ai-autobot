@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { Injectable } from "@nestjs/common";
-import type { BotState, Decision, Order, SymbolBlacklistEntry, UniverseCandidate } from "@autobot/shared";
+import type { BotState, Decision, Order, ProtectionLockEntry, SymbolBlacklistEntry, UniverseCandidate } from "@autobot/shared";
 import { BotStateSchema, defaultBotState } from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
@@ -162,6 +162,27 @@ type TransientExchangeBackoffState = {
   lastErrorMessage?: string;
 };
 
+type ClosedPnlEvent = {
+  symbol: string;
+  ts: string;
+  pnlAbs: number;
+  pnlPct: number;
+};
+
+type ProtectionPolicy = {
+  cooldownMs: number;
+  stoplossLookbackMs: number;
+  stoplossTradeLimit: number;
+  stoplossLockMs: number;
+  maxDrawdownLookbackMs: number;
+  maxDrawdownPct: number;
+  maxDrawdownLockMs: number;
+  lowProfitLookbackMs: number;
+  lowProfitTradeLimit: number;
+  lowProfitThresholdPct: number;
+  lowProfitLockMs: number;
+};
+
 export type BotRunStatsResponse = {
   generatedAt: string;
   kpi: BaselineRunStats | null;
@@ -227,12 +248,276 @@ export class BotEngineService {
     return { ...state, symbolBlacklist: pruned };
   }
 
+  private pruneExpiredProtectionLocks(state: BotState): BotState {
+    if (!state.protectionLocks || state.protectionLocks.length === 0) return state;
+    const now = Date.now();
+    const pruned = state.protectionLocks.filter((lock) => {
+      const expiresAt = Date.parse(lock.expiresAt);
+      return Number.isFinite(expiresAt) && expiresAt > now;
+    });
+    if (pruned.length === state.protectionLocks.length) return state;
+    return { ...state, protectionLocks: pruned };
+  }
+
+  private upsertProtectionLock(
+    state: BotState,
+    lockInput: Omit<ProtectionLockEntry, "id" | "createdAt">
+  ): BotState {
+    const existingIndex = (state.protectionLocks ?? []).findIndex(
+      (lock) => lock.type === lockInput.type && lock.scope === lockInput.scope && (lock.symbol ?? "") === (lockInput.symbol ?? "")
+    );
+    const nowIso = new Date().toISOString();
+    const existing = existingIndex >= 0 ? state.protectionLocks[existingIndex] : undefined;
+    const nextLock: ProtectionLockEntry = {
+      id: existing?.id ?? crypto.randomUUID(),
+      createdAt: existing?.createdAt ?? nowIso,
+      ...lockInput
+    };
+
+    const existingLocks = state.protectionLocks ?? [];
+    if (existingIndex >= 0) {
+      const nextLocks = existingLocks.filter((_, idx) => idx !== existingIndex);
+      return { ...state, protectionLocks: [nextLock, ...nextLocks].slice(0, 300) };
+    }
+
+    return { ...state, protectionLocks: [nextLock, ...existingLocks].slice(0, 300) };
+  }
+
+  private getActiveGlobalProtectionLock(state: BotState): ProtectionLockEntry | null {
+    const now = Date.now();
+    return (
+      (state.protectionLocks ?? []).find(
+        (lock) => lock.scope === "GLOBAL" && Number.isFinite(Date.parse(lock.expiresAt)) && Date.parse(lock.expiresAt) > now
+      ) ?? null
+    );
+  }
+
+  private getActiveSymbolProtectionLock(state: BotState, symbol: string): ProtectionLockEntry | null {
+    const now = Date.now();
+    const normalized = symbol.trim().toUpperCase();
+    if (!normalized) return null;
+    return (
+      (state.protectionLocks ?? []).find(
+        (lock) =>
+          lock.scope === "SYMBOL" &&
+          lock.symbol?.trim().toUpperCase() === normalized &&
+          Number.isFinite(Date.parse(lock.expiresAt)) &&
+          Date.parse(lock.expiresAt) > now
+      ) ?? null
+    );
+  }
+
+  private deriveProtectionPolicy(risk: number): ProtectionPolicy {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const t = boundedRisk / 100;
+
+    return {
+      cooldownMs: Math.round(180_000 - t * 160_000), // 180s -> 20s
+      stoplossLookbackMs: Math.round((180 - t * 135) * 60_000), // 180m -> 45m
+      stoplossTradeLimit: Math.max(2, Math.round(2 + t * 3)), // 2 -> 5
+      stoplossLockMs: Math.round((90 - t * 70) * 60_000), // 90m -> 20m
+      maxDrawdownLookbackMs: Math.round((24 - t * 12) * 60 * 60_000), // 24h -> 12h
+      maxDrawdownPct: Math.max(2.5, Number((4 + t * 10).toFixed(2))), // 4% -> 14%
+      maxDrawdownLockMs: Math.round((120 - t * 90) * 60_000), // 120m -> 30m
+      lowProfitLookbackMs: Math.round((180 - t * 135) * 60_000), // 180m -> 45m
+      lowProfitTradeLimit: Math.max(2, Math.round(2 + t * 3)), // 2 -> 5
+      lowProfitThresholdPct: Number((-0.5 - t * 2).toFixed(2)), // -0.5% -> -2.5%
+      lowProfitLockMs: Math.round((120 - t * 90) * 60_000) // 120m -> 30m
+    };
+  }
+
+  private getClosedPnlEvents(state: BotState): ClosedPnlEvent[] {
+    const events: ClosedPnlEvent[] = [];
+    const positions = new Map<string, { netQty: number; costQuote: number }>();
+    const filledOrders = [...state.orderHistory]
+      .filter((o) => o.status === "FILLED")
+      .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+
+    for (const order of filledOrders) {
+      const symbol = order.symbol.trim().toUpperCase();
+      if (!symbol) continue;
+      const qty = Number.isFinite(order.qty) ? Math.max(0, order.qty) : 0;
+      const price = Number.isFinite(order.price) ? Math.max(0, order.price ?? 0) : 0;
+      if (qty <= 0 || price <= 0) continue;
+
+      const current = positions.get(symbol) ?? { netQty: 0, costQuote: 0 };
+      if (order.side === "BUY") {
+        current.netQty += qty;
+        current.costQuote += qty * price;
+        positions.set(symbol, current);
+        continue;
+      }
+
+      const closeQty = Math.min(qty, current.netQty);
+      const avgCost = current.netQty > 0 ? current.costQuote / current.netQty : 0;
+      if (closeQty > 0 && avgCost > 0) {
+        const pnlAbs = (price - avgCost) * closeQty;
+        const pnlPct = ((price - avgCost) / avgCost) * 100;
+        events.push({
+          symbol,
+          ts: order.ts,
+          pnlAbs: this.toRounded(pnlAbs, 8),
+          pnlPct: this.toRounded(pnlPct, 8)
+        });
+      }
+
+      current.netQty = Math.max(0, current.netQty - closeQty);
+      current.costQuote = Math.max(0, current.costQuote - avgCost * closeQty);
+      if (current.netQty <= 1e-12) {
+        current.netQty = 0;
+        current.costQuote = 0;
+      }
+      positions.set(symbol, current);
+    }
+
+    return events;
+  }
+
+  private evaluateProtectionLocks(params: {
+    state: BotState;
+    risk: number;
+    walletTotalHome?: number;
+  }): BotState {
+    const nowMs = Date.now();
+    const policy = this.deriveProtectionPolicy(params.risk);
+    let next = this.pruneExpiredProtectionLocks(params.state);
+
+    const filledOrdersDesc = [...next.orderHistory]
+      .filter((o) => o.status === "FILLED")
+      .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts));
+    const latestPerSymbol = new Map<string, Order>();
+    for (const order of filledOrdersDesc) {
+      const symbol = order.symbol.trim().toUpperCase();
+      if (!symbol || latestPerSymbol.has(symbol)) continue;
+      latestPerSymbol.set(symbol, order);
+    }
+
+    for (const [symbol, order] of latestPerSymbol.entries()) {
+      const orderTs = Date.parse(order.ts);
+      if (!Number.isFinite(orderTs)) continue;
+      const expiresAtMs = orderTs + policy.cooldownMs;
+      if (expiresAtMs <= nowMs) continue;
+      next = this.upsertProtectionLock(next, {
+        type: "COOLDOWN",
+        scope: "SYMBOL",
+        symbol,
+        reason: `Cooldown active after last fill (${Math.round(policy.cooldownMs / 1000)}s)`,
+        expiresAt: new Date(expiresAtMs).toISOString(),
+        details: {
+          cooldownMs: policy.cooldownMs,
+          lastFillTs: order.ts
+        }
+      });
+    }
+
+    const stoplossEvents = next.decisions.filter((decision) => {
+      if (decision.kind !== "TRADE") return false;
+      const ts = Date.parse(decision.ts);
+      if (!Number.isFinite(ts) || nowMs - ts > policy.stoplossLookbackMs) return false;
+      const details = decision.details as Record<string, unknown> | undefined;
+      const reason = typeof details?.reason === "string" ? details.reason.toLowerCase() : "";
+      return reason.includes("stop-loss");
+    });
+    if (stoplossEvents.length >= policy.stoplossTradeLimit) {
+      next = this.upsertProtectionLock(next, {
+        type: "STOPLOSS_GUARD",
+        scope: "GLOBAL",
+        reason: `${stoplossEvents.length} stop-loss exits in last ${Math.round(policy.stoplossLookbackMs / 60000)}m`,
+        expiresAt: new Date(nowMs + policy.stoplossLockMs).toISOString(),
+        details: {
+          stoplossEvents: stoplossEvents.length,
+          lookbackMs: policy.stoplossLookbackMs,
+          tradeLimit: policy.stoplossTradeLimit
+        }
+      });
+    }
+
+    const closedPnlEvents = this.getClosedPnlEvents(next).filter((event) => {
+      const ts = Date.parse(event.ts);
+      return Number.isFinite(ts) && nowMs - ts <= policy.lowProfitLookbackMs;
+    });
+    const pnlBySymbol = new Map<string, { count: number; totalPnlPct: number }>();
+    for (const event of closedPnlEvents) {
+      const entry = pnlBySymbol.get(event.symbol) ?? { count: 0, totalPnlPct: 0 };
+      entry.count += 1;
+      entry.totalPnlPct += event.pnlPct;
+      pnlBySymbol.set(event.symbol, entry);
+    }
+    for (const [symbol, entry] of pnlBySymbol.entries()) {
+      if (entry.count < policy.lowProfitTradeLimit) continue;
+      const avgPnlPct = entry.totalPnlPct / entry.count;
+      if (avgPnlPct >= policy.lowProfitThresholdPct) continue;
+      next = this.upsertProtectionLock(next, {
+        type: "LOW_PROFIT",
+        scope: "SYMBOL",
+        symbol,
+        reason: `Low recent profitability (${avgPnlPct.toFixed(2)}% avg over ${entry.count} closes)`,
+        expiresAt: new Date(nowMs + policy.lowProfitLockMs).toISOString(),
+        details: {
+          avgPnlPct: this.toRounded(avgPnlPct, 6),
+          tradeCount: entry.count,
+          thresholdPct: policy.lowProfitThresholdPct,
+          lookbackMs: policy.lowProfitLookbackMs
+        }
+      });
+    }
+
+    if (typeof params.walletTotalHome === "number" && Number.isFinite(params.walletTotalHome) && params.walletTotalHome > 50) {
+      const events = this.getClosedPnlEvents(next).filter((event) => {
+        const ts = Date.parse(event.ts);
+        return Number.isFinite(ts) && nowMs - ts <= policy.maxDrawdownLookbackMs;
+      });
+      if (events.length >= 2) {
+        const totalPnl = events.reduce((sum, event) => sum + event.pnlAbs, 0);
+        let equity = Math.max(50, params.walletTotalHome - totalPnl);
+        let peak = equity;
+        let maxDrawdownPct = 0;
+        for (const event of events) {
+          equity += event.pnlAbs;
+          if (equity > peak) peak = equity;
+          if (peak > 0) {
+            const drawdownPct = ((peak - equity) / peak) * 100;
+            if (drawdownPct > maxDrawdownPct) {
+              maxDrawdownPct = drawdownPct;
+            }
+          }
+        }
+
+        if (maxDrawdownPct >= policy.maxDrawdownPct) {
+          next = this.upsertProtectionLock(next, {
+            type: "MAX_DRAWDOWN",
+            scope: "GLOBAL",
+            reason: `Realized drawdown ${maxDrawdownPct.toFixed(2)}% exceeded ${policy.maxDrawdownPct.toFixed(2)}%`,
+            expiresAt: new Date(nowMs + policy.maxDrawdownLockMs).toISOString(),
+            details: {
+              drawdownPct: this.toRounded(maxDrawdownPct, 6),
+              thresholdPct: this.toRounded(policy.maxDrawdownPct, 6),
+              lookbackMs: policy.maxDrawdownLookbackMs
+            }
+          });
+        }
+      }
+    }
+
+    return next;
+  }
+
   private isSymbolBlocked(symbol: string, state: BotState): string | null {
     const config = this.configService.load();
     if (!config) return "Bot is not initialized";
 
+    const globalLock = this.getActiveGlobalProtectionLock(state);
+    if (globalLock) {
+      return `Protection lock ${globalLock.type}: ${globalLock.reason}`;
+    }
+
     if (config.advanced.neverTradeSymbols.includes(symbol)) {
       return "Blocked by Advanced never-trade list";
+    }
+
+    const symbolLock = this.getActiveSymbolProtectionLock(state, symbol);
+    if (symbolLock) {
+      return `Protection lock ${symbolLock.type}: ${symbolLock.reason}`;
     }
 
     const now = Date.now();
@@ -1114,7 +1399,14 @@ export class BotEngineService {
     let tickContext: TickTelemetryContext | null = null;
     try {
       const config = this.configService.load();
-      let current = this.pruneExpiredBlacklist(this.getState());
+      const protectionFingerprint = (state: BotState): string =>
+        JSON.stringify(
+          (state.protectionLocks ?? [])
+            .map((lock) => `${lock.type}:${lock.scope}:${lock.symbol ?? "*"}:${lock.expiresAt}:${lock.reason}`)
+            .sort()
+        );
+
+      let current = this.pruneExpiredProtectionLocks(this.pruneExpiredBlacklist(this.getState()));
       beforeDecisionIds = new Set(current.decisions.map((d) => d.id));
       if (!current.running) return;
       if (current.phase !== "TRADING") return;
@@ -1135,6 +1427,15 @@ export class BotEngineService {
         maxOpenPositions: config?.derived.maxOpenPositions,
         maxPositionPct: config?.derived.maxPositionPct
       };
+
+      const preProtectionFingerprint = protectionFingerprint(current);
+      current = this.evaluateProtectionLocks({
+        state: current,
+        risk
+      });
+      if (preProtectionFingerprint !== protectionFingerprint(current)) {
+        this.save(current);
+      }
 
       if (liveRequested && !liveTrading) {
         const summary =
@@ -1431,6 +1732,32 @@ export class BotEngineService {
           tickContext.walletTotalHome = walletTotalHome;
           const maxPositionPct = config?.derived.maxPositionPct ?? 1;
           tickContext.maxPositionPct = maxPositionPct;
+
+          const preDrawdownProtectionFingerprint = protectionFingerprint(current);
+          current = this.evaluateProtectionLocks({
+            state: current,
+            risk,
+            walletTotalHome
+          });
+          if (preDrawdownProtectionFingerprint !== protectionFingerprint(current)) {
+            this.save(current);
+          }
+
+          const postProtectionBlockedReason = this.isSymbolBlocked(candidateSymbol, current);
+          if (postProtectionBlockedReason) {
+            const summary = `Skip ${candidateSymbol}: ${postProtectionBlockedReason}`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
 
           const universeSnapshot = await this.universe.getLatest().catch(() => null);
           const exposureEligibleCandidate = this.pickExposureEligibleCandidate({

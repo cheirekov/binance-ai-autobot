@@ -199,3 +199,28 @@ This log is mandatory for every implementation patch batch.
 - Validation evidence: local source review of reference files + updated board/changelog artifacts.
 - Runtime test request: none for this ticket (no runtime code change).
 - Follow-up: implement `T-024` next, then finish `T-003`, then start `T-023`.
+
+## 2026-02-11 16:58 UTC — T-024 Protection manager v1 (risk-linked)
+- Scope: introduce runtime protection locks so the bot automatically pauses risky entries in adverse conditions.
+- BA requirement mapping: autobot must reduce cascading losses and not require manual trader intervention during bearish/choppy periods.
+- PM milestone mapping: M1 live-path risk hardening before deeper adaptive strategy work.
+- Technical changes:
+  - Extended shared bot state with `protectionLocks` (`GLOBAL`/`SYMBOL`, typed lock kinds).
+  - Added protection engine in `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - `COOLDOWN` (per-symbol lock after recent fill),
+    - `STOPLOSS_GUARD` (global lock on stop-loss streak),
+    - `MAX_DRAWDOWN` (global lock on realized drawdown threshold),
+    - `LOW_PROFIT` (per-symbol lock on poor recent close performance).
+  - Added lock expiry pruning + upsert semantics to prevent duplicate lock spam.
+  - Integrated protection evaluation into trading loop (pre-candidate and post-wallet phases).
+  - Integrated protection lock checks into symbol blocking logic (global + per-symbol).
+  - Updated dashboard status to show lock count + lock table (`type/scope/symbol/reason/expires`).
+- Risk slider impact: explicit and significant; lock thresholds, lookbacks, and lock durations now scale with `basic.risk` (higher risk = looser guards, lower risk = stricter guards).
+- Validation evidence: Docker CI passed (`docker compose -f docker-compose.ci.yml run --rm ci`).
+- Runtime test request:
+  - Deploy this patch, reset state, run uninterrupted overnight (6-10h),
+  - Verify dashboard shows active protection locks when triggered,
+  - Verify decision stream includes `Skip <symbol>: Protection lock ...` instead of repeated risky entries.
+- Follow-up:
+  - Complete `T-003` adaptive exits using these lock signals.
+  - Expose optional Advanced overrides for protection thresholds in a later patch if runtime data indicates need.

@@ -40,6 +40,24 @@ export const SymbolBlacklistEntrySchema = z.object({
 });
 export type SymbolBlacklistEntry = z.infer<typeof SymbolBlacklistEntrySchema>;
 
+export const ProtectionLockScopeSchema = z.enum(["GLOBAL", "SYMBOL"]);
+export type ProtectionLockScope = z.infer<typeof ProtectionLockScopeSchema>;
+
+export const ProtectionLockTypeSchema = z.enum(["COOLDOWN", "STOPLOSS_GUARD", "MAX_DRAWDOWN", "LOW_PROFIT"]);
+export type ProtectionLockType = z.infer<typeof ProtectionLockTypeSchema>;
+
+export const ProtectionLockEntrySchema = z.object({
+  id: z.string().min(1),
+  type: ProtectionLockTypeSchema,
+  scope: ProtectionLockScopeSchema,
+  symbol: z.string().min(1).optional(),
+  reason: z.string().min(1),
+  createdAt: z.string().min(1),
+  expiresAt: z.string().min(1),
+  details: z.record(z.unknown()).optional()
+});
+export type ProtectionLockEntry = z.infer<typeof ProtectionLockEntrySchema>;
+
 export const BotStateSchema = z.object({
   version: z.literal(BOT_STATE_VERSION),
   updatedAt: z.string().min(1),
@@ -49,7 +67,8 @@ export const BotStateSchema = z.object({
   decisions: z.array(DecisionSchema),
   activeOrders: z.array(OrderSchema),
   orderHistory: z.array(OrderSchema),
-  symbolBlacklist: z.array(SymbolBlacklistEntrySchema).default([])
+  symbolBlacklist: z.array(SymbolBlacklistEntrySchema).default([]),
+  protectionLocks: z.array(ProtectionLockEntrySchema).default([])
 });
 export type BotState = z.infer<typeof BotStateSchema>;
 
@@ -62,6 +81,7 @@ export function defaultBotState(): BotState {
     decisions: [],
     activeOrders: [],
     orderHistory: [],
-    symbolBlacklist: []
+    symbolBlacklist: [],
+    protectionLocks: []
   };
 }

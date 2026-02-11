@@ -41,12 +41,12 @@ M1: Stabilize Spot testnet automation with risk-linked execution behavior and cl
 | T-021 | DONE | Transient exchange error backoff controller | Avoid retry storms on network/rate-limit faults | Stable live loop under exchange turbulence | Added exponential backoff with pause window + recovery for transient exchange errors. |
 | T-022 | DONE | Freqtrade-develop deep reference mapping | Convert external best-practices into actionable backlog without GPL code copying | Faster, less-chaotic decision making for next milestones | Added concrete architecture mapping for FreqAI lifecycle, pairlist pipeline, protections, exchange sizing, and hyperopt objective design. |
 | T-023 | TODO | Universe filter-chain architecture v1 | Improve autonomous pair discovery quality and explainability | Better candidate quality and less symbol-selection drift | Introduce generator+filters pipeline (liquidity/volatility/range/performance/price) with stage diagnostics and cache TTL. |
-| T-024 | TODO | Protection manager v1 (global+pair locks) | Bearish-loss control without manual trader tuning | Reduced cascading losses and clearer risk state | Add cooldown, stoploss-streak, max-drawdown, and low-profit pair locks tied to risk slider. |
+| T-024 | DONE | Protection manager v1 (global+pair locks) | Bearish-loss control without manual trader tuning | Reduced cascading losses and clearer risk state | Added risk-linked cooldown, stoploss-guard, max-drawdown, and low-profit locks with dashboard visibility. |
 | T-025 | TODO | Adaptive confidence shadow model v1 | Bot should adapt automatically while risk policy remains authoritative | Higher-quality decisions before execution promotion | Add model-age guard, outlier confidence gate, and rolling prediction statistics in shadow path. |
 | T-026 | TODO | Offline strategy calibration runner | Systematic parameter tuning from real telemetry/backtest data | Better repeatable improvements over ad-hoc tweaks | Add multi-metric objective calibration (profit, drawdown, winrate, expectancy, trade-count penalties). |
 
 ## Next execution batch (single patch set)
 
-1. Complete `T-024` and wire lock state into bot status telemetry.
-2. Complete `T-003` using protection state + regime signal for adaptive exits.
-3. Start `T-023` (filter-chain universe) and validate with one uninterrupted 4-6h run.
+1. Complete `T-003` using protection state + regime signal for adaptive exits.
+2. Start `T-023` (filter-chain universe) for staged candidate diagnostics.
+3. Validate with one uninterrupted 6-10h run and collect feedback bundle.
