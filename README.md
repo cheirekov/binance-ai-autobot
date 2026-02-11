@@ -41,3 +41,6 @@ This writes `autobot-feedback-*.tgz` containing state/universe/news/logs plus a 
 - `docs/SECURITY.md`
 - `docs/ROADMAP.md`
 - `docs/CONVERSION.md`
+- `docs/TEAM_OPERATING_RULES.md`
+- `docs/DELIVERY_BOARD.md`
+- `docs/PM_BA_CHANGELOG.md`

@@ -20,6 +20,12 @@ Latest implementation update (Feb 11, 2026):
 - Hardened transient exchange/network error handling (no auto-blacklist on timeouts/rate-limit/network noise).
 - Fixed decision/order table column wrapping for desktop and mobile/foldable layouts.
 
+Execution governance update (Feb 11, 2026):
+
+- Hard process rules are now documented in `docs/TEAM_OPERATING_RULES.md`.
+- Active ticket state is tracked in `docs/DELIVERY_BOARD.md`.
+- Every patch batch must be logged in `docs/PM_BA_CHANGELOG.md`.
+
 ## Phase 0 — Foundations (done)
 
 - Monorepo + Docker compose (UI + API)

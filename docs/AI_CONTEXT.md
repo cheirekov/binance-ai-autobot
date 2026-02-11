@@ -6,6 +6,16 @@ Build a **fully-automated**, dockerized Binance trading bot with a simple onboar
 
 This document exists so future GPT/Codex sessions can patch the codebase without re-reading everything.
 
+## Session memory controls (mandatory)
+
+To prevent focus loss and repeated loops across sessions:
+
+- `docs/TEAM_OPERATING_RULES.md` defines non-negotiable process rules.
+- `docs/DELIVERY_BOARD.md` is the single source of truth for active tickets.
+- `docs/PM_BA_CHANGELOG.md` records each patch batch with BA/PM/risk mapping.
+
+Any patch is incomplete unless board + changelog are updated.
+
 ## Current status (Feb 11, 2026)
 
 Bootstrap scaffolding:
