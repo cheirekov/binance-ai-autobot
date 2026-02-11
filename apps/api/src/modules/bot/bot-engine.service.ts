@@ -1480,10 +1480,12 @@ export class BotEngineService {
           const spreadBufferRate = Math.max(0, Number.parseFloat(process.env.ESTIMATED_SPREAD_BUFFER_RATE ?? "0.0006"));
           const roundTripCostPct = ((takerFeeRate * 2) + spreadBufferRate + Math.max(0, bufferFactor - 1)) * 100;
           const estimatedEdgePct = this.estimateCandidateEdgePct(selectedCandidate);
+          const riskNormalized = Math.max(0, Math.min(1, risk / 100));
+          const riskAdjustedMinNetEdgePct = Math.max(0.05, capitalProfile.minNetEdgePct * (1 - riskNormalized * 0.65));
           if (Number.isFinite(estimatedEdgePct)) {
             const netEdgePct = (estimatedEdgePct ?? 0) - roundTripCostPct;
-            if (netEdgePct < capitalProfile.minNetEdgePct) {
-              const summary = `Skip ${candidateSymbol}: Fee/edge filter (net ${netEdgePct.toFixed(3)}% < ${capitalProfile.minNetEdgePct.toFixed(3)}%)`;
+            if (netEdgePct < riskAdjustedMinNetEdgePct) {
+              const summary = `Skip ${candidateSymbol}: Fee/edge filter (net ${netEdgePct.toFixed(3)}% < ${riskAdjustedMinNetEdgePct.toFixed(3)}%)`;
               const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
               const next = {
                 ...current,
@@ -1501,7 +1503,9 @@ export class BotEngineService {
                           capitalTier: capitalProfile.tier,
                           estimatedEdgePct: Number((estimatedEdgePct ?? 0).toFixed(6)),
                           roundTripCostPct: Number(roundTripCostPct.toFixed(6)),
-                          minNetEdgePct: Number(capitalProfile.minNetEdgePct.toFixed(6)),
+                          minNetEdgePct: Number(riskAdjustedMinNetEdgePct.toFixed(6)),
+                          baseMinNetEdgePct: Number(capitalProfile.minNetEdgePct.toFixed(6)),
+                          risk,
                           rsi14: selectedCandidate?.rsi14,
                           adx14: selectedCandidate?.adx14,
                           atrPct14: selectedCandidate?.atrPct14,

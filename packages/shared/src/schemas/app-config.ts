@@ -158,17 +158,17 @@ export function deriveAdvancedRiskProfile(risk: number): Pick<
   const t = r / 100;
 
   return {
-    liveTradeCooldownMs: Math.round(120_000 - t * 90_000), // 120s -> 30s
-    liveTradeNotionalCap: round(10 + t * 25, 2), // 10 -> 35
+    liveTradeCooldownMs: Math.round(90_000 - t * 85_000), // 90s -> 5s
+    liveTradeNotionalCap: round(20 + t * 1_980, 2), // 20 -> 2000
     liveTradeSlippageBuffer: round(1.008 - t * 0.006, 4), // 1.008 -> 1.002
-    liveTradeRebalanceSellCooldownMs: Math.round(1_800_000 - t * 1_500_000), // 30m -> 5m
+    liveTradeRebalanceSellCooldownMs: Math.round(1_200_000 - t * 1_080_000), // 20m -> 2m
     conversionBuyBuffer: round(1.008 - t * 0.006, 4), // 1.008 -> 1.002
     conversionSellBuffer: round(1.003 - t * 0.002, 4), // 1.003 -> 1.001
     conversionFeeBuffer: round(1.003 - t * 0.002, 4), // 1.003 -> 1.001
-    symbolEntryCooldownMs: Math.round(180_000 - t * 120_000), // 180s -> 60s
-    maxConsecutiveEntriesPerSymbol: Math.max(1, Math.round(2 + t * 2)), // 2 -> 4
-    conversionTopUpReserveMultiplier: round(3 - t * 1, 2), // 3.0 -> 2.0
-    conversionTopUpCooldownMs: Math.round(240_000 - t * 150_000) // 240s -> 90s
+    symbolEntryCooldownMs: Math.round(180_000 - t * 165_000), // 180s -> 15s
+    maxConsecutiveEntriesPerSymbol: Math.max(1, Math.round(2 + t * 6)), // 2 -> 8
+    conversionTopUpReserveMultiplier: round(2.8 - t * 1.6, 2), // 2.8 -> 1.2
+    conversionTopUpCooldownMs: Math.round(240_000 - t * 220_000) // 240s -> 20s
   };
 }
 

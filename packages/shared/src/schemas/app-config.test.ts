@@ -27,5 +27,9 @@ describe("deriveAdvancedRiskProfile", () => {
     expect(low.maxConsecutiveEntriesPerSymbol).toBeLessThanOrEqual(high.maxConsecutiveEntriesPerSymbol);
     expect(low.conversionTopUpReserveMultiplier).toBeGreaterThan(high.conversionTopUpReserveMultiplier);
     expect(low.conversionTopUpCooldownMs).toBeGreaterThan(high.conversionTopUpCooldownMs);
+    expect(high.liveTradeCooldownMs).toBe(5_000);
+    expect(high.liveTradeNotionalCap).toBe(2_000);
+    expect(high.symbolEntryCooldownMs).toBe(15_000);
+    expect(high.maxConsecutiveEntriesPerSymbol).toBe(8);
   });
 });
