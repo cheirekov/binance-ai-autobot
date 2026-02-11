@@ -16,6 +16,24 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-11 17:19 UTC — T-013 supporting hotfix (conversion policy enforcement)
+- Scope: stop repeated conversion fills on symbols that users explicitly blocked (for example `USDCUSDT`).
+- BA requirement mapping: Advanced settings (`neverTradeSymbols`, region policy) must apply consistently to autonomous execution paths.
+- PM milestone mapping: M1 stabilization and loop/noise reduction before adaptive-exit rollout.
+- Technical changes:
+  - Updated `ConversionRouterService` to run pair-policy checks before executing each conversion leg.
+  - Conversion legs now honor `neverTradeSymbols` and regional enforcement settings.
+  - Kept utility conversion behavior intact for non-blocked symbols to avoid liquidity deadlocks.
+- Risk slider impact: none (policy consistency fix; no sizing/cooldown formula change).
+- Validation evidence: Docker CI passed (`docker compose -f docker-compose.ci.yml run --rm ci`).
+- Runtime test request:
+  - Keep `USDCUSDT` in `neverTradeSymbols` and run 1-2h.
+  - Verify no new `TRADE ... USDCUSDT ... convert ...` decisions appear.
+  - If quote shortfall appears, verify bot either uses another allowed route or logs a clean insufficient-quote skip.
+- Follow-up:
+  - Evaluate whether conversion should expose a dedicated skip reason when blocked by policy (UI diagnostics improvement).
+  - Continue `T-003` adaptive exit implementation on top of this stabilized conversion behavior.
+
 ## 2026-02-11 15:00 UTC — T-001 Exposure-aware candidate fallback
 - Scope: prevent idle loop when top candidate is blocked by symbol exposure cap.
 - BA requirement mapping: full automation should continue without manual intervention.

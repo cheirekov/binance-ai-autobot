@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 
 import { ConfigService } from "../config/config.service";
+import { getPairPolicyBlockReason } from "../policy/trading-policy";
 import { BinanceMarketDataService } from "./binance-market-data.service";
 import type { BinanceMarketOrderResponse } from "./binance-trading.service";
 import { BinanceTradingService } from "./binance-trading.service";
@@ -178,6 +179,27 @@ export class ConversionRouterService {
     }
   }
 
+  private isConversionPairBlocked(params: {
+    symbol: string;
+    baseAsset: string;
+    quoteAsset: string;
+  }): boolean {
+    const config = this.configService.load();
+    if (!config) return false;
+
+    const blockReason = getPairPolicyBlockReason({
+      symbol: params.symbol,
+      baseAsset: params.baseAsset,
+      quoteAsset: params.quoteAsset,
+      traderRegion: config.basic.traderRegion,
+      neverTradeSymbols: config.advanced.neverTradeSymbols,
+      excludeStableStablePairs: false,
+      enforceRegionPolicy: config.advanced.enforceRegionPolicy
+    });
+
+    return blockReason !== null;
+  }
+
   private async estimateBridgeRequired(params: {
     bridgeAsset: string;
     targetAsset: string;
@@ -223,6 +245,15 @@ export class ConversionRouterService {
     const buySymbol = `${targetAsset}${sourceAsset}`;
     const buyRules = await this.getRulesSafe(buySymbol);
     if (buyRules && buyRules.baseAsset.toUpperCase() === targetAsset && buyRules.quoteAsset.toUpperCase() === sourceAsset) {
+      if (
+        this.isConversionPairBlocked({
+          symbol: buySymbol,
+          baseAsset: buyRules.baseAsset,
+          quoteAsset: buyRules.quoteAsset
+        })
+      ) {
+        return { ok: false, obtainedTarget: 0 };
+      }
       const price = this.parsePositiveFloat(await this.marketData.getTickerPrice(buySymbol));
       if (price) {
         const maxAffordableQty = sourceFree / (price * this.buyBuffer * this.feeBuffer);
@@ -263,6 +294,15 @@ export class ConversionRouterService {
     const sellSymbol = `${sourceAsset}${targetAsset}`;
     const sellRules = await this.getRulesSafe(sellSymbol);
     if (sellRules && sellRules.baseAsset.toUpperCase() === sourceAsset && sellRules.quoteAsset.toUpperCase() === targetAsset) {
+      if (
+        this.isConversionPairBlocked({
+          symbol: sellSymbol,
+          baseAsset: sellRules.baseAsset,
+          quoteAsset: sellRules.quoteAsset
+        })
+      ) {
+        return { ok: false, obtainedTarget: 0 };
+      }
       const price = this.parsePositiveFloat(await this.marketData.getTickerPrice(sellSymbol));
       if (price) {
         const desiredQty = Math.min(sourceFree, (requiredTarget / price) * this.sellBuffer * this.feeBuffer);
