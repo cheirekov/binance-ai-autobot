@@ -13,6 +13,13 @@ Planned timeboxes (engineering estimates):
 - Track B adaptive policy v1 (shadow scoring + explainability + promotion gates): **2-4 working days**
 - Controlled promotion (adaptive sizing influence only, then entries): **2-3 working days**
 
+Latest implementation update (Feb 11, 2026):
+
+- Added baseline KPI + adaptive shadow telemetry endpoints/UI visibility (`/bot/run-stats`).
+- Improved universe auto-discovery defaults (adds JPY in discovery set, cross-quote liquidity normalization to home quote, broader diversified top list).
+- Hardened transient exchange/network error handling (no auto-blacklist on timeouts/rate-limit/network noise).
+- Fixed decision/order table column wrapping for desktop and mobile/foldable layouts.
+
 ## Phase 0 — Foundations (done)
 
 - Monorepo + Docker compose (UI + API)

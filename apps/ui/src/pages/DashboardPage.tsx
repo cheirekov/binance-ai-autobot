@@ -440,16 +440,16 @@ export function DashboardPage(): JSX.Element {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Time</th>
-                  <th>Kind</th>
+                  <th className="col-time">Time</th>
+                  <th className="col-kind">Kind</th>
                   <th>Summary</th>
                 </tr>
               </thead>
               <tbody>
                 {(state?.decisions ?? []).slice(0, 50).map((d) => (
                   <tr key={d.id}>
-                    <td>{new Date(d.ts).toLocaleTimeString()}</td>
-                    <td>{d.kind}</td>
+                    <td className="col-time">{new Date(d.ts).toLocaleTimeString()}</td>
+                    <td className="col-kind">{d.kind}</td>
                     <td>{d.summary}</td>
                   </tr>
                 ))}
@@ -475,9 +475,9 @@ export function DashboardPage(): JSX.Element {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Time</th>
+                  <th className="col-time">Time</th>
                   <th>Symbol</th>
-                  <th>Side</th>
+                  <th className="col-kind">Side</th>
                   <th>Type</th>
                   <th>Status</th>
                   <th>Qty</th>
@@ -486,9 +486,9 @@ export function DashboardPage(): JSX.Element {
               <tbody>
                 {(state?.activeOrders ?? []).slice(0, 50).map((o) => (
                   <tr key={o.id}>
-                    <td>{new Date(o.ts).toLocaleTimeString()}</td>
+                    <td className="col-time">{new Date(o.ts).toLocaleTimeString()}</td>
                     <td>{o.symbol}</td>
-                    <td>{o.side}</td>
+                    <td className="col-kind">{o.side}</td>
                     <td>{o.type}</td>
                     <td>{o.status}</td>
                     <td>{o.qty}</td>
@@ -512,22 +512,22 @@ export function DashboardPage(): JSX.Element {
         <div className="subtitle">Filled/canceled orders (stub data).</div>
         <div style={{ marginTop: 10, maxHeight: 320, overflow: "auto" }}>
           <table className="table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Symbol</th>
-                <th>Side</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Qty</th>
+              <thead>
+                <tr>
+                  <th className="col-time">Time</th>
+                  <th>Symbol</th>
+                  <th className="col-kind">Side</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Qty</th>
               </tr>
             </thead>
             <tbody>
               {(state?.orderHistory ?? []).slice(0, 80).map((o) => (
                 <tr key={o.id}>
-                  <td>{new Date(o.ts).toLocaleTimeString()}</td>
+                  <td className="col-time">{new Date(o.ts).toLocaleTimeString()}</td>
                   <td>{o.symbol}</td>
-                  <td>{o.side}</td>
+                  <td className="col-kind">{o.side}</td>
                   <td>{o.type}</td>
                   <td>{o.status}</td>
                   <td>{o.qty}</td>

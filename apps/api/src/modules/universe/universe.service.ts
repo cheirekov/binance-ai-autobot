@@ -35,6 +35,13 @@ type KlineRow = [
   string
 ];
 
+type Ticker24h = {
+  symbol: string;
+  lastPrice: string;
+  quoteVolume: string;
+  priceChangePercent: string;
+};
+
 function atomicWriteFile(filePath: string, data: string): void {
   const tmpPath = `${filePath}.tmp`;
   fs.writeFileSync(tmpPath, data, { encoding: "utf-8" });
@@ -53,6 +60,67 @@ function unique(items: string[]): string[] {
     out.push(u);
   }
   return out;
+}
+
+function resolveDirectOrInverseRate(params: {
+  from: string;
+  to: string;
+  tickerBySymbol: Map<string, { lastPrice: number; quoteVolume: number; priceChangePct: number }>;
+}): number | null {
+  const from = params.from.trim().toUpperCase();
+  const to = params.to.trim().toUpperCase();
+  if (!from || !to) return null;
+  if (from === to) return 1;
+
+  const direct = params.tickerBySymbol.get(`${from}${to}`)?.lastPrice;
+  if (typeof direct === "number" && Number.isFinite(direct) && direct > 0) {
+    return direct;
+  }
+
+  const inverse = params.tickerBySymbol.get(`${to}${from}`)?.lastPrice;
+  if (typeof inverse === "number" && Number.isFinite(inverse) && inverse > 0) {
+    return 1 / inverse;
+  }
+
+  return null;
+}
+
+function resolveQuoteToHomeRate(params: {
+  quoteAsset: string;
+  homeAsset: string;
+  tickerBySymbol: Map<string, { lastPrice: number; quoteVolume: number; priceChangePct: number }>;
+}): number | null {
+  const quoteAsset = params.quoteAsset.trim().toUpperCase();
+  const homeAsset = params.homeAsset.trim().toUpperCase();
+  if (!quoteAsset || !homeAsset) return null;
+  if (quoteAsset === homeAsset) return 1;
+
+  const direct = resolveDirectOrInverseRate({
+    from: quoteAsset,
+    to: homeAsset,
+    tickerBySymbol: params.tickerBySymbol
+  });
+  if (direct) return direct;
+
+  const bridges = unique([homeAsset, "USDT", "USDC", "EUR", "BTC", "ETH", "BNB", "JPY"]);
+  for (const bridge of bridges) {
+    if (bridge === quoteAsset || bridge === homeAsset) continue;
+    const quoteToBridge = resolveDirectOrInverseRate({
+      from: quoteAsset,
+      to: bridge,
+      tickerBySymbol: params.tickerBySymbol
+    });
+    if (!quoteToBridge) continue;
+    const bridgeToHome = resolveDirectOrInverseRate({
+      from: bridge,
+      to: homeAsset,
+      tickerBySymbol: params.tickerBySymbol
+    });
+    if (!bridgeToHome) continue;
+    return quoteToBridge * bridgeToHome;
+  }
+
+  return null;
 }
 
 function safeNumber(v: unknown): number | null {
@@ -262,16 +330,18 @@ export class UniverseService {
 
     const interval = "1h";
     const klineLimit = 120;
+    const homeQuote = (config?.basic.homeStableCoin ?? "USDC").trim().toUpperCase();
+    const traderRegion = config?.basic.traderRegion ?? "NON_EEA";
     const quoteAssets = unique([
-      config?.basic.homeStableCoin ?? "USDC",
-      "EUR",
+      homeQuote,
+      traderRegion === "EEA" ? "EUR" : "USDT",
       "BTC",
       "ETH",
-      "BNB"
+      "BNB",
+      "JPY"
     ]);
 
     const errors: Array<{ symbol?: string; error: string }> = [];
-    const traderRegion = config?.basic.traderRegion ?? "NON_EEA";
     const neverTradeSymbols = config?.advanced.neverTradeSymbols ?? [];
     const excludeStableStablePairs = config?.advanced.excludeStableStablePairs ?? true;
     const enforceRegionPolicy = config?.advanced.enforceRegionPolicy ?? true;
@@ -296,7 +366,7 @@ export class UniverseService {
       return;
     }
 
-    let tickers: Array<{ symbol: string; lastPrice: string; quoteVolume: string; priceChangePercent: string }> = [];
+    let tickers: Ticker24h[] = [];
     try {
       tickers = await client.ticker24hr();
     } catch (e) {
@@ -336,12 +406,20 @@ export class UniverseService {
       .map((s) => {
         const t = tickerBySymbol.get(s.symbol);
         if (!t) return null;
+        const quoteToHome = resolveQuoteToHomeRate({
+          quoteAsset: s.quoteAsset,
+          homeAsset: homeQuote,
+          tickerBySymbol
+        });
+        const quoteVolumeHome24h =
+          Number.isFinite(quoteToHome) && (quoteToHome ?? 0) > 0 ? t.quoteVolume * (quoteToHome ?? 0) : null;
         return {
           symbol: s.symbol,
           baseAsset: s.baseAsset,
           quoteAsset: s.quoteAsset,
           lastPrice: t.lastPrice,
           quoteVolume24h: t.quoteVolume,
+          quoteVolumeHome24h,
           priceChangePct24h: t.priceChangePct
         };
       })
@@ -351,11 +429,12 @@ export class UniverseService {
       quoteAsset: string;
       lastPrice: number;
       quoteVolume24h: number;
+      quoteVolumeHome24h: number | null;
       priceChangePct24h: number;
     }>;
 
     // Keep scan lightweight and diverse: pick top symbols per quote asset, then compute indicators.
-    const perQuoteLimit = 24;
+    const perQuoteLimit = 28;
     const grouped = new Map<string, typeof withTicker>();
     for (const s of withTicker) {
       const arr = grouped.get(s.quoteAsset) ?? [];
@@ -363,10 +442,13 @@ export class UniverseService {
       grouped.set(s.quoteAsset, arr);
     }
 
+    const liquidityValue = (row: { quoteVolume24h: number; quoteVolumeHome24h: number | null }): number =>
+      row.quoteVolumeHome24h && row.quoteVolumeHome24h > 0 ? row.quoteVolumeHome24h : row.quoteVolume24h;
+
     const preselected = Array.from(grouped.values())
-      .flatMap((arr) => arr.sort((a, b) => b.quoteVolume24h - a.quoteVolume24h).slice(0, perQuoteLimit))
-      .sort((a, b) => b.quoteVolume24h - a.quoteVolume24h)
-      .slice(0, 110);
+      .flatMap((arr) => arr.sort((a, b) => liquidityValue(b) - liquidityValue(a)).slice(0, perQuoteLimit))
+      .sort((a, b) => liquidityValue(b) - liquidityValue(a))
+      .slice(0, 140);
 
     const enriched = await mapWithConcurrency(preselected, 6, async (s): Promise<UniverseCandidate | null> => {
       try {
@@ -393,7 +475,8 @@ export class UniverseService {
         const adx14 = clampNumber(computeAdx(highs, lows, closes, 14), 0, 100);
         const atrPct14 = clampNumber(computeAtrPct(highs, lows, closes, 14), 0, 1000);
 
-        const volumeScore = Math.log10(Math.max(1, s.quoteVolume24h));
+        const normalizedVolume = s.quoteVolumeHome24h && s.quoteVolumeHome24h > 0 ? s.quoteVolumeHome24h : s.quoteVolume24h;
+        const volumeScore = Math.log10(Math.max(1, normalizedVolume));
         const trendScore = adx14 ? Math.min(adx14 / 50, 1) : 0;
         const volScore = atrPct14 ? Math.min(atrPct14 / 10, 1) : 0;
 
@@ -404,6 +487,9 @@ export class UniverseService {
 
         const reasons = [
           `Vol ${s.quoteVolume24h.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${s.quoteAsset} (24h)`,
+          s.quoteVolumeHome24h
+            ? `≈ ${s.quoteVolumeHome24h.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${homeQuote} eq`
+            : null,
           `Δ ${s.priceChangePct24h.toFixed(2)}% (24h)`,
           rsi14 === null ? null : `RSI14 ${rsi14.toFixed(1)}`,
           adx14 === null ? null : `ADX14 ${adx14.toFixed(1)}`,
@@ -431,7 +517,17 @@ export class UniverseService {
     });
 
     const candidates = enriched.filter(Boolean) as UniverseCandidate[];
-    const top = candidates.sort((a, b) => b.score - a.score).slice(0, 40);
+    const byQuoteTop = new Map<string, UniverseCandidate[]>();
+    for (const c of candidates) {
+      const rows = byQuoteTop.get(c.quoteAsset) ?? [];
+      rows.push(c);
+      byQuoteTop.set(c.quoteAsset, rows);
+    }
+
+    const diversified = Array.from(byQuoteTop.values())
+      .flatMap((rows) => rows.sort((a, b) => b.score - a.score).slice(0, 12))
+      .sort((a, b) => b.score - a.score);
+    const top = diversified.slice(0, 60);
 
     const finishedAt = new Date();
     const snapshot = UniverseSnapshotSchema.parse({

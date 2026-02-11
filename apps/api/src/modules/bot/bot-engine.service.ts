@@ -254,6 +254,21 @@ export class BotEngineService {
     return rawMessage;
   }
 
+  private sanitizeUserErrorMessage(rawMessage: string): string {
+    const extracted = this.extractBinanceErrorMessage(rawMessage).trim();
+    if (!extracted) return "Unknown exchange error";
+
+    const withoutQuery = extracted
+      .replace(/https?:\/\/\S+/gi, (url) => {
+        const q = url.indexOf("?");
+        return q >= 0 ? `${url.slice(0, q)}?<redacted>` : url;
+      })
+      .replace(/signature=[a-fA-F0-9]+/g, "signature=<redacted>")
+      .replace(/timestamp=\d+/g, "timestamp=<redacted>");
+
+    return withoutQuery.length > 220 ? `${withoutQuery.slice(0, 220)}…` : withoutQuery;
+  }
+
   private isSizingFilterError(rawMessage: string): boolean {
     const message = rawMessage.toUpperCase();
     return (
@@ -265,8 +280,27 @@ export class BotEngineService {
     );
   }
 
+  private isTransientExchangeError(rawMessage: string): boolean {
+    const message = rawMessage.toUpperCase();
+    return (
+      message.includes("REQUEST TIMED OUT") ||
+      message.includes("ETIMEDOUT") ||
+      message.includes("ECONNRESET") ||
+      message.includes("ECONNREFUSED") ||
+      message.includes("EAI_AGAIN") ||
+      message.includes("ENOTFOUND") ||
+      message.includes("NETWORK ERROR") ||
+      message.includes("\"CODE\":-1001") ||
+      message.includes("\"CODE\":-1003") ||
+      message.includes("TOO MANY REQUESTS") ||
+      message.includes("429")
+    );
+  }
+
   private shouldAutoBlacklistError(rawMessage: string): boolean {
-    return !this.isSizingFilterError(rawMessage);
+    if (this.isSizingFilterError(rawMessage)) return false;
+    if (this.isTransientExchangeError(rawMessage)) return false;
+    return true;
   }
 
   private getRecentSymbolOrders(state: BotState, symbol: string): Order[] {
@@ -1732,14 +1766,17 @@ export class BotEngineService {
           }
           return;
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          const summary = this.isSizingFilterError(msg)
-            ? `Skip ${candidateSymbol}: Binance sizing filter (${this.extractBinanceErrorMessage(msg)})`
-            : `Order rejected for ${candidateSymbol} (${envLabel}): ${msg}`;
+          const rawMsg = err instanceof Error ? err.message : String(err);
+          const safeMsg = this.sanitizeUserErrorMessage(rawMsg);
+          const summary = this.isSizingFilterError(rawMsg)
+            ? `Skip ${candidateSymbol}: Binance sizing filter (${safeMsg})`
+            : this.isTransientExchangeError(rawMsg)
+              ? `Skip ${candidateSymbol}: Temporary exchange/network issue (${safeMsg})`
+              : `Order rejected for ${candidateSymbol} (${envLabel}): ${safeMsg}`;
           const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
           let nextState: BotState = {
             ...current,
-            lastError: msg,
+            lastError: safeMsg,
             activeOrders: filled.activeOrders,
             orderHistory: filled.orderHistory,
             decisions: alreadyLogged
@@ -1747,12 +1784,12 @@ export class BotEngineService {
               : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
           };
 
-          if (config?.advanced.autoBlacklistEnabled && this.shouldAutoBlacklistError(msg)) {
+          if (config?.advanced.autoBlacklistEnabled && this.shouldAutoBlacklistError(rawMsg)) {
             const ttlMinutes = config.advanced.autoBlacklistTtlMinutes ?? 180;
             const now = new Date();
             nextState = this.addSymbolBlacklist(nextState, {
               symbol: candidateSymbol,
-              reason: msg.slice(0, 120),
+              reason: safeMsg.slice(0, 120),
               createdAt: now.toISOString(),
               expiresAt: new Date(now.getTime() + ttlMinutes * 60_000).toISOString()
             });

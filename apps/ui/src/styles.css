@@ -231,7 +231,28 @@ select {
   padding: 10px 8px;
   border-bottom: 1px solid rgba(36, 49, 75, 0.7);
   font-size: 13px;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.table th.col-time,
+.table td.col-time,
+.table th.col-kind,
+.table td.col-kind {
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  width: 1%;
+}
+
+.table th.col-time,
+.table td.col-time {
+  min-width: 76px;
+}
+
+.table th.col-kind,
+.table td.col-kind {
+  min-width: 52px;
 }
 
 .table th {

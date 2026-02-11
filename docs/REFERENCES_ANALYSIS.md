@@ -205,3 +205,13 @@ Current applied mappings:
   - Reference pattern: stake-limit and reserve discipline from mature engines (Freqtrade exchange-limit concepts)
   - Requirement: protect small accounts from over-sizing and low-edge entries after fees/slippage
   - Implemented: `apps/api/src/modules/bot/bot-engine.service.ts`
+
+- **Universe diversification + quote normalization**
+  - Reference pattern: multi-market universe ranking should normalize liquidity across quote currencies.
+  - Requirement: autobot should discover viable non-home-quote opportunities without manual trader tuning.
+  - Implemented: `apps/api/src/modules/universe/universe.service.ts`
+
+- **Transient exchange fault handling**
+  - Reference pattern: network/timeout/rate-limit errors treated as recoverable, not strategy failures.
+  - Requirement: avoid noisy temporary blacklists and confusing error strings in UI/state.
+  - Implemented: `apps/api/src/modules/bot/bot-engine.service.ts`
