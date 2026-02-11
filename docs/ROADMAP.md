@@ -19,6 +19,7 @@ Latest implementation update (Feb 11, 2026):
 - Improved universe auto-discovery defaults (adds JPY in discovery set, cross-quote liquidity normalization to home quote, broader diversified top list).
 - Hardened transient exchange/network error handling (no auto-blacklist on timeouts/rate-limit/network noise).
 - Fixed decision/order table column wrapping for desktop and mobile/foldable layouts.
+- Completed deep reference mapping from `references/freqtrade-develop` into concrete tickets for protections, universe filter-chain, adaptive confidence shadowing, and offline calibration (`T-023`..`T-026`).
 
 Execution governance update (Feb 11, 2026):
 

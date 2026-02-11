@@ -222,3 +222,120 @@ Current applied mappings:
     - `references/crypto-trading-open-main/core/services/arbitrage_monitor_v2/risk_control/network_state.py`
   - Requirement: during network/rate-limit turbulence, bot should pause retries briefly instead of hammering exchange APIs.
   - Implemented: `apps/api/src/modules/bot/bot-engine.service.ts`
+
+## Deep review update: `references/freqtrade-develop` (Feb 11, 2026)
+
+This section records concrete, reusable patterns from `freqtrade-develop` without copying GPL code.
+
+### A) FreqAI lifecycle patterns (adaptive model behavior)
+
+Reference files:
+
+- `references/freqtrade-develop/freqtrade/freqai/freqai_interface.py`
+- `references/freqtrade-develop/freqtrade/freqai/data_kitchen.py`
+
+Patterns extracted:
+
+- Sliding train/backtest windows (`train_period_days` + `backtest/live retrain cadence`).
+- Background retraining queue ordered by oldest model timestamp (prevents stale per-symbol models).
+- Model expiration guard (`expired_hours`) with explicit “prediction not trustworthy” signaling.
+- Confidence/outlier gating via DI/SVM/DBSCAN pipeline, separated from trading decision logic.
+- Rolling live-prediction statistics (`label mean/std`) used to adapt thresholds over time.
+
+Mapping to our architecture:
+
+- Add an **adaptive shadow model service** that computes confidence and regime, but does not place orders directly.
+- Keep risk policy authoritative: adaptive score can propose, policy decides.
+- Persist model health metadata (model age, confidence quality) in telemetry for promotion gates.
+
+### B) Universe discovery pipeline patterns
+
+Reference files:
+
+- `references/freqtrade-develop/freqtrade/plugins/pairlistmanager.py`
+- `references/freqtrade-develop/freqtrade/plugins/pairlist/VolumePairList.py`
+- `references/freqtrade-develop/freqtrade/plugins/pairlist/VolatilityFilter.py`
+- `references/freqtrade-develop/freqtrade/plugins/pairlist/rangestabilityfilter.py`
+- `references/freqtrade-develop/freqtrade/plugins/pairlist/PerformanceFilter.py`
+- `references/freqtrade-develop/freqtrade/plugins/pairlist/PriceFilter.py`
+
+Patterns extracted:
+
+- Generator + filter chain architecture (single pipeline pass).
+- Explicit cache TTL per filter to avoid exchange thrash.
+- Filters split by purpose: liquidity, volatility, range stability, price granularity, recent performance.
+- Backtest/live compatibility checks per filter.
+
+Mapping to our architecture:
+
+- Convert `UniverseService` to a staged filter chain with per-stage diagnostics.
+- Tie filter thresholds to risk slider defaults, while keeping Advanced override controls.
+- Keep a “candidate rejected by stage” trace for UI explainability.
+
+### C) Risk protection plugins (global and per-symbol)
+
+Reference files:
+
+- `references/freqtrade-develop/freqtrade/plugins/protectionmanager.py`
+- `references/freqtrade-develop/freqtrade/plugins/protections/cooldown_period.py`
+- `references/freqtrade-develop/freqtrade/plugins/protections/stoploss_guard.py`
+- `references/freqtrade-develop/freqtrade/plugins/protections/max_drawdown_protection.py`
+- `references/freqtrade-develop/freqtrade/plugins/protections/low_profit_pairs.py`
+
+Patterns extracted:
+
+- Two-level locks: global lock and per-pair lock.
+- Triggered safeguards based on recent realized outcomes (stoploss streak, drawdown, low pair profit).
+- Lock reason + unlock horizon are first-class telemetry fields.
+
+Mapping to our architecture:
+
+- Add `ProtectionManager` equivalent in bot engine with runtime lock table.
+- Connect to risk slider policy for default thresholds and cooldown durations.
+- Surface active protections in UI status (not only generic blacklist entries).
+
+### D) Exchange precision and min-trade handling (CCXT discipline)
+
+Reference files:
+
+- `references/freqtrade-develop/freqtrade/exchange/exchange.py`
+
+Patterns extracted:
+
+- Min/max stake derived from both `limits.cost` and `limits.amount`.
+- Reserve-aware minimum stake math to avoid post-fee/stoploss edge-case rejects.
+- Precision normalization (`amount_to_precision`, `price_to_precision`) before order submit.
+- Exception taxonomy split into insufficient funds, invalid order, transient exchange, operational.
+
+Mapping to our architecture:
+
+- Keep our existing minNotional/step-size work, but extend to a stake-limit function that combines cost+amount constraints.
+- Use uniform exception classes in execution layer to drive consistent skip/backoff decisions.
+
+### E) Hyperopt and objective design patterns
+
+Reference files:
+
+- `references/freqtrade-develop/freqtrade/optimize/hyperopt/hyperopt.py`
+- `references/freqtrade-develop/freqtrade/optimize/hyperopt/hyperopt_optimizer.py`
+- `references/freqtrade-develop/freqtrade/optimize/hyperopt_loss/hyperopt_loss_multi_metric.py`
+- `references/freqtrade-develop/freqtrade/optimize/hyperopt_loss/hyperopt_loss_profit_drawdown.py`
+
+Patterns extracted:
+
+- Offline optimizer run (not in live loop), with reproducible random state and parallel workers.
+- Multi-metric loss design combining profit + drawdown + winrate + expectancy + trade-count penalty.
+- Strict separation: optimize entry/exit thresholds, do not mutate feature definitions mid-run.
+
+Mapping to our architecture:
+
+- Add an offline “strategy calibration” job for shadow/backtest datasets.
+- Promote only parameter sets that improve drawdown-adjusted metrics, not raw PnL only.
+
+## Recommended delivery order from this review
+
+1. Implement risk protections (`T-024`) before deeper adaptive behavior changes.
+2. Finish adaptive exits (`T-003`) with protection-manager signals integrated.
+3. Implement universe filter chain (`T-023`) for broader, explainable candidate selection.
+4. Implement adaptive confidence/model-health shadow layer (`T-025`).
+5. Add offline calibration runner (`T-026`) after telemetry corpus is sufficient.

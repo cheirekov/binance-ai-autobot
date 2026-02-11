@@ -181,3 +181,21 @@ This log is mandatory for every implementation patch batch.
 - Validation evidence: Docker CI passed (`lint`, `test`, `build`).
 - Runtime test request: during API/network instability, verify decisions show backoff activation instead of repeated immediate retries.
 - Follow-up: make backoff tuning config-driven in Advanced settings as part of `T-020`.
+
+## 2026-02-11 16:46 UTC — T-022 Freqtrade-develop deep reference mapping
+- Scope: perform implementation-level review of `references/freqtrade-develop` and convert findings into concrete team backlog items.
+- BA requirement mapping: improve strategy quality, autonomous behavior, and reduce loop/rework from missing architecture direction.
+- PM milestone mapping: bridge from M1 stabilization into structured M2 strategy/protection improvements.
+- Technical changes:
+  - Added deep-review section in `docs/REFERENCES_ANALYSIS.md` with concrete mappings for:
+    - FreqAI lifecycle (train queue, model expiry, confidence/outlier gating, rolling prediction stats)
+    - Pairlist pipeline architecture (generator + staged filters + TTL)
+    - Protection manager model (global/pair locks for cooldown, stoploss streak, drawdown, low-profit)
+    - Exchange precision/min-stake discipline and exception taxonomy
+    - Hyperopt objective design and offline optimization discipline.
+  - Updated `docs/DELIVERY_BOARD.md` with new tickets `T-023` to `T-026`.
+  - Updated execution batch order to prioritize protections before adaptive exits.
+- Risk slider impact: none (analysis + planning artifacts only).
+- Validation evidence: local source review of reference files + updated board/changelog artifacts.
+- Runtime test request: none for this ticket (no runtime code change).
+- Follow-up: implement `T-024` next, then finish `T-003`, then start `T-023`.
