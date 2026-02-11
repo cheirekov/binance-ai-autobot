@@ -11,7 +11,7 @@ TMP_DIR="$(mktemp -d)"
 cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
-mkdir -p "$TMP_DIR/data" "$TMP_DIR/data/logs" "$TMP_DIR/meta"
+mkdir -p "$TMP_DIR/data" "$TMP_DIR/data/logs" "$TMP_DIR/data/telemetry" "$TMP_DIR/meta"
 
 copy_if_exists() {
   local src="$1"
@@ -27,6 +27,11 @@ copy_if_exists "data/state.json" "$TMP_DIR/data/state.json"
 copy_if_exists "data/universe.json" "$TMP_DIR/data/universe.json"
 copy_if_exists "data/news.json" "$TMP_DIR/data/news.json"
 copy_if_exists "data/logs/api.log" "$TMP_DIR/data/logs/api.log"
+copy_if_exists "data/telemetry/baseline-kpis.json" "$TMP_DIR/data/telemetry/baseline-kpis.json"
+
+if [[ -f "data/telemetry/adaptive-shadow.jsonl" ]]; then
+  tail -n 5000 "data/telemetry/adaptive-shadow.jsonl" >"$TMP_DIR/data/telemetry/adaptive-shadow.tail.jsonl" || true
+fi
 
 # Redacted config (keeps structure, removes secrets)
 if [[ -f "data/config.json" ]]; then
@@ -108,5 +113,4 @@ docker compose logs --no-color --tail=300 ui >"$TMP_DIR/meta/docker-ui-tail.log"
 tar -czf "$OUT_FILE" -C "$TMP_DIR" .
 
 echo "Wrote $OUT_FILE"
-echo "Contains: state/universe/news/api.log + redacted config (no raw config.json)."
-
+echo "Contains: state/universe/news/api.log + telemetry + redacted config (no raw config.json)."
