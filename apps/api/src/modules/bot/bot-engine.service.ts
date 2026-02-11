@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { Injectable } from "@nestjs/common";
-import type { BotState, Decision, Order, SymbolBlacklistEntry } from "@autobot/shared";
+import type { BotState, Decision, Order, SymbolBlacklistEntry, UniverseCandidate } from "@autobot/shared";
 import { BotStateSchema, defaultBotState } from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
@@ -30,6 +30,14 @@ type ManagedPosition = {
   costQuote: number;
   lastBuyTs?: string;
   lastSellTs?: string;
+};
+
+type CapitalProfile = {
+  tier: "MICRO" | "SMALL" | "STANDARD";
+  notionalCapMultiplier: number;
+  reserveLowPct: number;
+  reserveHighPct: number;
+  minNetEdgePct: number;
 };
 
 @Injectable()
@@ -310,6 +318,51 @@ export class BotEngineService {
     return total;
   }
 
+  private getCapitalProfile(walletTotalHome: number): CapitalProfile {
+    if (!Number.isFinite(walletTotalHome) || walletTotalHome <= 1_200) {
+      return {
+        tier: "MICRO",
+        notionalCapMultiplier: 0.6,
+        reserveLowPct: 0.005,
+        reserveHighPct: 0.0125,
+        minNetEdgePct: 0.35
+      };
+    }
+
+    if (walletTotalHome <= 5_000) {
+      return {
+        tier: "SMALL",
+        notionalCapMultiplier: 0.8,
+        reserveLowPct: 0.003,
+        reserveHighPct: 0.008,
+        minNetEdgePct: 0.25
+      };
+    }
+
+    return {
+      tier: "STANDARD",
+      notionalCapMultiplier: 1,
+      reserveLowPct: 0.001,
+      reserveHighPct: 0.0025,
+      minNetEdgePct: 0.15
+    };
+  }
+
+  private estimateCandidateEdgePct(candidate: UniverseCandidate | null): number | null {
+    if (!candidate) return null;
+    const atr = Number.isFinite(candidate.atrPct14) ? Math.max(0, Math.min(8, candidate.atrPct14 ?? 0)) : 0;
+    const adx = Number.isFinite(candidate.adx14) ? Math.max(0, Math.min(100, candidate.adx14 ?? 0)) : 0;
+    const rsi = Number.isFinite(candidate.rsi14) ? Math.max(0, Math.min(100, candidate.rsi14 ?? 50)) : 50;
+    const score = Number.isFinite(candidate.score) ? Math.max(0, candidate.score) : 0;
+
+    const atrComponent = atr * 0.35;
+    const trendComponent = Math.min(1, Math.max(0, (adx - 15) / 35)) * 0.45;
+    const rsiComponent = rsi <= 35 || rsi >= 65 ? 0.2 : 0.08;
+    const scoreComponent = Math.min(1, score / 6) * 0.25;
+
+    return atrComponent + trendComponent + rsiComponent + scoreComponent;
+  }
+
   start(): void {
     const state = this.getState();
     if (state.running) return;
@@ -390,7 +443,7 @@ export class BotEngineService {
       };
 
       const filled = liveTrading ? { activeOrders: current.activeOrders, orderHistory: current.orderHistory } : maybeFillOne(current);
-      const candidateSymbol = await (async () => {
+      const candidateSelection = await (async (): Promise<{ symbol: string; candidate: UniverseCandidate | null }> => {
         try {
           const snap = await this.universe.getLatest();
           const best = snap.candidates?.find((c) => {
@@ -410,11 +463,12 @@ export class BotEngineService {
             if (liveTrading && c.quoteAsset && c.quoteAsset.toUpperCase() !== homeStable) return false;
             return true;
           });
-          return best?.symbol ?? `BTC${homeStable}`;
+          return { symbol: best?.symbol ?? `BTC${homeStable}`, candidate: best ?? null };
         } catch {
-          return `BTC${homeStable}`;
+          return { symbol: `BTC${homeStable}`, candidate: null };
         }
       })();
+      const candidateSymbol = candidateSelection.symbol;
       const blockedReason = this.isSymbolBlocked(candidateSymbol, current);
       if (blockedReason) {
         const summary = `Skip ${candidateSymbol}: ${blockedReason}`;
@@ -647,6 +701,9 @@ export class BotEngineService {
             return;
           }
 
+          const walletTotalHome = await this.estimateWalletTotalInHome(balances, homeStable);
+          const capitalProfile = this.getCapitalProfile(walletTotalHome);
+
           const managedPositions = this.getManagedPositions(current);
           const managedOpenHomeSymbols = [...managedPositions.values()].filter((p) => p.netQty > 0 && p.symbol.endsWith(homeStable));
           const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
@@ -656,8 +713,8 @@ export class BotEngineService {
             config?.advanced.liveTradeRebalanceSellCooldownMs ??
             Number.parseInt(process.env.LIVE_TRADE_REBALANCE_SELL_COOLDOWN_MS ?? "900000", 10);
           const risk = Math.max(0, Math.min(100, config?.basic.risk ?? 50));
-          const takeProfitPct = 0.5 + (risk / 100) * 1.5; // 0.5% .. 2.0%
-          const stopLossPct = -(1 + (risk / 100) * 2); // -1.0% .. -3.0%
+          const takeProfitPct = 0.35 + (risk / 100) * 0.9; // 0.35% .. 1.25%
+          const stopLossPct = -(0.8 + (risk / 100) * 1.2); // -0.8% .. -2.0%
 
           for (const position of managedOpenHomeSymbols) {
             const baseAsset = position.symbol.slice(0, Math.max(0, position.symbol.length - homeStable.length));
@@ -764,7 +821,46 @@ export class BotEngineService {
           const slippageBuffer =
             config?.advanced.liveTradeSlippageBuffer ?? Number.parseFloat(process.env.LIVE_TRADE_SLIPPAGE_BUFFER ?? "1.005");
           const bufferFactor = Number.isFinite(slippageBuffer) && slippageBuffer > 0 ? slippageBuffer : 1;
-          const walletTotalHome = await this.estimateWalletTotalInHome(balances, homeStable);
+          const takerFeeRate = Math.max(0, Number.parseFloat(process.env.BINANCE_TAKER_FEE_RATE ?? "0.001"));
+          const spreadBufferRate = Math.max(0, Number.parseFloat(process.env.ESTIMATED_SPREAD_BUFFER_RATE ?? "0.0006"));
+          const roundTripCostPct = ((takerFeeRate * 2) + spreadBufferRate + Math.max(0, bufferFactor - 1)) * 100;
+          const estimatedEdgePct = this.estimateCandidateEdgePct(candidateSelection.candidate);
+          if (Number.isFinite(estimatedEdgePct)) {
+            const netEdgePct = (estimatedEdgePct ?? 0) - roundTripCostPct;
+            if (netEdgePct < capitalProfile.minNetEdgePct) {
+              const summary = `Skip ${candidateSymbol}: Fee/edge filter (net ${netEdgePct.toFixed(3)}% < ${capitalProfile.minNetEdgePct.toFixed(3)}%)`;
+              const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+              const next = {
+                ...current,
+                activeOrders: filled.activeOrders,
+                orderHistory: filled.orderHistory,
+                decisions: alreadyLogged
+                  ? current.decisions
+                  : [
+                      {
+                        id: crypto.randomUUID(),
+                        ts: new Date().toISOString(),
+                        kind: "SKIP",
+                        summary,
+                        details: {
+                          capitalTier: capitalProfile.tier,
+                          estimatedEdgePct: Number((estimatedEdgePct ?? 0).toFixed(6)),
+                          roundTripCostPct: Number(roundTripCostPct.toFixed(6)),
+                          minNetEdgePct: Number(capitalProfile.minNetEdgePct.toFixed(6)),
+                          rsi14: candidateSelection.candidate?.rsi14,
+                          adx14: candidateSelection.candidate?.adx14,
+                          atrPct14: candidateSelection.candidate?.atrPct14,
+                          score: candidateSelection.candidate?.score
+                        }
+                      },
+                      ...current.decisions
+                    ].slice(0, 200),
+                lastError: undefined
+              } satisfies BotState;
+              this.save(next);
+              return;
+            }
+          }
           const candidateBaseTotal = balances.find((b) => b.asset.toUpperCase() === candidateBaseAsset)?.total ?? 0;
           const currentCandidateNotional =
             Number.isFinite(candidateBaseTotal) && candidateBaseTotal > 0 ? candidateBaseTotal * price : 0;
@@ -801,7 +897,9 @@ export class BotEngineService {
           }
 
           const rawTargetNotional = walletTotalHome * (maxPositionPct / 100);
-          const enforcedCap = Number.isFinite(notionalCap) && notionalCap > 0 ? notionalCap : null;
+          const effectiveNotionalCap =
+            Number.isFinite(notionalCap) && notionalCap > 0 ? Math.max(1, notionalCap * capitalProfile.notionalCapMultiplier) : null;
+          const enforcedCap = effectiveNotionalCap;
           const capForSizing = enforcedCap ? enforcedCap / bufferFactor : null;
           const targetNotional = Math.min(rawTargetNotional, capForSizing ?? rawTargetNotional, quoteFree, remainingSymbolNotional);
           if (!Number.isFinite(targetNotional) || targetNotional <= 0) {
@@ -898,8 +996,16 @@ export class BotEngineService {
               : Number.isFinite(configuredMinTopUpTarget) && configuredMinTopUpTarget > 0
                 ? configuredMinTopUpTarget
                 : 5;
-            const reserveLowTarget = floorTopUpTarget * conversionTopUpReserveMultiplier;
-            const reserveHighTarget = reserveLowTarget * 2;
+            const reserveLowTarget = Math.max(
+              floorTopUpTarget,
+              floorTopUpTarget * conversionTopUpReserveMultiplier,
+              walletTotalHome * capitalProfile.reserveLowPct
+            );
+            const reserveHighTarget = Math.max(
+              reserveLowTarget,
+              reserveLowTarget * 2,
+              walletTotalHome * capitalProfile.reserveHighPct
+            );
             const reserveTopUpNeeded = quoteFree < reserveLowTarget ? Math.max(0, reserveHighTarget - quoteFree) : 0;
             const conversionTarget = Math.max(shortfall * conversionTopUpReserveMultiplier, floorTopUpTarget, reserveTopUpNeeded);
             const conversionTopUpCooldownMs = Math.max(
@@ -937,7 +1043,8 @@ export class BotEngineService {
                             floorTopUpTarget: Number(floorTopUpTarget.toFixed(6)),
                             reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
                             reserveHighTarget: Number(reserveHighTarget.toFixed(6)),
-                            reserveTopUpNeeded: Number(reserveTopUpNeeded.toFixed(6))
+                            reserveTopUpNeeded: Number(reserveTopUpNeeded.toFixed(6)),
+                            capitalTier: capitalProfile.tier
                           }
                         },
                         ...current.decisions
@@ -1001,6 +1108,8 @@ export class BotEngineService {
                     reserveHighTarget: Number(reserveHighTarget.toFixed(6)),
                     reserveTopUpNeeded: Number(reserveTopUpNeeded.toFixed(6)),
                     reserveMultiplier: conversionTopUpReserveMultiplier,
+                    capitalTier: capitalProfile.tier,
+                    walletTotalHome: Number(walletTotalHome.toFixed(6)),
                     sourceAsset,
                     route: leg.route,
                     bridgeAsset: leg.bridgeAsset,
@@ -1038,6 +1147,8 @@ export class BotEngineService {
                         reserveHighTarget: Number(reserveHighTarget.toFixed(6)),
                         reserveTopUpNeeded: Number(reserveTopUpNeeded.toFixed(6)),
                         reserveMultiplier: conversionTopUpReserveMultiplier,
+                        capitalTier: capitalProfile.tier,
+                        walletTotalHome: Number(walletTotalHome.toFixed(6)),
                         price: Number(price.toFixed(8)),
                         qty: Number(qty.toFixed(8)),
                         bufferFactor

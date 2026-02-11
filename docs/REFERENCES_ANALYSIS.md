@@ -189,3 +189,8 @@ Current applied mappings:
   - Reference pattern: strategy/risk separation (Freqtrade/Jesse conceptual)
   - Requirement: AI and engine should not “fight”; risk remains authoritative
   - Implemented: `apps/api/src/modules/bot/bot-engine.service.ts`, `packages/shared/src/schemas/app-config.ts`
+
+- **Capital-aware sizing + fee/edge gating**
+  - Reference pattern: stake-limit and reserve discipline from mature engines (Freqtrade exchange-limit concepts)
+  - Requirement: protect small accounts from over-sizing and low-edge entries after fees/slippage
+  - Implemented: `apps/api/src/modules/bot/bot-engine.service.ts`

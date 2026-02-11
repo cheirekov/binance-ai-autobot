@@ -41,6 +41,8 @@
   - Recoverable Binance sizing errors (`NOTIONAL`/lot-size) skip without auto-blacklist
   - Conversion top-up reserve hysteresis to reduce repetitive quote-asset churn
   - Derived risk limits enforced at runtime (`maxOpenPositions`, `maxPositionPct`)
+  - Capital-tier runtime profile for sizing/reserve behavior (`MICRO`/`SMALL`/`STANDARD`)
+  - Fee-aware entry gate (estimated edge vs round-trip execution cost)
   - Basic live exit path (`take-profit` / `stop-loss`) to avoid buy-only behavior
 - Spot mainnet live trading (requires additional safeguards + explicit opt-in)
 

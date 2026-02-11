@@ -71,12 +71,19 @@ Runtime safety values are stored in `config.json` and configurable from UI Advan
 - `followRiskProfile=true` keeps these values aligned with Basic risk slider.
 - `followRiskProfile=false` allows manual override from Advanced.
 - Conversion top-up anti-churn uses reserve hysteresis:
-  - low target = `conversionTopUpMinTarget * conversionTopUpReserveMultiplier`
-  - high target = `low * 2`
+  - low target = max(`conversionTopUpMinTarget`, `conversionTopUpMinTarget * conversionTopUpReserveMultiplier`, `walletTotalHome * tier.reserveLowPct`)
+  - high target = max(`low * 2`, `walletTotalHome * tier.reserveHighPct`)
   - when quote balance falls below low, conversion aims toward high (bounded by available source assets)
+- Capital tiers are runtime-only and derived from total wallet estimate in home stable:
+  - `MICRO` (<= 1200): stricter notional cap multiplier + higher required net edge
+  - `SMALL` (<= 5000): moderate cap multiplier + moderate required net edge
+  - `STANDARD` (> 5000): default cap multiplier + lowest required net edge
 - Derived risk controls now enforce runtime position limits:
   - `maxOpenPositions` limits concurrently open bot-managed symbols (quote = home stable)
   - `maxPositionPct` caps both new symbol exposure and target notional sizing per symbol
+- Live entries are fee-aware:
+  - candidate edge estimate is compared against round-trip costs (fees + spread + slippage buffer)
+  - low-edge candidates are skipped with a detailed reason in decisions
 - Basic exit path is enabled for live mode:
   - uses bot-managed average entry price per symbol
   - triggers `SELL` on take-profit / stop-loss thresholds derived from Basic risk
@@ -93,3 +100,5 @@ Environment variables remain as fallback defaults:
 - `CONVERSION_BUY_BUFFER`
 - `CONVERSION_SELL_BUFFER`
 - `CONVERSION_FEE_BUFFER`
+- `BINANCE_TAKER_FEE_RATE`
+- `ESTIMATED_SPREAD_BUFFER_RATE`
