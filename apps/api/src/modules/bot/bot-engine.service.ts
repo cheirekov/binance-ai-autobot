@@ -524,6 +524,72 @@ export class BotEngineService {
     return atrComponent + trendComponent + rsiComponent + scoreComponent;
   }
 
+  private pickExposureEligibleCandidate(params: {
+    preferredCandidate: UniverseCandidate | null;
+    snapshotCandidates: UniverseCandidate[];
+    state: BotState;
+    homeStable: string;
+    traderRegion: string;
+    neverTradeSymbols: string[];
+    excludeStableStablePairs: boolean;
+    enforceRegionPolicy: boolean;
+    balances: BinanceBalanceSnapshot[];
+    walletTotalHome: number;
+    maxPositionPct: number;
+  }): UniverseCandidate | null {
+    const {
+      preferredCandidate,
+      snapshotCandidates,
+      state,
+      homeStable,
+      traderRegion,
+      neverTradeSymbols,
+      excludeStableStablePairs,
+      enforceRegionPolicy,
+      balances,
+      walletTotalHome,
+      maxPositionPct
+    } = params;
+
+    const pool = [preferredCandidate, ...snapshotCandidates].filter(Boolean) as UniverseCandidate[];
+    const seen = new Set<string>();
+    const maxSymbolNotional = walletTotalHome * (maxPositionPct / 100);
+    if (!Number.isFinite(maxSymbolNotional) || maxSymbolNotional <= 0) return null;
+
+    for (const candidate of pool) {
+      const symbol = candidate.symbol.trim().toUpperCase();
+      if (!symbol || seen.has(symbol)) continue;
+      seen.add(symbol);
+
+      if (candidate.quoteAsset.trim().toUpperCase() !== homeStable) continue;
+      if (this.isSymbolBlocked(symbol, state)) continue;
+      if (this.getEntryGuard({ symbol, state })) continue;
+
+      const policyReason = getPairPolicyBlockReason({
+        symbol,
+        baseAsset: candidate.baseAsset,
+        quoteAsset: candidate.quoteAsset,
+        traderRegion: traderRegion === "EEA" ? "EEA" : "NON_EEA",
+        neverTradeSymbols,
+        excludeStableStablePairs,
+        enforceRegionPolicy
+      });
+      if (policyReason) continue;
+
+      const price = Number.isFinite(candidate.lastPrice) ? candidate.lastPrice : Number.NaN;
+      if (!Number.isFinite(price) || price <= 0) continue;
+
+      const baseAsset = candidate.baseAsset.trim().toUpperCase();
+      const baseTotal = balances.find((b) => b.asset.trim().toUpperCase() === baseAsset)?.total ?? 0;
+      const currentNotional = Number.isFinite(baseTotal) && baseTotal > 0 ? baseTotal * price : 0;
+      if (currentNotional >= maxSymbolNotional) continue;
+
+      return candidate;
+    }
+
+    return null;
+  }
+
   private ensureTelemetryDir(): void {
     fs.mkdirSync(this.telemetryDir, { recursive: true });
   }
@@ -1031,9 +1097,10 @@ export class BotEngineService {
           return { symbol: `BTC${homeStable}`, candidate: null };
         }
       })();
-      const candidateSymbol = candidateSelection.symbol;
+      let candidateSymbol = candidateSelection.symbol;
+      let selectedCandidate = candidateSelection.candidate;
       tickContext.candidateSymbol = candidateSymbol;
-      tickContext.candidate = candidateSelection.candidate;
+      tickContext.candidate = selectedCandidate;
       const blockedReason = this.isSymbolBlocked(candidateSymbol, current);
       if (blockedReason) {
         const summary = `Skip ${candidateSymbol}: ${blockedReason}`;
@@ -1117,46 +1184,6 @@ export class BotEngineService {
         }
 
         try {
-          const rules = await this.marketData.getSymbolRules(candidateSymbol);
-          const pairPolicyReason = getPairPolicyBlockReason({
-            symbol: candidateSymbol,
-            baseAsset: rules.baseAsset,
-            quoteAsset: rules.quoteAsset,
-            traderRegion: config?.basic.traderRegion ?? "NON_EEA",
-            neverTradeSymbols: config?.advanced.neverTradeSymbols,
-            excludeStableStablePairs: config?.advanced.excludeStableStablePairs,
-            enforceRegionPolicy: config?.advanced.enforceRegionPolicy
-          });
-          if (pairPolicyReason) {
-            const summary = `Skip ${candidateSymbol}: ${pairPolicyReason}`;
-            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
-            const next = {
-              ...current,
-              activeOrders: filled.activeOrders,
-              orderHistory: filled.orderHistory,
-              decisions: alreadyLogged
-                ? current.decisions
-                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
-            } satisfies BotState;
-            this.save(next);
-            return;
-          }
-          if (rules.quoteAsset !== homeStable) {
-            const summary = `Skip ${candidateSymbol}: Quote asset ${rules.quoteAsset} ≠ home stable ${homeStable}`;
-            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
-            const next = {
-              ...current,
-              activeOrders: filled.activeOrders,
-              orderHistory: filled.orderHistory,
-              decisions: alreadyLogged
-                ? current.decisions
-                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
-            } satisfies BotState;
-            this.save(next);
-            return;
-          }
-          const candidateBaseAsset = rules.baseAsset.toUpperCase();
-
           const mapStatus = (s: string | undefined): Order["status"] => {
             const st = (s ?? "").toUpperCase();
             if (st === "FILLED") return "FILLED";
@@ -1269,6 +1296,69 @@ export class BotEngineService {
           const walletTotalHome = await this.estimateWalletTotalInHome(balances, homeStable);
           const capitalProfile = this.getCapitalProfile(walletTotalHome);
           tickContext.walletTotalHome = walletTotalHome;
+          const maxPositionPct = config?.derived.maxPositionPct ?? 1;
+          tickContext.maxPositionPct = maxPositionPct;
+
+          const universeSnapshot = await this.universe.getLatest().catch(() => null);
+          const exposureEligibleCandidate = this.pickExposureEligibleCandidate({
+            preferredCandidate: selectedCandidate,
+            snapshotCandidates: universeSnapshot?.candidates ?? [],
+            state: current,
+            homeStable,
+            traderRegion: config?.basic.traderRegion ?? "NON_EEA",
+            neverTradeSymbols: config?.advanced.neverTradeSymbols ?? [],
+            excludeStableStablePairs: config?.advanced.excludeStableStablePairs ?? true,
+            enforceRegionPolicy: config?.advanced.enforceRegionPolicy ?? true,
+            balances,
+            walletTotalHome,
+            maxPositionPct
+          });
+          if (exposureEligibleCandidate && exposureEligibleCandidate.symbol !== candidateSymbol) {
+            candidateSymbol = exposureEligibleCandidate.symbol;
+            selectedCandidate = exposureEligibleCandidate;
+            tickContext.candidateSymbol = candidateSymbol;
+            tickContext.candidate = selectedCandidate;
+          }
+
+          const rules = await this.marketData.getSymbolRules(candidateSymbol);
+          const pairPolicyReason = getPairPolicyBlockReason({
+            symbol: candidateSymbol,
+            baseAsset: rules.baseAsset,
+            quoteAsset: rules.quoteAsset,
+            traderRegion: config?.basic.traderRegion ?? "NON_EEA",
+            neverTradeSymbols: config?.advanced.neverTradeSymbols,
+            excludeStableStablePairs: config?.advanced.excludeStableStablePairs,
+            enforceRegionPolicy: config?.advanced.enforceRegionPolicy
+          });
+          if (pairPolicyReason) {
+            const summary = `Skip ${candidateSymbol}: ${pairPolicyReason}`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
+          if (rules.quoteAsset !== homeStable) {
+            const summary = `Skip ${candidateSymbol}: Quote asset ${rules.quoteAsset} ≠ home stable ${homeStable}`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
+          const candidateBaseAsset = rules.baseAsset.toUpperCase();
 
           const managedPositions = this.getManagedPositions(current);
           const managedOpenHomeSymbols = [...managedPositions.values()].filter((p) => p.netQty > 0 && p.symbol.endsWith(homeStable));
@@ -1381,8 +1471,6 @@ export class BotEngineService {
             throw new Error(`Invalid ticker price: ${priceStr}`);
           }
 
-          const maxPositionPct = config?.derived.maxPositionPct ?? 1;
-          tickContext.maxPositionPct = maxPositionPct;
           const notionalCap =
             config?.advanced.liveTradeNotionalCap ?? Number.parseFloat(process.env.LIVE_TRADE_NOTIONAL_CAP ?? "25");
           const slippageBuffer =
@@ -1391,7 +1479,7 @@ export class BotEngineService {
           const takerFeeRate = Math.max(0, Number.parseFloat(process.env.BINANCE_TAKER_FEE_RATE ?? "0.001"));
           const spreadBufferRate = Math.max(0, Number.parseFloat(process.env.ESTIMATED_SPREAD_BUFFER_RATE ?? "0.0006"));
           const roundTripCostPct = ((takerFeeRate * 2) + spreadBufferRate + Math.max(0, bufferFactor - 1)) * 100;
-          const estimatedEdgePct = this.estimateCandidateEdgePct(candidateSelection.candidate);
+          const estimatedEdgePct = this.estimateCandidateEdgePct(selectedCandidate);
           if (Number.isFinite(estimatedEdgePct)) {
             const netEdgePct = (estimatedEdgePct ?? 0) - roundTripCostPct;
             if (netEdgePct < capitalProfile.minNetEdgePct) {
@@ -1414,10 +1502,10 @@ export class BotEngineService {
                           estimatedEdgePct: Number((estimatedEdgePct ?? 0).toFixed(6)),
                           roundTripCostPct: Number(roundTripCostPct.toFixed(6)),
                           minNetEdgePct: Number(capitalProfile.minNetEdgePct.toFixed(6)),
-                          rsi14: candidateSelection.candidate?.rsi14,
-                          adx14: candidateSelection.candidate?.adx14,
-                          atrPct14: candidateSelection.candidate?.atrPct14,
-                          score: candidateSelection.candidate?.score
+                          rsi14: selectedCandidate?.rsi14,
+                          adx14: selectedCandidate?.adx14,
+                          atrPct14: selectedCandidate?.atrPct14,
+                          score: selectedCandidate?.score
                         }
                       },
                       ...current.decisions
