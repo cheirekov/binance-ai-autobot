@@ -16,6 +16,31 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-12 18:05 UTC — Process hardening v2 (timebox + AI specialist + single lane)
+- Scope: stop cyclical patching and context-switch drift by enforcing a strict execution cadence and role ownership model.
+- BA requirement mapping:
+  - User requested speed-up and explicit prevention of daily looping.
+  - Team must keep time-awareness despite context window limits.
+- PM milestone mapping: delivery governance upgrade before next implementation cycle.
+- Technical changes:
+  - Added retrospective doc `docs/RETROSPECTIVE_2026-02-12.md` with 4-day evidence and bottlenecks.
+  - Updated `docs/TEAM_OPERATING_RULES.md`:
+    - mandatory role ownership section including `AI Specialist`,
+    - mandatory day/night batch timeboxes (`2-4h`, `8-12h`),
+    - mandatory hypothesis/KPI/stop-condition per batch,
+    - freeze rule after 2 non-improving batches.
+  - Updated `docs/DELIVERY_BOARD.md` to enforce one active lane:
+    - queued all previous parallel `IN_PROGRESS` tickets,
+    - created single active ticket `T-027` (Spot limit/grid execution v1).
+- Risk slider impact: none (process/governance update only).
+- Validation evidence: document consistency check completed (board + rules + changelog aligned).
+- Runtime test request:
+  - Next deploy batch must target only `T-027`.
+  - Define KPI targets before coding (open-order count stability, entry-vs-conversion ratio, sizing reject ratio).
+- Follow-up:
+  - Implement `T-027` in one focused patch batch.
+  - Record day-batch results and go/no-go decision before any parallel scope starts.
+
 ## 2026-02-12 15:44 UTC — T-006/T-023 night-build slice (feasibility filter + KPI visibility)
 - Scope: deliver the requested night scope to reduce invalid candidate churn and make execution quality visible in UI KPIs.
 - BA requirement mapping:

@@ -2,6 +2,19 @@
 
 Purpose: keep execution stable across long-running sessions and context resets.
 
+## Team roles (mandatory)
+
+- `PM/BA`
+  - Own ticket priority, acceptance criteria, and stop/go decisions.
+- `Solution Architect`
+  - Own system boundaries, integration safety, and technical sequencing.
+- `Professional Trader`
+  - Own market-structure checks, strategy realism, and risk assumptions.
+- `Senior BE/UI`
+  - Own implementation quality, telemetry, and operational usability.
+- `AI Specialist`
+  - Own adaptive-policy experiment design, shadow-mode quality gates, and promotion criteria from shadow to execution.
+
 ## Hard rules
 
 1. Every implementation patch must map to a ticket in `docs/DELIVERY_BOARD.md`.
@@ -25,6 +38,16 @@ Purpose: keep execution stable across long-running sessions and context resets.
 13. Commit messages must be actionable and structured. Disallow generic subjects (`Implemented`, `Patched`, `Code changes`, `What changed`).
 14. Commit subject format: `<type>(<scope>): <outcome>` (preferred) or concise imperative summary.
 15. Keep commit subject <= 72 chars and include details in body when needed.
+16. One delivery lane only: exactly one ticket may be `IN_PROGRESS` at any time.
+17. Every patch batch must be timeboxed before coding starts:
+   - day batch: `2-4h`
+   - night batch: `8-12h`
+18. Every batch must define before coding:
+   - hypothesis
+   - KPI target delta
+   - stop/rollback condition
+19. If two consecutive batches show no KPI improvement, feature expansion pauses until root-cause analysis is documented.
+20. Adaptive/AI logic must ship in shadow-first mode unless PM/BA explicitly approves promotion with measurable gates.
 
 ## Delivery workflow (mandatory)
 
@@ -34,6 +57,15 @@ Purpose: keep execution stable across long-running sessions and context resets.
 4. Run `docker compose -f docker-compose.ci.yml run --rm ci`.
 5. Add a structured entry in `docs/PM_BA_CHANGELOG.md`.
 6. Mark ticket `DONE` (or `BLOCKED` with reason and next action).
+
+## Batch cadence (mandatory)
+
+1. Start-of-batch brief (max 10 lines) in `docs/PM_BA_CHANGELOG.md`:
+   - scope, hypothesis, target KPI delta, stop condition.
+2. End-of-batch result:
+   - observed KPI delta,
+   - decision (`continue`, `rollback`, `pivot`),
+   - next batch owner.
 
 ## Commit subject examples
 
