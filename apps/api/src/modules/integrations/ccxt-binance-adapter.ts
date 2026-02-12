@@ -37,6 +37,20 @@ export type CcxtBinanceMarketOrderResponse = {
   }>;
 };
 
+export type CcxtBinanceOrderSnapshot = {
+  symbol?: string;
+  orderId?: string;
+  clientOrderId?: string;
+  transactTime?: number;
+  price?: string;
+  origQty?: string;
+  executedQty?: string;
+  cummulativeQuoteQty?: string;
+  status?: string;
+  type?: string;
+  side?: string;
+};
+
 function normalizeBaseUrl(url: string): string {
   return url.replace(/\/+$/, "");
 }
@@ -104,6 +118,14 @@ function mapCcxtStatusToBinance(status: unknown, rawStatus: unknown): string | u
 type CcxtExchangeMinimal = {
   loadMarkets: () => Promise<unknown>;
   fetchBalance: () => Promise<unknown>;
+  fetchOpenOrders: (
+    symbol?: string,
+    since?: number,
+    limit?: number,
+    params?: Record<string, unknown>
+  ) => Promise<unknown>;
+  fetchOrder: (id: string, symbol?: string, params?: Record<string, unknown>) => Promise<unknown>;
+  cancelOrder: (id: string, symbol?: string, params?: Record<string, unknown>) => Promise<unknown>;
   createOrder: (
     symbol: string,
     type: string,
@@ -201,6 +223,82 @@ export class CcxtBinanceAdapter {
       out.push({ asset, free: f, locked: u, total });
     }
     return out;
+  }
+
+  private mapCcxtOrder(orderRaw: unknown, symbolIdHint?: string): CcxtBinanceOrderSnapshot {
+    const order = asRecord(orderRaw) ?? {};
+    const info = asRecord(order.info) ?? {};
+
+    const orderIdRaw = asNumberOrString(info.orderId) ?? asNumberOrString(order.id);
+    const orderId = orderIdRaw === null ? undefined : String(orderIdRaw);
+    const unifiedSymbol = asString(order.symbol);
+    const fallbackSymbol = symbolIdHint?.trim().toUpperCase();
+    const mappedSymbol = unifiedSymbol ? unifiedSymbol.replace("/", "").toUpperCase() : fallbackSymbol;
+    const avg = asNumber(order.average);
+    const cost = asNumber(order.cost);
+    const filled = asNumber(order.filled);
+    const amountOrig = asNumber(order.amount);
+
+    return {
+      symbol: mappedSymbol,
+      orderId,
+      clientOrderId: asString(info.clientOrderId) ?? undefined,
+      transactTime: typeof info.transactTime === "number" ? info.transactTime : undefined,
+      price: avg !== null ? String(avg) : typeof order.price === "number" ? String(order.price) : asString(info.price) ?? undefined,
+      origQty: amountOrig !== null ? String(amountOrig) : asString(info.origQty) ?? undefined,
+      executedQty: filled !== null ? String(filled) : asString(info.executedQty) ?? undefined,
+      cummulativeQuoteQty: cost !== null ? String(cost) : asString(info.cummulativeQuoteQty) ?? undefined,
+      status: mapCcxtStatusToBinance(order.status, info.status),
+      type: (asString(info.type) ?? asString(order.type) ?? "").toUpperCase() || undefined,
+      side: (asString(info.side) ?? asString(order.side) ?? "").toUpperCase() || undefined
+    };
+  }
+
+  async getOpenOrders(symbolId?: string): Promise<CcxtBinanceOrderSnapshot[]> {
+    const unifiedSymbol = symbolId ? await this.toUnifiedSymbol(symbolId) : undefined;
+    const raw = await this.exchange.fetchOpenOrders(unifiedSymbol);
+    const list = Array.isArray(raw) ? raw : [];
+    return list
+      .map((item) => this.mapCcxtOrder(item, symbolId))
+      .filter((item) => Boolean(item.orderId));
+  }
+
+  async getOrder(symbolId: string, orderId: string): Promise<CcxtBinanceOrderSnapshot> {
+    const unifiedSymbol = await this.toUnifiedSymbol(symbolId);
+    const raw = await this.exchange.fetchOrder(orderId, unifiedSymbol);
+    return this.mapCcxtOrder(raw, symbolId);
+  }
+
+  async cancelOrder(symbolId: string, orderId: string): Promise<CcxtBinanceOrderSnapshot> {
+    const unifiedSymbol = await this.toUnifiedSymbol(symbolId);
+    const raw = await this.exchange.cancelOrder(orderId, unifiedSymbol);
+    return this.mapCcxtOrder(raw, symbolId);
+  }
+
+  async placeSpotLimitOrder(params: {
+    symbolId: string;
+    side: "BUY" | "SELL";
+    quantity: string;
+    price: string;
+    timeInForce?: "GTC" | "IOC" | "FOK";
+    postOnly?: boolean;
+  }): Promise<CcxtBinanceOrderSnapshot> {
+    const symbol = await this.toUnifiedSymbol(params.symbolId);
+    const amount = Number.parseFloat(params.quantity);
+    const price = Number.parseFloat(params.price);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error(`Invalid quantity: ${params.quantity}`);
+    }
+    if (!Number.isFinite(price) || price <= 0) {
+      throw new Error(`Invalid price: ${params.price}`);
+    }
+
+    const side = params.side.toLowerCase();
+    const raw = await this.exchange.createOrder(symbol, "limit", side, amount, price, {
+      timeInForce: params.timeInForce ?? "GTC",
+      ...(params.postOnly ? { postOnly: true } : {})
+    });
+    return this.mapCcxtOrder(raw, params.symbolId);
   }
 
   async placeSpotMarketOrder(params: {

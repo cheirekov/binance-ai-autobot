@@ -44,7 +44,7 @@ M1: Stabilize Spot testnet automation with risk-linked execution behavior and cl
 | T-024 | DONE | Protection manager v1 (global+pair locks) | Bearish-loss control without manual trader tuning | Reduced cascading losses and clearer risk state | Added risk-linked cooldown, stoploss-guard, max-drawdown, and low-profit locks with dashboard visibility. |
 | T-025 | TODO | Adaptive confidence shadow model v1 | Bot should adapt automatically while risk policy remains authoritative | Higher-quality decisions before execution promotion | Add model-age guard, outlier confidence gate, and rolling prediction statistics in shadow path. |
 | T-026 | TODO | Offline strategy calibration runner | Systematic parameter tuning from real telemetry/backtest data | Better repeatable improvements over ad-hoc tweaks | Add multi-metric objective calibration (profit, drawdown, winrate, expectancy, trade-count penalties). |
-| T-027 | IN_PROGRESS | Spot limit/grid execution v1 | Replace market-only execution path with true open-order lifecycle | Realistic grid behavior and actionable PnL | Implement LIMIT ladder placement, open-order sync, cancel/replace, and market fallback guardrails; keep market-only path as explicit fallback mode. |
+| T-027 | IN_PROGRESS | Spot limit/grid execution v1 | Replace market-only execution path with true open-order lifecycle | Realistic grid behavior and actionable PnL | Delivered slice: ccxt adapter limit/open/cancel APIs + bot exchange order sync + SPOT_GRID LIMIT ladder branch. Remaining: filter-aware ladder placement and richer grid KPIs. |
 
 ## Next execution batch (single patch set)
 

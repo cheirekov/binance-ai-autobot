@@ -11,6 +11,7 @@ import { resolveRouteBridgeAssets } from "../config/asset-routing";
 import { BinanceMarketDataService, type MarketQtyValidation } from "../integrations/binance-market-data.service";
 import {
   BinanceTradingService,
+  type BinanceOrderSnapshot,
   isBinanceTestnetBaseUrl,
   type BinanceBalanceSnapshot,
   type BinanceMarketOrderResponse
@@ -1188,6 +1189,96 @@ export class BotEngineService {
     return false;
   }
 
+  private mapBinanceStatus(status: string | undefined): Order["status"] {
+    const normalized = (status ?? "").trim().toUpperCase();
+    if (normalized === "FILLED") return "FILLED";
+    if (normalized === "NEW" || normalized === "PARTIALLY_FILLED") return "NEW";
+    if (normalized === "CANCELED" || normalized === "EXPIRED") return "CANCELED";
+    return "REJECTED";
+  }
+
+  private mapExchangeOrderToStateOrder(snapshot: BinanceOrderSnapshot): Order | null {
+    const id = snapshot.orderId ? String(snapshot.orderId) : "";
+    const symbol = snapshot.symbol?.trim().toUpperCase() ?? "";
+    const sideRaw = snapshot.side?.trim().toUpperCase();
+    const side: "BUY" | "SELL" | null = sideRaw === "BUY" || sideRaw === "SELL" ? sideRaw : null;
+    const executedQty = Number.parseFloat(snapshot.executedQty ?? "");
+    const originalQty = Number.parseFloat(snapshot.origQty ?? "");
+    const qty =
+      Number.isFinite(executedQty) && executedQty > 0
+        ? executedQty
+        : Number.isFinite(originalQty) && originalQty > 0
+          ? originalQty
+          : Number.NaN;
+    if (!id || !symbol || !side) return null;
+    if (!Number.isFinite(qty) || qty <= 0) return null;
+
+    const tsCandidate = typeof snapshot.transactTime === "number" ? snapshot.transactTime : Number.NaN;
+    const ts = Number.isFinite(tsCandidate) ? new Date(tsCandidate).toISOString() : new Date().toISOString();
+    const priceCandidate = Number.parseFloat(snapshot.price ?? "");
+    const type = (snapshot.type?.trim().toUpperCase() ?? "MARKET") as Order["type"];
+
+    return {
+      id,
+      ts,
+      symbol,
+      side,
+      type: type === "LIMIT" || type === "LIMIT_MAKER" ? type : "MARKET",
+      status: this.mapBinanceStatus(snapshot.status),
+      qty,
+      ...(Number.isFinite(priceCandidate) && priceCandidate > 0 ? { price: priceCandidate } : {})
+    };
+  }
+
+  private dedupeOrderHistory(orders: Order[]): Order[] {
+    const seen = new Set<string>();
+    const out: Order[] = [];
+    for (const order of orders) {
+      const key = `${order.id}:${order.status}:${order.side}:${order.symbol}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(order);
+    }
+    return out;
+  }
+
+  private async syncLiveOrders(state: BotState): Promise<BotState> {
+    const openSnapshots = await this.trading.getOpenOrders();
+    const openOrders = openSnapshots
+      .map((snapshot) => this.mapExchangeOrderToStateOrder(snapshot))
+      .filter((order): order is Order => Boolean(order))
+      .filter((order) => order.status === "NEW")
+      .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts));
+    const openById = new Set(openOrders.map((order) => order.id));
+
+    const closedActiveOrders = state.activeOrders.filter((order) => !openById.has(order.id));
+    if (closedActiveOrders.length === 0) {
+      return {
+        ...state,
+        activeOrders: openOrders.slice(0, 50)
+      };
+    }
+
+    const finalized: Order[] = [];
+    for (const active of closedActiveOrders) {
+      try {
+        const latest = await this.trading.getOrder(active.symbol, active.id);
+        const mapped = this.mapExchangeOrderToStateOrder(latest);
+        if (mapped && mapped.status !== "NEW") {
+          finalized.push(mapped);
+        }
+      } catch {
+        finalized.push({ ...active, status: "CANCELED" });
+      }
+    }
+
+    return {
+      ...state,
+      activeOrders: openOrders.slice(0, 50),
+      orderHistory: this.dedupeOrderHistory([...finalized, ...state.orderHistory]).slice(0, 200)
+    };
+  }
+
   private buildRegimeSnapshot(candidate: UniverseCandidate | null): AdaptiveRegimeSnapshot {
     const inputs = {
       priceChangePct24h: candidate?.priceChangePct24h,
@@ -1566,7 +1657,8 @@ export class BotEngineService {
       kpi,
       adaptiveShadowTail: this.readAdaptiveShadowTail(200),
       notes: {
-        activeOrders: "Spot MARKET orders are usually filled immediately, so active order lists can stay at 0 while order history increases."
+        activeOrders:
+          "SPOT mode uses MARKET execution (active may stay 0). SPOT_GRID keeps resting LIMIT orders, so active orders should be visible."
       }
     };
   }
@@ -1664,14 +1756,17 @@ export class BotEngineService {
         }
       }
 
-      if (liveTrading && current.activeOrders.length > 0) {
-        const canceledOrders: Order[] = current.activeOrders.map((o) => ({ ...o, status: "CANCELED" }));
-        current = {
-          ...current,
-          activeOrders: [],
-          orderHistory: [...canceledOrders, ...current.orderHistory].slice(0, 200)
-        };
-        this.save(current);
+      if (liveTrading) {
+        const synced = await this.syncLiveOrders(current);
+        const changed =
+          synced.activeOrders.length !== current.activeOrders.length ||
+          synced.orderHistory.length !== current.orderHistory.length ||
+          synced.activeOrders.some((order, index) => order.id !== current.activeOrders[index]?.id) ||
+          synced.orderHistory.some((order, index) => order.id !== current.orderHistory[index]?.id);
+        current = synced;
+        if (changed) {
+          this.save(current);
+        }
       }
 
       const maybeFillOne = (state: BotState): { activeOrders: Order[]; orderHistory: Order[] } => {
@@ -1872,26 +1967,18 @@ export class BotEngineService {
         }
 
         try {
-          const mapStatus = (s: string | undefined): Order["status"] => {
-            const st = (s ?? "").toUpperCase();
-            if (st === "FILLED") return "FILLED";
-            if (st === "NEW" || st === "PARTIALLY_FILLED") return "NEW";
-            if (st === "CANCELED" || st === "EXPIRED") return "CANCELED";
-            return "REJECTED";
-          };
-
           const persistLiveTrade = (params: {
             symbol: string;
             side: "BUY" | "SELL";
             requestedQty: string;
             fallbackQty: number;
-            response: BinanceMarketOrderResponse;
+            response: BinanceMarketOrderResponse | BinanceOrderSnapshot;
             reason: string;
             details?: Record<string, unknown>;
           }): void => {
             const { symbol, side, requestedQty, fallbackQty, response, reason, details } = params;
             const avgPrice = (() => {
-              const fills = response.fills ?? [];
+              const fills = "fills" in response && Array.isArray(response.fills) ? response.fills : [];
               let qtySum = 0;
               let costSum = 0;
               for (const f of fills) {
@@ -1920,13 +2007,13 @@ export class BotEngineService {
               ts: new Date().toISOString(),
               symbol,
               side,
-              type: "MARKET",
-              status: mapStatus(response.status),
+              type: (response.type?.toUpperCase() ?? "MARKET"),
+              status: this.mapBinanceStatus(response.status),
               qty: finalQty,
               ...(avgPrice ? { price: avgPrice } : {})
             };
 
-            const decisionSummary = `Binance ${envLabel} ${side} MARKET ${symbol} qty ${requestedQty} → ${order.status} (orderId ${order.id} · ${reason})`;
+            const decisionSummary = `Binance ${envLabel} ${side} ${order.type} ${symbol} qty ${requestedQty} → ${order.status} (orderId ${order.id} · ${reason})`;
 
             let nextState: BotState = {
               ...current,
@@ -2779,6 +2866,135 @@ export class BotEngineService {
                         price: Number(price.toFixed(8)),
                         qty: Number(qty.toFixed(8)),
                         bufferFactor
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
+
+          const gridEnabled = Boolean(config?.derived.allowGrid && config?.basic.tradeMode === "SPOT_GRID");
+          if (gridEnabled) {
+            const symbolOpenLimits = current.activeOrders.filter((order) => {
+              if (order.symbol !== candidateSymbol) return false;
+              if (order.status !== "NEW") return false;
+              const t = order.type.trim().toUpperCase();
+              return t === "LIMIT" || t === "LIMIT_MAKER";
+            });
+            const hasBuyLimit = symbolOpenLimits.some((order) => order.side === "BUY");
+            const hasSellLimit = symbolOpenLimits.some((order) => order.side === "SELL");
+            const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(risk / 25)));
+
+            if (symbolOpenLimits.length >= maxGridOrdersPerSymbol) {
+              const summary = `Skip ${candidateSymbol}: Grid ladder full (${symbolOpenLimits.length}/${maxGridOrdersPerSymbol})`;
+              const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+              const next = {
+                ...current,
+                activeOrders: filled.activeOrders,
+                orderHistory: filled.orderHistory,
+                decisions: alreadyLogged
+                  ? current.decisions
+                  : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200),
+                lastError: undefined
+              } satisfies BotState;
+              this.save(next);
+              return;
+            }
+
+            const atr = Number.isFinite(selectedCandidate?.atrPct14) ? Math.max(0.1, selectedCandidate?.atrPct14 ?? 0.4) : 0.4;
+            const gridSpacingPct = Math.max(0.2, Math.min(2.5, atr * (0.6 - (risk / 100) * 0.25)));
+            const buyLimitPrice = Number((price * (1 - gridSpacingPct / 100)).toFixed(8));
+            const sellLimitPrice = Number((price * (1 + gridSpacingPct / 100)).toFixed(8));
+            let placedGridOrder = false;
+
+            if (!hasBuyLimit && Number.isFinite(buyLimitPrice) && buyLimitPrice > 0) {
+              const buyNotionalEstimate = qty * buyLimitPrice * bufferFactor;
+              if (Number.isFinite(buyNotionalEstimate) && buyNotionalEstimate <= quoteFree + 1e-8) {
+                const buyOrder = await this.trading.placeSpotLimitOrder({
+                  symbol: candidateSymbol,
+                  side: "BUY",
+                  quantity: qtyStr,
+                  price: buyLimitPrice.toFixed(8),
+                  timeInForce: "GTC"
+                });
+                persistLiveTrade({
+                  symbol: candidateSymbol,
+                  side: "BUY",
+                  requestedQty: qtyStr,
+                  fallbackQty: qty,
+                  response: buyOrder,
+                  reason: "grid-ladder-buy",
+                  details: {
+                    mode: "grid-ladder",
+                    gridSide: "BUY",
+                    anchorPrice: Number(price.toFixed(8)),
+                    gridSpacingPct: Number(gridSpacingPct.toFixed(6))
+                  }
+                });
+                placedGridOrder = true;
+              }
+            }
+
+            if (!hasSellLimit && Number.isFinite(sellLimitPrice) && sellLimitPrice > 0) {
+              const baseFree = balances.find((b) => b.asset.toUpperCase() === candidateBaseAsset)?.free ?? 0;
+              const desiredSellQty = Math.min(baseFree, qty);
+              if (Number.isFinite(desiredSellQty) && desiredSellQty > 0) {
+                const sellCheck = await this.marketData.validateMarketOrderQty(candidateSymbol, desiredSellQty);
+                const sellQtyStr = sellCheck.ok ? sellCheck.normalizedQty : sellCheck.requiredQty;
+                const sellQty = sellQtyStr ? Number.parseFloat(sellQtyStr) : Number.NaN;
+                if (sellQtyStr && Number.isFinite(sellQty) && sellQty > 0) {
+                  const sellOrder = await this.trading.placeSpotLimitOrder({
+                    symbol: candidateSymbol,
+                    side: "SELL",
+                    quantity: sellQtyStr,
+                    price: sellLimitPrice.toFixed(8),
+                    timeInForce: "GTC"
+                  });
+                  persistLiveTrade({
+                    symbol: candidateSymbol,
+                    side: "SELL",
+                    requestedQty: sellQtyStr,
+                    fallbackQty: sellQty,
+                    response: sellOrder,
+                    reason: "grid-ladder-sell",
+                    details: {
+                      mode: "grid-ladder",
+                      gridSide: "SELL",
+                      anchorPrice: Number(price.toFixed(8)),
+                      gridSpacingPct: Number(gridSpacingPct.toFixed(6))
+                    }
+                  });
+                  placedGridOrder = true;
+                }
+              }
+            }
+
+            if (placedGridOrder) {
+              return;
+            }
+
+            const summary = `Skip ${candidateSymbol}: Grid waiting for ladder slot or inventory`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        hasBuyLimit,
+                        hasSellLimit,
+                        openLimitOrders: symbolOpenLimits.length,
+                        maxGridOrdersPerSymbol
                       }
                     },
                     ...current.decisions

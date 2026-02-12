@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import { ConfigService } from "../config/config.service";
 import { resolveBinanceBaseUrl } from "./binance-base-url";
-import { CcxtBinanceAdapter } from "./ccxt-binance-adapter";
+import { CcxtBinanceAdapter, type CcxtBinanceOrderSnapshot } from "./ccxt-binance-adapter";
 
 export type BinanceBalanceSnapshot = {
   asset: string;
@@ -30,6 +30,8 @@ export type BinanceMarketOrderResponse = {
     commissionAsset?: string;
   }>;
 };
+
+export type BinanceOrderSnapshot = CcxtBinanceOrderSnapshot;
 
 export function isBinanceTestnetBaseUrl(baseUrl: string): boolean {
   return /demo-api\.binance\.com|testnet\.binance\.vision|sandbox/i.test(baseUrl);
@@ -78,5 +80,35 @@ export class BinanceTradingService {
 
   async placeSpotMarketOrder(params: { symbol: string; side: "BUY" | "SELL"; quantity: string }): Promise<BinanceMarketOrderResponse> {
     return await this.adapter.placeSpotMarketOrder({ symbolId: params.symbol, side: params.side, quantity: params.quantity });
+  }
+
+  async placeSpotLimitOrder(params: {
+    symbol: string;
+    side: "BUY" | "SELL";
+    quantity: string;
+    price: string;
+    timeInForce?: "GTC" | "IOC" | "FOK";
+    postOnly?: boolean;
+  }): Promise<BinanceOrderSnapshot> {
+    return await this.adapter.placeSpotLimitOrder({
+      symbolId: params.symbol,
+      side: params.side,
+      quantity: params.quantity,
+      price: params.price,
+      timeInForce: params.timeInForce,
+      postOnly: params.postOnly
+    });
+  }
+
+  async getOpenOrders(symbol?: string): Promise<BinanceOrderSnapshot[]> {
+    return await this.adapter.getOpenOrders(symbol);
+  }
+
+  async getOrder(symbol: string, orderId: string): Promise<BinanceOrderSnapshot> {
+    return await this.adapter.getOrder(symbol, orderId);
+  }
+
+  async cancelOrder(symbol: string, orderId: string): Promise<BinanceOrderSnapshot> {
+    return await this.adapter.cancelOrder(symbol, orderId);
   }
 }

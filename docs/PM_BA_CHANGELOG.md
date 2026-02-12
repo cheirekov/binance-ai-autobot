@@ -16,6 +16,41 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-12 17:16 UTC — T-027 spot grid execution v1 (night direct patch)
+- Scope: deliver a direct night-build patch to move execution from market-only behavior to real Spot LIMIT/grid lifecycle.
+- BA requirement mapping:
+  - User must see real open orders on exchange when grid mode is selected.
+  - Bot should not depend on market-only fills for all strategies.
+- PM milestone mapping: accelerate to meaningful POC behavior under live testnet with single active ticket lane.
+- Technical changes:
+  - Exchange adapter (`ccxt`) now supports:
+    - `placeSpotLimitOrder`,
+    - `getOpenOrders`,
+    - `getOrder`,
+    - `cancelOrder`.
+  - Trading service exposes the above APIs to bot engine.
+  - Bot engine now syncs open orders from exchange each tick (instead of auto-canceling local active orders in live mode).
+  - Added grid execution branch for `SPOT_GRID` mode:
+    - places resting LIMIT BUY/SELL ladder orders around anchor price,
+    - enforces max grid orders per symbol (risk-scaled),
+    - keeps market execution path as fallback for non-grid mode.
+  - Updated run-stats note and feedback collection script:
+    - active-order note now differentiates SPOT vs SPOT_GRID behavior,
+    - support bundle includes `state-summary.txt` and retrospective docs snapshot, plus larger API/UI log tails.
+- Risk slider impact:
+  - explicit: grid density cap is risk-scaled (`maxGridOrdersPerSymbol`),
+  - spacing is volatility/risk-aware (`atrPct14` + risk factor),
+  - no change to existing risk guard locks.
+- Validation evidence: Docker CI passed (`docker compose -f docker-compose.ci.yml run --rm ci`).
+- Runtime test request:
+  - Night run in `SPOT_GRID` mode:
+    - verify non-zero active LIMIT orders appear on Binance + UI,
+    - verify order history contains `LIMIT` entries (`grid-ladder-buy` / `grid-ladder-sell` reasons),
+    - verify no market-only flood when grid mode is active.
+- Follow-up:
+  - Add price-filter-aware ladder placement (`PERCENT_PRICE_BY_SIDE` pre-check) in next T-027 slice.
+  - Add limit order reconciliation metrics to run-stats (`openLimitOrders`, `filledLimitOrders`).
+
 ## 2026-02-12 18:05 UTC — Process hardening v2 (timebox + AI specialist + single lane)
 - Scope: stop cyclical patching and context-switch drift by enforcing a strict execution cadence and role ownership model.
 - BA requirement mapping:

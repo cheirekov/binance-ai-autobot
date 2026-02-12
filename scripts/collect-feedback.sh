@@ -37,6 +37,10 @@ fi
 copy_if_exists "docs/TEAM_OPERATING_RULES.md" "$TMP_DIR/meta/docs/TEAM_OPERATING_RULES.md"
 copy_if_exists "docs/DELIVERY_BOARD.md" "$TMP_DIR/meta/docs/DELIVERY_BOARD.md"
 copy_if_exists "docs/PM_BA_CHANGELOG.md" "$TMP_DIR/meta/docs/PM_BA_CHANGELOG.md"
+for retro in docs/RETROSPECTIVE_*.md; do
+  [[ -f "$retro" ]] || continue
+  copy_if_exists "$retro" "$TMP_DIR/meta/docs/$(basename "$retro")"
+done
 
 # Redacted config (keeps structure, removes secrets)
 if [[ -f "data/config.json" ]]; then
@@ -112,8 +116,37 @@ fi
 } >"$TMP_DIR/meta/info.txt"
 
 docker compose ps >"$TMP_DIR/meta/docker-compose-ps.txt" 2>/dev/null || true
-docker compose logs --no-color --tail=300 api >"$TMP_DIR/meta/docker-api-tail.log" 2>/dev/null || true
-docker compose logs --no-color --tail=300 ui >"$TMP_DIR/meta/docker-ui-tail.log" 2>/dev/null || true
+docker compose logs --no-color --tail=500 api >"$TMP_DIR/meta/docker-api-tail.log" 2>/dev/null || true
+docker compose logs --no-color --tail=500 ui >"$TMP_DIR/meta/docker-ui-tail.log" 2>/dev/null || true
+
+if [[ -f "data/state.json" ]] && command -v node >/dev/null 2>&1; then
+  node - <<'NODE' >"$TMP_DIR/meta/state-summary.txt" 2>/dev/null || true
+const fs = require("node:fs");
+const raw = fs.readFileSync("data/state.json", "utf8");
+const state = JSON.parse(raw);
+const openLimits = (state.activeOrders ?? []).filter((o) => {
+  const t = String(o.type ?? "").toUpperCase();
+  return t === "LIMIT" || t === "LIMIT_MAKER";
+}).length;
+const openMarkets = (state.activeOrders ?? []).filter((o) => String(o.type ?? "").toUpperCase() === "MARKET").length;
+const tradeCount = (state.decisions ?? []).filter((d) => d.kind === "TRADE").length;
+const skipCount = (state.decisions ?? []).filter((d) => d.kind === "SKIP").length;
+
+const out = {
+  updatedAt: state.updatedAt,
+  running: state.running,
+  phase: state.phase,
+  activeOrders: (state.activeOrders ?? []).length,
+  openLimitOrders: openLimits,
+  openMarketOrders: openMarkets,
+  orderHistory: (state.orderHistory ?? []).length,
+  decisions: (state.decisions ?? []).length,
+  trades: tradeCount,
+  skips: skipCount
+};
+process.stdout.write(JSON.stringify(out, null, 2));
+NODE
+fi
 
 tar -czf "$OUT_FILE" -C "$TMP_DIR" .
 
