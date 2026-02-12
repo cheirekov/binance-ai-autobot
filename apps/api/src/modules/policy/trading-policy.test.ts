@@ -6,6 +6,7 @@ describe("trading-policy", () => {
   it("treats known stable assets as stable for stable/stable filtering", () => {
     expect(isStableAsset("usdc")).toBe(true);
     expect(isStableAsset("usdt")).toBe(true);
+    expect(isStableAsset("u")).toBe(true);
 
     const reason = getPairPolicyBlockReason({
       symbol: "USDCUSDT",
@@ -37,5 +38,16 @@ describe("trading-policy", () => {
       enforceRegionPolicy: true
     });
     expect(reason).toBe("EEA policy filtered quote asset USDT");
+  });
+
+  it("keeps EEA restrictions for non-MiCA stable-like quotes", () => {
+    const reason = getPairPolicyBlockReason({
+      symbol: "BTCU",
+      baseAsset: "BTC",
+      quoteAsset: "U",
+      traderRegion: "EEA",
+      enforceRegionPolicy: true
+    });
+    expect(reason).toBe("EEA policy filtered quote asset U");
   });
 });

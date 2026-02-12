@@ -16,6 +16,69 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-12 15:44 UTC — T-006/T-023 night-build slice (feasibility filter + KPI visibility)
+- Scope: deliver the requested night scope to reduce invalid candidate churn and make execution quality visible in UI KPIs.
+- BA requirement mapping:
+  - AUTOBOT should avoid repeatedly choosing candidates that cannot pass exchange sizing/cap constraints.
+  - Operator needs direct visibility of conversion-vs-entry behavior and sizing reject pressure.
+- PM milestone mapping: night build readiness for 2-4h + overnight validation with measurable selection/execution indicators.
+- Technical changes:
+  - Added live pre-trade candidate feasibility filter in engine:
+    - checks lot/minNotional viability through Binance market validation,
+    - enforces exposure/cap-aware feasibility before final candidate lock,
+    - skips tick with explicit reason when no feasible candidate remains.
+  - Extended baseline KPI totals:
+    - `entryTrades`,
+    - `sizingRejectSkips`,
+    - `conversionTradePct`,
+    - `entryTradePct`,
+    - `sizingRejectSkipPct`.
+  - Added dashboard KPI pills in Adaptive panel:
+    - `% conversion trades`,
+    - `% entry trades`,
+    - `% sizing rejects`.
+- Risk slider impact:
+  - Feasibility stage respects risk-linked sizing inputs indirectly via derived position cap and existing risk-based notional/cooldown policy.
+  - No new hardcoded risk constants were added.
+- Validation evidence: Docker CI run requested in this patch batch.
+- Runtime test request:
+  - Run 2-4h on testnet and compare against prior baseline:
+    - lower repeated NOTIONAL candidate loops,
+    - lower sizing reject ratio,
+    - conversion/entry percentages stabilize (not conversion-dominant flood).
+- Follow-up:
+  - Continue T-004 with conversion source weighting tuned by regime and wallet utilization bands.
+  - Continue T-007 with fee-aware PnL reconciliation and realized/unrealized split.
+
+## 2026-02-12 15:35 UTC — T-004/T-006 night-build prep (conversion anti-churn + stable policy correction)
+- Scope: stop conversion-driven churn observed in `autobot-feedback-20260212-151348.tgz` and align stable/EEA policy with latest Binance EEA notice.
+- BA requirement mapping:
+  - Adaptive AUTOBOT should not produce high trade count with flat wallet due to internal conversion loops.
+  - Stable/stable behavior and regional filtering must match real exchange behavior better (especially `U` in testnet/mainnet pairset).
+- PM milestone mapping: night run readiness with measurable execution-quality improvements before deeper adaptive policy promotion.
+- Technical changes:
+  - Policy updates:
+    - Classified `U` as stable-like for pair policy (`excludeStableStablePairs` now filters `UUSDC`).
+    - Expanded EEA blocked quote defaults (`USDT`, `DAI`, `AEUR`, `XUSD`, `PAXG`, `USD1`, `FDUSD`, `FUSD`, `BUSD`, `TUSD`, `USDP`, `USDS`, plus `U`).
+  - Entry execution anti-churn:
+    - Added affordability downsize before conversion (attempt smaller valid qty first when quote shortfall is small).
+    - Added shortfall trigger gate: if quote reserve is healthy and shortfall is too small, skip conversion instead of forcing micro top-up.
+  - Conversion routing anti-churn:
+    - Source prioritization now prefers non-open-position assets and stable-like sources.
+    - Added per-source conversion cooldown to avoid repeated selling of the same asset every global cooldown tick.
+    - Avoids selling open managed position assets for non-reserve-recovery top-ups.
+- Risk slider impact:
+  - Maintained existing risk-link formulas.
+  - Shortfall trigger threshold is risk-aware (higher risk permits smaller shortfall conversions; low risk requires larger deficit).
+- Validation evidence: Docker CI passed (`docker compose -f docker-compose.ci.yml run --rm ci`).
+- Runtime test request (night build):
+  - Verify `UUSDC` is no longer used for repetitive entry/conversion ping-pong when stable/stable filtering is enabled.
+  - Verify conversion trade share drops materially vs prior run (`62/71` conversion-heavy baseline).
+  - Verify NOTIONAL skip bursts are reduced and candidate rotation continues without fallback spam.
+- Follow-up:
+  - Continue T-006 with pre-trade feasibility filter chain to suppress repeated NOTIONAL candidates earlier.
+  - Continue T-007 with fee-aware realized/unrealized PnL visibility improvements.
+
 ## 2026-02-12 12:52 UTC — T-020/T-023 supporting patch (config-driven routing + adaptive universe defaults)
 - Scope: deliver a 2-4h testable slice that removes hardcoded routing behavior and exposes quote/bridge discovery controls in Advanced UI.
 - BA requirement mapping:

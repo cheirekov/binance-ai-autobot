@@ -93,6 +93,7 @@ Runtime safety values are stored in `config.json` and configurable from UI Advan
   - respects `liveTradeRebalanceSellCooldownMs` to avoid immediate buy/sell churn
 - Binance sizing filter rejects (`-1013` / `NOTIONAL` / lot-size) are treated as recoverable sizing events and are not auto-blacklisted.
 - On live sizing rejects, bot now sets a short symbol cooldown lock (risk-scaled) to reduce immediate retry churn.
+- Regional policy defaults (`enforceRegionPolicy=true`) use a maintained EEA blocked-quote baseline aligned with Binance's non-MiCA guidance (last reviewed Feb 12, 2026).
 
 Environment variables still used in runtime:
 

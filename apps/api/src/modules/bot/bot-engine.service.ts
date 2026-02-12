@@ -8,7 +8,7 @@ import { BotStateSchema, defaultBotState } from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
 import { resolveRouteBridgeAssets } from "../config/asset-routing";
-import { BinanceMarketDataService } from "../integrations/binance-market-data.service";
+import { BinanceMarketDataService, type MarketQtyValidation } from "../integrations/binance-market-data.service";
 import {
   BinanceTradingService,
   isBinanceTestnetBaseUrl,
@@ -16,7 +16,7 @@ import {
   type BinanceMarketOrderResponse
 } from "../integrations/binance-trading.service";
 import { ConversionRouterService } from "../integrations/conversion-router.service";
-import { getPairPolicyBlockReason } from "../policy/trading-policy";
+import { getPairPolicyBlockReason, isStableAsset } from "../policy/trading-policy";
 import { UniverseService } from "../universe/universe.service";
 
 function atomicWriteFile(filePath: string, data: string): void {
@@ -132,6 +132,11 @@ type BaselineRunStats = {
     buys: number;
     sells: number;
     conversions: number;
+    entryTrades: number;
+    sizingRejectSkips: number;
+    conversionTradePct: number;
+    entryTradePct: number;
+    sizingRejectSkipPct: number;
     buyNotional: number;
     sellNotional: number;
     realizedPnl: number;
@@ -995,6 +1000,145 @@ export class BotEngineService {
     return null;
   }
 
+  private async pickFeasibleLiveCandidate(params: {
+    preferredCandidate: UniverseCandidate | null;
+    snapshotCandidates: UniverseCandidate[];
+    state: BotState;
+    homeStable: string;
+    traderRegion: string;
+    neverTradeSymbols: string[];
+    excludeStableStablePairs: boolean;
+    enforceRegionPolicy: boolean;
+    balances: BinanceBalanceSnapshot[];
+    walletTotalHome: number;
+    maxPositionPct: number;
+    quoteFree: number;
+    notionalCap: number;
+    capitalNotionalCapMultiplier: number;
+    bufferFactor: number;
+  }): Promise<{ candidate: UniverseCandidate | null; reason?: string; sizingRejected: number }> {
+    const {
+      preferredCandidate,
+      snapshotCandidates,
+      state,
+      homeStable,
+      traderRegion,
+      neverTradeSymbols,
+      excludeStableStablePairs,
+      enforceRegionPolicy,
+      balances,
+      walletTotalHome,
+      maxPositionPct,
+      quoteFree,
+      notionalCap,
+      capitalNotionalCapMultiplier,
+      bufferFactor
+    } = params;
+
+    const pool = [preferredCandidate, ...snapshotCandidates].filter(Boolean) as UniverseCandidate[];
+    const seen = new Set<string>();
+    const maxSymbolNotional = walletTotalHome * (maxPositionPct / 100);
+    if (!Number.isFinite(maxSymbolNotional) || maxSymbolNotional <= 0) {
+      return { candidate: null, reason: "Max symbol exposure is zero", sizingRejected: 0 };
+    }
+
+    const effectiveNotionalCap =
+      Number.isFinite(notionalCap) && notionalCap > 0 ? Math.max(1, notionalCap * capitalNotionalCapMultiplier) : null;
+    const capForSizing = effectiveNotionalCap ? effectiveNotionalCap / bufferFactor : null;
+    const rawTargetNotional = walletTotalHome * (maxPositionPct / 100);
+    let sizingRejected = 0;
+
+    for (const candidate of pool) {
+      const symbol = candidate.symbol.trim().toUpperCase();
+      if (!symbol || seen.has(symbol)) continue;
+      seen.add(symbol);
+
+      if (candidate.quoteAsset.trim().toUpperCase() !== homeStable) continue;
+      if (this.isSymbolBlocked(symbol, state)) continue;
+      if (this.getEntryGuard({ symbol, state })) continue;
+
+      const policyReason = getPairPolicyBlockReason({
+        symbol,
+        baseAsset: candidate.baseAsset,
+        quoteAsset: candidate.quoteAsset,
+        traderRegion: traderRegion === "EEA" ? "EEA" : "NON_EEA",
+        neverTradeSymbols,
+        excludeStableStablePairs,
+        enforceRegionPolicy
+      });
+      if (policyReason) continue;
+
+      let check: MarketQtyValidation | null = null;
+      try {
+        const rules = await this.marketData.getSymbolRules(symbol);
+        if (rules.quoteAsset.trim().toUpperCase() !== homeStable) continue;
+
+        let price = Number.isFinite(candidate.lastPrice) ? candidate.lastPrice : Number.NaN;
+        if (!Number.isFinite(price) || price <= 0) {
+          const priceStr = await this.marketData.getTickerPrice(symbol);
+          const parsed = Number.parseFloat(priceStr);
+          price = Number.isFinite(parsed) ? parsed : Number.NaN;
+        }
+        if (!Number.isFinite(price) || price <= 0) continue;
+
+        const baseAsset = rules.baseAsset.trim().toUpperCase();
+        const baseTotal = balances.find((b) => b.asset.trim().toUpperCase() === baseAsset)?.total ?? 0;
+        const currentNotional = Number.isFinite(baseTotal) && baseTotal > 0 ? baseTotal * price : 0;
+        const remainingSymbolNotional = Math.max(0, maxSymbolNotional - currentNotional);
+        if (remainingSymbolNotional <= 0) continue;
+
+        const targetNotional = Math.min(rawTargetNotional, capForSizing ?? rawTargetNotional, quoteFree, remainingSymbolNotional);
+        if (!Number.isFinite(targetNotional) || targetNotional <= 0) continue;
+
+        const desiredQty = targetNotional / price;
+        check = await this.marketData.validateMarketOrderQty(symbol, desiredQty);
+        const qtyStr = check.ok ? check.normalizedQty : check.requiredQty;
+        if (!qtyStr) {
+          sizingRejected += 1;
+          continue;
+        }
+
+        const qty = Number.parseFloat(qtyStr);
+        if (!Number.isFinite(qty) || qty <= 0) {
+          sizingRejected += 1;
+          continue;
+        }
+
+        const bufferedCost = qty * price * bufferFactor;
+        if (!Number.isFinite(bufferedCost) || bufferedCost <= 0) {
+          sizingRejected += 1;
+          continue;
+        }
+
+        if (remainingSymbolNotional > 0 && bufferedCost > remainingSymbolNotional + 1e-8) {
+          sizingRejected += 1;
+          continue;
+        }
+
+        if (effectiveNotionalCap) {
+          const capTolerance = Math.max(0.01, effectiveNotionalCap * 0.001);
+          if (bufferedCost > effectiveNotionalCap + capTolerance) {
+            sizingRejected += 1;
+            continue;
+          }
+        }
+
+        return { candidate, sizingRejected };
+      } catch {
+        if (check && !check.ok) {
+          sizingRejected += 1;
+        }
+        continue;
+      }
+    }
+
+    const reason =
+      sizingRejected > 0
+        ? `No feasible candidates after sizing/cap filters (${sizingRejected} rejected)`
+        : "No feasible candidates after policy/exposure filters";
+    return { candidate: null, reason, sizingRejected };
+  }
+
   private ensureTelemetryDir(): void {
     fs.mkdirSync(this.telemetryDir, { recursive: true });
   }
@@ -1008,6 +1152,40 @@ export class BotEngineService {
     if (!Number.isFinite(value)) return 0;
     const power = 10 ** decimals;
     return Math.round(value * power) / power;
+  }
+
+  private getDecisionDetails(decision: Decision): Record<string, unknown> | undefined {
+    if (!decision.details || typeof decision.details !== "object") return undefined;
+    return decision.details as Record<string, unknown>;
+  }
+
+  private isConversionTradeDecision(decision: Decision): boolean {
+    if (decision.kind !== "TRADE") return false;
+    const details = this.getDecisionDetails(decision);
+    if (typeof details?.mode === "string" && (details.mode === "conversion-router" || details.mode === "wallet-sweep")) {
+      return true;
+    }
+    if (typeof details?.reason === "string" && details.reason.toLowerCase().includes("convert ")) {
+      return true;
+    }
+    return decision.summary.toLowerCase().includes("convert ");
+  }
+
+  private isEntryTradeDecision(decision: Decision): boolean {
+    if (decision.kind !== "TRADE") return false;
+    const details = this.getDecisionDetails(decision);
+    if (typeof details?.reason !== "string") return false;
+    return details.reason === "entry" || details.reason === "entry-retry-sizing";
+  }
+
+  private isSizingRejectSkipDecision(decision: Decision): boolean {
+    if (decision.kind !== "SKIP") return false;
+    const summary = decision.summary.toLowerCase();
+    if (summary.includes("binance sizing filter")) return true;
+    if (summary.includes("min order constraints")) return true;
+    if (summary.includes("minnotional")) return true;
+    if (summary.includes("notional")) return true;
+    return false;
   }
 
   private buildRegimeSnapshot(candidate: UniverseCandidate | null): AdaptiveRegimeSnapshot {
@@ -1099,22 +1277,25 @@ export class BotEngineService {
     let trades = 0;
     let skips = 0;
     let conversions = 0;
+    let entryTrades = 0;
+    let sizingRejectSkips = 0;
 
     for (const decision of decisionList) {
       byDecisionKind[decision.kind] = (byDecisionKind[decision.kind] ?? 0) + 1;
       if (decision.kind === "TRADE") {
         trades += 1;
-        if (decision.summary.toLowerCase().includes("convert ")) {
+        if (this.isConversionTradeDecision(decision)) {
           conversions += 1;
-        } else {
-          const details = decision.details as Record<string, unknown> | undefined;
-          if (typeof details?.reason === "string" && details.reason.toLowerCase().includes("convert ")) {
-            conversions += 1;
-          }
+        }
+        if (this.isEntryTradeDecision(decision)) {
+          entryTrades += 1;
         }
       }
       if (decision.kind === "SKIP") {
         skips += 1;
+        if (this.isSizingRejectSkipDecision(decision)) {
+          sizingRejectSkips += 1;
+        }
         skipSummaryCounts.set(decision.summary, (skipSummaryCounts.get(decision.summary) ?? 0) + 1);
       }
     }
@@ -1220,6 +1401,11 @@ export class BotEngineService {
         buys,
         sells,
         conversions,
+        entryTrades,
+        sizingRejectSkips,
+        conversionTradePct: this.toRounded(trades > 0 ? (conversions / trades) * 100 : 0, 4),
+        entryTradePct: this.toRounded(trades > 0 ? (entryTrades / trades) * 100 : 0, 4),
+        sizingRejectSkipPct: this.toRounded(skips > 0 ? (sizingRejectSkips / skips) * 100 : 0, 4),
         buyNotional: this.toRounded(buyNotional, 8),
         sellNotional: this.toRounded(sellNotional, 8),
         realizedPnl,
@@ -1849,6 +2035,59 @@ export class BotEngineService {
             tickContext.candidate = selectedCandidate;
           }
 
+          const notionalCap = config?.advanced.liveTradeNotionalCap ?? 25;
+          const slippageBuffer = config?.advanced.liveTradeSlippageBuffer ?? 1.005;
+          const bufferFactor = Number.isFinite(slippageBuffer) && slippageBuffer > 0 ? slippageBuffer : 1;
+          const feasibleCandidateSelection = await this.pickFeasibleLiveCandidate({
+            preferredCandidate: selectedCandidate,
+            snapshotCandidates: universeSnapshot?.candidates ?? [],
+            state: current,
+            homeStable,
+            traderRegion: config?.basic.traderRegion ?? "NON_EEA",
+            neverTradeSymbols: config?.advanced.neverTradeSymbols ?? [],
+            excludeStableStablePairs: config?.advanced.excludeStableStablePairs ?? true,
+            enforceRegionPolicy: config?.advanced.enforceRegionPolicy ?? true,
+            balances,
+            walletTotalHome,
+            maxPositionPct,
+            quoteFree,
+            notionalCap,
+            capitalNotionalCapMultiplier: capitalProfile.notionalCapMultiplier,
+            bufferFactor
+          });
+          if (!feasibleCandidateSelection.candidate) {
+            const summary = `Skip: ${feasibleCandidateSelection.reason ?? "No feasible live candidate"}`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        rejectedBySizing: feasibleCandidateSelection.sizingRejected
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200)
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
+
+          if (feasibleCandidateSelection.candidate.symbol !== candidateSymbol) {
+            candidateSymbol = feasibleCandidateSelection.candidate.symbol;
+            selectedCandidate = feasibleCandidateSelection.candidate;
+            tickContext.candidateSymbol = candidateSymbol;
+            tickContext.candidate = selectedCandidate;
+          }
+
           const rules = await this.marketData.getSymbolRules(candidateSymbol);
           const pairPolicyReason = getPairPolicyBlockReason({
             symbol: candidateSymbol,
@@ -2115,9 +2354,6 @@ export class BotEngineService {
             throw new Error(`Invalid ticker price: ${priceStr}`);
           }
 
-          const notionalCap = config?.advanced.liveTradeNotionalCap ?? 25;
-          const slippageBuffer = config?.advanced.liveTradeSlippageBuffer ?? 1.005;
-          const bufferFactor = Number.isFinite(slippageBuffer) && slippageBuffer > 0 ? slippageBuffer : 1;
           const takerFeeRate = Math.max(0, Number.parseFloat(process.env.BINANCE_TAKER_FEE_RATE ?? "0.001"));
           const spreadBufferRate = Math.max(0, Number.parseFloat(process.env.ESTIMATED_SPREAD_BUFFER_RATE ?? "0.0006"));
           const roundTripCostPct = ((takerFeeRate * 2) + spreadBufferRate + Math.max(0, bufferFactor - 1)) * 100;
@@ -2248,12 +2484,34 @@ export class BotEngineService {
             return;
           }
 
-          const qty = Number.parseFloat(qtyStr);
+          let qty = Number.parseFloat(qtyStr);
           if (!Number.isFinite(qty) || qty <= 0) {
             throw new Error(`Invalid normalized quantity: ${qtyStr}`);
           }
 
-          const bufferedCost = qty * price * bufferFactor;
+          let bufferedCost = qty * price * bufferFactor;
+          if (Number.isFinite(bufferedCost) && bufferedCost > quoteFree) {
+            const affordableQtyTarget = quoteFree / (price * bufferFactor);
+            if (Number.isFinite(affordableQtyTarget) && affordableQtyTarget > 0) {
+              const affordableCheck = await this.marketData.validateMarketOrderQty(candidateSymbol, affordableQtyTarget);
+              const affordableQtyStr = affordableCheck.ok ? affordableCheck.normalizedQty : undefined;
+              const affordableQty = affordableQtyStr ? Number.parseFloat(affordableQtyStr) : Number.NaN;
+              const affordableBufferedCost =
+                Number.isFinite(affordableQty) && affordableQty > 0 ? affordableQty * price * bufferFactor : Number.NaN;
+              if (
+                affordableQtyStr &&
+                Number.isFinite(affordableQty) &&
+                affordableQty > 0 &&
+                Number.isFinite(affordableBufferedCost) &&
+                affordableBufferedCost <= quoteFree + 1e-8
+              ) {
+                qtyStr = affordableQtyStr;
+                qty = affordableQty;
+                bufferedCost = affordableBufferedCost;
+              }
+            }
+          }
+
           if (enforcedCap && Number.isFinite(bufferedCost)) {
             const capTolerance = Math.max(0.01, enforcedCap * 0.001);
             if (bufferedCost > enforcedCap + capTolerance) {
@@ -2308,8 +2566,45 @@ export class BotEngineService {
               walletTotalHome * capitalProfile.reserveHighPct
             );
             const reserveTopUpNeeded = quoteFree < reserveLowTarget ? Math.max(0, reserveHighTarget - quoteFree) : 0;
+            const requiresReserveRecovery = quoteFree < reserveLowTarget;
+            const shortfallTriggerRatio = Math.max(0.3, 0.8 - (risk / 100) * 0.5); // risk 0 -> 80%, risk 100 -> 30%
+            const minShortfallToConvert = floorTopUpTarget * shortfallTriggerRatio;
+            if (!requiresReserveRecovery && shortfall < minShortfallToConvert) {
+              const summary = `Skip ${candidateSymbol}: Insufficient ${homeStable} for estimated cost`;
+              const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+              const next = {
+                ...current,
+                activeOrders: filled.activeOrders,
+                orderHistory: filled.orderHistory,
+                decisions: alreadyLogged
+                  ? current.decisions
+                  : [
+                      {
+                        id: crypto.randomUUID(),
+                        ts: new Date().toISOString(),
+                        kind: "SKIP",
+                        summary,
+                        details: {
+                          shortfall: Number(shortfall.toFixed(6)),
+                          minShortfallToConvert: Number(minShortfallToConvert.toFixed(6)),
+                          floorTopUpTarget: Number(floorTopUpTarget.toFixed(6)),
+                          shortfallTriggerRatio: Number(shortfallTriggerRatio.toFixed(6)),
+                          reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
+                          reserveHighTarget: Number(reserveHighTarget.toFixed(6)),
+                          reserveTopUpNeeded: Number(reserveTopUpNeeded.toFixed(6)),
+                          capitalTier: capitalProfile.tier
+                        }
+                      },
+                      ...current.decisions
+                    ].slice(0, 200),
+                lastError: undefined
+              } satisfies BotState;
+              this.save(next);
+              return;
+            }
             const conversionTarget = Math.max(shortfall * conversionTopUpReserveMultiplier, floorTopUpTarget, reserveTopUpNeeded);
             const conversionTopUpCooldownMs = Math.max(0, config?.advanced.conversionTopUpCooldownMs ?? 90_000);
+            const nowMs = Date.now();
             if (conversionTopUpCooldownMs > 0) {
               const lastConversionTrade = current.decisions.find((d) => {
                 if (d.kind !== "TRADE") return false;
@@ -2317,7 +2612,7 @@ export class BotEngineService {
                 return details?.mode === "conversion-router";
               });
               const lastConversionAt = lastConversionTrade ? Date.parse(lastConversionTrade.ts) : Number.NaN;
-              if (Number.isFinite(lastConversionAt) && Date.now() - lastConversionAt < conversionTopUpCooldownMs) {
+              if (Number.isFinite(lastConversionAt) && nowMs - lastConversionAt < conversionTopUpCooldownMs) {
                 const summary = `Skip ${candidateSymbol}: Conversion cooldown active`;
                 const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
                 const next = {
@@ -2334,7 +2629,7 @@ export class BotEngineService {
                           summary,
                           details: {
                             conversionTopUpCooldownMs,
-                            remainingMs: Math.max(0, Math.round(conversionTopUpCooldownMs - (Date.now() - lastConversionAt))),
+                            remainingMs: Math.max(0, Math.round(conversionTopUpCooldownMs - (nowMs - lastConversionAt))),
                             shortfall: Number(shortfall.toFixed(6)),
                             conversionTarget: Number(conversionTarget.toFixed(6)),
                             floorTopUpTarget: Number(floorTopUpTarget.toFixed(6)),
@@ -2370,15 +2665,24 @@ export class BotEngineService {
                 const aIsCandidateBase = a.asset.toUpperCase() === candidateBaseAsset ? 1 : 0;
                 const bIsCandidateBase = b.asset.toUpperCase() === candidateBaseAsset ? 1 : 0;
                 if (aIsCandidateBase !== bIsCandidateBase) return aIsCandidateBase - bIsCandidateBase;
+                const aManagedOpen = (managedPositions.get(`${a.asset.toUpperCase()}${homeStable}`)?.netQty ?? 0) > 0 ? 1 : 0;
+                const bManagedOpen = (managedPositions.get(`${b.asset.toUpperCase()}${homeStable}`)?.netQty ?? 0) > 0 ? 1 : 0;
+                if (aManagedOpen !== bManagedOpen) return aManagedOpen - bManagedOpen;
+                const aIsStable = isStableAsset(a.asset) ? 1 : 0;
+                const bIsStable = isStableAsset(b.asset) ? 1 : 0;
+                if (aIsStable !== bIsStable) return bIsStable - aIsStable;
                 return b.free - a.free;
               });
 
+            const sourceConversionCooldownMs = Math.max(60_000, conversionTopUpCooldownMs * 3);
             for (const source of sourceBalances) {
               const sourceAsset = source.asset.toUpperCase();
               const sourceFree = source.free;
               if (sourceFree <= 0) continue;
               if (sourceAsset === candidateBaseAsset && hasRecentCandidateBuy) continue;
               const sourceHomeSymbol = `${sourceAsset}${homeStable}`;
+              const sourceOpenManagedPosition = (managedPositions.get(sourceHomeSymbol)?.netQty ?? 0) > 0;
+              if (sourceOpenManagedPosition && !requiresReserveRecovery) continue;
               const hasRecentSourceBuy =
                 Number.isFinite(rebalanceSellCooldownMs) && rebalanceSellCooldownMs > 0
                   ? current.orderHistory.some((o) => {
@@ -2386,10 +2690,24 @@ export class BotEngineService {
                       if (o.side !== "BUY") return false;
                       if (o.status !== "FILLED" && o.status !== "NEW") return false;
                       const ts = Date.parse(o.ts);
-                      return Number.isFinite(ts) && Date.now() - ts < rebalanceSellCooldownMs;
+                      return Number.isFinite(ts) && nowMs - ts < rebalanceSellCooldownMs;
                     })
                   : false;
               if (hasRecentSourceBuy) continue;
+              const hasRecentSourceConversion =
+                sourceConversionCooldownMs > 0
+                  ? current.decisions.some((d) => {
+                      if (d.kind !== "TRADE") return false;
+                      const details = d.details as Record<string, unknown> | undefined;
+                      if (details?.mode !== "conversion-router") return false;
+                      if (typeof details?.sourceAsset !== "string" || details.sourceAsset.trim().toUpperCase() !== sourceAsset) {
+                        return false;
+                      }
+                      const ts = Date.parse(d.ts);
+                      return Number.isFinite(ts) && nowMs - ts < sourceConversionCooldownMs;
+                    })
+                  : false;
+              if (hasRecentSourceConversion) continue;
 
               const conversion = await this.conversionRouter.convertFromSourceToTarget({
                 sourceAsset,

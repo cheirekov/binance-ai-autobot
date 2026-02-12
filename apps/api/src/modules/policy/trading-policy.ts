@@ -1,6 +1,7 @@
 import type { TraderRegion } from "@autobot/shared";
 
 const STABLE_ASSETS = new Set([
+  "U",
   "USDT",
   "USDC",
   "FDUSD",
@@ -17,7 +18,12 @@ const STABLE_ASSETS = new Set([
 ]);
 
 const EEA_BLOCKED_QUOTE_ASSETS = new Set([
+  "U",
   "USDT",
+  "DAI",
+  "AEUR",
+  "XUSD",
+  "PAXG",
   "USD1",
   "FDUSD",
   "FUSD",

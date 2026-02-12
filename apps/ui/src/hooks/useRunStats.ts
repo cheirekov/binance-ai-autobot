@@ -13,6 +13,11 @@ export type BaselineRunStats = {
     buys: number;
     sells: number;
     conversions: number;
+    entryTrades?: number;
+    sizingRejectSkips?: number;
+    conversionTradePct?: number;
+    entryTradePct?: number;
+    sizingRejectSkipPct?: number;
     realizedPnl: number;
     openExposureCost: number;
   };

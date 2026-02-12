@@ -463,6 +463,30 @@ export function DashboardPage(): JSX.Element {
             Conversions: <b>{runStats.stats?.kpi?.totals.conversions ?? "—"}</b>
           </span>
           <span className="pill">
+            Conversion trades:{" "}
+            <b>
+              {runStats.stats?.kpi
+                ? `${runStats.stats.kpi.totals.conversionTradePct?.toFixed(1) ?? "0.0"}%`
+                : "—"}
+            </b>
+          </span>
+          <span className="pill">
+            Entry trades:{" "}
+            <b>
+              {runStats.stats?.kpi
+                ? `${runStats.stats.kpi.totals.entryTradePct?.toFixed(1) ?? "0.0"}%`
+                : "—"}
+            </b>
+          </span>
+          <span className="pill">
+            Sizing rejects:{" "}
+            <b>
+              {runStats.stats?.kpi
+                ? `${runStats.stats.kpi.totals.sizingRejectSkipPct?.toFixed(1) ?? "0.0"}%`
+                : "—"}
+            </b>
+          </span>
+          <span className="pill">
             Last regime: <b>{latestAdaptiveEvent?.regime.label ?? "—"}</b>
           </span>
           <span className="pill">
