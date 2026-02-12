@@ -16,6 +16,32 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-12 19:45 UTC — T-027 P0 hotfix (CCXT open-orders sync warning loop)
+- Scope: fix immediate no-trade loop where bot entered transient backoff repeatedly during pre-trade order sync.
+- BA requirement mapping:
+  - User reported bot inactivity and repeating sync loop immediately after restart.
+  - User asked if issue was Binance Testnet inability to return orders.
+- PM milestone mapping: keep active `T-027` lane stable and runnable for overnight validation.
+- Technical changes:
+  - Confirmed root cause from bundle `autobot-feedback-20260212-194020.tgz`:
+    - repeated decisions: `Skip: Live order sync failed`,
+    - error text from CCXT Binance: `fetchOpenOrders() WARNING ... without specifying a symbol ...`.
+  - Bot engine sync path (`apps/api/src/modules/bot/bot-engine.service.ts`):
+    - switched live order sync to symbol-aware calls only (tracked active-order symbols),
+    - removed unsymbolized open-order fetch from tick path to avoid warning-triggered backoff loop.
+  - CCXT adapter safety (`apps/api/src/modules/integrations/ccxt-binance-adapter.ts`):
+    - set `options.warnOnFetchOpenOrdersWithoutSymbol = false` as defensive guard.
+- Risk slider impact: none (exchange sync reliability only; trading/risk formulas unchanged).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+  - Bundle evidence shows this is not a generic “testnet can’t return orders” limitation; it was our unsymbolized sync call pattern.
+- Runtime test request:
+  - Redeploy and run 20-30 minutes.
+  - Verify no new `order-sync` backoff loop decisions.
+  - Verify decisions progress to normal `SKIP`/`TRADE` flow.
+- Follow-up:
+  - Consider optional periodic full open-order reconciliation job (slower cadence) if we need discovery of externally-created orders.
+
 ## 2026-02-12 19:26 UTC — T-027 P0 hotfix (engine stall prevention after night patch)
 - Scope: fix bot inactivity where runtime showed `running=true` but produced almost no decisions/trades after startup.
 - BA requirement mapping:

@@ -1313,7 +1313,25 @@ export class BotEngineService implements OnModuleInit {
   }
 
   private async syncLiveOrders(state: BotState): Promise<BotState> {
-    const openSnapshots = await this.trading.getOpenOrders();
+    const trackedSymbols = Array.from(
+      new Set(
+        state.activeOrders
+          .map((order) => order.symbol.trim().toUpperCase())
+          .filter((symbol) => symbol.length > 0)
+      )
+    );
+
+    if (trackedSymbols.length === 0) {
+      return state;
+    }
+
+    const openSnapshots = (
+      await Promise.all(
+        trackedSymbols.map(async (symbol) => {
+          return await this.trading.getOpenOrders(symbol);
+        })
+      )
+    ).flat();
     const openOrders = openSnapshots
       .map((snapshot) => this.mapExchangeOrderToStateOrder(snapshot))
       .filter((order): order is Order => Boolean(order))

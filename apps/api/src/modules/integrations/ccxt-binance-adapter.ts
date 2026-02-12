@@ -159,7 +159,8 @@ export class CcxtBinanceAdapter {
       timeout,
       options: {
         defaultType: "spot",
-        adjustForTimeDifference: true
+        adjustForTimeDifference: true,
+        warnOnFetchOpenOrdersWithoutSymbol: false
       }
     });
 
