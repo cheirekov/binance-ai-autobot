@@ -21,7 +21,7 @@ function AppRoutes(): JSX.Element {
       <div className="container">
         <div className="card">
           <div className="title">Loading…</div>
-          <div className="subtitle">Checking setup status.</div>
+          <div className="subtitle">{status.error ?? "Checking setup status."}</div>
         </div>
       </div>
     );

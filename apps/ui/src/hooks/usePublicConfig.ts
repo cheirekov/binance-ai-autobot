@@ -73,7 +73,6 @@ export function usePublicConfig(options?: { pollMs?: number }): { loading: boole
         }
       } catch (e) {
         if (!cancelled) {
-          setConfig(null);
           setError(e instanceof Error ? e.message : String(e));
         }
       } finally {

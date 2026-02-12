@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { Injectable } from "@nestjs/common";
+import { Injectable, OnModuleInit } from "@nestjs/common";
 import type { BotState, Decision, Order, ProtectionLockEntry, SymbolBlacklistEntry, UniverseCandidate } from "@autobot/shared";
 import { BotStateSchema, defaultBotState } from "@autobot/shared";
 
@@ -200,7 +200,7 @@ export type BotRunStatsResponse = {
 };
 
 @Injectable()
-export class BotEngineService {
+export class BotEngineService implements OnModuleInit {
   private readonly dataDir = process.env.DATA_DIR ?? path.resolve(process.cwd(), "../../data");
   private readonly statePath = path.join(this.dataDir, "state.json");
   private readonly telemetryDir = path.join(this.dataDir, "telemetry");
@@ -220,6 +220,29 @@ export class BotEngineService {
     private readonly conversionRouter: ConversionRouterService,
     private readonly universe: UniverseService
   ) {}
+
+  onModuleInit(): void {
+    const state = this.getState();
+    if (!state.running) return;
+
+    const summary = "Recovered running bot state after process restart; resuming engine loop";
+    const alreadyLogged = state.decisions[0]?.kind === "ENGINE" && state.decisions[0]?.summary === summary;
+    if (!alreadyLogged) {
+      this.addDecision("ENGINE", summary);
+    }
+
+    if (state.phase !== "TRADING" && state.phase !== "EXAMINING") {
+      this.save({
+        ...state,
+        phase: "EXAMINING"
+      });
+    }
+
+    if (this.getState().phase !== "TRADING") {
+      this.scheduleExamineTransition();
+    }
+    this.ensureLoopTimer();
+  }
 
   getState(): BotState {
     if (!fs.existsSync(this.statePath)) {
@@ -712,6 +735,53 @@ export class BotEngineService {
 
   private clearTransientExchangeBackoff(): void {
     this.transientExchangeBackoffState = null;
+  }
+
+  private async withTimeout<T>(work: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    let timer: NodeJS.Timeout | null = null;
+    try {
+      return await Promise.race([
+        work,
+        new Promise<T>((_resolve, reject) => {
+          timer = setTimeout(() => {
+            reject(new Error(`${label} request timed out after ${timeoutMs}ms`));
+          }, timeoutMs);
+        })
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  private ensureLoopTimer(): void {
+    if (this.loopTimer) return;
+    this.loopTimer = setInterval(() => {
+      void this.tick();
+    }, 5000);
+  }
+
+  private scheduleExamineTransition(): void {
+    if (this.examineTimer) {
+      clearTimeout(this.examineTimer);
+      this.examineTimer = null;
+    }
+
+    this.examineTimer = setTimeout(() => {
+      void (async () => {
+        try {
+          const snap = await this.universe.scanAndWait();
+          const top = snap.candidates?.[0];
+          const summary = top
+            ? `Universe scan finished: top ${top.symbol} (ADX ${top.adx14?.toFixed(1) ?? "—"} · RSI ${top.rsi14?.toFixed(1) ?? "—"})`
+            : "Universe scan finished (no candidates)";
+          this.addDecision("EXAMINE", summary);
+        } catch (err) {
+          this.addDecision("EXAMINE", `Universe scan failed: ${err instanceof Error ? err.message : String(err)}`);
+        } finally {
+          this.save({ ...this.getState(), phase: "TRADING" });
+        }
+      })();
+    }, 250);
   }
 
   private getRecentSymbolOrders(state: BotState, symbol: string): Order[] {
@@ -1665,7 +1735,13 @@ export class BotEngineService {
 
   start(): void {
     const state = this.getState();
-    if (state.running) return;
+    if (state.running) {
+      if (state.phase !== "TRADING") {
+        this.scheduleExamineTransition();
+      }
+      this.ensureLoopTimer();
+      return;
+    }
 
     this.addDecision("ENGINE", "Start requested");
     this.save({
@@ -1676,26 +1752,8 @@ export class BotEngineService {
       startedAt: new Date().toISOString()
     });
 
-    this.examineTimer = setTimeout(() => {
-      void (async () => {
-        try {
-          const snap = await this.universe.scanAndWait();
-          const top = snap.candidates?.[0];
-          const summary = top
-            ? `Universe scan finished: top ${top.symbol} (ADX ${top.adx14?.toFixed(1) ?? "—"} · RSI ${top.rsi14?.toFixed(1) ?? "—"})`
-            : "Universe scan finished (no candidates)";
-          this.addDecision("EXAMINE", summary);
-        } catch (err) {
-          this.addDecision("EXAMINE", `Universe scan failed: ${err instanceof Error ? err.message : String(err)}`);
-        } finally {
-          this.save({ ...this.getState(), phase: "TRADING" });
-        }
-      })();
-    }, 250);
-
-    this.loopTimer = setInterval(() => {
-      void this.tick();
-    }, 5000);
+    this.scheduleExamineTransition();
+    this.ensureLoopTimer();
   }
 
   private async tick(): Promise<void> {
@@ -1757,15 +1815,80 @@ export class BotEngineService {
       }
 
       if (liveTrading) {
-        const synced = await this.syncLiveOrders(current);
-        const changed =
-          synced.activeOrders.length !== current.activeOrders.length ||
-          synced.orderHistory.length !== current.orderHistory.length ||
-          synced.activeOrders.some((order, index) => order.id !== current.activeOrders[index]?.id) ||
-          synced.orderHistory.some((order, index) => order.id !== current.orderHistory[index]?.id);
-        current = synced;
-        if (changed) {
-          this.save(current);
+        const syncBackoff = this.getTransientBackoffInfo();
+        if (syncBackoff.active) {
+          const summary = "Skip: Transient exchange backoff active";
+          const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+          const next = {
+            ...current,
+            decisions: alreadyLogged
+              ? current.decisions
+              : [
+                  {
+                    id: crypto.randomUUID(),
+                    ts: new Date().toISOString(),
+                    kind: "SKIP",
+                    summary,
+                    details: {
+                      stage: "order-sync",
+                      remainingMs: syncBackoff.remainingMs,
+                      errorCount: syncBackoff.errorCount,
+                      pauseUntil: syncBackoff.pauseUntilIso,
+                      lastErrorCode: syncBackoff.lastErrorCode,
+                      lastErrorMessage: syncBackoff.lastErrorMessage
+                    }
+                  },
+                  ...current.decisions
+                ].slice(0, 200),
+            lastError: undefined
+          } satisfies BotState;
+          this.save(next);
+          return;
+        }
+
+        try {
+          const synced = await this.withTimeout(this.syncLiveOrders(current), 15_000, "Live order sync");
+          const changed =
+            synced.activeOrders.length !== current.activeOrders.length ||
+            synced.orderHistory.length !== current.orderHistory.length ||
+            synced.activeOrders.some((order, index) => order.id !== current.activeOrders[index]?.id) ||
+            synced.orderHistory.some((order, index) => order.id !== current.orderHistory[index]?.id);
+          current = synced;
+          this.clearTransientExchangeBackoff();
+          if (changed) {
+            this.save(current);
+          }
+        } catch (syncErr) {
+          const rawMsg = syncErr instanceof Error ? syncErr.message : String(syncErr);
+          const safeMsg = this.sanitizeUserErrorMessage(rawMsg);
+          const backoffDetails = this.registerTransientExchangeError(rawMsg, safeMsg);
+          const summary = "Skip: Live order sync failed";
+          const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+          const next = {
+            ...current,
+            decisions: alreadyLogged
+              ? current.decisions
+              : [
+                  {
+                    id: crypto.randomUUID(),
+                    ts: new Date().toISOString(),
+                    kind: "SKIP",
+                    summary,
+                    details: {
+                      stage: "order-sync",
+                      error: safeMsg,
+                      backoffMs: backoffDetails.pauseMs,
+                      pauseUntil: backoffDetails.pauseUntilIso,
+                      errorCount: backoffDetails.errorCount,
+                      lastErrorCode: backoffDetails.lastErrorCode
+                    }
+                  },
+                  ...current.decisions
+                ].slice(0, 200),
+            lastError: safeMsg
+          } satisfies BotState;
+          this.save(next);
+          return;
         }
       }
 

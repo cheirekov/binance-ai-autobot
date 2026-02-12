@@ -63,7 +63,6 @@ export function useRunStats(): {
         }
       } catch (e) {
         if (!cancelled) {
-          setStats(null);
           setError(e instanceof Error ? e.message : String(e));
         }
       } finally {
@@ -72,7 +71,7 @@ export function useRunStats(): {
     }
 
     run();
-    const timer = setInterval(run, 5000);
+    const timer = setInterval(run, 8000);
     return () => {
       cancelled = true;
       clearInterval(timer);

@@ -40,7 +40,6 @@ export function usePortfolioWallet(): {
         }
       } catch (e) {
         if (!cancelled) {
-          setWallet(null);
           setError(e instanceof Error ? e.message : String(e));
         }
       } finally {
@@ -49,7 +48,7 @@ export function usePortfolioWallet(): {
     }
 
     run();
-    const t = setInterval(run, 20_000);
+    const t = setInterval(run, 30_000);
     return () => {
       cancelled = true;
       clearInterval(t);
@@ -58,4 +57,3 @@ export function usePortfolioWallet(): {
 
   return { loading, wallet, error };
 }
-

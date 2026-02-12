@@ -16,6 +16,64 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-12 19:26 UTC — T-027 P0 hotfix (engine stall prevention after night patch)
+- Scope: fix bot inactivity where runtime showed `running=true` but produced almost no decisions/trades after startup.
+- BA requirement mapping:
+  - User reported only ~2 actions for ~2h and bot effectively idle.
+  - User requested highest-priority investigation of night patch impact.
+- PM milestone mapping: critical runtime continuity fix under active `T-027` lane.
+- Technical changes:
+  - Bot engine (`apps/api/src/modules/bot/bot-engine.service.ts`):
+    - added `onModuleInit` recovery to resume loop when persisted state is `running=true` after process/container restart,
+    - refactored start path to ensure loop/examine timers are (re)attached when needed,
+    - added `withTimeout(...)` helper and guarded live order sync with 15s timeout,
+    - moved transient backoff handling to cover pre-trade order-sync stage,
+    - added explicit `SKIP` decisions/details for order-sync failures/backoff instead of silent tick abort.
+- Risk slider impact: none (execution continuity/observability fix only; risk formulas unchanged).
+- Validation evidence:
+  - Root-cause evidence from `autobot-feedback-20260212-191102.tgz`:
+    - baseline runtime only ~10s with `running=true`, `trades=0`, `skips=0`,
+    - indicates tick loop stalled before decision/trade path.
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request:
+  - Redeploy and run 20-30 minutes.
+  - Verify decisions continue beyond initial EXAMINE and include either trades or explicit skips.
+  - Verify no prolonged `running=true` + zero decision growth state.
+- Follow-up:
+  - If inactivity repeats, collect immediate bundle and check for new `order-sync` skip details to isolate exchange-side behavior.
+
+## 2026-02-12 19:18 UTC — T-027 P0 hotfix (UI setup-state stability + polling resilience)
+- Scope: fix urgent runtime issue where UI intermittently redirected to onboarding and appeared slow despite existing config.
+- BA requirement mapping:
+  - User reported setup wizard reappearing after refresh/restart even when bot remained configured.
+  - User reported degraded UI responsiveness during live run.
+- PM milestone mapping: P0 production stability fix while staying within active single-lane ticket (`T-027`).
+- Technical changes:
+  - UI HTTP client (`apps/ui/src/api/http.ts`):
+    - added `no-store`/no-cache fetch policy for API calls,
+    - added `304` recovery path with in-memory GET payload fallback + retry fetch,
+    - hardened JSON parsing for empty/204 responses.
+  - Setup status hook (`apps/ui/src/hooks/useSetupStatus.ts`):
+    - no longer forces `initialized=false` on transient fetch failures,
+    - added retry loop and error state to avoid false onboarding redirects.
+  - App boot view (`apps/ui/src/app/App.tsx`):
+    - shows setup-status retry message during transient bootstrap failures.
+  - Polling resilience and UI smoothness:
+    - hooks now retain last good snapshot on transient fetch errors (`config`, `integrations`, `wallet`, `universe`, `run-stats`),
+    - lowered expensive polling pressure (`integrations`/`wallet` to 30s, run-stats to 8s).
+- Risk slider impact: none (UI/runtime transport behavior only; trading policy unchanged).
+- Validation evidence:
+  - Root-cause evidence from `autobot-feedback-20260212-191102.tgz`:
+    - repeated `304` on `/setup/status` and `/config/public`,
+    - setup hook previously interpreted fetch failure as uninitialized.
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request:
+  - Redeploy UI+API containers and refresh dashboard repeatedly.
+  - Confirm no onboarding redirect when `data/config.json` exists.
+  - Confirm reduced UI jitter and stable data cards during temporary API latency.
+- Follow-up:
+  - If any onboarding bounce remains, capture fresh bundle immediately after bounce and include browser network HAR for `/api/setup/status`.
+
 ## 2026-02-12 17:56 UTC — Session brief automation helper (bundle -> section 4)
 - Scope: automate end-of-batch `SESSION_BRIEF` completion from collected feedback bundle to reduce manual errors and speed morning handoff.
 - BA requirement mapping:

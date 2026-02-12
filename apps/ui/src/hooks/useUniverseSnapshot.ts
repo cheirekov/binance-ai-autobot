@@ -50,7 +50,6 @@ export function useUniverseSnapshot(): {
         }
       } catch (e) {
         if (!cancelled) {
-          setSnapshot(undefined);
           setError(e instanceof Error ? e.message : String(e));
         }
       } finally {
@@ -68,4 +67,3 @@ export function useUniverseSnapshot(): {
 
   return { loading, snapshot, error };
 }
-

@@ -38,7 +38,6 @@ export function useIntegrationsStatus(): {
         }
       } catch (e) {
         if (!cancelled) {
-          setStatus(null);
           setError(e instanceof Error ? e.message : String(e));
         }
       } finally {
@@ -47,7 +46,7 @@ export function useIntegrationsStatus(): {
     }
 
     run();
-    const t = setInterval(run, 15_000);
+    const t = setInterval(run, 30_000);
     return () => {
       cancelled = true;
       clearInterval(t);
@@ -56,4 +55,3 @@ export function useIntegrationsStatus(): {
 
   return { loading, status, error };
 }
-
