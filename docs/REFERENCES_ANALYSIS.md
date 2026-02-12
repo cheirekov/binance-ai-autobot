@@ -332,6 +332,64 @@ Mapping to our architecture:
 - Add an offline “strategy calibration” job for shadow/backtest datasets.
 - Promote only parameter sets that improve drawdown-adjusted metrics, not raw PnL only.
 
+## Deep review update: `references/jesse-master` (Feb 12, 2026)
+
+This section records reusable execution/risk patterns from `jesse-master` (MIT).
+
+### A) Reduce-only exit discipline
+
+Reference files:
+
+- `references/jesse-master/jesse/services/broker.py`
+- `references/jesse-master/tests/test_broker.py`
+- `references/jesse-master/tests/test_spot_mode.py`
+
+Patterns extracted:
+
+- Exit orders are explicitly treated as `reduce_only` and validated against current open position state.
+- Direction and order type are selected by current price relation (market/limit/stop) for position reduction.
+- Invalid reductions are rejected early (no open position, invalid side/price context).
+
+Mapping to our architecture:
+
+- Keep conversion/sell paths from consuming fresh entry legs in the same short window.
+- In `T-003`, add explicit reduce-only exit semantics for managed positions (instead of generic opposite-side market exits).
+
+### B) Fee-aware balance/position accounting
+
+Reference files:
+
+- `references/jesse-master/tests/test_spot_mode.py`
+- `references/jesse-master/jesse/strategies/TestBalanceAndFeeReductionWorksCorrectlyInSpotModeInBothBuyAndSellOrders/__init__.py`
+
+Patterns extracted:
+
+- Spot accounting tests validate base/quote balance updates after each partial fill.
+- Fee impact is asserted directly in position quantity and quote balance evolution.
+- Test coverage includes increase/reduce/close transitions and cancellation handling.
+
+Mapping to our architecture:
+
+- `T-007` should move from notional-only PnL to fee-aware realized/unrealized accounting.
+- Add deterministic order-ledger tests for partial close flows and quantity rounding with fees.
+
+### C) Position lifecycle hooks as anti-churn control points
+
+Reference files:
+
+- `references/jesse-master/tests/test_parent_strategy.py`
+- `references/jesse-master/jesse/strategies/Test30/__init__.py`
+
+Patterns extracted:
+
+- Strategies separate entry signals from ongoing position management (`update_position` lifecycle).
+- Exit adjustment can happen after entry, but is guarded by position state and executed quantities.
+
+Mapping to our architecture:
+
+- Use post-entry management windows (cooldown/hold-time) to avoid rapid buy/sell flip loops.
+- This directly supports `T-003` adaptive exits and `T-004` wallet conversion policy.
+
 ## Recommended delivery order from this review
 
 1. Implement risk protections (`T-024`) before deeper adaptive behavior changes.

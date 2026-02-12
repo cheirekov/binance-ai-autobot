@@ -60,6 +60,7 @@ export type ProtectionLockEntry = z.infer<typeof ProtectionLockEntrySchema>;
 
 export const BotStateSchema = z.object({
   version: z.literal(BOT_STATE_VERSION),
+  startedAt: z.string().min(1).optional(),
   updatedAt: z.string().min(1),
   running: z.boolean(),
   phase: BotPhaseSchema,
@@ -73,9 +74,11 @@ export const BotStateSchema = z.object({
 export type BotState = z.infer<typeof BotStateSchema>;
 
 export function defaultBotState(): BotState {
+  const now = new Date().toISOString();
   return {
     version: BOT_STATE_VERSION,
-    updatedAt: new Date().toISOString(),
+    startedAt: now,
+    updatedAt: now,
     running: false,
     phase: "STOPPED",
     decisions: [],

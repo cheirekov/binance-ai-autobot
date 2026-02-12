@@ -1,6 +1,6 @@
 # Delivery Board
 
-Last updated: 2026-02-11
+Last updated: 2026-02-12
 Owner: Codex + User
 
 ## Current milestone
@@ -32,7 +32,7 @@ M1: Stabilize Spot testnet automation with risk-linked execution behavior and cl
 | T-019 | DONE | Commit hygiene and traceability rules | Prevent context-loss and ambiguous history | Better PM/BA auditability | Added hard commit-subject rules and examples in team operating rules. |
 | T-001 | DONE | Exposure-aware candidate fallback | Avoid idle bot on top-symbol exposure cap | Increase trading continuity | Implemented in bot engine; candidate rotates to next eligible symbol. |
 | T-002 | DONE | High-risk profile aggressiveness tuning | Risk slider must materially affect behavior | Faster results in high-risk mode | Live cooldown/notional/entry limits now scale aggressively at risk=100. |
-| T-003 | IN_PROGRESS | Risk-linked adaptive exit policy (no hard fixed stop profile) | Protect downside in bearish periods while keeping automation | Reduce deep hold drawdowns | In progress; supporting hotfix shipped to stop blocked conversion-symbol flood by honoring policy in conversion legs. Next: risk+regime-adjusted take-profit/stop-loss bands and hold-time logic. |
+| T-003 | IN_PROGRESS | Risk-linked adaptive exit policy (no hard fixed stop profile) | Protect downside in bearish periods while keeping automation | Reduce deep hold drawdowns | In progress; supporting patches shipped for conversion anti-churn source guard and persistent run-start telemetry (`startedAt`) to keep adaptive runtime accurate. Next: risk+regime-adjusted take-profit/stop-loss bands and hold-time logic. |
 | T-004 | TODO | Wallet policy v1 (convert/sweep/autonomous reserve) | Handle mixed assets automatically | Keep tradeable quote liquidity | USDC top-up + non-core sweep + cooldown governance. |
 | T-005 | TODO | Daily risk guardrails visible in UI | User requested max-loss + per-position hard cap tied to risk | Safe live operation | Enforce maxDailyLoss and expose guard state in status panel. |
 | T-006 | TODO | Universe discovery breadth + regime diversity | Improve pair selection quality and reduce single-symbol bias | Better candidate quality | Expand quote-aware ranking and rotational selection quality. |

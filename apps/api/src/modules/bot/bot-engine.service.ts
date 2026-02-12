@@ -221,7 +221,7 @@ export class BotEngineService {
 
     try {
       const raw = fs.readFileSync(this.statePath, "utf-8");
-      return BotStateSchema.parse(JSON.parse(raw));
+      return this.ensureStateStartedAt(BotStateSchema.parse(JSON.parse(raw)));
     } catch (err) {
       const fallback = defaultBotState();
       return {
@@ -231,9 +231,28 @@ export class BotEngineService {
     }
   }
 
+  private ensureStateStartedAt(state: BotState): BotState {
+    if (state.startedAt && Number.isFinite(Date.parse(state.startedAt))) {
+      return state;
+    }
+
+    const candidates = [
+      ...state.decisions.map((d) => d.ts),
+      ...state.orderHistory.map((o) => o.ts),
+      state.updatedAt
+    ];
+    const timestamps = candidates.map((ts) => Date.parse(ts)).filter((ts) => Number.isFinite(ts));
+    const earliest = timestamps.length > 0 ? Math.min(...timestamps) : Date.now();
+    return {
+      ...state,
+      startedAt: new Date(earliest).toISOString()
+    };
+  }
+
   private save(state: BotState): void {
     fs.mkdirSync(this.dataDir, { recursive: true });
-    const next: BotState = { ...state, updatedAt: new Date().toISOString() };
+    const withStartedAt = this.ensureStateStartedAt(state);
+    const next: BotState = { ...withStartedAt, updatedAt: new Date().toISOString() };
     atomicWriteFile(this.statePath, JSON.stringify(next, null, 2));
   }
 
@@ -1068,7 +1087,10 @@ export class BotEngineService {
     const nowIso = new Date().toISOString();
     const decisionList = [...state.decisions];
     const decisionChronological = [...decisionList].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
-    const startedAt = decisionChronological[0]?.ts ?? state.updatedAt;
+    const startedAt =
+      state.startedAt && Number.isFinite(Date.parse(state.startedAt))
+        ? state.startedAt
+        : decisionChronological[0]?.ts ?? state.updatedAt;
     const runtimeSeconds = Math.max(0, Math.round((Date.now() - Date.parse(startedAt)) / 1000));
 
     const byDecisionKind: Record<string, number> = {};
@@ -1367,7 +1389,13 @@ export class BotEngineService {
     if (state.running) return;
 
     this.addDecision("ENGINE", "Start requested");
-    this.save({ ...this.getState(), running: true, phase: "EXAMINING", lastError: undefined });
+    this.save({
+      ...this.getState(),
+      running: true,
+      phase: "EXAMINING",
+      lastError: undefined,
+      startedAt: new Date().toISOString()
+    });
 
     this.examineTimer = setTimeout(() => {
       void (async () => {
@@ -2200,6 +2228,18 @@ export class BotEngineService {
               const sourceFree = source.free;
               if (sourceFree <= 0) continue;
               if (sourceAsset === candidateBaseAsset && hasRecentCandidateBuy) continue;
+              const sourceHomeSymbol = `${sourceAsset}${homeStable}`;
+              const hasRecentSourceBuy =
+                Number.isFinite(rebalanceSellCooldownMs) && rebalanceSellCooldownMs > 0
+                  ? current.orderHistory.some((o) => {
+                      if (o.symbol !== sourceHomeSymbol) return false;
+                      if (o.side !== "BUY") return false;
+                      if (o.status !== "FILLED" && o.status !== "NEW") return false;
+                      const ts = Date.parse(o.ts);
+                      return Number.isFinite(ts) && Date.now() - ts < rebalanceSellCooldownMs;
+                    })
+                  : false;
+              if (hasRecentSourceBuy) continue;
 
               const conversion = await this.conversionRouter.convertFromSourceToTarget({
                 sourceAsset,

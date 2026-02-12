@@ -16,6 +16,26 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-12 07:26 UTC — T-003 supporting patch (anti-churn + runtime accuracy)
+- Scope: resolve overnight trade flip churn and adaptive runtime drift seen in `autobot-feedback-20260212-071236.tgz`.
+- BA requirement mapping: autonomous bot must avoid confusing buy/sell loops and show reliable runtime telemetry in UI.
+- PM milestone mapping: M1 stabilization before deeper adaptive-exit rollout.
+- Technical changes:
+  - Added persistent `startedAt` in bot state and migrated runtime calculation to use this stable run-start anchor.
+  - On each engine start, state now resets run-start timestamp explicitly for the new session.
+  - Added conversion source guard: skip using a source asset for conversion when that asset had a recent BUY on its home-stable pair within rebalance cooldown.
+  - This prevents immediate `entry BUY` then `convert SELL` churn on the same asset (for example `ETHUSDC` flip loops).
+  - Added Jesse/Freqtrade reference mapping update in `docs/REFERENCES_ANALYSIS.md` to guide next adaptive-exit and fee-accounting work.
+- Risk slider impact: explicit; anti-churn guard uses `liveTradeRebalanceSellCooldownMs` (risk-linked via follow-risk-profile), so higher risk still shortens guard windows.
+- Validation evidence: Docker CI passed (`docker compose -f docker-compose.ci.yml run --rm ci`); root-cause evidence from state/kpi in `autobot-feedback-20260212-071236.tgz`.
+- Runtime test request:
+  - Run 4-8h with current config and verify no repeated immediate BUY/SELL flip on the same symbol/qty.
+  - Verify adaptive runtime in UI grows continuously beyond prior 200-decision horizon.
+  - Collect next feedback bundle for T-003 exit-band tuning.
+- Follow-up:
+  - Continue `T-003` with adaptive exit bands and minimum hold-time logic.
+  - Continue `T-007` with fee-aware realized/unrealized PnL ledger.
+
 ## 2026-02-11 17:19 UTC — T-013 supporting hotfix (conversion policy enforcement)
 - Scope: stop repeated conversion fills on symbols that users explicitly blocked (for example `USDCUSDT`).
 - BA requirement mapping: Advanced settings (`neverTradeSymbols`, region policy) must apply consistently to autonomous execution paths.
