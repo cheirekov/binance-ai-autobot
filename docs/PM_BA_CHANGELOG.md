@@ -16,6 +16,28 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-12 07:41 UTC — T-003 supporting patch (adaptive visibility + universe freshness)
+- Scope: deliver immediate operator-visible progress without waiting for another long overnight-only cycle.
+- BA requirement mapping:
+  - Adaptive policy should be visible and understandable in UI (history, not only last status).
+  - Universe discovery must react to real wallet composition and stay fresh over time.
+- PM milestone mapping: M1 stabilization speed-up while keeping T-003 active and preparing T-023 quality improvements.
+- Technical changes:
+  - Increased adaptive shadow tail payload from 60 to 200 events in run-stats API.
+  - Added adaptive history table in dashboard (time, candidate, regime, strategy, decision summary).
+  - Universe service now auto-triggers background rescan when cached snapshot is stale.
+  - Universe quote-asset set now includes wallet-derived quote hints (top held assets), constrained by exchange-available quote assets.
+  - `UniverseModule` now imports `IntegrationsModule` so universe scans can use wallet balances safely.
+- Risk slider impact: indirect only; no sizing formula change. Faster universe refresh improves candidate turnover under all risk levels.
+- Validation evidence: Docker CI passed (`docker compose -f docker-compose.ci.yml run --rm ci`).
+- Runtime test request:
+  - Run 4-6h and verify Adaptive section shows scrolling event history (not only summary pills).
+  - Verify universe `Last scan` time advances automatically without manual rescan after cache TTL.
+  - Verify `quoteAssets` line includes wallet-driven hints when holdings change.
+- Follow-up:
+  - Continue T-003 core exit-band implementation (adaptive TP/SL + hold-time).
+  - Start full T-023 staged filter diagnostics once exit policy patch is merged.
+
 ## 2026-02-12 07:26 UTC — T-003 supporting patch (anti-churn + runtime accuracy)
 - Scope: resolve overnight trade flip churn and adaptive runtime drift seen in `autobot-feedback-20260212-071236.tgz`.
 - BA requirement mapping: autonomous bot must avoid confusing buy/sell loops and show reliable runtime telemetry in UI.

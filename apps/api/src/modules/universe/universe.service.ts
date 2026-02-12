@@ -8,6 +8,7 @@ import { UNIVERSE_VERSION, UniverseSnapshotSchema } from "@autobot/shared";
 import { ConfigService } from "../config/config.service";
 import { resolveBinanceBaseUrl } from "../integrations/binance-base-url";
 import { BinanceClient } from "../integrations/binance-client";
+import { BinanceTradingService } from "../integrations/binance-trading.service";
 import { getPairPolicyBlockReason } from "../policy/trading-policy";
 
 type ExchangeInfoResponse = {
@@ -266,11 +267,35 @@ export class UniverseService {
   private readonly dataDir = process.env.DATA_DIR ?? path.resolve(process.cwd(), "../../data");
   private readonly snapshotPath = path.join(this.dataDir, "universe.json");
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly trading: BinanceTradingService
+  ) {}
+
+  private async getWalletQuoteHints(maxItems: number): Promise<string[]> {
+    try {
+      const balances = await this.trading.getBalances();
+      const sorted = balances
+        .map((b) => ({
+          asset: b.asset.trim().toUpperCase(),
+          total: Number.isFinite(b.total) ? b.total : 0,
+          free: Number.isFinite(b.free) ? b.free : 0
+        }))
+        .filter((b) => b.asset && (b.total > 0 || b.free > 0))
+        .sort((a, b) => {
+          if (b.total !== a.total) return b.total - a.total;
+          return b.free - a.free;
+        });
+      return unique(sorted.map((b) => b.asset)).slice(0, Math.max(1, maxItems));
+    } catch {
+      return [];
+    }
+  }
 
   async getLatest(): Promise<UniverseSnapshot> {
+    const cacheTtlMs = 5 * 60_000;
     const now = Date.now();
-    if (this.cached && now - this.cachedAtMs < 5 * 60_000) {
+    if (this.cached && now - this.cachedAtMs < cacheTtlMs) {
       return this.cached;
     }
 
@@ -280,28 +305,33 @@ export class UniverseService {
         const parsed = UniverseSnapshotSchema.parse(JSON.parse(raw));
         this.cached = parsed;
         this.cachedAtMs = now;
+        const finishedAtMs = Date.parse(parsed.finishedAt);
+        if (Number.isFinite(finishedAtMs) && now - finishedAtMs >= cacheTtlMs) {
+          void this.triggerScan();
+        }
       } catch {
         // ignore
       }
     }
 
-    // Kick off a background scan if nothing exists yet.
-    if (!this.cached) {
+    if (this.cached) {
       void this.triggerScan();
-      return UniverseSnapshotSchema.parse({
-        version: UNIVERSE_VERSION,
-        startedAt: new Date().toISOString(),
-        finishedAt: new Date().toISOString(),
-        durationMs: 0,
-        baseUrl: resolveBinanceBaseUrl(this.configService.load()),
-        interval: "1h",
-        quoteAssets: [],
-        candidates: [],
-        errors: [{ error: "Universe scan has not completed yet." }]
-      });
+      return this.cached;
     }
 
-    return this.cached;
+    // Kick off a background scan if nothing exists yet.
+    void this.triggerScan();
+    return UniverseSnapshotSchema.parse({
+      version: UNIVERSE_VERSION,
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      durationMs: 0,
+      baseUrl: resolveBinanceBaseUrl(this.configService.load()),
+      interval: "1h",
+      quoteAssets: [],
+      candidates: [],
+      errors: [{ error: "Universe scan has not completed yet." }]
+    });
   }
 
   async triggerScan(): Promise<boolean> {
@@ -332,7 +362,7 @@ export class UniverseService {
     const klineLimit = 120;
     const homeQuote = (config?.basic.homeStableCoin ?? "USDC").trim().toUpperCase();
     const traderRegion = config?.basic.traderRegion ?? "NON_EEA";
-    const quoteAssets = unique([
+    const defaultQuoteAssets = unique([
       homeQuote,
       traderRegion === "EEA" ? "EUR" : "USDT",
       "BTC",
@@ -340,6 +370,7 @@ export class UniverseService {
       "BNB",
       "JPY"
     ]);
+    let quoteAssets = [...defaultQuoteAssets];
 
     const errors: Array<{ symbol?: string; error: string }> = [];
     const neverTradeSymbols = config?.advanced.neverTradeSymbols ?? [];
@@ -383,6 +414,14 @@ export class UniverseService {
     }
 
     const rawSymbols = exchangeInfo.symbols ?? [];
+    const availableQuoteAssets = new Set(rawSymbols.map((s) => s.quoteAsset?.trim().toUpperCase()).filter(Boolean));
+    const walletQuoteHints = await this.getWalletQuoteHints(8);
+    const mergedQuoteAssets = unique([...defaultQuoteAssets, ...walletQuoteHints]);
+    quoteAssets = mergedQuoteAssets.filter((asset) => availableQuoteAssets.size === 0 || availableQuoteAssets.has(asset));
+    if (quoteAssets.length === 0) {
+      quoteAssets = defaultQuoteAssets.filter((asset) => availableQuoteAssets.size === 0 || availableQuoteAssets.has(asset));
+    }
+
     const spotSymbols = rawSymbols.filter((s) => {
       if (!s || s.status !== "TRADING") return false;
       if (!quoteAssets.includes(s.quoteAsset)) return false;

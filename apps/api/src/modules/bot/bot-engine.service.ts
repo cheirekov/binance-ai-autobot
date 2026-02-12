@@ -1377,7 +1377,7 @@ export class BotEngineService {
     return {
       generatedAt: new Date().toISOString(),
       kpi,
-      adaptiveShadowTail: this.readAdaptiveShadowTail(60),
+      adaptiveShadowTail: this.readAdaptiveShadowTail(200),
       notes: {
         activeOrders: "Spot MARKET orders are usually filled immediately, so active order lists can stay at 0 while order history increases."
       }

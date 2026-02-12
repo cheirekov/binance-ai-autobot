@@ -21,9 +21,11 @@ export type BaselineRunStats = {
 
 export type AdaptiveShadowEvent = {
   ts: string;
+  environment?: "LIVE" | "PAPER";
+  candidateSymbol?: string;
   regime: { label: string; confidence: number };
   strategy: { recommended: string; trend: number; meanReversion: number; grid: number };
-  decision: { kind: string; summary: string; reason?: string };
+  decision: { kind: string; summary: string; reason?: string; symbol?: string; side?: "BUY" | "SELL"; status?: string };
 };
 
 export type RunStatsSnapshot = {

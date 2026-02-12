@@ -129,9 +129,9 @@ export function DashboardPage(): JSX.Element {
   const walletUnpricedCount = wallet.wallet ? wallet.wallet.assets.filter((a) => a.estValueHome === undefined).length : 0;
   const universeCandidates = universe.snapshot?.candidates ?? [];
   const universeRows = universeCandidates.slice(0, 40);
-  const latestAdaptiveEvent = runStats.stats?.adaptiveShadowTail?.length
-    ? runStats.stats.adaptiveShadowTail[runStats.stats.adaptiveShadowTail.length - 1]
-    : undefined;
+  const adaptiveTail = runStats.stats?.adaptiveShadowTail ?? [];
+  const latestAdaptiveEvent = adaptiveTail.length ? adaptiveTail[adaptiveTail.length - 1] : undefined;
+  const adaptiveRows = [...adaptiveTail].reverse().slice(0, 30);
 
   async function rescanUniverse(): Promise<void> {
     setUniverseMsg(null);
@@ -468,6 +468,43 @@ export function DashboardPage(): JSX.Element {
           <span className="pill">
             Last strategy: <b>{latestAdaptiveEvent?.strategy.recommended ?? "—"}</b>
           </span>
+          <span className="pill">
+            Last decision: <b>{latestAdaptiveEvent?.decision.kind ?? "—"}</b>
+          </span>
+          <span className="pill">
+            History loaded: <b>{adaptiveTail.length}</b>
+          </span>
+        </div>
+        <div style={{ marginTop: 10, maxHeight: 260, overflow: "auto" }}>
+          <table className="table">
+            <thead>
+              <tr>
+                <th className="col-time">Time</th>
+                <th>Candidate</th>
+                <th>Regime</th>
+                <th>Strategy</th>
+                <th>Decision</th>
+              </tr>
+            </thead>
+            <tbody>
+              {adaptiveRows.map((event, idx) => (
+                <tr key={`${event.ts}:${idx}`}>
+                  <td className="col-time">{new Date(event.ts).toLocaleTimeString()}</td>
+                  <td>{event.candidateSymbol ?? "—"}</td>
+                  <td>{event.regime.label}</td>
+                  <td>{event.strategy.recommended}</td>
+                  <td>{event.decision.summary}</td>
+                </tr>
+              ))}
+              {adaptiveRows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ color: "var(--muted)" }}>
+                    No adaptive events yet.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
         {runStats.error ? <div className="subtitle" style={{ marginTop: 8 }}>{runStats.error}</div> : null}
       </div>
