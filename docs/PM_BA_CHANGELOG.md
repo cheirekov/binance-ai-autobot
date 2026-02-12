@@ -16,6 +16,31 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-12 17:56 UTC — Session brief automation helper (bundle -> section 4)
+- Scope: automate end-of-batch `SESSION_BRIEF` completion from collected feedback bundle to reduce manual errors and speed morning handoff.
+- BA requirement mapping:
+  - User asked to automate manual section filling.
+  - Keep PM/BA process usable without repeated prompt guidance.
+- PM milestone mapping: execution process acceleration for nightly/day cycle analysis.
+- Technical changes:
+  - Added `scripts/update-session-brief.sh`:
+    - reads latest (or provided) `autobot-feedback-*.tgz`,
+    - extracts `state` + telemetry artifacts,
+    - computes LIMIT lifecycle, market-order share signal, sizing reject pressure,
+    - auto-updates Section 4 in `docs/SESSION_BRIEF.md`,
+    - writes recommended decision (`continue`/`pivot`) and next ticket hint.
+  - Updated `docs/SESSION_BRIEF.md` validation commands to include automation helper.
+  - Updated `docs/TEAM_OPERATING_RULES.md` batch cadence to require running helper after feedback collection.
+- Risk slider impact: none (process/runtime-report automation only).
+- Validation evidence: helper script executed against latest local bundle and updated `docs/SESSION_BRIEF.md` successfully.
+- Runtime test request:
+  - after each run, execute:
+    - `./scripts/collect-feedback.sh`
+    - `./scripts/update-session-brief.sh`
+  - confirm Section 4 is populated before next prioritization decision.
+- Follow-up:
+  - if needed, extend helper to emit a compact markdown summary for release notes.
+
 ## 2026-02-12 17:45 UTC — Session brief prefill for active night run (T-027)
 - Scope: pre-populate the mandatory batch contract so overnight validation has explicit acceptance criteria and morning handoff fields.
 - BA requirement mapping:

@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-12 17:45 UTC
+Last updated: 2026-02-12 17:58 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -46,6 +46,7 @@ Use this file at the start and end of every batch.
   - `docker compose -f docker-compose.ci.yml run --rm ci`
   - additional targeted command(s):
     - `./scripts/collect-feedback.sh`
+    - `./scripts/update-session-brief.sh`
     - `docker logs --tail 500 binance-ai-autobot_api_1`
 - Runtime validation plan:
   - run duration: `8-12h`
@@ -67,13 +68,18 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `<yes/no + notes>`
-  - market-only share reduced: `<yes/no + notes>`
-  - sizing reject pressure: `<low/medium/high + notes>`
-- Decision: `continue` / `rollback` / `pivot`
-- Next ticket candidate: `T-007` (if lifecycle works) or next `T-027` slice (if lifecycle gaps remain)
+  - open LIMIT lifecycle observed: `no` (openLimitOrders=0, historyLimitOrders=0, activeMarketOrders=0)
+  - market-only share reduced: `no` (historyMarketShare=100.0%)
+  - sizing reject pressure: `high` (sizingRejectSkips=61, decisions=200, ratio=30.5%)
+- Decision: `pivot`
+- Next ticket candidate: `T-027` (continue T-027 hardening)
 - Open risks:
+  - no observed LIMIT order lifecycle in this bundle.
+  - sizing reject pressure is high (30.5%).
+  - conversion-heavy flow remains high (87.3% of trades).
 - Notes for next session:
+  - bundle: `autobot-feedback-20260212-151348.tgz`
+  - auto-updated at: `2026-02-12T17:58:10.092Z`
 
 ## 5) Copy/paste prompt for next session
 
@@ -88,6 +94,6 @@ DoD:
 - UI: active orders visible during grid operation; no market-only-only pattern.
 - Runtime log evidence: decisions include grid ladder reasons and exchange sync events.
 - Risk slider mapping: high risk -> denser grid than low risk.
-- CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci` and `./scripts/collect-feedback.sh`.
+- CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`, `./scripts/collect-feedback.sh`, and `./scripts/update-session-brief.sh`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

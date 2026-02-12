@@ -71,6 +71,7 @@ Companion docs:
 1. Start-of-batch brief (max 10 lines) in `docs/PM_BA_CHANGELOG.md`:
    - scope, hypothesis, target KPI delta, stop condition.
 2. End-of-batch result:
+   - run `./scripts/collect-feedback.sh` then `./scripts/update-session-brief.sh`,
    - observed KPI delta,
    - decision (`continue`, `rollback`, `pivot`),
    - next batch owner.
