@@ -1504,24 +1504,46 @@ export class BotEngineService {
       const candidateSelection = await (async (): Promise<{ symbol: string; candidate: UniverseCandidate | null }> => {
         try {
           const snap = await this.universe.getLatest();
-          const best = snap.candidates?.find((c) => {
-            if (!c.symbol) return false;
-            if (this.isSymbolBlocked(c.symbol, current)) return false;
+          const byHomeQuoteBase = new Map<string, UniverseCandidate>();
+          for (const candidate of snap.candidates ?? []) {
+            const quote = candidate.quoteAsset.trim().toUpperCase();
+            const base = candidate.baseAsset.trim().toUpperCase();
+            if (!base || quote !== homeStable) continue;
+            byHomeQuoteBase.set(base, candidate);
+          }
+
+          const seenSymbols = new Set<string>();
+          for (const rawCandidate of snap.candidates ?? []) {
+            if (!rawCandidate?.symbol) continue;
+
+            let candidate = rawCandidate;
+            if (liveTrading && rawCandidate.quoteAsset.trim().toUpperCase() !== homeStable) {
+              const mapped = byHomeQuoteBase.get(rawCandidate.baseAsset.trim().toUpperCase());
+              if (!mapped) continue;
+              candidate = mapped;
+            }
+
+            const symbol = candidate.symbol.trim().toUpperCase();
+            if (!symbol || seenSymbols.has(symbol)) continue;
+            seenSymbols.add(symbol);
+            if (this.isSymbolBlocked(symbol, current)) continue;
+
             const policyReason = getPairPolicyBlockReason({
-              symbol: c.symbol,
-              baseAsset: c.baseAsset,
-              quoteAsset: c.quoteAsset,
+              symbol,
+              baseAsset: candidate.baseAsset,
+              quoteAsset: candidate.quoteAsset,
               traderRegion: config?.basic.traderRegion ?? "NON_EEA",
               neverTradeSymbols: config?.advanced.neverTradeSymbols,
               excludeStableStablePairs: config?.advanced.excludeStableStablePairs,
               enforceRegionPolicy: config?.advanced.enforceRegionPolicy
             });
-            if (policyReason) return false;
-            if (this.getEntryGuard({ symbol: c.symbol, state: current })) return false;
-            if (liveTrading && c.quoteAsset && c.quoteAsset.toUpperCase() !== homeStable) return false;
-            return true;
-          });
-          return { symbol: best?.symbol ?? `BTC${homeStable}`, candidate: best ?? null };
+            if (policyReason) continue;
+            if (this.getEntryGuard({ symbol, state: current })) continue;
+
+            return { symbol, candidate };
+          }
+
+          return { symbol: `BTC${homeStable}`, candidate: null };
         } catch {
           return { symbol: `BTC${homeStable}`, candidate: null };
         }
@@ -1923,6 +1945,123 @@ export class BotEngineService {
               }
             });
             return;
+          }
+
+          if ((universeSnapshot?.candidates?.length ?? 0) > 0) {
+            const preferredHomeBaseAssets = new Set<string>(
+              (universeSnapshot?.candidates ?? [])
+                .filter((c) => c.quoteAsset.trim().toUpperCase() === homeStable)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, Math.max(4, Math.round(12 - risk / 15)))
+                .map((c) => c.baseAsset.trim().toUpperCase())
+            );
+            preferredHomeBaseAssets.add(candidateBaseAsset);
+            for (const position of managedOpenHomeSymbols) {
+              const baseAsset = position.symbol.slice(0, Math.max(0, position.symbol.length - homeStable.length)).trim().toUpperCase();
+              if (baseAsset) preferredHomeBaseAssets.add(baseAsset);
+            }
+
+            const sweepFloorPct = risk >= 80 ? 0.002 : risk >= 50 ? 0.0035 : 0.006;
+            const sweepMinValueHome = Math.max(config?.advanced.conversionTopUpMinTarget ?? 5, walletTotalHome * sweepFloorPct);
+            const sourceBridgeAssets = [homeStable, "USDT", "USDC", "BTC", "ETH", "BNB"];
+            const staleSources: Array<{
+              asset: string;
+              free: number;
+              estimatedValueHome: number;
+              sourceHomeSymbol: string;
+              change24hPct: number | null;
+              reason: string;
+            }> = [];
+
+            for (const balance of balances) {
+              const asset = balance.asset.trim().toUpperCase();
+              const free = Number.isFinite(balance.free) ? balance.free : 0;
+              if (!asset || asset === homeStable || free <= 0) continue;
+              if (preferredHomeBaseAssets.has(asset)) continue;
+
+              const estimatedValueHome = await this.estimateAssetValueInHome(asset, free, homeStable, sourceBridgeAssets);
+              if (!Number.isFinite(estimatedValueHome ?? Number.NaN) || (estimatedValueHome ?? 0) <= 0) continue;
+              if ((estimatedValueHome ?? 0) < sweepMinValueHome) continue;
+
+              const sourceHomeSymbol = `${asset}${homeStable}`;
+              const marketCandidate = (universeSnapshot?.candidates ?? []).find(
+                (candidate) => candidate.symbol.trim().toUpperCase() === sourceHomeSymbol
+              );
+              const change24hPct = typeof marketCandidate?.priceChangePct24h === "number" ? marketCandidate.priceChangePct24h : null;
+              const weakTrend = change24hPct === null || change24hPct <= -0.35;
+              if (!weakTrend) continue;
+
+              staleSources.push({
+                asset,
+                free,
+                estimatedValueHome: estimatedValueHome ?? 0,
+                sourceHomeSymbol,
+                change24hPct,
+                reason: change24hPct === null ? "not in preferred universe set" : `24h change ${change24hPct.toFixed(2)}%`
+              });
+            }
+
+            staleSources.sort((a, b) => b.estimatedValueHome - a.estimatedValueHome);
+
+            for (const source of staleSources) {
+              if (Number.isFinite(rebalanceSellCooldownMs) && rebalanceSellCooldownMs > 0) {
+                const hasRecentHomeBuy = current.orderHistory.some((order) => {
+                  if (order.symbol !== source.sourceHomeSymbol) return false;
+                  if (order.side !== "BUY") return false;
+                  if (order.status !== "FILLED" && order.status !== "NEW") return false;
+                  const ts = Date.parse(order.ts);
+                  return Number.isFinite(ts) && Date.now() - ts < rebalanceSellCooldownMs;
+                });
+                if (hasRecentHomeBuy) continue;
+
+                const hasRecentSweepConversion = current.decisions.some((decision) => {
+                  if (decision.kind !== "TRADE") return false;
+                  const details = decision.details as Record<string, unknown> | undefined;
+                  if (typeof details?.mode !== "string" || details.mode !== "wallet-sweep") return false;
+                  if (typeof details?.sourceAsset !== "string" || details.sourceAsset.trim().toUpperCase() !== source.asset) return false;
+                  const ts = Date.parse(decision.ts);
+                  return Number.isFinite(ts) && Date.now() - ts < rebalanceSellCooldownMs;
+                });
+                if (hasRecentSweepConversion) continue;
+              }
+
+              const conversionTarget = Math.max(config?.advanced.conversionTopUpMinTarget ?? 5, source.estimatedValueHome * 0.98);
+              const conversion = await this.conversionRouter.convertFromSourceToTarget({
+                sourceAsset: source.asset,
+                sourceFree: source.free,
+                targetAsset: homeStable,
+                requiredTarget: conversionTarget,
+                allowTwoHop: true
+              });
+              if (!conversion.ok || conversion.legs.length === 0) continue;
+
+              conversion.legs.forEach((leg, idx) => {
+                const fallbackQty = Number.parseFloat(leg.quantity);
+                persistLiveTrade({
+                  symbol: leg.symbol,
+                  side: leg.side,
+                  requestedQty: leg.quantity,
+                  fallbackQty: Number.isFinite(fallbackQty) && fallbackQty > 0 ? fallbackQty : 0,
+                  response: leg.response,
+                  reason: `wallet-sweep ${source.asset} -> ${homeStable}`,
+                  details: {
+                    mode: "wallet-sweep",
+                    sourceAsset: source.asset,
+                    sourceHomeSymbol: source.sourceHomeSymbol,
+                    sourceEstimatedValueHome: Number(source.estimatedValueHome.toFixed(6)),
+                    sweepMinValueHome: Number(sweepMinValueHome.toFixed(6)),
+                    change24hPct: source.change24hPct === null ? null : Number(source.change24hPct.toFixed(6)),
+                    sweepReason: source.reason,
+                    route: leg.route,
+                    bridgeAsset: leg.bridgeAsset,
+                    leg: idx + 1,
+                    legs: conversion.legs.length,
+                    obtainedTarget: Number(leg.obtainedTarget.toFixed(8))
+                  }
+                });
+              });
+              return;
+            }
           }
 
           if (managedOpenHomeSymbols.length >= maxOpenPositions && !candidateIsOpen) {

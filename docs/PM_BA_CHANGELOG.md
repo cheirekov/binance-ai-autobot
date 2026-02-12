@@ -16,6 +16,33 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-12 07:50 UTC — T-004/T-006 supporting patch (wallet policy + universe candidate mapping)
+- Scope: align bot behavior with autonomous wallet governance and universe-first strategy selection.
+- BA requirement mapping:
+  - Bot should not trade based on existing wallet bag only; it should follow universe winners and perform required conversions.
+  - Bot should reduce stale/falling non-core holdings back to home stable coin automatically.
+- PM milestone mapping: M1 stabilization with practical wallet policy before deeper adaptive exit tuning.
+- Technical changes:
+  - Candidate selection no longer discards non-home-quote universe winners immediately; in live mode it maps winner base assets to tradable home-quote candidates when available.
+  - Added wallet sweep policy in bot loop:
+    - derives preferred base assets from top home-quote universe candidates and current open managed positions,
+    - detects stale/non-preferred holdings above a risk-scaled value floor,
+    - requires weak/absent trend on `<asset><homeStable>` candidate before sweep,
+    - executes conversion via conversion router with cooldown checks to prevent churn.
+  - Sweep conversions are explicitly tagged in decisions/details (`mode=wallet-sweep`) for runtime diagnostics.
+  - Reference strategy alignment used from:
+    - `references/freqtrade-develop/freqtrade/plugins/protections/*` (lock/cooldown discipline),
+    - `references/jesse-master/jesse/services/broker.py` + spot tests (position lifecycle and reduction discipline patterns).
+- Risk slider impact: explicit; sweep activation floor scales with wallet size and risk level, and cooldown behavior reuses risk-linked rebalance cooldown.
+- Validation evidence: Docker CI passed (`docker compose -f docker-compose.ci.yml run --rm ci`).
+- Runtime test request:
+  - Run 4-8h with mixed-asset wallet.
+  - Verify decisions include occasional `wallet-sweep <asset> -> <homeStable>` for stale assets, without rapid repeated flips.
+  - Verify entries still follow universe candidates (not just held wallet assets).
+- Follow-up:
+  - Continue T-004 with broader quote-routing policy for non-home candidate execution when direct home pair is missing.
+  - Resume T-003 adaptive exit-band implementation after wallet policy stabilization.
+
 ## 2026-02-12 07:41 UTC — T-003 supporting patch (adaptive visibility + universe freshness)
 - Scope: deliver immediate operator-visible progress without waiting for another long overnight-only cycle.
 - BA requirement mapping:

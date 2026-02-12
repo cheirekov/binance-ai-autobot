@@ -32,8 +32,8 @@ M1: Stabilize Spot testnet automation with risk-linked execution behavior and cl
 | T-019 | DONE | Commit hygiene and traceability rules | Prevent context-loss and ambiguous history | Better PM/BA auditability | Added hard commit-subject rules and examples in team operating rules. |
 | T-001 | DONE | Exposure-aware candidate fallback | Avoid idle bot on top-symbol exposure cap | Increase trading continuity | Implemented in bot engine; candidate rotates to next eligible symbol. |
 | T-002 | DONE | High-risk profile aggressiveness tuning | Risk slider must materially affect behavior | Faster results in high-risk mode | Live cooldown/notional/entry limits now scale aggressively at risk=100. |
-| T-003 | IN_PROGRESS | Risk-linked adaptive exit policy (no hard fixed stop profile) | Protect downside in bearish periods while keeping automation | Reduce deep hold drawdowns | In progress; supporting patches shipped for conversion anti-churn guard, persistent run-start telemetry (`startedAt`), and visible adaptive shadow history in dashboard. Next: risk+regime-adjusted take-profit/stop-loss bands and hold-time logic. |
-| T-004 | TODO | Wallet policy v1 (convert/sweep/autonomous reserve) | Handle mixed assets automatically | Keep tradeable quote liquidity | USDC top-up + non-core sweep + cooldown governance. |
+| T-003 | BLOCKED | Risk-linked adaptive exit policy (no hard fixed stop profile) | Protect downside in bearish periods while keeping automation | Reduce deep hold drawdowns | Temporarily paused by PM/BA reprioritization to deliver wallet policy first. Next after T-004: risk+regime-adjusted take-profit/stop-loss bands and hold-time logic. |
+| T-004 | IN_PROGRESS | Wallet policy v1 (convert/sweep/autonomous reserve) | Handle mixed assets automatically | Keep tradeable quote liquidity | USDC top-up + non-core sweep + cooldown governance; delivered first slice: stale/non-preferred asset sweep with conversion routing and cooldown checks. |
 | T-005 | TODO | Daily risk guardrails visible in UI | User requested max-loss + per-position hard cap tied to risk | Safe live operation | Enforce maxDailyLoss and expose guard state in status panel. |
 | T-006 | TODO | Universe discovery breadth + regime diversity | Improve pair selection quality and reduce single-symbol bias | Better candidate quality | Expand quote-aware ranking and rotational selection quality. |
 | T-007 | TODO | PnL correctness and exposure reporting | Trustworthy dashboard for non-trader users | Clear performance visibility | Reconcile realized/unrealized PnL from fills and holdings. |
@@ -47,6 +47,6 @@ M1: Stabilize Spot testnet automation with risk-linked execution behavior and cl
 
 ## Next execution batch (single patch set)
 
-1. Complete `T-003` using protection state + regime signal for adaptive exits.
-2. Start `T-023` (filter-chain universe) for staged candidate diagnostics.
+1. Complete `T-004` with broader conversion policies (including non-home universe winners via safe routing).
+2. Resume `T-003` adaptive exits using protection state + regime signal.
 3. Validate with one uninterrupted 6-10h run and collect feedback bundle.
