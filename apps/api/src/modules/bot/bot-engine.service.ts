@@ -7,6 +7,7 @@ import type { BotState, Decision, Order, ProtectionLockEntry, SymbolBlacklistEnt
 import { BotStateSchema, defaultBotState } from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
+import { resolveRouteBridgeAssets } from "../config/asset-routing";
 import { BinanceMarketDataService } from "../integrations/binance-market-data.service";
 import {
   BinanceTradingService,
@@ -871,7 +872,7 @@ export class BotEngineService {
   }
 
   private async estimateWalletTotalInHome(balances: BinanceBalanceSnapshot[], homeStable: string): Promise<number> {
-    const bridgeAssets = [homeStable, "USDT", "USDC", "BTC", "ETH", "BNB"];
+    const bridgeAssets = resolveRouteBridgeAssets(this.configService.load(), homeStable);
     let total = 0;
     for (const balance of balances) {
       const qty = Number.isFinite(balance.total) ? balance.total : balance.free + balance.locked;
@@ -1450,7 +1451,7 @@ export class BotEngineService {
         homeStableCoin: homeStable,
         liveTrading,
         risk,
-        candidateSymbol: `BTC${homeStable}`,
+        candidateSymbol: "UNSET",
         candidate: null,
         maxOpenPositions: config?.derived.maxOpenPositions,
         maxPositionPct: config?.derived.maxPositionPct
@@ -1501,7 +1502,11 @@ export class BotEngineService {
       };
 
       const filled = liveTrading ? { activeOrders: current.activeOrders, orderHistory: current.orderHistory } : maybeFillOne(current);
-      const candidateSelection = await (async (): Promise<{ symbol: string; candidate: UniverseCandidate | null }> => {
+      const candidateSelection = await (async (): Promise<{
+        symbol: string | null;
+        candidate: UniverseCandidate | null;
+        reason?: string;
+      }> => {
         try {
           const snap = await this.universe.getLatest();
           const byHomeQuoteBase = new Map<string, UniverseCandidate>();
@@ -1543,11 +1548,26 @@ export class BotEngineService {
             return { symbol, candidate };
           }
 
-          return { symbol: `BTC${homeStable}`, candidate: null };
+          return { symbol: null, candidate: null, reason: "No eligible universe candidates after policy and lock filters" };
         } catch {
-          return { symbol: `BTC${homeStable}`, candidate: null };
+          return { symbol: null, candidate: null, reason: "Universe snapshot unavailable" };
         }
       })();
+      if (!candidateSelection.symbol) {
+        const summary = `Skip: ${candidateSelection.reason ?? "No eligible trading candidate"}`;
+        const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+        const next = {
+          ...current,
+          activeOrders: filled.activeOrders,
+          orderHistory: filled.orderHistory,
+          decisions: alreadyLogged
+            ? current.decisions
+            : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+        } satisfies BotState;
+        this.save(next);
+        return;
+      }
+
       let candidateSymbol = candidateSelection.symbol;
       let selectedCandidate = candidateSelection.candidate;
       tickContext.candidateSymbol = candidateSymbol;
@@ -1624,8 +1644,7 @@ export class BotEngineService {
           orderHistory: filled.orderHistory
         };
 
-        const cooldownMs =
-          config?.advanced.liveTradeCooldownMs ?? Number.parseInt(process.env.LIVE_TRADE_COOLDOWN_MS ?? "60000", 10);
+        const cooldownMs = config?.advanced.liveTradeCooldownMs ?? 60_000;
         if (Number.isFinite(cooldownMs) && cooldownMs > 0) {
           const lastTrade = current.decisions.find((d) => d.kind === "TRADE");
           const lastTradeAt = lastTrade ? Date.parse(lastTrade.ts) : Number.NaN;
@@ -1876,9 +1895,7 @@ export class BotEngineService {
           tickContext.maxOpenPositions = maxOpenPositions;
           const candidateIsOpen = (managedPositions.get(candidateSymbol)?.netQty ?? 0) > 0;
 
-          const rebalanceSellCooldownMs =
-            config?.advanced.liveTradeRebalanceSellCooldownMs ??
-            Number.parseInt(process.env.LIVE_TRADE_REBALANCE_SELL_COOLDOWN_MS ?? "900000", 10);
+          const rebalanceSellCooldownMs = config?.advanced.liveTradeRebalanceSellCooldownMs ?? 900_000;
           const takeProfitPct = 0.35 + (risk / 100) * 0.9; // 0.35% .. 1.25%
           const stopLossPct = -(0.8 + (risk / 100) * 1.2); // -0.8% .. -2.0%
 
@@ -1963,7 +1980,7 @@ export class BotEngineService {
 
             const sweepFloorPct = risk >= 80 ? 0.002 : risk >= 50 ? 0.0035 : 0.006;
             const sweepMinValueHome = Math.max(config?.advanced.conversionTopUpMinTarget ?? 5, walletTotalHome * sweepFloorPct);
-            const sourceBridgeAssets = [homeStable, "USDT", "USDC", "BTC", "ETH", "BNB"];
+            const sourceBridgeAssets = resolveRouteBridgeAssets(config, homeStable);
             const staleSources: Array<{
               asset: string;
               free: number;
@@ -2098,10 +2115,8 @@ export class BotEngineService {
             throw new Error(`Invalid ticker price: ${priceStr}`);
           }
 
-          const notionalCap =
-            config?.advanced.liveTradeNotionalCap ?? Number.parseFloat(process.env.LIVE_TRADE_NOTIONAL_CAP ?? "25");
-          const slippageBuffer =
-            config?.advanced.liveTradeSlippageBuffer ?? Number.parseFloat(process.env.LIVE_TRADE_SLIPPAGE_BUFFER ?? "1.005");
+          const notionalCap = config?.advanced.liveTradeNotionalCap ?? 25;
+          const slippageBuffer = config?.advanced.liveTradeSlippageBuffer ?? 1.005;
           const bufferFactor = Number.isFinite(slippageBuffer) && slippageBuffer > 0 ? slippageBuffer : 1;
           const takerFeeRate = Math.max(0, Number.parseFloat(process.env.BINANCE_TAKER_FEE_RATE ?? "0.001"));
           const spreadBufferRate = Math.max(0, Number.parseFloat(process.env.ESTIMATED_SPREAD_BUFFER_RATE ?? "0.0006"));
@@ -2294,11 +2309,7 @@ export class BotEngineService {
             );
             const reserveTopUpNeeded = quoteFree < reserveLowTarget ? Math.max(0, reserveHighTarget - quoteFree) : 0;
             const conversionTarget = Math.max(shortfall * conversionTopUpReserveMultiplier, floorTopUpTarget, reserveTopUpNeeded);
-            const conversionTopUpCooldownMs = Math.max(
-              0,
-              config?.advanced.conversionTopUpCooldownMs ??
-                Number.parseInt(process.env.CONVERSION_TOP_UP_COOLDOWN_MS ?? "90000", 10)
-            );
+            const conversionTopUpCooldownMs = Math.max(0, config?.advanced.conversionTopUpCooldownMs ?? 90_000);
             if (conversionTopUpCooldownMs > 0) {
               const lastConversionTrade = current.decisions.find((d) => {
                 if (d.kind !== "TRADE") return false;
@@ -2500,8 +2511,9 @@ export class BotEngineService {
           const rawMsg = err instanceof Error ? err.message : String(err);
           const safeMsg = this.sanitizeUserErrorMessage(rawMsg);
           const transient = this.isTransientExchangeError(rawMsg);
+          const sizingFilterError = this.isSizingFilterError(rawMsg);
           const backoffDetails = transient ? this.registerTransientExchangeError(rawMsg, safeMsg) : null;
-          const summary = this.isSizingFilterError(rawMsg)
+          const summary = sizingFilterError
             ? `Skip ${candidateSymbol}: Binance sizing filter (${safeMsg})`
             : transient
               ? `Skip ${candidateSymbol}: Temporary exchange/network issue (${safeMsg})`
@@ -2532,6 +2544,23 @@ export class BotEngineService {
               ? current.decisions
               : [skipDecision, ...current.decisions].slice(0, 200)
           };
+
+          if (sizingFilterError) {
+            const boundedRisk = Math.max(0, Math.min(100, config?.basic.risk ?? 50));
+            const sizingCooldownMs = Math.round(120_000 - (boundedRisk / 100) * 80_000); // 120s -> 40s
+            nextState = this.upsertProtectionLock(nextState, {
+              type: "COOLDOWN",
+              scope: "SYMBOL",
+              symbol: candidateSymbol,
+              reason: `Sizing cooldown after Binance filter error (${Math.round(sizingCooldownMs / 1000)}s)`,
+              expiresAt: new Date(Date.now() + sizingCooldownMs).toISOString(),
+              details: {
+                category: "SIZING_FILTER",
+                cooldownMs: sizingCooldownMs,
+                exchangeError: safeMsg
+              }
+            });
+          }
 
           if (config?.advanced.autoBlacklistEnabled && this.shouldAutoBlacklistError(rawMsg)) {
             const ttlMinutes = config.advanced.autoBlacklistTtlMinutes ?? 180;

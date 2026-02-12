@@ -36,6 +36,9 @@ export function SettingsAdvanced(): JSX.Element {
   const [conversionBuyBuffer, setConversionBuyBuffer] = useState(1.005);
   const [conversionSellBuffer, setConversionSellBuffer] = useState(1.002);
   const [conversionFeeBuffer, setConversionFeeBuffer] = useState(1.002);
+  const [routingBridgeAssetsText, setRoutingBridgeAssetsText] = useState("USDT\nUSDC\nBTC\nETH\nBNB");
+  const [universeQuoteAssetsText, setUniverseQuoteAssetsText] = useState("");
+  const [walletQuoteHintLimit, setWalletQuoteHintLimit] = useState(8);
   const [excludeStableStablePairs, setExcludeStableStablePairs] = useState(true);
   const [enforceRegionPolicy, setEnforceRegionPolicy] = useState(true);
   const [symbolEntryCooldownMs, setSymbolEntryCooldownMs] = useState(120000);
@@ -75,6 +78,9 @@ export function SettingsAdvanced(): JSX.Element {
     setConversionBuyBuffer(config.advanced.conversionBuyBuffer);
     setConversionSellBuffer(config.advanced.conversionSellBuffer);
     setConversionFeeBuffer(config.advanced.conversionFeeBuffer);
+    setRoutingBridgeAssetsText((config.advanced.routingBridgeAssets ?? []).join("\n"));
+    setUniverseQuoteAssetsText((config.advanced.universeQuoteAssets ?? []).join("\n"));
+    setWalletQuoteHintLimit(config.advanced.walletQuoteHintLimit ?? 8);
     setExcludeStableStablePairs(config.advanced.excludeStableStablePairs);
     setEnforceRegionPolicy(config.advanced.enforceRegionPolicy);
     setSymbolEntryCooldownMs(config.advanced.symbolEntryCooldownMs);
@@ -150,6 +156,14 @@ export function SettingsAdvanced(): JSX.Element {
         .split(/\r?\n/g)
         .map((s) => s.trim())
         .filter(Boolean);
+      const routingBridgeAssets = routingBridgeAssetsText
+        .split(/\r?\n/g)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const universeQuoteAssets = universeQuoteAssetsText
+        .split(/\r?\n/g)
+        .map((s) => s.trim())
+        .filter(Boolean);
 
       await apiPut("/config/advanced", {
         apiBaseUrl: apiBaseUrl.trim(),
@@ -170,6 +184,9 @@ export function SettingsAdvanced(): JSX.Element {
         conversionBuyBuffer,
         conversionSellBuffer,
         conversionFeeBuffer,
+        routingBridgeAssets,
+        universeQuoteAssets,
+        walletQuoteHintLimit,
         excludeStableStablePairs,
         enforceRegionPolicy,
         symbolEntryCooldownMs,
@@ -493,6 +510,47 @@ export function SettingsAdvanced(): JSX.Element {
                 if (Number.isFinite(next)) setConversionFeeBuffer(next);
               }}
             />
+          </div>
+
+          <div className="row cols-2" style={{ marginTop: 12 }}>
+            <div>
+              <label className="label">Routing bridge assets</label>
+              <textarea
+                className="field"
+                style={{ minHeight: 120 }}
+                value={routingBridgeAssetsText}
+                onChange={(e) => setRoutingBridgeAssetsText(e.target.value)}
+                placeholder={"One asset per line, e.g.\nUSDT\nUSDC\nBTC\nETH\nBNB"}
+              />
+              <div className="subtitle">Used for valuation and conversion route discovery (home stable is always included).</div>
+            </div>
+            <div>
+              <label className="label">Universe quote assets (optional)</label>
+              <textarea
+                className="field"
+                style={{ minHeight: 120 }}
+                value={universeQuoteAssetsText}
+                onChange={(e) => setUniverseQuoteAssetsText(e.target.value)}
+                placeholder={"Leave empty for auto mode.\nOr set one per line, e.g.\nUSDC\nUSDT\nBTC"}
+              />
+              <div className="subtitle">If empty, the bot auto-selects quote assets from region defaults and wallet hints.</div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label className="label">Wallet quote hint limit (auto mode)</label>
+            <input
+              className="field"
+              type="number"
+              min={0}
+              max={20}
+              value={walletQuoteHintLimit}
+              onChange={(e) => {
+                const next = Number.parseInt(e.target.value, 10);
+                if (Number.isFinite(next)) setWalletQuoteHintLimit(next);
+              }}
+            />
+            <div className="subtitle">How many top wallet assets can influence auto quote-asset selection.</div>
           </div>
 
           <div className="row cols-2" style={{ marginTop: 12 }}>

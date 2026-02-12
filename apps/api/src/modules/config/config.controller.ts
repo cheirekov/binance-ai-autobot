@@ -24,6 +24,9 @@ const AdvancedUpdateSchema = z.object({
   conversionBuyBuffer: z.number().min(1).max(1.1).optional(),
   conversionSellBuffer: z.number().min(1).max(1.1).optional(),
   conversionFeeBuffer: z.number().min(1).max(1.1).optional(),
+  routingBridgeAssets: z.array(z.string().min(1)).max(20).optional(),
+  universeQuoteAssets: z.array(z.string().min(1)).max(20).optional(),
+  walletQuoteHintLimit: z.number().int().min(0).max(20).optional(),
   excludeStableStablePairs: z.boolean().optional(),
   enforceRegionPolicy: z.boolean().optional(),
   symbolEntryCooldownMs: z.number().int().min(0).max(86_400_000).optional(),
@@ -98,6 +101,9 @@ export class ConfigController {
       conversionBuyBuffer: number;
       conversionSellBuffer: number;
       conversionFeeBuffer: number;
+      routingBridgeAssets: string[];
+      universeQuoteAssets: string[];
+      walletQuoteHintLimit: number;
       excludeStableStablePairs: boolean;
       enforceRegionPolicy: boolean;
       symbolEntryCooldownMs: number;
@@ -149,6 +155,9 @@ export class ConfigController {
         conversionBuyBuffer: config.advanced.conversionBuyBuffer,
         conversionSellBuffer: config.advanced.conversionSellBuffer,
         conversionFeeBuffer: config.advanced.conversionFeeBuffer,
+        routingBridgeAssets: config.advanced.routingBridgeAssets,
+        universeQuoteAssets: config.advanced.universeQuoteAssets,
+        walletQuoteHintLimit: config.advanced.walletQuoteHintLimit,
         excludeStableStablePairs: config.advanced.excludeStableStablePairs,
         enforceRegionPolicy: config.advanced.enforceRegionPolicy,
         symbolEntryCooldownMs: config.advanced.symbolEntryCooldownMs,

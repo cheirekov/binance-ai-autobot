@@ -42,6 +42,9 @@ export type PublicConfig = {
     conversionBuyBuffer: number;
     conversionSellBuffer: number;
     conversionFeeBuffer: number;
+    routingBridgeAssets: string[];
+    universeQuoteAssets: string[];
+    walletQuoteHintLimit: number;
     excludeStableStablePairs: boolean;
     enforceRegionPolicy: boolean;
     symbolEntryCooldownMs: number;

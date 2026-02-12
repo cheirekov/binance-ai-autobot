@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 
 import { ConfigService } from "../config/config.service";
+import { resolveRouteBridgeAssets } from "../config/asset-routing";
 import { BinanceClient } from "../integrations/binance-client";
 import { resolveBinanceBaseUrl } from "../integrations/binance-base-url";
 
@@ -121,7 +122,7 @@ export class PortfolioService {
       errors.push(`Price feed unavailable: ${err instanceof Error ? err.message : String(err)}`);
     }
 
-    const bridges = unique([homeStableCoin, "USDT", "BTC", "ETH", "BNB"]);
+    const bridges = unique(resolveRouteBridgeAssets(config, homeStableCoin));
     const getPairPrice = (base: string, quote: string): number | undefined => {
       if (!priceBySymbol) return undefined;
       if (base === quote) return 1;

@@ -6,6 +6,7 @@ import type { UniverseCandidate, UniverseSnapshot } from "@autobot/shared";
 import { UNIVERSE_VERSION, UniverseSnapshotSchema } from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
+import { resolveRouteBridgeAssets, resolveUniverseDefaultQuoteAssets, resolveWalletQuoteHintLimit } from "../config/asset-routing";
 import { resolveBinanceBaseUrl } from "../integrations/binance-base-url";
 import { BinanceClient } from "../integrations/binance-client";
 import { BinanceTradingService } from "../integrations/binance-trading.service";
@@ -89,6 +90,7 @@ function resolveDirectOrInverseRate(params: {
 function resolveQuoteToHomeRate(params: {
   quoteAsset: string;
   homeAsset: string;
+  bridgeAssets: string[];
   tickerBySymbol: Map<string, { lastPrice: number; quoteVolume: number; priceChangePct: number }>;
 }): number | null {
   const quoteAsset = params.quoteAsset.trim().toUpperCase();
@@ -103,7 +105,7 @@ function resolveQuoteToHomeRate(params: {
   });
   if (direct) return direct;
 
-  const bridges = unique([homeAsset, "USDT", "USDC", "EUR", "BTC", "ETH", "BNB", "JPY"]);
+  const bridges = unique([homeAsset, ...params.bridgeAssets, "USDT", "USDC", "EUR", "BTC", "ETH", "BNB", "JPY"]);
   for (const bridge of bridges) {
     if (bridge === quoteAsset || bridge === homeAsset) continue;
     const quoteToBridge = resolveDirectOrInverseRate({
@@ -273,6 +275,8 @@ export class UniverseService {
   ) {}
 
   private async getWalletQuoteHints(maxItems: number): Promise<string[]> {
+    const limit = Math.max(0, Math.floor(maxItems));
+    if (limit === 0) return [];
     try {
       const balances = await this.trading.getBalances();
       const sorted = balances
@@ -286,7 +290,7 @@ export class UniverseService {
           if (b.total !== a.total) return b.total - a.total;
           return b.free - a.free;
         });
-      return unique(sorted.map((b) => b.asset)).slice(0, Math.max(1, maxItems));
+      return unique(sorted.map((b) => b.asset)).slice(0, limit);
     } catch {
       return [];
     }
@@ -362,14 +366,13 @@ export class UniverseService {
     const klineLimit = 120;
     const homeQuote = (config?.basic.homeStableCoin ?? "USDC").trim().toUpperCase();
     const traderRegion = config?.basic.traderRegion ?? "NON_EEA";
-    const defaultQuoteAssets = unique([
-      homeQuote,
-      traderRegion === "EEA" ? "EUR" : "USDT",
-      "BTC",
-      "ETH",
-      "BNB",
-      "JPY"
-    ]);
+    const routeBridgeAssets = resolveRouteBridgeAssets(config, homeQuote);
+    const defaultQuoteAssets = resolveUniverseDefaultQuoteAssets({
+      config,
+      homeStableCoin: homeQuote,
+      traderRegion
+    });
+    const walletQuoteHintLimit = resolveWalletQuoteHintLimit(config);
     let quoteAssets = [...defaultQuoteAssets];
 
     const errors: Array<{ symbol?: string; error: string }> = [];
@@ -415,7 +418,8 @@ export class UniverseService {
 
     const rawSymbols = exchangeInfo.symbols ?? [];
     const availableQuoteAssets = new Set(rawSymbols.map((s) => s.quoteAsset?.trim().toUpperCase()).filter(Boolean));
-    const walletQuoteHints = await this.getWalletQuoteHints(8);
+    const useConfiguredQuoteSet = (config?.advanced.universeQuoteAssets?.length ?? 0) > 0;
+    const walletQuoteHints = useConfiguredQuoteSet ? [] : await this.getWalletQuoteHints(walletQuoteHintLimit);
     const mergedQuoteAssets = unique([...defaultQuoteAssets, ...walletQuoteHints]);
     quoteAssets = mergedQuoteAssets.filter((asset) => availableQuoteAssets.size === 0 || availableQuoteAssets.has(asset));
     if (quoteAssets.length === 0) {
@@ -448,6 +452,7 @@ export class UniverseService {
         const quoteToHome = resolveQuoteToHomeRate({
           quoteAsset: s.quoteAsset,
           homeAsset: homeQuote,
+          bridgeAssets: routeBridgeAssets,
           tickerBySymbol
         });
         const quoteVolumeHome24h =

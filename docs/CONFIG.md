@@ -45,6 +45,9 @@ On API startup, an automatic migration normalizes existing `config.json` to the 
   - `conversionBuyBuffer`
   - `conversionSellBuffer`
   - `conversionFeeBuffer`
+  - `routingBridgeAssets` (valuation/conversion bridge route candidates)
+  - `universeQuoteAssets` (optional explicit quote-asset set; empty = auto mode)
+  - `walletQuoteHintLimit` (how many wallet assets can influence auto quote discovery)
   - `excludeStableStablePairs`
   - `enforceRegionPolicy`
   - `symbolEntryCooldownMs`
@@ -89,16 +92,10 @@ Runtime safety values are stored in `config.json` and configurable from UI Advan
   - triggers `SELL` on take-profit / stop-loss thresholds derived from Basic risk
   - respects `liveTradeRebalanceSellCooldownMs` to avoid immediate buy/sell churn
 - Binance sizing filter rejects (`-1013` / `NOTIONAL` / lot-size) are treated as recoverable sizing events and are not auto-blacklisted.
+- On live sizing rejects, bot now sets a short symbol cooldown lock (risk-scaled) to reduce immediate retry churn.
 
-Environment variables remain as fallback defaults:
+Environment variables still used in runtime:
 
 - `ALLOW_MAINNET_LIVE_TRADING` (default `false`): blocks MAINNET live orders unless explicitly enabled.
-- `LIVE_TRADE_COOLDOWN_MS`
-- `LIVE_TRADE_NOTIONAL_CAP`
-- `LIVE_TRADE_SLIPPAGE_BUFFER`
-- `LIVE_TRADE_REBALANCE_SELL_COOLDOWN_MS`
-- `CONVERSION_BUY_BUFFER`
-- `CONVERSION_SELL_BUFFER`
-- `CONVERSION_FEE_BUFFER`
 - `BINANCE_TAKER_FEE_RATE`
 - `ESTIMATED_SPREAD_BUFFER_RATE`

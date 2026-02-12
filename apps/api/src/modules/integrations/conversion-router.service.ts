@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 
 import { ConfigService } from "../config/config.service";
+import { resolveRouteBridgeAssets } from "../config/asset-routing";
 import { getPairPolicyBlockReason } from "../policy/trading-policy";
 import { BinanceMarketDataService } from "./binance-market-data.service";
 import type { BinanceMarketOrderResponse } from "./binance-trading.service";
@@ -40,6 +41,10 @@ type DirectConversionResult = {
   obtainedTarget: number;
   leg?: ConversionLeg;
 };
+
+const DEFAULT_CONVERSION_BUY_BUFFER = 1.005;
+const DEFAULT_CONVERSION_SELL_BUFFER = 1.002;
+const DEFAULT_CONVERSION_FEE_BUFFER = 1.002;
 
 @Injectable()
 export class ConversionRouterService {
@@ -82,7 +87,8 @@ export class ConversionRouterService {
       return { ok: false, obtainedTarget: 0, legs: [] };
     }
 
-    const defaultBridges = ["USDT", "USDC", "BTC", "ETH", "BNB"];
+    const homeStableCoin = this.configService.load()?.basic.homeStableCoin ?? "USDT";
+    const defaultBridges = resolveRouteBridgeAssets(this.configService.load(), homeStableCoin);
     const bridges = (params.bridgeAssets ?? defaultBridges)
       .map((v) => v.trim().toUpperCase())
       .filter((v, idx, arr) => v && arr.indexOf(v) === idx && v !== sourceAsset && v !== targetAsset);
@@ -135,23 +141,20 @@ export class ConversionRouterService {
 
   private get buyBuffer(): number {
     const fromConfig = this.configService.load()?.advanced.conversionBuyBuffer ?? null;
-    const fromEnv = Number.parseFloat(process.env.CONVERSION_BUY_BUFFER ?? process.env.LIVE_TRADE_SLIPPAGE_BUFFER ?? "1.005");
     if (fromConfig !== null && Number.isFinite(fromConfig) && fromConfig > 0) return fromConfig;
-    return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : 1.005;
+    return DEFAULT_CONVERSION_BUY_BUFFER;
   }
 
   private get sellBuffer(): number {
     const fromConfig = this.configService.load()?.advanced.conversionSellBuffer ?? null;
-    const fromEnv = Number.parseFloat(process.env.CONVERSION_SELL_BUFFER ?? "1.002");
     if (fromConfig !== null && Number.isFinite(fromConfig) && fromConfig > 0) return fromConfig;
-    return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : 1.002;
+    return DEFAULT_CONVERSION_SELL_BUFFER;
   }
 
   private get feeBuffer(): number {
     const fromConfig = this.configService.load()?.advanced.conversionFeeBuffer ?? null;
-    const fromEnv = Number.parseFloat(process.env.CONVERSION_FEE_BUFFER ?? "1.002");
     if (fromConfig !== null && Number.isFinite(fromConfig) && fromConfig > 0) return fromConfig;
-    return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : 1.002;
+    return DEFAULT_CONVERSION_FEE_BUFFER;
   }
 
   private chooseQtyWithin(candidates: Array<string | undefined>, maxQty: number): string | null {

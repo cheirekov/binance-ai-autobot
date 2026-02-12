@@ -135,6 +135,9 @@ export class ConfigService {
         autoBlacklistEnabled: true,
         autoBlacklistTtlMinutes: 180,
         followRiskProfile: true,
+        routingBridgeAssets: ["USDT", "USDC", "BTC", "ETH", "BNB"],
+        universeQuoteAssets: [],
+        walletQuoteHintLimit: 8,
         excludeStableStablePairs: true,
         enforceRegionPolicy: true,
         conversionTopUpMinTarget: 5,
@@ -208,6 +211,9 @@ export class ConfigService {
     conversionBuyBuffer?: number;
     conversionSellBuffer?: number;
     conversionFeeBuffer?: number;
+    routingBridgeAssets?: string[];
+    universeQuoteAssets?: string[];
+    walletQuoteHintLimit?: number;
     excludeStableStablePairs?: boolean;
     enforceRegionPolicy?: boolean;
     symbolEntryCooldownMs?: number;
@@ -223,6 +229,12 @@ export class ConfigService {
 
     const neverTradeSymbols = patch.neverTradeSymbols
       ? patch.neverTradeSymbols.map((s) => s.trim()).filter(Boolean)
+      : undefined;
+    const routingBridgeAssets = patch.routingBridgeAssets
+      ? Array.from(new Set(patch.routingBridgeAssets.map((s) => s.trim().toUpperCase()).filter(Boolean)))
+      : undefined;
+    const universeQuoteAssets = patch.universeQuoteAssets
+      ? Array.from(new Set(patch.universeQuoteAssets.map((s) => s.trim().toUpperCase()).filter(Boolean)))
       : undefined;
 
     const apiHost = patch.apiHost?.trim();
@@ -267,7 +279,9 @@ export class ConfigService {
       ...(binanceBaseUrlOverride ? { binanceBaseUrlOverride } : {}),
       ...(apiHost ? { apiHost } : {}),
       ...(uiHost ? { uiHost } : {}),
-      ...(neverTradeSymbols ? { neverTradeSymbols } : {})
+      ...(neverTradeSymbols ? { neverTradeSymbols } : {}),
+      ...(routingBridgeAssets !== undefined ? { routingBridgeAssets } : {}),
+      ...(universeQuoteAssets !== undefined ? { universeQuoteAssets } : {})
     };
 
     const nextAdvanced = nextAdvancedBase.followRiskProfile

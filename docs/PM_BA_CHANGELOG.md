@@ -16,6 +16,57 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-12 12:52 UTC — T-020/T-023 supporting patch (config-driven routing + adaptive universe defaults)
+- Scope: deliver a 2-4h testable slice that removes hardcoded routing behavior and exposes quote/bridge discovery controls in Advanced UI.
+- BA requirement mapping:
+  - Autobot must adapt by environment/config instead of fixed symbol assumptions.
+  - Operator should tune routing/universe behavior from UI/exported config, not hidden env defaults.
+- PM milestone mapping: M1 stabilization speed-up with explicit config controls before next overnight run.
+- Technical changes:
+  - Added advanced config fields:
+    - `routingBridgeAssets`
+    - `universeQuoteAssets`
+    - `walletQuoteHintLimit`
+  - Refactored runtime services to use config-driven routing assets:
+    - universe valuation path,
+    - conversion router bridge path,
+    - wallet valuation path (portfolio + bot).
+  - Removed fallback behavior that forced hardcoded candidate symbol (`BTC<home>`); bot now cleanly skips with explicit reason when no eligible universe candidate exists.
+  - Replaced hidden env fallbacks for trade cooldown/cap/slippage/rebalance and conversion top-up cooldown with schema-backed config defaults.
+  - Exposed all new routing/universe fields in `/config/public`, `/config/advanced`, and Advanced settings UI.
+- Risk slider impact: unchanged formulas; routing behavior is now deterministic under exported config, while risk-linked controls continue to govern execution pacing/sizing.
+- Validation evidence: Docker CI requested in this patch batch (post-edit validation step).
+- Runtime test request (2-4h):
+  - Keep `universeQuoteAssets` empty (auto mode) and observe quote-asset set evolution via dashboard universe snapshot.
+  - Confirm no `Skip BTC...` fallback noise when candidate pool is empty; expect explicit skip reason without forced symbol.
+  - Verify conversions/valuations use configured `routingBridgeAssets` by changing bridge list and comparing decisions/valuations.
+- Follow-up:
+  - Continue T-020 by moving fee/spread runtime env constants into explicit Advanced config controls.
+  - Continue T-023 with filter-chain stage diagnostics in run-stats/UI.
+
+## 2026-02-12 11:50 UTC — T-004/T-006 supporting patch (sizing anti-churn)
+- Scope: reduce reject-loop churn observed in `autobot-feedback-20260212-114132.tgz` and tighten autonomous wallet behavior under high risk.
+- BA requirement mapping:
+  - Autobot should not loop on low-value stable-like rotations that do not improve portfolio quality.
+  - Decision stream should stay readable and avoid repeated reject spam on the same symbol.
+- PM milestone mapping: M1 stabilization before broader universe/filter-chain rollout.
+- Technical changes:
+  - Added symbol-level sizing cooldown lock on live `NOTIONAL/LOT_SIZE` rejects:
+    - lock type: `COOLDOWN`, scope: `SYMBOL`,
+    - cooldown window scales by risk (120s -> 40s),
+    - reason/details are visible in protection locks for diagnostics.
+  - Added API policy tests for:
+    - stable/stable block behavior,
+    - EEA quote restriction check.
+- Risk slider impact: explicit; sizing cooldown is shorter at higher risk while still preventing reject loops.
+- Validation evidence: targeted API tests and full Docker CI run (requested in this patch batch).
+- Runtime test request:
+  - Run 2-4h on testnet.
+  - Verify repeated `Skip <symbol>: Binance sizing filter (...)` bursts are reduced and replaced by temporary protection lock behavior.
+- Follow-up:
+  - Continue T-004 with wallet dust governance visibility in UI.
+  - Continue T-006 with filter-chain stage diagnostics and regime-diverse candidate rotation.
+
 ## 2026-02-12 07:50 UTC — T-004/T-006 supporting patch (wallet policy + universe candidate mapping)
 - Scope: align bot behavior with autonomous wallet governance and universe-first strategy selection.
 - BA requirement mapping:

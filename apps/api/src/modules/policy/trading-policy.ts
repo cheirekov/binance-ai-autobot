@@ -60,4 +60,3 @@ export function getPairPolicyBlockReason(params: {
 
   return null;
 }
-
