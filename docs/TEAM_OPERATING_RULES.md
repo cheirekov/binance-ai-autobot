@@ -2,6 +2,11 @@
 
 Purpose: keep execution stable across long-running sessions and context resets.
 
+Companion docs:
+
+- `docs/PM_BA_PLAYBOOK.md` (how PM/BA prioritize and define done)
+- `docs/SESSION_BRIEF.md` (single-session handoff and execution contract)
+
 ## Team roles (mandatory)
 
 - `PM/BA`
@@ -48,15 +53,18 @@ Purpose: keep execution stable across long-running sessions and context resets.
    - stop/rollback condition
 19. If two consecutive batches show no KPI improvement, feature expansion pauses until root-cause analysis is documented.
 20. Adaptive/AI logic must ship in shadow-first mode unless PM/BA explicitly approves promotion with measurable gates.
+21. Every batch must start by updating `docs/SESSION_BRIEF.md` with active ticket, scope, DoD, KPIs, and stop condition.
+22. Ticket prioritization and DoD must follow `docs/PM_BA_PLAYBOOK.md`; ad-hoc priority decisions are not allowed.
 
 ## Delivery workflow (mandatory)
 
-1. Select the next `TODO` ticket in `docs/DELIVERY_BOARD.md`.
-2. Move it to `IN_PROGRESS` and note date/owner.
-3. Implement code + tests.
-4. Run `docker compose -f docker-compose.ci.yml run --rm ci`.
-5. Add a structured entry in `docs/PM_BA_CHANGELOG.md`.
-6. Mark ticket `DONE` (or `BLOCKED` with reason and next action).
+1. Update `docs/SESSION_BRIEF.md` (timebox, hypothesis, DoD, KPI targets, stop condition).
+2. Select the next `TODO` ticket in `docs/DELIVERY_BOARD.md` using `docs/PM_BA_PLAYBOOK.md`.
+3. Move it to `IN_PROGRESS` and note date/owner.
+4. Implement code + tests.
+5. Run `docker compose -f docker-compose.ci.yml run --rm ci`.
+6. Add a structured entry in `docs/PM_BA_CHANGELOG.md`.
+7. Mark ticket `DONE` (or `BLOCKED` with reason and next action).
 
 ## Batch cadence (mandatory)
 
@@ -89,3 +97,4 @@ A ticket is done only if all are true:
 - Ticket status updated in `docs/DELIVERY_BOARD.md`.
 - Changelog entry exists in `docs/PM_BA_CHANGELOG.md`.
 - Runtime validation plan is stated (or completed with bundle id).
+- `docs/SESSION_BRIEF.md` end-of-batch section is completed with decision (`continue`/`rollback`/`pivot`).

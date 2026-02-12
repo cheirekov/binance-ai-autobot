@@ -16,6 +16,55 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-12 17:45 UTC — Session brief prefill for active night run (T-027)
+- Scope: pre-populate the mandatory batch contract so overnight validation has explicit acceptance criteria and morning handoff fields.
+- BA requirement mapping:
+  - User requested practical PM/BA help for prioritization and DoD usage.
+  - Reduce ambiguity during long running sessions.
+- PM milestone mapping: improve execution discipline for ongoing T-027 night validation.
+- Technical changes:
+  - Filled `docs/SESSION_BRIEF.md` with:
+    - active ticket and night scope,
+    - concrete DoD for API/UI/runtime evidence,
+    - KPI targets and rollback conditions,
+    - deploy/operator checklist and next-session prompt.
+- Risk slider impact: none (process/handoff update only).
+- Validation evidence: document consistency check completed (session brief aligned with board active ticket `T-027`).
+- Runtime test request:
+  - complete end-of-batch section in `docs/SESSION_BRIEF.md` after bundle collection,
+  - use result to choose next single ticket (`T-007` or remaining `T-027` slice).
+- Follow-up:
+  - keep this file updated at start/end of every future day/night batch.
+
+## 2026-02-12 17:39 UTC — Process hardening v3 (PM/BA playbook + session brief)
+- Scope: convert process guidance into concrete templates so prioritization and DoD are repeatable without prompt iteration.
+- BA requirement mapping:
+  - User requested PM/BA support for priority decisions and hard Definition of Done.
+  - Reduce looping/context-loss by enforcing structured start/end handoff per batch.
+- PM milestone mapping: delivery-governance stabilization before next runtime patch cycle.
+- Technical changes:
+  - Added `docs/PM_BA_PLAYBOOK.md` with:
+    - hard priority scoring model,
+    - day/night batch selection rubric,
+    - strict DoD template,
+    - mandatory KPI set.
+  - Added `docs/SESSION_BRIEF.md` template:
+    - batch contract,
+    - DoD section,
+    - deploy handoff checklist,
+    - end-of-batch decision + next-session prompt block.
+  - Updated `docs/TEAM_OPERATING_RULES.md`:
+    - made session brief + playbook mandatory in workflow,
+    - expanded DoD completion rule to include session brief closure.
+  - Updated `docs/DELIVERY_BOARD.md` with explicit PM/BA execution-control references.
+- Risk slider impact: none (process/documentation update only).
+- Validation evidence: document consistency check completed (`DELIVERY_BOARD`, `TEAM_OPERATING_RULES`, `PM_BA_CHANGELOG`, `PM_BA_PLAYBOOK`, `SESSION_BRIEF` aligned).
+- Runtime test request:
+  - Use new `SESSION_BRIEF` for next patch batch start/end.
+  - Keep single active ticket lane and measure KPI deltas using playbook template.
+- Follow-up:
+  - For next code patch, require ticket DoD block to be copied from `PM_BA_PLAYBOOK.md` and filled before coding.
+
 ## 2026-02-12 17:16 UTC — T-027 spot grid execution v1 (night direct patch)
 - Scope: deliver a direct night-build patch to move execution from market-only behavior to real Spot LIMIT/grid lifecycle.
 - BA requirement mapping:

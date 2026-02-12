@@ -7,6 +7,12 @@ Owner: Codex + User
 
 M1: Stabilize Spot testnet automation with risk-linked execution behavior and clear telemetry.
 
+## PM/BA execution control
+
+- Prioritization and DoD rules are defined in `docs/PM_BA_PLAYBOOK.md`.
+- Every batch must start/end with `docs/SESSION_BRIEF.md`.
+- Only one ticket may stay `IN_PROGRESS` at any time.
+
 ## Status legend
 
 - `TODO`: not started

@@ -1,0 +1,93 @@
+# Session Brief
+
+Last updated: 2026-02-12 17:45 UTC
+Owner: PM/BA + Codex
+
+Use this file at the start and end of every batch.
+
+## 1) Batch contract (fill before coding)
+
+- Batch type: `NIGHT (8-12h)`
+- Active ticket: `T-027` (Spot limit/grid execution v1)
+- Goal (single sentence): validate that `SPOT_GRID` runs with real LIMIT open-order lifecycle instead of market-only behavior.
+- In scope:
+  - runtime validation of exchange open-order sync,
+  - LIMIT ladder placement behavior in live testnet,
+  - grid-related KPI evidence from logs/state.
+- Out of scope:
+  - adaptive policy promotion from shadow to execution,
+  - new wallet-policy features (`T-004`),
+  - PnL reconciliation refactor (`T-007`).
+- Hypothesis: with `SPOT_GRID`, the bot should maintain real exchange LIMIT orders and reduce market-only execution dependence.
+- Target KPI delta:
+  - open LIMIT orders visible in runtime (`activeOrders > 0` during grid windows),
+  - order history includes LIMIT entries with grid reasons,
+  - sizing-reject bursts do not dominate decision stream.
+- Stop/rollback condition:
+  - repeated exchange filter errors prevent ladder placement for most cycles, or
+  - no observable open LIMIT lifecycle after sufficient runtime.
+
+## 2) Definition of Done (must be concrete)
+
+- API behavior:
+  - `GET /orders/active` returns synced exchange open orders when `SPOT_GRID` is active,
+  - `GET /orders/history` includes LIMIT entries from grid path.
+- UI behavior:
+  - Dashboard `Orders (active)` is non-empty during grid operation,
+  - order history shows LIMIT events and no market-only flood pattern when grid is enabled.
+- Runtime evidence in decisions/logs:
+  - decisions include `grid-ladder-buy` / `grid-ladder-sell` reasons,
+  - support bundle includes state summary showing active order lifecycle.
+- Risk slider impact (`none` or explicit low/mid/high behavior):
+  - low risk: fewer simultaneous grid orders and wider spacing,
+  - high risk: denser grid and faster ladder refresh,
+  - current run expectation: high-risk profile should show more active ladder orders.
+- Validation commands:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - additional targeted command(s):
+    - `./scripts/collect-feedback.sh`
+    - `docker logs --tail 500 binance-ai-autobot_api_1`
+- Runtime validation plan:
+  - run duration: `8-12h`
+  - expected bundle name pattern: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
+
+## 3) Deployment handoff
+
+- Commit hash: `<set-after-commit>`
+- Deploy target: remote Binance Spot testnet runtime
+- Required config changes:
+  - `tradeMode=SPOT_GRID`
+  - `liveTrading=true`
+  - testnet endpoint and keys configured
+- Operator checklist:
+  - reset state needed? (`no` for this active night run unless explicitly testing cold start)
+  - keep config.json? (`yes`)
+  - start command: `docker compose up -d --build --force-recreate`
+
+## 4) End-of-batch result (fill after run)
+
+- Observed KPI delta:
+  - open LIMIT lifecycle observed: `<yes/no + notes>`
+  - market-only share reduced: `<yes/no + notes>`
+  - sizing reject pressure: `<low/medium/high + notes>`
+- Decision: `continue` / `rollback` / `pivot`
+- Next ticket candidate: `T-007` (if lifecycle works) or next `T-027` slice (if lifecycle gaps remain)
+- Open risks:
+- Notes for next session:
+
+## 5) Copy/paste prompt for next session
+
+```text
+Ticket: T-027
+Batch: NIGHT (8-12h)
+Goal: Validate SPOT_GRID LIMIT lifecycle and summarize gaps.
+In scope: bot engine grid path, active/history order sync, runtime KPI evidence.
+Out of scope: adaptive policy promotion, wallet policy expansion, PnL refactor.
+DoD:
+- API: `GET /orders/active` and `GET /orders/history` reflect real LIMIT lifecycle.
+- UI: active orders visible during grid operation; no market-only-only pattern.
+- Runtime log evidence: decisions include grid ladder reasons and exchange sync events.
+- Risk slider mapping: high risk -> denser grid than low risk.
+- CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci` and `./scripts/collect-feedback.sh`.
+After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
+```
