@@ -16,6 +16,73 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-13 13:10 UTC — T-027 Dashboard snapshot endpoint (faster UI refresh, fewer pollers)
+- Scope: reduce dashboard slowness and API polling fan-out by returning a single aggregated snapshot payload (similar to `binance-ai-bot-1`’s `GET /strategy` pattern), without changing trading logic.
+- BA requirement mapping:
+  - User reported the dashboard is slower and “refresh” feels heavy (multiple endpoints and timers).
+  - User asked for clearer, faster evidence during 2–4h/night runs with fewer moving parts.
+- PM milestone mapping: keep `T-027` validation stable and reduce noise in runtime evidence; improve operator experience on remote deployments.
+- Technical changes:
+  - API:
+    - Added `GET /dashboard/snapshot` returning: public config view, integrations status, wallet snapshot, universe snapshot, bot state, and run-stats (`apps/api/src/modules/dashboard/dashboard.controller.ts`).
+    - Added `DashboardModule` and wired it into `AppModule` (`apps/api/src/modules/dashboard/dashboard.module.ts`, `apps/api/src/modules/app.module.ts`).
+    - Exported required services for injection (no behavioral change): `BotEngineService`, `PortfolioService`, `BinanceStatusService`.
+  - UI:
+    - Added `useDashboardSnapshot()` and updated `DashboardPage` to use it (single poll loop) instead of 6+ separate hooks/timers (`apps/ui/src/hooks/useDashboardSnapshot.ts`, `apps/ui/src/pages/DashboardPage.tsx`).
+- Risk slider impact: none (UI/API aggregation only).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (10–20 min):
+  - Open dashboard and confirm: pills update, wallet/universe blocks render, decisions/details render, and start/stop still works.
+  - In browser devtools, confirm dashboard no longer spams many concurrent `/api/*` requests; it should mostly poll `/api/dashboard/snapshot`.
+- Follow-up:
+  - If dashboard still feels slow on high-latency links, add server-side snapshot caching (short TTL) and/or reduce poll interval on `risk=0` profiles.
+
+## 2026-02-13 12:57 UTC — Reference extraction: `binance-ai-bot-1` (UI snapshot + wallet sweep patterns)
+- Scope: analyze internal v1 reference bot (`references/binance-ai-bot-1`) to extract patterns that reduce UI/API load and accelerate delivery of wallet automation, without adopting the old architecture.
+- BA requirement mapping:
+  - User reported the current dashboard feels slower (multiple endpoints/pollers) compared to earlier prototypes.
+  - User requested wallet policy to handle “unused coins/dust” and return non-preferred assets back to HOME automatically (or at least via a safe operator action first).
+  - User requested AI to be additive and gated (no engine vs AI fighting).
+- PM milestone mapping:
+  - Feed concrete design into `T-027` (dashboard snapshot for faster refresh and clearer evidence).
+  - Feed concrete wallet policy design into `T-004` (sweep/panic controls and later automation).
+  - Provide guardrails for future AI/news tracks (`T-025`, later news tickets).
+- Technical changes:
+  - Updated `docs/REFERENCES_ANALYSIS.md`:
+    - Added internal references (`binance-ai-bot-1`, `binance-ai-bot-24`) to the table.
+    - Added a new section summarizing v1 patterns: snapshot endpoint, sweep-unused policy, grid breakout action, AI policy gating, RSS ingestion constraints.
+    - Replaced stale `references/freqtrade-stable/*` paths with `references/freqtrade-develop/*` (folder is not present locally).
+- Risk slider impact: none (docs-only extraction). Recommended mapping for implementation:
+  - higher risk: allow more frequent snapshot refresh and more aggressive sweep thresholds; lower risk: slower refresh and more conservative sweep automation.
+- Validation evidence: not applicable (docs-only).
+- Runtime test request: not applicable.
+- Follow-up:
+  - Consider adding `GET /dashboard/snapshot` to reduce UI polling fan-out (reference: v1 `GET /strategy`).
+  - Implement `T-004` slice: `POST /portfolio/sweep-unused` as dry-run first, then gated live mode with risk-linked thresholds.
+
+## 2026-02-13 12:37 UTC — Reference extraction: `binance-ai-bot-24` (strategy/risk patterns)
+- Scope: analyze internal reference bot (`references/binance-ai-bot-24`) and extract concrete patterns we should port (without dragging old architecture into the current monorepo).
+- BA requirement mapping:
+  - User requested “autobot” behavior: adaptive risk handling, grid behavior that does not accumulate bags in bearish/trending markets, and explainable PnL.
+  - User requested reduced hardcoding: exchange/environment differences should be handled via config/policy, not per-coin code edits.
+- PM milestone mapping: inform the next `T-027` and post-`T-027` roadmap choices with proven patterns (reduce churn and long-run drift).
+- Technical changes:
+  - Added a new “patterns worth porting” section to `docs/REFERENCES_ANALYSIS.md` referencing:
+    - Risk Governor hysteresis + fee burn telemetry,
+    - Grid Guard BUY-pause (SELLs remain active) with hysteresis,
+    - conversion blocking under risk HALT/caps,
+    - explainable PnL reconciliation,
+    - universe quote-asset discovery + allow/deny policy,
+    - UI safety UX patterns (LIVE/HALT banners).
+- Risk slider impact: none (docs-only extraction). Recommended mapping for implementation:
+  - higher risk: shorter resume/hold windows, tighter guard thresholds; lower risk: wider/safer.
+- Validation evidence: not applicable (docs-only).
+- Runtime test request: not applicable.
+- Follow-up (recommended next patch scope):
+  - Implement Grid Guard BUY-pause inside `T-027` SPOT_GRID path (pause/cancel bot-owned BUY LIMITs on trend/vol regimes; keep SELLs).
+  - Add fee-burn telemetry and daily/rolling equity baselines to improve global protections (`T-005`/`T-003`).
+
 ## 2026-02-13 12:13 UTC — Region policy defaults (EEA blocked quotes aligned to Binance MiCA list)
 - Scope: tighten region-policy defaults so EEA quote filtering matches Binance’s published impacted-asset list, avoiding over-blocking and testnet confusion.
 - BA requirement mapping:

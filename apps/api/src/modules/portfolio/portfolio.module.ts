@@ -7,7 +7,7 @@ import { PortfolioService } from "./portfolio.service";
 @Module({
   imports: [ConfigModule],
   controllers: [PortfolioController],
-  providers: [PortfolioService]
+  providers: [PortfolioService],
+  exports: [PortfolioService]
 })
 export class PortfolioModule {}
-

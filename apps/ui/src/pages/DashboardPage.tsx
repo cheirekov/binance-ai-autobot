@@ -1,32 +1,8 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { apiGet, apiPost } from "../api/http";
-import { useApiHealth } from "../hooks/useApiHealth";
-import { useIntegrationsStatus } from "../hooks/useIntegrationsStatus";
-import { usePortfolioWallet } from "../hooks/usePortfolioWallet";
-import { usePublicConfig } from "../hooks/usePublicConfig";
-import { useRunStats } from "../hooks/useRunStats";
-import { useUniverseSnapshot } from "../hooks/useUniverseSnapshot";
-
-type BotState = {
-  running: boolean;
-  phase: "STOPPED" | "EXAMINING" | "TRADING";
-  updatedAt: string;
-  decisions: Array<{ id: string; ts: string; kind: string; summary: string; details?: Record<string, unknown> }>;
-  activeOrders: Array<{ id: string; ts: string; symbol: string; side: string; type: string; status: string; qty: number; price?: number }>;
-  orderHistory: Array<{ id: string; ts: string; symbol: string; side: string; type: string; status: string; qty: number; price?: number }>;
-  symbolBlacklist?: Array<{ symbol: string; reason: string; createdAt: string; expiresAt: string }>;
-  protectionLocks?: Array<{
-    id: string;
-    type: "COOLDOWN" | "STOPLOSS_GUARD" | "MAX_DRAWDOWN" | "LOW_PROFIT";
-    scope: "GLOBAL" | "SYMBOL";
-    symbol?: string;
-    reason: string;
-    createdAt: string;
-    expiresAt: string;
-  }>;
-};
+import { apiPost } from "../api/http";
+import { useDashboardSnapshot } from "../hooks/useDashboardSnapshot";
 
 type PillTone = "neutral" | "ok" | "bad" | "warn";
 
@@ -38,19 +14,39 @@ function pillClass(tone: PillTone): string {
 }
 
 export function DashboardPage(): JSX.Element {
-  const [state, setState] = useState<BotState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [universeBusy, setUniverseBusy] = useState(false);
   const [universeMsg, setUniverseMsg] = useState<string | null>(null);
   const [expandedDecisionId, setExpandedDecisionId] = useState<string | null>(null);
 
-  const apiHealth = useApiHealth();
-  const publicConfig = usePublicConfig();
-  const integrations = useIntegrationsStatus();
-  const wallet = usePortfolioWallet();
-  const universe = useUniverseSnapshot();
-  const runStats = useRunStats();
+  const dashboard = useDashboardSnapshot();
+  const state = dashboard.snapshot?.bot ?? null;
+
+  const apiHealth = useMemo(() => {
+    const ok = Boolean(dashboard.snapshot && !dashboard.error);
+    return { loading: dashboard.loading, ok, error: dashboard.error };
+  }, [dashboard.error, dashboard.loading, dashboard.snapshot]);
+
+  const publicConfig = useMemo(() => {
+    return { loading: dashboard.loading, config: dashboard.snapshot?.config ?? null, error: dashboard.error };
+  }, [dashboard.error, dashboard.loading, dashboard.snapshot]);
+
+  const integrations = useMemo(() => {
+    return { loading: dashboard.loading, status: dashboard.snapshot?.integrations ?? null, error: dashboard.error };
+  }, [dashboard.error, dashboard.loading, dashboard.snapshot]);
+
+  const wallet = useMemo(() => {
+    return { loading: dashboard.loading, wallet: dashboard.snapshot?.wallet ?? null, error: dashboard.error };
+  }, [dashboard.error, dashboard.loading, dashboard.snapshot]);
+
+  const universe = useMemo(() => {
+    return { loading: dashboard.loading, snapshot: dashboard.snapshot?.universe, error: dashboard.error };
+  }, [dashboard.error, dashboard.loading, dashboard.snapshot]);
+
+  const runStats = useMemo(() => {
+    return { loading: dashboard.loading, stats: dashboard.snapshot?.runStats ?? null, error: dashboard.error };
+  }, [dashboard.error, dashboard.loading, dashboard.snapshot]);
 
   const phasePill = useMemo(() => {
     if (!state) return "…";
@@ -96,27 +92,11 @@ export function DashboardPage(): JSX.Element {
     return liveTrading ? { label: "Live: On", tone: "ok" as const } : { label: "Live: Off", tone: "bad" as const };
   }, [publicConfig.config?.basic?.liveTrading]);
 
-  async function refresh(): Promise<void> {
-    setError(null);
-    try {
-      const next = await apiGet<BotState>("/bot/status");
-      setState(next);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  useEffect(() => {
-    refresh();
-    const t = setInterval(refresh, 2500);
-    return () => clearInterval(t);
-  }, []);
-
   async function startStop(next: "start" | "stop"): Promise<void> {
     setBusy(true);
     try {
       await apiPost(`/bot/${next}`, {});
-      await refresh();
+      await dashboard.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

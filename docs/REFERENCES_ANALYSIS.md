@@ -8,7 +8,8 @@ This repo now contains several third‑party codebases under `references/` for *
 
 | Folder | What it is | Language | License (as found locally) | Can we copy code into this repo? |
 |---|---|---:|---|---|
-| `references/freqtrade-stable` | Freqtrade trading bot framework | Python | **GPLv3** (`LICENSE`) | **No** (unless this repo becomes GPLv3‑compatible) |
+| `references/binance-ai-bot-1` | Internal reference bot (v1) | TS/React | **No license file found locally** (treat as internal) | Yes (internal), but prefer porting patterns not files |
+| `references/binance-ai-bot-24` | Internal reference bot (v24) | TS/React | **No license file found locally** (treat as internal) | Yes (internal), but prefer porting patterns not files |
 | `references/freqtrade-develop` | Freqtrade trading bot framework (develop branch) | Python | **GPLv3** (`LICENSE`) | **No** (unless this repo becomes GPLv3‑compatible) |
 | `references/jesse-master` | Jesse algo trading framework | Python | **MIT** (`LICENSE`) | Yes (with attribution) |
 | `references/ccxt-master` | CCXT multi‑exchange trading API | JS/TS/Python/etc | **MIT** (`LICENSE.txt`) | Prefer using the published `ccxt` package; copying is allowed with attribution |
@@ -68,7 +69,7 @@ Why this matters:
 Notable approach (Freqtrade):
 
 - Calculates min/max stake using CCXT market `limits` (cost + amount) and additional safety reserves.
-  - `references/freqtrade-stable/freqtrade/exchange/exchange.py` (`get_min_pair_stake_amount`, `_get_stake_amount_limit`)
+  - `references/freqtrade-develop/freqtrade/exchange/exchange.py` (`get_min_pair_stake_amount`, `_get_stake_amount_limit`)
 
 Implication for our repo:
 
@@ -101,6 +102,104 @@ Reality check:
   - measure drawdown/PnL in paper mode,
   - then iterate.
 
+### 5) `binance-ai-bot-24` (internal reference) patterns worth porting
+
+This folder appears to be an earlier JS/TS bot implementation (no license file found locally). Treat it as **internal reference** unless/until we add an explicit license/permission note.
+
+Key patterns (good fit for our current goals):
+
+- **Risk Governor (account-level) with hysteresis**
+  - State machine `NORMAL → CAUTION → HALT` based on:
+    - equity drawdown (daily baseline + rolling peak baseline),
+    - fee burn % (rolling window),
+    - data/liquidity failures.
+  - Trend is explicitly not a global halt trigger: trend is handled per-symbol (grid guard).
+  - Reference: `references/binance-ai-bot-24/backend/src/services/riskGovernor.ts`
+  - Mapping to our repo:
+    - aligns with `T-005` (daily risk guardrails) + `T-003/T-024` (protection locks), but adds hysteresis and fee burn.
+
+- **Grid Guard (per-grid) that pauses BUYs only**
+  - Detects trend / falling-knife / volatility spike regimes and:
+    - cancels/pauses new grid BUYs,
+    - keeps SELLs active to unwind inventory,
+    - resumes with hysteresis (min minutes + required “ok” ticks).
+  - Reference: `references/binance-ai-bot-24/backend/src/services/gridTrader.ts`
+  - Mapping to our repo:
+    - fits directly into `T-027` (Spot grid execution): add BUY-pause logic before placing grid BUY orders, and optionally cancel bot-owned BUY LIMITs when guard triggers.
+
+- **Wallet sweep + conversion blocks tied to risk locks**
+  - Conversion router blocks conversions during emergency stop / governor HALT / daily loss cap breach.
+  - Optional limit-with-TTL conversion (place LIMIT, poll until TTL, cancel, then fallback) to reduce slippage when liquidity allows.
+  - Reference: `references/binance-ai-bot-24/backend/src/services/conversionRouter.ts`
+  - Mapping to our repo:
+    - aligns with `T-004` (wallet policy) and complements our conversion router anti-churn work; limit-with-TTL is a later optimization.
+
+- **Explainable PnL reconciliation**
+  - Separate “grid PnL” vs total account equity change; include fees, conversions, residual notes.
+  - Reference: `references/binance-ai-bot-24/backend/src/services/pnlReconcile.ts`
+  - Mapping to our repo:
+    - aligns with `T-007` (PnL correctness + reporting).
+
+- **Universe policy and quote-asset discovery**
+  - Conceptual model:
+    - `TRADE_UNIVERSE` allow-list (optional),
+    - deny-list always enforced,
+    - `QUOTE_ASSETS=AUTO` style resolved quote assets + excluded quote assets.
+  - Reference: `references/binance-ai-bot-24/backend/src/services/symbolPolicy.ts`
+  - Mapping to our repo:
+    - aligns with `T-023/T-006` (universe filter-chain architecture + breadth), and supports the “no hardcoded coins” goal by pushing this into config.
+
+- **UI safety UX**
+  - Clear “LIVE TRADING ENABLED” banner, halt banner, and capability chips with tooltips.
+  - Reference: `references/binance-ai-bot-24/frontend/src/components/layout/TopBar.tsx`
+  - Mapping to our repo:
+    - aligns with our existing status pills; can be upgraded without adding trader complexity.
+
+Net take: the most immediately valuable, small-scope port into our current NestJS bot is Grid Guard BUY-pause (because it directly reduces bearish inventory accumulation without user tuning), followed by Risk Governor hysteresis (fee burn + daily/rolling baselines) and PnL reconciliation.
+
+### 6) `binance-ai-bot-1` (internal reference) patterns worth porting
+
+This v1 implementation is smaller, but it contains a few high-leverage patterns we can reuse directly in our monorepo without taking on a full architecture rewrite.
+
+- **Fast UI via a single “snapshot” endpoint**
+  - The frontend polls one API endpoint that returns a complete dashboard state (balances, candidates, risk flags, grid state, orders).
+  - Reference: `references/binance-ai-bot-1/frontend/src/api.ts`, `references/binance-ai-bot-1/frontend/src/App.tsx` (`fetchStrategy()`)
+  - Mapping to our repo:
+    - add `GET /dashboard/snapshot` (or similar) so the UI can fetch one payload instead of 6+ endpoints with multiple timers.
+
+- **Wallet sweep unused to home (with protected assets)**
+  - Implements a “sweep unused to HOME” operation that:
+    - protects HOME + configured quotes + current position/grid assets,
+    - sells remaining free balances to HOME when a direct market exists and filters allow it,
+    - skips dust safely (stepSize/minQty/minNotional).
+  - Reference: `references/binance-ai-bot-1/backend/src/services/sweepUnused.ts`
+  - Mapping to our repo:
+    - `T-004` (wallet policy v1): start with a dry-run endpoint + UI button; later enable scheduled automation.
+
+- **Grid breakout handling**
+  - Cancels grid orders when price exits range, optionally liquidates grid inventory back to HOME, and persists “breakout” counters.
+  - Reference: `references/binance-ai-bot-1/backend/src/services/gridTrader.ts` (`gridBreakoutAction`)
+  - Mapping to our repo:
+    - complements `T-027` Grid Guard: when range is invalidated, stop placing new BUYs and consider unwind policies.
+
+- **OCO-based exit management (spot positions)**
+  - Tracks an OCO order list per open position, reconciles it on restart, and re-arms exits when OCO is missing while balance still exists.
+  - Reference: `references/binance-ai-bot-1/backend/src/services/autoTrader.ts` (OCO reconcile + placement)
+  - Mapping to our repo:
+    - informs `T-003/T-007`: make “hold bags forever” less likely by ensuring exits exist and remain consistent across restarts.
+
+- **AI policy as “advisory/gated-live” with rate limits and tuning clamps**
+  - The AI can propose actions and bounded parameter changes; the engine enforces constraints and limits tuning drift per day.
+  - Reference: `references/binance-ai-bot-1/backend/src/services/aiPolicy.ts`, `references/binance-ai-bot-1/backend/src/services/aiTuning.ts`
+  - Mapping to our repo:
+    - informs `T-025` (adaptive confidence shadow) and later AI promotion rules: shadow-first, gated-live later.
+
+- **RSS/Atom ingestion constraints**
+  - Explicitly notes that many “feeds” are HTML pages or block server-side fetches; requires real XML feeds.
+  - Reference: `references/binance-ai-bot-1/backend/src/services/newsService.ts`
+  - Mapping to our repo:
+    - informs later news integration: strict feed validation, caching, and per-feed failure isolation.
+
 ## Recommendation: how to proceed (POC options)
 
 ### What to learn specifically from FreqAI (patterns only; Freqtrade is GPL)
@@ -122,12 +221,12 @@ FreqAI’s docs explain an architecture we can borrow conceptually:
 Relevant files for study:
 
 - Overview and constraints:
-  - `references/freqtrade-stable/docs/freqai.md`
-  - `references/freqtrade-stable/docs/freqai-running.md`
-  - `references/freqtrade-stable/docs/freqai-configuration.md`
+  - `references/freqtrade-develop/docs/freqai.md`
+  - `references/freqtrade-develop/docs/freqai-running.md`
+  - `references/freqtrade-develop/docs/freqai-configuration.md`
 - Core interfaces/pipeline:
-  - `references/freqtrade-stable/freqtrade/freqai/freqai_interface.py`
-  - `references/freqtrade-stable/freqtrade/freqai/data_kitchen.py`
+  - `references/freqtrade-develop/freqtrade/freqai/freqai_interface.py`
+  - `references/freqtrade-develop/freqtrade/freqai/data_kitchen.py`
 
 ### Option A (recommended): Keep NestJS core, add an adapter layer + CCXT (Node)
 
@@ -187,7 +286,7 @@ This project now follows an explicit “reference -> requirement -> implementati
 Current applied mappings:
 
 - **Market filter enforcement (minQty/minNotional/stepSize)**
-  - Reference pattern: Freqtrade market-limit handling (`references/freqtrade-stable/freqtrade/exchange/exchange.py`)
+  - Reference pattern: Freqtrade market-limit handling (`references/freqtrade-develop/freqtrade/exchange/exchange.py`)
   - Requirement: no invalid small orders / clear skip reasons
   - Implemented: `apps/api/src/modules/integrations/binance-market-data.service.ts`
 

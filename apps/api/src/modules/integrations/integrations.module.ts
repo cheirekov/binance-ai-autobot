@@ -11,6 +11,6 @@ import { IntegrationsController } from "./integrations.controller";
   imports: [ConfigModule],
   controllers: [IntegrationsController],
   providers: [BinanceStatusService, BinanceMarketDataService, BinanceTradingService, ConversionRouterService],
-  exports: [BinanceMarketDataService, BinanceTradingService, ConversionRouterService]
+  exports: [BinanceStatusService, BinanceMarketDataService, BinanceTradingService, ConversionRouterService]
 })
 export class IntegrationsModule {}

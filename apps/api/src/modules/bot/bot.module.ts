@@ -17,6 +17,7 @@ import { BotEngineService } from "./bot-engine.service";
       provide: APP_GUARD,
       useClass: ApiKeyGuard
     }
-  ]
+  ],
+  exports: [BotEngineService]
 })
 export class BotModule {}
