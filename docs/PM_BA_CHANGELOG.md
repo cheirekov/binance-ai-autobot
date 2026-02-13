@@ -36,6 +36,32 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
   - If we later need “global open orders” discovery, implement it as an explicit low-frequency job (not per-tick) and accept stricter limits intentionally.
 
+## 2026-02-13 09:57 UTC — T-027 grid hardening (LIMIT ladder sizing at LIMIT price)
+- Scope: make `SPOT_GRID` LIMIT ladder placements pass Binance filters more reliably (tick size + minNotional evaluated at the LIMIT price), so open orders actually stay open.
+- BA requirement mapping:
+  - User expects to see real open LIMIT orders (grid ladder) in Binance UI and our dashboard when `tradeMode=SPOT_GRID`.
+  - User reported repeated `Filter failure: NOTIONAL` and lack of active orders.
+- PM milestone mapping: finish the next `T-027` slice to support a meaningful 2–4h live test where active orders are visible.
+- Technical changes:
+  - Market data rules (`apps/api/src/modules/integrations/binance-market-data.service.ts`):
+    - parse `PRICE_FILTER` and expose `priceFilter` in `BinanceSymbolRules`,
+    - add `normalizeLimitPrice(symbol, desiredPrice, side)` (BUY floors to tick, SELL ceils to tick),
+    - add `validateLimitOrderQty(symbol, desiredQty, limitPrice)` (LOT_SIZE + minNotional check at LIMIT price).
+  - Bot grid ladder (`apps/api/src/modules/bot/bot-engine.service.ts`):
+    - normalize buy/sell ladder prices to tick size,
+    - size/validate BUY ladder by affordability then enforce minNotional at LIMIT price,
+    - validate SELL ladder using LOT_SIZE + minNotional at LIMIT price,
+    - emit explicit SKIP decisions when ladder sizing is rejected (instead of silent retries).
+- Risk slider impact:
+  - Existing risk scaling remains (grid density/spacing). This change improves feasibility for all risk levels by applying correct filter math at the ladder price.
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request:
+  - Run 30–60 minutes in Spot testnet with `tradeMode=SPOT_GRID` and `risk=100`.
+  - Confirm `Orders (active)` becomes non-empty and no repeated `Filter failure: NOTIONAL` loops for the same symbol.
+- Follow-up:
+  - If LIMIT orders still cancel quickly, capture bundle and check `TRADE` details `validation.*` fields for tick/minNotional drift.
+
 ## 2026-02-12 19:45 UTC — T-027 P0 hotfix (CCXT open-orders sync warning loop)
 - Scope: fix immediate no-trade loop where bot entered transient backoff repeatedly during pre-trade order sync.
 - BA requirement mapping:

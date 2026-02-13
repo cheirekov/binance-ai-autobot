@@ -3052,30 +3052,101 @@ export class BotEngineService implements OnModuleInit {
             let placedGridOrder = false;
 
             if (!hasBuyLimit && Number.isFinite(buyLimitPrice) && buyLimitPrice > 0) {
-              const buyNotionalEstimate = qty * buyLimitPrice * bufferFactor;
-              if (Number.isFinite(buyNotionalEstimate) && buyNotionalEstimate <= quoteFree + 1e-8) {
-                const buyOrder = await this.trading.placeSpotLimitOrder({
-                  symbol: candidateSymbol,
-                  side: "BUY",
-                  quantity: qtyStr,
-                  price: buyLimitPrice.toFixed(8),
-                  timeInForce: "GTC"
-                });
-                persistLiveTrade({
-                  symbol: candidateSymbol,
-                  side: "BUY",
-                  requestedQty: qtyStr,
-                  fallbackQty: qty,
-                  response: buyOrder,
-                  reason: "grid-ladder-buy",
-                  details: {
-                    mode: "grid-ladder",
-                    gridSide: "BUY",
-                    anchorPrice: Number(price.toFixed(8)),
-                    gridSpacingPct: Number(gridSpacingPct.toFixed(6))
-                  }
-                });
-                placedGridOrder = true;
+              const buyPriceNorm = await this.marketData.normalizeLimitPrice(candidateSymbol, buyLimitPrice, "BUY");
+              if (!buyPriceNorm.ok) {
+                const summary = `Skip ${candidateSymbol}: Grid buy price invalid (${buyPriceNorm.reason})`;
+                const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+                const next = {
+                  ...current,
+                  activeOrders: filled.activeOrders,
+                  orderHistory: filled.orderHistory,
+                  decisions: alreadyLogged
+                    ? current.decisions
+                    : [
+                        {
+                          id: crypto.randomUUID(),
+                          ts: new Date().toISOString(),
+                          kind: "SKIP",
+                          summary,
+                          details: { ...buyPriceNorm, desiredPrice: buyLimitPrice }
+                        },
+                        ...current.decisions
+                      ].slice(0, 200),
+                  lastError: undefined
+                } satisfies BotState;
+                this.save(next);
+                return;
+              }
+
+              const buyPrice = Number.parseFloat(buyPriceNorm.normalizedPrice);
+              const maxAffordableQty = buyPrice > 0 ? quoteFree / (buyPrice * bufferFactor) : 0;
+              const buyQtyTarget = Math.min(qty, maxAffordableQty);
+              const buyCheck = await this.marketData.validateLimitOrderQty(candidateSymbol, buyQtyTarget, buyPriceNorm.normalizedPrice);
+              const buyQtyStr = buyCheck.ok ? buyCheck.normalizedQty : buyCheck.requiredQty;
+              const buyQty = buyQtyStr ? Number.parseFloat(buyQtyStr) : Number.NaN;
+
+              if (buyQtyStr && Number.isFinite(buyQty) && buyQty > 0) {
+                const buyNotionalEstimate = buyQty * buyPrice * bufferFactor;
+                if (Number.isFinite(buyNotionalEstimate) && buyNotionalEstimate <= quoteFree + 1e-8) {
+                  const buyOrder = await this.trading.placeSpotLimitOrder({
+                    symbol: candidateSymbol,
+                    side: "BUY",
+                    quantity: buyQtyStr,
+                    price: buyPriceNorm.normalizedPrice,
+                    timeInForce: "GTC"
+                  });
+                  persistLiveTrade({
+                    symbol: candidateSymbol,
+                    side: "BUY",
+                    requestedQty: buyQtyStr,
+                    fallbackQty: buyQty,
+                    response: buyOrder,
+                    reason: "grid-ladder-buy",
+                    details: {
+                      mode: "grid-ladder",
+                      gridSide: "BUY",
+                      anchorPrice: Number(price.toFixed(8)),
+                      gridSpacingPct: Number(gridSpacingPct.toFixed(6)),
+                      limitPrice: buyPriceNorm.normalizedPrice,
+                      validation: {
+                        ok: buyCheck.ok,
+                        normalizedQty: buyCheck.normalizedQty,
+                        requiredQty: buyCheck.requiredQty,
+                        notional: buyCheck.notional,
+                        minNotional: buyCheck.minNotional
+                      }
+                    }
+                  });
+                  placedGridOrder = true;
+                }
+              } else if (buyCheck.reason) {
+                const summary = `Skip ${candidateSymbol}: Grid buy sizing rejected (${buyCheck.reason})`;
+                const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+                const next = {
+                  ...current,
+                  activeOrders: filled.activeOrders,
+                  orderHistory: filled.orderHistory,
+                  decisions: alreadyLogged
+                    ? current.decisions
+                    : [
+                        {
+                          id: crypto.randomUUID(),
+                          ts: new Date().toISOString(),
+                          kind: "SKIP",
+                          summary,
+                          details: {
+                            ...buyCheck,
+                            desiredQty: Number(qty.toFixed(8)),
+                            maxAffordableQty: Number(maxAffordableQty.toFixed(8)),
+                            limitPrice: buyPriceNorm.normalizedPrice
+                          }
+                        },
+                        ...current.decisions
+                      ].slice(0, 200),
+                  lastError: undefined
+                } satisfies BotState;
+                this.save(next);
+                return;
               }
             }
 
@@ -3083,15 +3154,41 @@ export class BotEngineService implements OnModuleInit {
               const baseFree = balances.find((b) => b.asset.toUpperCase() === candidateBaseAsset)?.free ?? 0;
               const desiredSellQty = Math.min(baseFree, qty);
               if (Number.isFinite(desiredSellQty) && desiredSellQty > 0) {
-                const sellCheck = await this.marketData.validateMarketOrderQty(candidateSymbol, desiredSellQty);
-                const sellQtyStr = sellCheck.ok ? sellCheck.normalizedQty : sellCheck.requiredQty;
+                const sellPriceNorm = await this.marketData.normalizeLimitPrice(candidateSymbol, sellLimitPrice, "SELL");
+                if (!sellPriceNorm.ok) {
+                  const summary = `Skip ${candidateSymbol}: Grid sell price invalid (${sellPriceNorm.reason})`;
+                  const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+                  const next = {
+                    ...current,
+                    activeOrders: filled.activeOrders,
+                    orderHistory: filled.orderHistory,
+                    decisions: alreadyLogged
+                      ? current.decisions
+                      : [
+                          {
+                            id: crypto.randomUUID(),
+                            ts: new Date().toISOString(),
+                            kind: "SKIP",
+                            summary,
+                            details: { ...sellPriceNorm, desiredPrice: sellLimitPrice }
+                          },
+                          ...current.decisions
+                        ].slice(0, 200),
+                    lastError: undefined
+                  } satisfies BotState;
+                  this.save(next);
+                  return;
+                }
+
+                const sellCheck = await this.marketData.validateLimitOrderQty(candidateSymbol, desiredSellQty, sellPriceNorm.normalizedPrice);
+                const sellQtyStr = sellCheck.ok ? sellCheck.normalizedQty : undefined;
                 const sellQty = sellQtyStr ? Number.parseFloat(sellQtyStr) : Number.NaN;
                 if (sellQtyStr && Number.isFinite(sellQty) && sellQty > 0) {
                   const sellOrder = await this.trading.placeSpotLimitOrder({
                     symbol: candidateSymbol,
                     side: "SELL",
                     quantity: sellQtyStr,
-                    price: sellLimitPrice.toFixed(8),
+                    price: sellPriceNorm.normalizedPrice,
                     timeInForce: "GTC"
                   });
                   persistLiveTrade({
@@ -3105,10 +3202,46 @@ export class BotEngineService implements OnModuleInit {
                       mode: "grid-ladder",
                       gridSide: "SELL",
                       anchorPrice: Number(price.toFixed(8)),
-                      gridSpacingPct: Number(gridSpacingPct.toFixed(6))
+                      gridSpacingPct: Number(gridSpacingPct.toFixed(6)),
+                      limitPrice: sellPriceNorm.normalizedPrice,
+                      validation: {
+                        ok: sellCheck.ok,
+                        normalizedQty: sellCheck.normalizedQty,
+                        requiredQty: sellCheck.requiredQty,
+                        notional: sellCheck.notional,
+                        minNotional: sellCheck.minNotional
+                      }
                     }
                   });
                   placedGridOrder = true;
+                } else if (sellCheck.reason) {
+                  const summary = `Skip ${candidateSymbol}: Grid sell sizing rejected (${sellCheck.reason})`;
+                  const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+                  const next = {
+                    ...current,
+                    activeOrders: filled.activeOrders,
+                    orderHistory: filled.orderHistory,
+                    decisions: alreadyLogged
+                      ? current.decisions
+                      : [
+                          {
+                            id: crypto.randomUUID(),
+                            ts: new Date().toISOString(),
+                            kind: "SKIP",
+                            summary,
+                            details: {
+                              ...sellCheck,
+                              desiredQty: Number(desiredSellQty.toFixed(8)),
+                              baseFree: Number(baseFree.toFixed(8)),
+                              limitPrice: sellPriceNorm.normalizedPrice
+                            }
+                          },
+                          ...current.decisions
+                        ].slice(0, 200),
+                    lastError: undefined
+                  } satisfies BotState;
+                  this.save(next);
+                  return;
                 }
               }
             }

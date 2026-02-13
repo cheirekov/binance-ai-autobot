@@ -23,6 +23,13 @@ type LotSizeFilter = {
   stepSize: string;
 };
 
+type PriceFilter = {
+  filterType: "PRICE_FILTER";
+  minPrice: string;
+  maxPrice: string;
+  tickSize: string;
+};
+
 type NotionalFilter =
   | {
       filterType: "NOTIONAL";
@@ -44,6 +51,7 @@ export type BinanceSymbolRules = {
   status: string;
   baseAsset: string;
   quoteAsset: string;
+  priceFilter?: PriceFilter;
   lotSize?: LotSizeFilter;
   marketLotSize?: LotSizeFilter;
   notional?: NotionalFilter;
@@ -135,6 +143,16 @@ function parseLotSizeFilter(filters: Array<Record<string, unknown>>, type: "LOT_
   return { filterType: type, minQty, maxQty, stepSize };
 }
 
+function parsePriceFilter(filters: Array<Record<string, unknown>>): PriceFilter | undefined {
+  const f = asRecord(findFilter(filters, "PRICE_FILTER"));
+  if (!f) return undefined;
+  const minPrice = f.minPrice;
+  const maxPrice = f.maxPrice;
+  const tickSize = f.tickSize;
+  if (typeof minPrice !== "string" || typeof maxPrice !== "string" || typeof tickSize !== "string") return undefined;
+  return { filterType: "PRICE_FILTER", minPrice, maxPrice, tickSize };
+}
+
 function parseNotionalFilter(filters: Array<Record<string, unknown>>): NotionalFilter | undefined {
   const notional = asRecord(findFilter(filters, "NOTIONAL"));
   if (notional) {
@@ -212,6 +230,7 @@ export class BinanceMarketDataService {
       status: info.status,
       baseAsset: info.baseAsset,
       quoteAsset: info.quoteAsset,
+      priceFilter: parsePriceFilter(filters),
       lotSize: parseLotSizeFilter(filters, "LOT_SIZE"),
       marketLotSize: parseLotSizeFilter(filters, "MARKET_LOT_SIZE"),
       notional: parseNotionalFilter(filters)
@@ -236,6 +255,158 @@ export class BinanceMarketDataService {
 
     this.priceCache.set(sym, { atMs: now, price: tick.price });
     return tick.price;
+  }
+
+  async normalizeLimitPrice(
+    symbol: string,
+    desiredPrice: number,
+    side: "BUY" | "SELL"
+  ): Promise<{ ok: true; normalizedPrice: string } | { ok: false; reason: string; minPrice?: string; maxPrice?: string; tickSize?: string }> {
+    if (!Number.isFinite(desiredPrice) || desiredPrice <= 0) {
+      return { ok: false, reason: "Invalid desiredPrice" };
+    }
+
+    const rules = await this.getSymbolRules(symbol);
+    if (rules.status !== "TRADING") {
+      return { ok: false, reason: `Symbol not tradable: ${rules.status}` };
+    }
+
+    const filter = rules.priceFilter;
+    if (!filter) {
+      // If we can't normalize to tick-size, return a conservative fixed string.
+      return { ok: true, normalizedPrice: desiredPrice.toFixed(8) };
+    }
+
+    const decimals = decimalsFromStep(filter.tickSize);
+    const tickInt = toScaledInt(filter.tickSize, decimals);
+    if (tickInt <= 0n) {
+      return { ok: false, reason: "Invalid tickSize", minPrice: filter.minPrice, maxPrice: filter.maxPrice, tickSize: filter.tickSize };
+    }
+
+    // Use a high-precision fixed representation; toScaledInt truncates to `decimals`.
+    let priceInt = toScaledInt(desiredPrice.toFixed(decimals + 8), decimals);
+    if (priceInt <= 0n) {
+      return { ok: false, reason: "Price rounds to zero", minPrice: filter.minPrice, maxPrice: filter.maxPrice, tickSize: filter.tickSize };
+    }
+
+    const remainder = priceInt % tickInt;
+    if (remainder !== 0n) {
+      priceInt = side === "BUY" ? priceInt - remainder : priceInt + (tickInt - remainder);
+    }
+
+    const minInt = toScaledInt(filter.minPrice, decimals);
+    const maxInt = toScaledInt(filter.maxPrice, decimals);
+    if (priceInt < minInt) {
+      return { ok: false, reason: `Below minPrice ${filter.minPrice}`, minPrice: filter.minPrice, maxPrice: filter.maxPrice, tickSize: filter.tickSize };
+    }
+    if (maxInt > 0n && priceInt > maxInt) {
+      return { ok: false, reason: `Above maxPrice ${filter.maxPrice}`, minPrice: filter.minPrice, maxPrice: filter.maxPrice, tickSize: filter.tickSize };
+    }
+
+    return { ok: true, normalizedPrice: scaledIntToString(priceInt, decimals) };
+  }
+
+  async validateLimitOrderQty(symbol: string, desiredQty: number, limitPrice: string): Promise<MarketQtyValidation> {
+    if (!Number.isFinite(desiredQty) || desiredQty <= 0) {
+      return { ok: false, reason: "Invalid desiredQty" };
+    }
+
+    const priceNum = Number.parseFloat(limitPrice);
+    if (!Number.isFinite(priceNum) || priceNum <= 0) {
+      return { ok: false, reason: "Invalid limitPrice" };
+    }
+
+    const rules = await this.getSymbolRules(symbol);
+    if (rules.status !== "TRADING") {
+      return { ok: false, reason: `Symbol not tradable: ${rules.status}` };
+    }
+
+    const lot = rules.lotSize;
+    if (!lot) {
+      return { ok: false, reason: "Missing LOT_SIZE filter" };
+    }
+
+    const decimals = decimalsFromStep(lot.stepSize);
+    const stepInt = toScaledInt(lot.stepSize, decimals);
+    const minQtyInt = toScaledInt(lot.minQty, decimals);
+
+    let qtyInt = toScaledInt(desiredQty.toFixed(decimals + 8), decimals);
+    if (qtyInt < minQtyInt) {
+      return { ok: false, normalizedQty: scaledIntToString(qtyInt, decimals), reason: `Below minQty ${lot.minQty}` };
+    }
+
+    if (stepInt > 0n) {
+      const remainder = qtyInt % stepInt;
+      if (remainder !== 0n) {
+        qtyInt = qtyInt - remainder;
+        if (qtyInt < minQtyInt) {
+          return {
+            ok: false,
+            normalizedQty: scaledIntToString(qtyInt, decimals),
+            reason: `Qty rounds below minQty ${lot.minQty} (step ${lot.stepSize})`
+          };
+        }
+      }
+    }
+
+    const normalizedQty = scaledIntToString(qtyInt, decimals);
+
+    const notional = rules.notional;
+    if (!notional) {
+      return { ok: true, normalizedQty };
+    }
+
+    // For LIMIT orders, minNotional always applies (even when applyToMarket/applyMinToMarket is false).
+    const priceDecimals = decimalsFromNumberString(limitPrice);
+    const qtyScale = pow10(decimals);
+    const priceScale = pow10(priceDecimals);
+
+    const priceInt = toScaledInt(limitPrice, priceDecimals);
+    if (priceInt <= 0n) {
+      return { ok: false, normalizedQty, reason: "Limit price rounds to zero" };
+    }
+
+    const minNotionalDecimals = decimalsFromNumberString(notional.minNotional);
+    const minNotionalInt = toScaledInt(notional.minNotional, minNotionalDecimals);
+
+    // Compare: (qtyInt/qtyScale)*(priceInt/priceScale) >= (minNotionalInt/minNotionalScale)
+    const left = qtyInt * priceInt * pow10(minNotionalDecimals);
+    const right = minNotionalInt * qtyScale * priceScale;
+
+    // Readable notional string (limited precision).
+    const notionalDecimals = Math.min(8, priceDecimals);
+    const notionalScale = pow10(decimals + priceDecimals);
+    const notionalInt = qtyInt * priceInt;
+    const notionalHuman = scaledIntToString((notionalInt * pow10(notionalDecimals)) / notionalScale, notionalDecimals);
+
+    if (left < right) {
+      let requiredQtyInt = ceilDiv(right, priceInt * pow10(minNotionalDecimals));
+      if (requiredQtyInt < minQtyInt) requiredQtyInt = minQtyInt;
+
+      const maxQtyInt = toScaledInt(lot.maxQty, decimals);
+      if (stepInt > 0n) {
+        const remainder = requiredQtyInt % stepInt;
+        if (remainder !== 0n) {
+          requiredQtyInt = requiredQtyInt + (stepInt - remainder);
+        }
+      }
+
+      const requiredQty = requiredQtyInt <= maxQtyInt ? scaledIntToString(requiredQtyInt, decimals) : undefined;
+      return {
+        ok: false,
+        normalizedQty,
+        requiredQty,
+        price: limitPrice,
+        minNotional: notional.minNotional,
+        notional: notionalHuman,
+        reason:
+          requiredQty && requiredQty !== normalizedQty
+            ? `Below minNotional ${notional.minNotional} at LIMIT price (need qty ≥ ${requiredQty})`
+            : `Below minNotional ${notional.minNotional} at LIMIT price`
+      };
+    }
+
+    return { ok: true, normalizedQty, price: limitPrice, notional: notionalHuman, minNotional: notional.minNotional };
   }
 
   async validateMarketOrderQty(symbol: string, desiredQty: number): Promise<MarketQtyValidation> {
