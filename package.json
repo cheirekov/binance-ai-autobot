@@ -17,6 +17,7 @@
     "dev": "pnpm -r dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
+    "pretest": "pnpm -C packages/shared build",
     "test": "pnpm -r test",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down"
