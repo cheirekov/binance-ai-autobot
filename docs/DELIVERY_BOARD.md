@@ -51,6 +51,7 @@ M1: Stabilize Spot testnet automation with risk-linked execution behavior and cl
 | T-025 | TODO | Adaptive confidence shadow model v1 | Bot should adapt automatically while risk policy remains authoritative | Higher-quality decisions before execution promotion | Add model-age guard, outlier confidence gate, and rolling prediction statistics in shadow path. |
 | T-026 | TODO | Offline strategy calibration runner | Systematic parameter tuning from real telemetry/backtest data | Better repeatable improvements over ad-hoc tweaks | Add multi-metric objective calibration (profit, drawdown, winrate, expectancy, trade-count penalties). |
 | T-027 | IN_PROGRESS | Spot limit/grid execution v1 | Replace market-only execution path with true open-order lifecycle | Realistic grid behavior and actionable PnL | Delivered slice: ccxt adapter limit/open/cancel APIs + bot exchange order sync + SPOT_GRID LIMIT ladder branch + limit-price affordability (avoid false market-cost quote blocks) + grid sell sizing fallback (`requiredQty` when within `baseFree`) + risk-linked no-action symbol cooldown (reduce cycling on infeasible sizing/quote shortfalls) + bot-owned order tagging via `clientOrderId` prefix + stale bot LIMIT auto-cancel (TTL+distance, risk-linked) + safe external-order handling (skip unless enabled) + stop/global-lock bot-order auto-cancel + P0 UI setup-status resilience + dashboard snapshot endpoint (UI polls one endpoint instead of many). Remaining: richer grid KPI panel + ladder refresh KPIs + Grid Guard v1 (pause BUY legs in trend/vol regimes; keep SELLs) + PnL reconciliation for LIMIT lifecycle. |
+| T-028 | TODO | Compact Advanced settings UX | Reduce operator overwhelm without hiding safety controls | Faster day-to-day operation for non-trader users | When `Follow Basic risk profile=On`: collapse risk-managed numeric inputs into a short "Managed by Risk" summary + toggle "Show details". Add a small "Refresh config" action, and improve small-width layout. Priority: PM/BA review tomorrow (non-blocking). |
 
 ## Next execution batch (single patch set)
 
@@ -62,6 +63,7 @@ M1: Stabilize Spot testnet automation with risk-linked execution behavior and cl
 4. `T-007` PnL correctness and exposure reporting.
 5. `T-023` Universe filter-chain architecture v1 (then `T-006` breadth/regime diversity).
 6. `T-025` Adaptive confidence shadow model v1 (AI specialist lane; shadow-first).
+7. `T-028` Compact Advanced settings UX (non-blocking; reduce Advanced page noise when risk-managed).
 
 ### Next batch (execute now)
 
