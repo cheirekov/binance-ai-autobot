@@ -212,6 +212,7 @@ export class BotEngineService implements OnModuleInit {
   private tickInFlight = false;
   private lastBaselineFingerprint: string | null = null;
   private transientExchangeBackoffState: TransientExchangeBackoffState | null = null;
+  private orderDiscoveryCursor = 0;
 
   constructor(
     private readonly configService: ConfigService,
@@ -1408,18 +1409,36 @@ export class BotEngineService implements OnModuleInit {
     return out;
   }
 
-  private async syncLiveOrders(state: BotState): Promise<BotState> {
-    const trackedSymbols = Array.from(
+  private async syncLiveOrders(
+    state: BotState,
+    opts?: {
+      symbolsHint?: string[];
+    }
+  ): Promise<BotState> {
+    const activeSymbols = Array.from(
       new Set(
         state.activeOrders
           .map((order) => order.symbol.trim().toUpperCase())
           .filter((symbol) => symbol.length > 0)
       )
     );
+    const hintSymbols = Array.from(
+      new Set(
+        (opts?.symbolsHint ?? [])
+          .map((symbol) => symbol.trim().toUpperCase())
+          .filter((symbol) => symbol.length > 0)
+      )
+    );
 
-    if (trackedSymbols.length === 0) {
-      return state;
+    let trackedSymbols = activeSymbols;
+    const discoveryMode = trackedSymbols.length === 0 && hintSymbols.length > 0;
+    if (discoveryMode) {
+      const next = hintSymbols[this.orderDiscoveryCursor % hintSymbols.length];
+      this.orderDiscoveryCursor += 1;
+      trackedSymbols = [next];
     }
+
+    if (trackedSymbols.length === 0) return state;
 
     const openSnapshots = (
       await Promise.all(
@@ -1437,9 +1456,35 @@ export class BotEngineService implements OnModuleInit {
 
     const closedActiveOrders = state.activeOrders.filter((order) => !openById.has(order.id));
     if (closedActiveOrders.length === 0) {
+      const summary =
+        discoveryMode && openOrders.length > 0
+          ? `Synced ${openOrders.length} existing open order(s) for ${trackedSymbols[0]}`
+          : null;
+      const alreadyLogged =
+        summary && state.decisions[0]?.kind === "ENGINE" && state.decisions[0]?.summary === summary;
       return {
         ...state,
-        activeOrders: openOrders.slice(0, 50)
+        activeOrders: openOrders.slice(0, 50),
+        ...(summary
+          ? {
+              decisions: alreadyLogged
+                ? state.decisions
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "ENGINE",
+                      summary,
+                      details: {
+                        stage: "order-discovery",
+                        symbol: trackedSymbols[0],
+                        orderIds: openOrders.map((o) => o.id).slice(0, 20)
+                      }
+                    },
+                    ...state.decisions
+                  ].slice(0, 200)
+            }
+          : {})
       };
     }
 
@@ -1961,7 +2006,25 @@ export class BotEngineService implements OnModuleInit {
         }
 
         try {
-          const synced = await this.withTimeout(this.syncLiveOrders(current), 15_000, "Live order sync");
+          const universeSnapshotForSync = await this.universe.getLatest().catch(() => null);
+          const orderSyncSymbolsHint = Array.from(
+            new Set([
+              ...current.orderHistory
+                .map((order) => order.symbol.trim().toUpperCase())
+                .filter((symbol) => symbol.length > 0)
+                .slice(0, 10),
+              ...(universeSnapshotForSync?.candidates ?? [])
+                .map((candidate) => candidate.symbol.trim().toUpperCase())
+                .filter((symbol) => symbol.length > 0)
+                .slice(0, 12)
+            ])
+          ).slice(0, 20);
+
+          const synced = await this.withTimeout(
+            this.syncLiveOrders(current, { symbolsHint: orderSyncSymbolsHint }),
+            15_000,
+            "Live order sync"
+          );
           const changed =
             synced.activeOrders.length !== current.activeOrders.length ||
             synced.orderHistory.length !== current.orderHistory.length ||

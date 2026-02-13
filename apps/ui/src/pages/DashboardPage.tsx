@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { apiGet, apiPost } from "../api/http";
@@ -13,7 +13,7 @@ type BotState = {
   running: boolean;
   phase: "STOPPED" | "EXAMINING" | "TRADING";
   updatedAt: string;
-  decisions: Array<{ id: string; ts: string; kind: string; summary: string }>;
+  decisions: Array<{ id: string; ts: string; kind: string; summary: string; details?: Record<string, unknown> }>;
   activeOrders: Array<{ id: string; ts: string; symbol: string; side: string; type: string; status: string; qty: number; price?: number }>;
   orderHistory: Array<{ id: string; ts: string; symbol: string; side: string; type: string; status: string; qty: number; price?: number }>;
   symbolBlacklist?: Array<{ symbol: string; reason: string; createdAt: string; expiresAt: string }>;
@@ -43,6 +43,7 @@ export function DashboardPage(): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [universeBusy, setUniverseBusy] = useState(false);
   const [universeMsg, setUniverseMsg] = useState<string | null>(null);
+  const [expandedDecisionId, setExpandedDecisionId] = useState<string | null>(null);
 
   const apiHealth = useApiHealth();
   const publicConfig = usePublicConfig();
@@ -132,6 +133,15 @@ export function DashboardPage(): JSX.Element {
   const adaptiveTail = runStats.stats?.adaptiveShadowTail ?? [];
   const latestAdaptiveEvent = adaptiveTail.length ? adaptiveTail[adaptiveTail.length - 1] : undefined;
   const adaptiveRows = [...adaptiveTail].reverse().slice(0, 30);
+
+  function formatDecisionDetails(details: Record<string, unknown> | undefined): string | null {
+    if (!details) return null;
+    try {
+      return JSON.stringify(details, null, 2);
+    } catch {
+      return String(details);
+    }
+  }
 
   async function rescanUniverse(): Promise<void> {
     setUniverseMsg(null);
@@ -544,19 +554,47 @@ export function DashboardPage(): JSX.Element {
                   <th className="col-time">Time</th>
                   <th className="col-kind">Kind</th>
                   <th>Summary</th>
+                  <th className="col-kind">Details</th>
                 </tr>
               </thead>
               <tbody>
-                {(state?.decisions ?? []).slice(0, 50).map((d) => (
-                  <tr key={d.id}>
-                    <td className="col-time">{new Date(d.ts).toLocaleTimeString()}</td>
-                    <td className="col-kind">{d.kind}</td>
-                    <td>{d.summary}</td>
-                  </tr>
-                ))}
+                {(state?.decisions ?? []).slice(0, 50).map((d) => {
+                  const detailsText = formatDecisionDetails(d.details);
+                  const hasDetails = Boolean(detailsText) && detailsText !== "{}";
+                  const expanded = expandedDecisionId === d.id;
+                  return (
+                    <Fragment key={d.id}>
+                      <tr>
+                        <td className="col-time">{new Date(d.ts).toLocaleTimeString()}</td>
+                        <td className="col-kind">{d.kind}</td>
+                        <td>{d.summary}</td>
+                        <td className="col-kind">
+                          {hasDetails ? (
+                            <button
+                              className="btn tiny"
+                              onClick={() => setExpandedDecisionId(expanded ? null : d.id)}
+                              type="button"
+                            >
+                              {expanded ? "Hide" : "View"}
+                            </button>
+                          ) : (
+                            <span style={{ color: "var(--muted)" }}>—</span>
+                          )}
+                        </td>
+                      </tr>
+                      {expanded && hasDetails ? (
+                        <tr>
+                          <td colSpan={4}>
+                            <pre className="code-block">{detailsText}</pre>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
                 {(state?.decisions?.length ?? 0) === 0 ? (
                   <tr>
-                    <td colSpan={3} style={{ color: "var(--muted)" }}>
+                    <td colSpan={4} style={{ color: "var(--muted)" }}>
                       No decisions yet.
                     </td>
                   </tr>

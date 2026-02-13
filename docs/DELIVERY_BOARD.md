@@ -54,7 +54,20 @@ M1: Stabilize Spot testnet automation with risk-linked execution behavior and cl
 
 ## Next execution batch (single patch set)
 
-1. Finish `T-027` Spot limit/grid execution v1 (single active lane).
-2. Run one 2-4h validation batch with explicit KPI targets.
+### Priority order (PM/BA default)
+
+1. Close `T-027` (Spot limit/grid execution v1) with clear LIMIT lifecycle + order visibility.
+2. `T-004` Wallet policy v1 (convert/sweep/autonomous reserve; dust policy; risk-linked).
+3. `T-005` Daily risk guardrails visible in UI (max daily loss + per-position cap tied to risk).
+4. `T-007` PnL correctness and exposure reporting.
+5. `T-023` Universe filter-chain architecture v1 (then `T-006` breadth/regime diversity).
+6. `T-025` Adaptive confidence shadow model v1 (AI specialist lane; shadow-first).
+
+### Next batch (execute now)
+
+1. Finish `T-027` (single active lane):
+   - Make `GET /orders/active` reflect exchange open orders even after a state reset (symbol-scoped, no global open-order fetch).
+   - Ensure skip diagnostics are visible in UI (candidate rejection reasons, not just summary).
+2. Run one 2-4h validation batch with explicit KPI targets (recommended: `./scripts/run-batch.sh --minutes 240`).
 3. Run one overnight 8-12h batch and collect feedback bundle.
-4. Re-prioritize next single ticket (`T-007` or `T-004`) from measured gaps.
+4. Re-prioritize the next single ticket from measured gaps (default next: `T-004`).

@@ -16,6 +16,32 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-13 11:07 UTC — T-027 validation automation + visibility fixes
+- Scope: speed up the 2-4h/night validation loop by standardizing batch runs, and make order/skip evidence visible without unpacking bundles.
+- BA requirement mapping:
+  - User reported only seeing a single SKIP summary (`No feasible candidates...`) with no actionable context.
+  - User reported `Orders (active)` empty after state resets, while Binance UI still had a live open LIMIT order.
+- PM milestone mapping: keep `T-027` moving with fast feedback and correct open-order visibility during Spot testnet runs.
+- Technical changes:
+  - Batch automation:
+    - Added `scripts/run-batch.sh` to run a timed batch (optional state/universe reset), then auto-run `./scripts/collect-feedback.sh` and `./scripts/update-session-brief.sh`.
+    - Reordered next-batch priorities and clarified post-`T-027` lane order in `docs/DELIVERY_BOARD.md`.
+  - Order discovery (API engine):
+    - Bot engine order sync now uses a bounded `symbolsHint` list (recent order history + top universe candidates) to discover exchange open orders even when local state was reset.
+    - Discovery is symbol-scoped (no global `fetchOpenOrders`), and only probes one hint symbol per tick when there are no tracked open orders.
+  - Evidence visibility (UI):
+    - Dashboard decisions table now exposes `decision.details` via a `View/Hide` expander (renders JSON).
+    - Added UI styles for compact buttons and detail blocks (`apps/ui/src/styles.css`).
+- Risk slider impact: none (validation automation + sync/visibility only; no sizing/strategy change).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (2-4h):
+  - Deploy and run with `tradeMode=SPOT_GRID` and `liveTrading=true` (Spot testnet).
+  - If Binance has existing open LIMIT orders, confirm they appear in `Orders (active)` within ~1 minute after start.
+  - When a feasibility SKIP occurs, confirm `Decisions → Details` shows `rejectionSamples` and wallet/cap context.
+- Follow-up:
+  - Add explicit operator controls (per-symbol open-order refresh and cancel) if bundles show stale/external orders frequently.
+
 ## 2026-02-13 09:37 UTC — T-027 P0 hotfix (CCXT open-orders fetch without symbol)
 - Scope: unblock live trading by preventing CCXT `fetchOpenOrders()` from being called without a symbol (which CCXT treats as warning-as-error and triggers our transient backoff loop).
 - BA requirement mapping:
