@@ -16,6 +16,26 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-13 13:36 UTC — P0 UI blank-screen hotfix (Dashboard refresh handler + UI typecheck)
+- Scope: restore dashboard rendering after the snapshot refactor (a missing handler caused a runtime crash that produced a blank screen after the “Loading…” card).
+- BA requirement mapping:
+  - User reported: “Loading then empty dark blue screen” after deploying the snapshot changes.
+  - User requested P0 priority to keep UI usable for overnight evidence collection.
+- PM milestone mapping: keep `T-027` validation loop operational; prevent UI regressions that block all testing.
+- Technical changes:
+  - UI:
+    - Fixed `DashboardPage` refresh button to call `dashboard.refresh()` (it referenced an undefined identifier at runtime) (`apps/ui/src/pages/DashboardPage.tsx`).
+    - Added TypeScript typecheck to the UI build step so similar runtime failures are caught in CI and Docker builds (`apps/ui/package.json`).
+  - UI server:
+    - Removed unsupported `logLevel` option in `http-proxy-middleware` config (TypeScript typecheck surfaced the mismatch) (`apps/ui/server/index.ts`).
+- Risk slider impact: none.
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (2–5 min):
+  - Redeploy and load the dashboard: it must render cards/tables and not go blank after initial load.
+- Follow-up:
+  - If UI still “feels slow”, tune `useDashboardSnapshot({ pollMs })` and/or add a short TTL cache on `/dashboard/snapshot`.
+
 ## 2026-02-13 13:10 UTC — T-027 Dashboard snapshot endpoint (faster UI refresh, fewer pollers)
 - Scope: reduce dashboard slowness and API polling fan-out by returning a single aggregated snapshot payload (similar to `binance-ai-bot-1`’s `GET /strategy` pattern), without changing trading logic.
 - BA requirement mapping:

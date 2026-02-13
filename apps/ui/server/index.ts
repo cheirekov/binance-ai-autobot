@@ -94,8 +94,7 @@ async function start(): Promise<void> {
             proxyReq.setHeader("x-api-key", apiKey);
           }
         }
-      },
-      logLevel: "silent"
+      }
     })
   );
 

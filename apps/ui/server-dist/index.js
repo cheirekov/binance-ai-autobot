@@ -97,8 +97,7 @@ async function start() {
             proxyReq.setHeader("x-api-key", apiKey);
           }
         }
-      },
-      logLevel: "silent"
+      }
     })
   );
   const distDir = import_node_path.default.join(process.cwd(), "dist");

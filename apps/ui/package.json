@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && tsup server/index.ts --out-dir server-dist --format cjs --platform node --target node20",
+    "build": "tsc -p tsconfig.json && vite build && tsup server/index.ts --out-dir server-dist --format cjs --platform node --target node20",
     "start": "node server-dist/index.js",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests"

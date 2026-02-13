@@ -188,7 +188,7 @@ export function DashboardPage(): JSX.Element {
             <button className="btn danger" disabled={busy} onClick={() => startStop("stop")}>
               Stop
             </button>
-            <button className="btn" disabled={busy} onClick={refresh}>
+            <button className="btn" disabled={busy} onClick={() => void dashboard.refresh()}>
               Refresh
             </button>
           </div>
