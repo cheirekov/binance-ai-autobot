@@ -16,6 +16,26 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-13 09:37 UTC — T-027 P0 hotfix (CCXT open-orders fetch without symbol)
+- Scope: unblock live trading by preventing CCXT `fetchOpenOrders()` from being called without a symbol (which CCXT treats as warning-as-error and triggers our transient backoff loop).
+- BA requirement mapping:
+  - User reported bot “does nothing” for hours and UI appears slow.
+  - Night bundle showed decision flood of `Skip: Live order sync failed` + `Skip: Transient exchange backoff active`.
+- PM milestone mapping: keep `T-027` runnable for 2-4h and overnight validation; remove self-inflicted exchange-sync stall.
+- Technical changes:
+  - CCXT adapter (`apps/api/src/modules/integrations/ccxt-binance-adapter.ts`):
+    - `getOpenOrders()` now returns `[]` when `symbolId` is missing/blank (no global open-order fetch),
+    - force-sets `ex.options.warnOnFetchOpenOrdersWithoutSymbol=false` after exchange construction (constructor option was not reliably honored in runtime).
+- Risk slider impact: none (execution reliability only).
+- Validation evidence:
+  - Evidence bundle `autobot-feedback-20260213-092451.tgz` shows backoff loop error text from CCXT: `fetchOpenOrders() WARNING ... without specifying a symbol ...` and zero trades.
+  - API image builds clean: `docker compose build api`.
+- Runtime test request:
+  - Redeploy API/UI and run 20-30 minutes with `liveTrading=true` on Spot testnet.
+  - Confirm decisions progress beyond `order-sync` skips and trades resume.
+- Follow-up:
+  - If we later need “global open orders” discovery, implement it as an explicit low-frequency job (not per-tick) and accept stricter limits intentionally.
+
 ## 2026-02-12 19:45 UTC — T-027 P0 hotfix (CCXT open-orders sync warning loop)
 - Scope: fix immediate no-trade loop where bot entered transient backoff repeatedly during pre-trade order sync.
 - BA requirement mapping:

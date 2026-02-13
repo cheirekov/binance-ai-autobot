@@ -140,6 +140,7 @@ type BinanceLikeCcxtExchange = CcxtExchangeMinimal & {
   enableDemoTrading?: (enable: boolean) => void;
   urls?: { api?: Record<string, unknown> };
   markets_by_id?: Record<string, unknown>;
+  options?: Record<string, unknown>;
   close?: () => Promise<void> | void;
 };
 
@@ -168,6 +169,12 @@ export class CcxtBinanceAdapter {
     if (options.env === "SPOT_TESTNET") {
       // ccxt throws if sandbox mode is enabled; we do not use sandbox mode.
       ex.enableDemoTrading?.(true);
+    }
+
+    // ccxt sometimes still throws its "fetchOpenOrders without symbol" warning even when passed via constructor options.
+    // Force-disable it defensively so order sync can't stall the bot.
+    if (ex.options && typeof ex.options === "object") {
+      ex.options.warnOnFetchOpenOrdersWithoutSymbol = false;
     }
 
     // Keep our config as the source of truth for the base URL (Spot endpoints).
@@ -256,7 +263,13 @@ export class CcxtBinanceAdapter {
   }
 
   async getOpenOrders(symbolId?: string): Promise<CcxtBinanceOrderSnapshot[]> {
-    const unifiedSymbol = symbolId ? await this.toUnifiedSymbol(symbolId) : undefined;
+    const id = typeof symbolId === "string" ? symbolId.trim() : "";
+    if (!id) {
+      // Do not fetch open orders globally; ccxt enforces stricter limits and may throw a warning-as-error.
+      return [];
+    }
+
+    const unifiedSymbol = await this.toUnifiedSymbol(id);
     const raw = await this.exchange.fetchOpenOrders(unifiedSymbol);
     const list = Array.isArray(raw) ? raw : [];
     return list

@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-12 19:40 UTC
+Last updated: 2026-02-13 09:24 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -75,9 +75,10 @@ Use this file at the start and end of every batch.
 - Next ticket candidate: `T-027` (continue T-027 hardening)
 - Open risks:
   - no observed LIMIT order lifecycle in this bundle.
+  - root cause identified: CCXT threw `fetchOpenOrders()` warning-as-error when called without symbol, putting the engine into `order-sync` transient backoff and preventing all trading.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260212-194020.tgz`
-  - auto-updated at: `2026-02-12T19:40:27.307Z`
+  - bundle: `autobot-feedback-20260213-092451.tgz`
+  - auto-updated at: `2026-02-13T09:24:58.655Z`
 
 ## 5) Copy/paste prompt for next session
 
