@@ -62,6 +62,25 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
   - If LIMIT orders still cancel quickly, capture bundle and check `TRADE` details `validation.*` fields for tick/minNotional drift.
 
+## 2026-02-13 10:33 UTC — T-027 diagnostics (feasible-candidate rejection samples)
+- Scope: make “No feasible candidates after sizing/cap filters” actionable by capturing *why* candidates were rejected (without needing long runs).
+- BA requirement mapping:
+  - User reported long idle periods with only a single SKIP message and asked for faster iteration.
+  - Current bundles lacked per-candidate reject reasons, making analysis guessy.
+- PM milestone mapping: speed up T-027 validation loop by improving decision evidence quality.
+- Technical changes:
+  - Bot engine (`apps/api/src/modules/bot/bot-engine.service.ts`):
+    - `pickFeasibleLiveCandidate()` now returns `rejectionSamples` (up to 8) containing symbol, stage, reason, and key sizing numbers,
+    - the resulting SKIP decision now includes wallet/cap context (`walletTotalHome`, `quoteFree`, `maxSymbolNotional`, `bufferFactor`, `capitalTier`) plus `rejectionSamples`.
+- Risk slider impact: none (diagnostics only; no change to sizing formulas).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request:
+  - Redeploy and run 5–10 minutes.
+  - If the bot skips feasibility, open the latest decision details and confirm `rejectionSamples` explains the dominant blocker (minNotional, exposure cap, notional cap, etc.).
+- Follow-up:
+  - Implement the smallest behavior change that addresses the dominant blocker (based on the new evidence) for the next 2–4h run.
+
 ## 2026-02-12 19:45 UTC — T-027 P0 hotfix (CCXT open-orders sync warning loop)
 - Scope: fix immediate no-trade loop where bot entered transient backoff repeatedly during pre-trade order sync.
 - BA requirement mapping:

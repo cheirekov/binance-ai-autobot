@@ -1087,7 +1087,24 @@ export class BotEngineService implements OnModuleInit {
     notionalCap: number;
     capitalNotionalCapMultiplier: number;
     bufferFactor: number;
-  }): Promise<{ candidate: UniverseCandidate | null; reason?: string; sizingRejected: number }> {
+  }): Promise<{
+    candidate: UniverseCandidate | null;
+    reason?: string;
+    sizingRejected: number;
+    rejectionSamples: Array<{
+      symbol: string;
+      stage: string;
+      reason: string;
+      price?: number;
+      targetNotional?: number;
+      desiredQty?: number;
+      normalizedQty?: string;
+      requiredQty?: string;
+      bufferedCost?: number;
+      remainingSymbolNotional?: number;
+      effectiveNotionalCap?: number;
+    }>;
+  }> {
     const {
       preferredCandidate,
       snapshotCandidates,
@@ -1110,7 +1127,7 @@ export class BotEngineService implements OnModuleInit {
     const seen = new Set<string>();
     const maxSymbolNotional = walletTotalHome * (maxPositionPct / 100);
     if (!Number.isFinite(maxSymbolNotional) || maxSymbolNotional <= 0) {
-      return { candidate: null, reason: "Max symbol exposure is zero", sizingRejected: 0 };
+      return { candidate: null, reason: "Max symbol exposure is zero", sizingRejected: 0, rejectionSamples: [] };
     }
 
     const effectiveNotionalCap =
@@ -1118,6 +1135,24 @@ export class BotEngineService implements OnModuleInit {
     const capForSizing = effectiveNotionalCap ? effectiveNotionalCap / bufferFactor : null;
     const rawTargetNotional = walletTotalHome * (maxPositionPct / 100);
     let sizingRejected = 0;
+    const rejectionSamples: Array<{
+      symbol: string;
+      stage: string;
+      reason: string;
+      price?: number;
+      targetNotional?: number;
+      desiredQty?: number;
+      normalizedQty?: string;
+      requiredQty?: string;
+      bufferedCost?: number;
+      remainingSymbolNotional?: number;
+      effectiveNotionalCap?: number;
+    }> = [];
+
+    const recordRejection = (sample: (typeof rejectionSamples)[number]): void => {
+      if (rejectionSamples.length >= 8) return;
+      rejectionSamples.push(sample);
+    };
 
     for (const candidate of pool) {
       const symbol = candidate.symbol.trim().toUpperCase();
@@ -1166,23 +1201,65 @@ export class BotEngineService implements OnModuleInit {
         const qtyStr = check.ok ? check.normalizedQty : check.requiredQty;
         if (!qtyStr) {
           sizingRejected += 1;
+          recordRejection({
+            symbol,
+            stage: "validate-qty",
+            reason: check.reason ?? "No qty returned",
+            price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined,
+            targetNotional: Number.isFinite(targetNotional) ? Number(targetNotional.toFixed(6)) : undefined,
+            desiredQty: Number.isFinite(desiredQty) ? Number(desiredQty.toFixed(8)) : undefined,
+            normalizedQty: check.normalizedQty,
+            requiredQty: check.requiredQty
+          });
           continue;
         }
 
         const qty = Number.parseFloat(qtyStr);
         if (!Number.isFinite(qty) || qty <= 0) {
           sizingRejected += 1;
+          recordRejection({
+            symbol,
+            stage: "parse-qty",
+            reason: `Non-positive qty (${qtyStr})`,
+            price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined,
+            targetNotional: Number.isFinite(targetNotional) ? Number(targetNotional.toFixed(6)) : undefined,
+            desiredQty: Number.isFinite(desiredQty) ? Number(desiredQty.toFixed(8)) : undefined,
+            normalizedQty: check.normalizedQty,
+            requiredQty: check.requiredQty
+          });
           continue;
         }
 
         const bufferedCost = qty * price * bufferFactor;
         if (!Number.isFinite(bufferedCost) || bufferedCost <= 0) {
           sizingRejected += 1;
+          recordRejection({
+            symbol,
+            stage: "buffered-cost",
+            reason: "Invalid buffered cost",
+            price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined,
+            targetNotional: Number.isFinite(targetNotional) ? Number(targetNotional.toFixed(6)) : undefined,
+            desiredQty: Number.isFinite(desiredQty) ? Number(desiredQty.toFixed(8)) : undefined,
+            normalizedQty: check.normalizedQty,
+            requiredQty: check.requiredQty
+          });
           continue;
         }
 
         if (remainingSymbolNotional > 0 && bufferedCost > remainingSymbolNotional + 1e-8) {
           sizingRejected += 1;
+          recordRejection({
+            symbol,
+            stage: "max-symbol-exposure",
+            reason: "Would exceed max symbol exposure",
+            price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined,
+            targetNotional: Number.isFinite(targetNotional) ? Number(targetNotional.toFixed(6)) : undefined,
+            desiredQty: Number.isFinite(desiredQty) ? Number(desiredQty.toFixed(8)) : undefined,
+            normalizedQty: check.normalizedQty,
+            requiredQty: check.requiredQty,
+            bufferedCost: Number(bufferedCost.toFixed(6)),
+            remainingSymbolNotional: Number(remainingSymbolNotional.toFixed(6))
+          });
           continue;
         }
 
@@ -1190,14 +1267,33 @@ export class BotEngineService implements OnModuleInit {
           const capTolerance = Math.max(0.01, effectiveNotionalCap * 0.001);
           if (bufferedCost > effectiveNotionalCap + capTolerance) {
             sizingRejected += 1;
+            recordRejection({
+              symbol,
+              stage: "notional-cap",
+              reason: "Would exceed live notional cap",
+              price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined,
+              targetNotional: Number.isFinite(targetNotional) ? Number(targetNotional.toFixed(6)) : undefined,
+              desiredQty: Number.isFinite(desiredQty) ? Number(desiredQty.toFixed(8)) : undefined,
+              normalizedQty: check.normalizedQty,
+              requiredQty: check.requiredQty,
+              bufferedCost: Number(bufferedCost.toFixed(6)),
+              effectiveNotionalCap: Number(effectiveNotionalCap.toFixed(6))
+            });
             continue;
           }
         }
 
-        return { candidate, sizingRejected };
+        return { candidate, sizingRejected, rejectionSamples };
       } catch {
         if (check && !check.ok) {
           sizingRejected += 1;
+          recordRejection({
+            symbol,
+            stage: "exception",
+            reason: check.reason ?? "Exception during sizing check",
+            normalizedQty: check.normalizedQty,
+            requiredQty: check.requiredQty
+          });
         }
         continue;
       }
@@ -1207,7 +1303,7 @@ export class BotEngineService implements OnModuleInit {
       sizingRejected > 0
         ? `No feasible candidates after sizing/cap filters (${sizingRejected} rejected)`
         : "No feasible candidates after policy/exposure filters";
-    return { candidate: null, reason, sizingRejected };
+    return { candidate: null, reason, sizingRejected, rejectionSamples };
   }
 
   private ensureTelemetryDir(): void {
@@ -2299,7 +2395,15 @@ export class BotEngineService implements OnModuleInit {
                       kind: "SKIP",
                       summary,
                       details: {
-                        rejectedBySizing: feasibleCandidateSelection.sizingRejected
+                        rejectedBySizing: feasibleCandidateSelection.sizingRejected,
+                        capitalTier: capitalProfile.tier,
+                        walletTotalHome: Number(walletTotalHome.toFixed(6)),
+                        maxPositionPct,
+                        maxSymbolNotional: Number((walletTotalHome * (maxPositionPct / 100)).toFixed(6)),
+                        quoteFree: Number(quoteFree.toFixed(6)),
+                        liveTradeNotionalCap: Number.isFinite(notionalCap) ? notionalCap : null,
+                        bufferFactor,
+                        rejectionSamples: feasibleCandidateSelection.rejectionSamples
                       }
                     },
                     ...current.decisions

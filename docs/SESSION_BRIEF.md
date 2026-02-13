@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-13 09:24 UTC
+Last updated: 2026-02-13 10:26 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -70,15 +70,14 @@ Use this file at the start and end of every batch.
 - Observed KPI delta:
   - open LIMIT lifecycle observed: `no` (openLimitOrders=0, historyLimitOrders=0, activeMarketOrders=0)
   - market-only share reduced: `no`
-  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=8, ratio=0.0%)
+  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=3, ratio=0.0%)
 - Decision: `pivot`
 - Next ticket candidate: `T-027` (continue T-027 hardening)
 - Open risks:
   - no observed LIMIT order lifecycle in this bundle.
-  - root cause identified: CCXT threw `fetchOpenOrders()` warning-as-error when called without symbol, putting the engine into `order-sync` transient backoff and preventing all trading.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260213-092451.tgz`
-  - auto-updated at: `2026-02-13T09:24:58.655Z`
+  - bundle: `autobot-feedback-20260213-102557.tgz`
+  - auto-updated at: `2026-02-13T10:26:04.493Z`
 
 ## 5) Copy/paste prompt for next session
 
