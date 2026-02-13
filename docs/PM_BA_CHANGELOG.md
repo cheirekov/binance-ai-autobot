@@ -16,6 +16,58 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-13 12:13 UTC — Region policy defaults (EEA blocked quotes aligned to Binance MiCA list)
+- Scope: tighten region-policy defaults so EEA quote filtering matches Binance’s published impacted-asset list, avoiding over-blocking and testnet confusion.
+- BA requirement mapping:
+  - User asked to verify which “stable-like” quote assets are blocked for EEA on Binance and flagged `U` as likely testnet-only.
+- PM milestone mapping: keep `T-013`/`T-027` runs representative of real-world constraints without hardcoding testnet quirks.
+- Technical changes:
+  - Trading policy (`apps/api/src/modules/policy/trading-policy.ts`):
+    - Updated default `EEA_BLOCKED_QUOTE_ASSETS` to the published impacted assets list (USDT, FDUSD, TUSD, USDP, DAI, AEUR, XUSD, PAXG).
+  - Tests updated accordingly (`apps/api/src/modules/policy/trading-policy.test.ts`).
+- Risk slider impact: none (policy defaults only).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request:
+  - For Spot testnet runs where restrictions are not enforced by Binance, consider disabling `Advanced → Enforce region policy` to prevent unnecessary filtering.
+- Follow-up:
+  - Make region blocked quotes explicitly configurable (Advanced/Expert) instead of code defaults (tracked under `T-020`).
+
+## 2026-02-13 12:07 UTC — T-027 order ownership + open-order safety (bot-owned only)
+- Scope: make open-order lifecycle safe and adaptive by default (manage/cancel bot-owned orders without touching external/manual ones), and remove a P0 UI false-onboarding failure mode.
+- BA requirement mapping:
+  - User reported orphaned open LIMIT orders on Binance not reflected in bot UI after state resets.
+  - User reported chaos around “who owns this order” and asked for adaptive order lifecycle behavior tied to risk slider.
+  - User reported UI occasionally redirecting to onboarding despite an existing config (API temporarily unreachable).
+- PM milestone mapping: close the “don’t leave live orders behind” gap inside `T-027` so nightly runs produce reliable evidence and less operator confusion.
+- Technical changes:
+  - Shared schema:
+    - Added optional `clientOrderId` on orders so the bot can tag/recognize its own exchange orders (`packages/shared/src/schemas/bot-state.ts`).
+  - Config + UI:
+    - Added Advanced “Open order management” controls (clientOrderId prefix, stale TTL/distance, cancel-on-stop, cancel-on-global-lock, manage external orders toggle) and risk-derived defaults for TTL/distance (`packages/shared/src/schemas/app-config.ts`, `apps/api/src/modules/config/*`, `apps/ui/src/pages/settings/SettingsAdvanced.tsx`).
+  - Exchange adapter:
+    - CCXT order mapping now carries `clientOrderId` and a better `transactTime` fallback; limit/market order placement supports `newClientOrderId` (`apps/api/src/modules/integrations/ccxt-binance-adapter.ts`, `apps/api/src/modules/integrations/binance-trading.service.ts`).
+  - Bot engine:
+    - Bot-owned order identification via `clientOrderId` prefix and deterministic ID builder.
+    - Grid path cancels stale bot-owned open LIMIT orders using TTL and distance-from-market thresholds (risk-linked).
+    - Safe default: if external/manual open LIMIT orders exist for the symbol and `manageExternalOpenOrders=false`, bot logs a SKIP with details and does not touch them.
+    - Global protection locks now optionally auto-cancel bot-owned open orders, and `Stop` optionally cancels bot-owned open orders on the exchange (without falsely “canceling” external ones in local state).
+  - UI bootstrap P0:
+    - Setup status no longer treats “API unreachable” as “not initialized” (prevents false onboarding redirects) (`apps/ui/src/hooks/useSetupStatus.ts`, `apps/ui/src/app/App.tsx`).
+- Risk slider impact:
+  - Affects stale order cancellation thresholds via derived defaults:
+    - higher risk: shorter stale TTL + tighter distance threshold,
+    - lower risk: longer TTL + wider distance threshold.
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (2-4h):
+  - Run with `tradeMode=SPOT_GRID`, `liveTrading=true`, Spot testnet.
+  - Create one manual LIMIT order on the same symbol: bot should SKIP with “External open LIMIT order(s) detected” and must not cancel it.
+  - Observe bot-created LIMIT orders: they should include `clientOrderId` with the configured prefix, and stale/far ones should be canceled over time.
+  - Press Stop: bot-owned open orders should be canceled best-effort; manual orders should remain open.
+- Follow-up:
+  - Add UI “ownership” badges (bot vs external) and a controlled “cancel external” action gated behind `manageExternalOpenOrders`.
+
 ## 2026-02-13 11:07 UTC — T-027 validation automation + visibility fixes
 - Scope: speed up the 2-4h/night validation loop by standardizing batch runs, and make order/skip evidence visible without unpacking bundles.
 - BA requirement mapping:

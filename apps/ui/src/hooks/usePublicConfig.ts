@@ -31,6 +31,13 @@ export type PublicConfig = {
     binanceEnvironment: "MAINNET" | "SPOT_TESTNET";
     binanceBaseUrlOverride?: string;
     apiKeyHint: string;
+    botOrderClientIdPrefix: string;
+    botOrderAutoCancelEnabled: boolean;
+    botOrderStaleTtlMinutes: number;
+    botOrderMaxDistancePct: number;
+    autoCancelBotOrdersOnStop: boolean;
+    autoCancelBotOrdersOnGlobalProtectionLock: boolean;
+    manageExternalOpenOrders: boolean;
     neverTradeSymbols: string[];
     autoBlacklistEnabled: boolean;
     autoBlacklistTtlMinutes: number;

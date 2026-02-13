@@ -27,6 +27,17 @@ function AppRoutes(): JSX.Element {
     );
   }
 
+  if (status.initialized === null) {
+    return (
+      <div className="container">
+        <div className="card">
+          <div className="title">API unavailable</div>
+          <div className="subtitle">{status.error ?? "Unable to verify setup status. Retrying…"}</div>
+        </div>
+      </div>
+    );
+  }
+
   if (!status.initialized) {
     return (
       <Routes>

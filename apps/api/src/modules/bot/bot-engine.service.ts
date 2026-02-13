@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { Injectable, OnModuleInit } from "@nestjs/common";
-import type { BotState, Decision, Order, ProtectionLockEntry, SymbolBlacklistEntry, UniverseCandidate } from "@autobot/shared";
+import type { AppConfig, BotState, Decision, Order, ProtectionLockEntry, SymbolBlacklistEntry, UniverseCandidate } from "@autobot/shared";
 import { BotStateSchema, defaultBotState } from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
@@ -1364,9 +1364,116 @@ export class BotEngineService implements OnModuleInit {
     return "REJECTED";
   }
 
+  private resolveBotOrderClientIdPrefix(config: AppConfig | null): string {
+    const raw = config?.advanced.botOrderClientIdPrefix ?? "ABOT";
+    const trimmed = raw.trim().toUpperCase();
+    return trimmed.length >= 3 ? trimmed.slice(0, 12) : "ABOT";
+  }
+
+  private isBotOwnedOrder(order: Order, prefix: string): boolean {
+    const clientOrderId = typeof order.clientOrderId === "string" ? order.clientOrderId.trim().toUpperCase() : "";
+    if (!clientOrderId) return false;
+    return clientOrderId.startsWith(`${prefix}-`);
+  }
+
+  private buildBotClientOrderId(params: { config: AppConfig; purpose: string; side: "BUY" | "SELL" }): string {
+    const prefix = this.resolveBotOrderClientIdPrefix(params.config);
+    const purposeCode = (params.purpose.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 2) || "O").padEnd(2, "O");
+    const sideCode = params.side === "BUY" ? "B" : "S";
+    const time36 = Date.now().toString(36).toUpperCase();
+    const rand = crypto.randomBytes(3).toString("hex").toUpperCase();
+    // Binance Spot newClientOrderId max length is small (commonly 36); keep it short and deterministic.
+    return `${prefix}-${purposeCode}${sideCode}-${time36}${rand}`.slice(0, 36);
+  }
+
+  private getOrderAgeMs(order: Order): number | null {
+    const ts = Date.parse(order.ts);
+    if (!Number.isFinite(ts)) return null;
+    const age = Date.now() - ts;
+    return Number.isFinite(age) && age >= 0 ? age : null;
+  }
+
+  private async cancelBotOwnedOpenOrders(params: {
+    config: AppConfig;
+    state: BotState;
+    orders: Order[];
+    reason: string;
+    details?: Record<string, unknown>;
+    maxCancels: number;
+  }): Promise<BotState> {
+    const prefix = this.resolveBotOrderClientIdPrefix(params.config);
+    const toCancel = params.orders
+      .filter((o) => o.status === "NEW")
+      .filter((o) => this.isBotOwnedOrder(o, prefix))
+      .slice(0, Math.max(0, Math.floor(params.maxCancels)));
+
+    if (toCancel.length === 0) return params.state;
+
+    const finalized: Order[] = [];
+    const canceledIds: string[] = [];
+    for (const order of toCancel) {
+      try {
+        const latest = await this.trading.cancelOrder(order.symbol, order.id);
+        const mapped = this.mapExchangeOrderToStateOrder(latest);
+        finalized.push(mapped ?? { ...order, status: "CANCELED" });
+      } catch {
+        try {
+          const latest = await this.trading.getOrder(order.symbol, order.id);
+          const mapped = this.mapExchangeOrderToStateOrder(latest);
+          if (mapped && mapped.status !== "NEW") {
+            finalized.push(mapped);
+          }
+        } catch {
+          // leave it in activeOrders; next sync will reconcile.
+          continue;
+        }
+      }
+      canceledIds.push(order.id);
+    }
+
+    if (finalized.length === 0) return params.state;
+
+    const summary = `Canceled ${finalized.length} bot open order(s): ${params.reason}`;
+    const alreadyLogged = params.state.decisions[0]?.kind === "ENGINE" && params.state.decisions[0]?.summary === summary;
+
+    const nextActive = params.state.activeOrders.filter((o) => !canceledIds.includes(o.id));
+    const next: BotState = {
+      ...params.state,
+      activeOrders: nextActive,
+      orderHistory: this.dedupeOrderHistory([...finalized, ...params.state.orderHistory]).slice(0, 500),
+      decisions: alreadyLogged
+        ? params.state.decisions
+        : [
+            {
+              id: crypto.randomUUID(),
+              ts: new Date().toISOString(),
+              kind: "ENGINE",
+              summary,
+              details: {
+                stage: "order-maintenance",
+                reason: params.reason,
+                canceled: finalized.map((o) => ({
+                  symbol: o.symbol,
+                  id: o.id,
+                  side: o.side,
+                  type: o.type,
+                  price: o.price,
+                  clientOrderId: o.clientOrderId
+                })),
+                ...params.details
+              }
+            },
+            ...params.state.decisions
+          ].slice(0, 200)
+    };
+
+    return next;
+  }
+
   private mapExchangeOrderToStateOrder(snapshot: BinanceOrderSnapshot): Order | null {
     const id = snapshot.orderId ? String(snapshot.orderId) : "";
     const symbol = snapshot.symbol?.trim().toUpperCase() ?? "";
+    const clientOrderId = snapshot.clientOrderId?.trim() ?? "";
     const sideRaw = snapshot.side?.trim().toUpperCase();
     const side: "BUY" | "SELL" | null = sideRaw === "BUY" || sideRaw === "SELL" ? sideRaw : null;
     const executedQty = Number.parseFloat(snapshot.executedQty ?? "");
@@ -1389,6 +1496,7 @@ export class BotEngineService implements OnModuleInit {
       id,
       ts,
       symbol,
+      ...(clientOrderId ? { clientOrderId } : {}),
       side,
       type: type === "LIMIT" || type === "LIMIT_MAKER" ? type : "MARKET",
       status: this.mapBinanceStatus(snapshot.status),
@@ -2069,6 +2177,49 @@ export class BotEngineService implements OnModuleInit {
         }
       }
 
+      const globalLock = this.getActiveGlobalProtectionLock(current);
+      if (globalLock) {
+        if (liveTrading && config && config.advanced.autoCancelBotOrdersOnGlobalProtectionLock) {
+          current = await this.cancelBotOwnedOpenOrders({
+            config,
+            state: current,
+            orders: current.activeOrders,
+            reason: `global-lock ${globalLock.type}`,
+            details: {
+              lockType: globalLock.type,
+              lockReason: globalLock.reason,
+              lockExpiresAt: globalLock.expiresAt
+            },
+            maxCancels: 10
+          });
+          this.save(current);
+        }
+
+        const summary = `Skip: Protection lock ${globalLock.type} (GLOBAL)`;
+        const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+        const next = {
+          ...current,
+          decisions: alreadyLogged
+            ? current.decisions
+            : [
+                {
+                  id: crypto.randomUUID(),
+                  ts: new Date().toISOString(),
+                  kind: "SKIP",
+                  summary,
+                  details: {
+                    stage: "protection-lock",
+                    lock: globalLock
+                  }
+                },
+                ...current.decisions
+              ].slice(0, 200),
+          lastError: undefined
+        } satisfies BotState;
+        this.save(next);
+        return;
+      }
+
       const maybeFillOne = (state: BotState): { activeOrders: Order[]; orderHistory: Order[] } => {
         if (state.activeOrders.length === 0) {
           return { activeOrders: state.activeOrders, orderHistory: state.orderHistory };
@@ -2302,10 +2453,13 @@ export class BotEngineService implements OnModuleInit {
                   ? origQty
                   : fallbackQty;
 
+            const clientOrderId = typeof response.clientOrderId === "string" ? response.clientOrderId.trim() : "";
+
             const order: Order = {
               id: response.orderId !== undefined ? String(response.orderId) : crypto.randomUUID(),
               ts: new Date().toISOString(),
               symbol,
+              ...(clientOrderId ? { clientOrderId } : {}),
               side,
               type: (response.type?.toUpperCase() ?? "MARKET"),
               status: this.mapBinanceStatus(response.status),
@@ -2383,6 +2537,49 @@ export class BotEngineService implements OnModuleInit {
           });
           if (preDrawdownProtectionFingerprint !== protectionFingerprint(current)) {
             this.save(current);
+          }
+
+          const globalLockAfterDrawdown = this.getActiveGlobalProtectionLock(current);
+          if (globalLockAfterDrawdown) {
+            if (config?.advanced.autoCancelBotOrdersOnGlobalProtectionLock && config) {
+              current = await this.cancelBotOwnedOpenOrders({
+                config,
+                state: current,
+                orders: current.activeOrders,
+                reason: `global-lock ${globalLockAfterDrawdown.type}`,
+                details: {
+                  lockType: globalLockAfterDrawdown.type,
+                  lockReason: globalLockAfterDrawdown.reason,
+                  lockExpiresAt: globalLockAfterDrawdown.expiresAt
+                },
+                maxCancels: 10
+              });
+              this.save(current);
+            }
+
+            const summary = `Skip: Protection lock ${globalLockAfterDrawdown.type} (GLOBAL)`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        stage: "protection-lock",
+                        lock: globalLockAfterDrawdown
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            this.save(next);
+            return;
           }
 
           const postProtectionBlockedReason = this.isSymbolBlocked(candidateSymbol, current);
@@ -3012,8 +3209,8 @@ export class BotEngineService implements OnModuleInit {
                 const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
                 const next = {
                   ...current,
-                  activeOrders: filled.activeOrders,
-                  orderHistory: filled.orderHistory,
+                  activeOrders: current.activeOrders,
+                  orderHistory: current.orderHistory,
                   decisions: alreadyLogged
                     ? current.decisions
                     : [
@@ -3186,12 +3383,110 @@ export class BotEngineService implements OnModuleInit {
 
           const gridEnabled = Boolean(config?.derived.allowGrid && config?.basic.tradeMode === "SPOT_GRID");
           if (gridEnabled) {
-            const symbolOpenLimits = current.activeOrders.filter((order) => {
+            const botPrefix = config ? this.resolveBotOrderClientIdPrefix(config) : "ABOT";
+            const manageExternalOpenOrders = Boolean(config?.advanced.manageExternalOpenOrders);
+            const botOrderAutoCancelEnabled = Boolean(config?.advanced.botOrderAutoCancelEnabled);
+
+            const symbolOpenLimitOrdersAll = current.activeOrders.filter((order) => {
               if (order.symbol !== candidateSymbol) return false;
               if (order.status !== "NEW") return false;
               const t = order.type.trim().toUpperCase();
               return t === "LIMIT" || t === "LIMIT_MAKER";
             });
+
+            const externalOpenLimits = symbolOpenLimitOrdersAll.filter((order) => !this.isBotOwnedOrder(order, botPrefix));
+            if (externalOpenLimits.length > 0 && !manageExternalOpenOrders) {
+              const summary = `Skip ${candidateSymbol}: External open LIMIT order(s) detected`;
+              const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+              const next = {
+                ...current,
+                decisions: alreadyLogged
+                  ? current.decisions
+                  : [
+                      {
+                        id: crypto.randomUUID(),
+                        ts: new Date().toISOString(),
+                        kind: "SKIP",
+                        summary,
+                        details: {
+                          externalOpenOrders: externalOpenLimits.map((o) => ({
+                            id: o.id,
+                            side: o.side,
+                            type: o.type,
+                            price: o.price,
+                            qty: o.qty,
+                            clientOrderId: o.clientOrderId
+                          })),
+                          guidance: "Cancel the external order(s), or enable Advanced → Manage external/manual open orders."
+                        }
+                      },
+                      ...current.decisions
+                    ].slice(0, 200),
+                lastError: undefined
+              } satisfies BotState;
+              this.save(next);
+              return;
+            }
+
+            const atr = Number.isFinite(selectedCandidate?.atrPct14) ? Math.max(0.1, selectedCandidate?.atrPct14 ?? 0.4) : 0.4;
+            const gridSpacingPct = Math.max(0.2, Math.min(2.5, atr * (0.6 - (risk / 100) * 0.25)));
+
+            if (botOrderAutoCancelEnabled && config) {
+              const ttlMs = Math.max(60_000, Math.round(config.advanced.botOrderStaleTtlMinutes * 60_000));
+              const maxDistancePct = Math.max(0.1, config.advanced.botOrderMaxDistancePct);
+              const cancelDistancePct = Math.max(maxDistancePct, gridSpacingPct * 3);
+
+              const stale = symbolOpenLimitOrdersAll
+                .filter((order) => this.isBotOwnedOrder(order, botPrefix))
+                .map((order) => {
+                  const ageMs = this.getOrderAgeMs(order);
+                  const orderPrice = typeof order.price === "number" && Number.isFinite(order.price) ? order.price : Number.NaN;
+                  const distancePct =
+                    Number.isFinite(orderPrice) && orderPrice > 0 && Number.isFinite(price) && price > 0
+                      ? (Math.abs(orderPrice - price) / price) * 100
+                      : Number.NaN;
+                  const tooOld = typeof ageMs === "number" && ageMs > ttlMs;
+                  const tooFar = Number.isFinite(distancePct) && distancePct > cancelDistancePct;
+                  return { order, ageMs, distancePct, tooOld, tooFar };
+                })
+                .filter((item) => item.tooOld || item.tooFar)
+	                .sort((a, b) => {
+	                  const da = Number.isFinite(a.distancePct) ? a.distancePct : -1;
+	                  const db = Number.isFinite(b.distancePct) ? b.distancePct : -1;
+	                  if (db !== da) return db - da;
+	                  const aa = typeof a.ageMs === "number" ? a.ageMs : -1;
+	                  const ab = typeof b.ageMs === "number" ? b.ageMs : -1;
+	                  return ab - aa;
+	                })
+	                .map((item) => item.order);
+
+              if (stale.length > 0) {
+                current = await this.cancelBotOwnedOpenOrders({
+                  config,
+                  state: current,
+                  orders: stale,
+                  reason: `stale-grid-order ${candidateSymbol}`,
+                  details: {
+                    symbol: candidateSymbol,
+                    marketPrice: Number(price.toFixed(8)),
+                    gridSpacingPct: Number(gridSpacingPct.toFixed(6)),
+                    staleTtlMinutes: config.advanced.botOrderStaleTtlMinutes,
+                    cancelDistancePct: Number(cancelDistancePct.toFixed(6))
+                  },
+                  maxCancels: 2
+                });
+                this.save(current);
+              }
+            }
+
+            const symbolOpenLimits = current.activeOrders.filter((order) => {
+              if (order.symbol !== candidateSymbol) return false;
+              if (order.status !== "NEW") return false;
+              const t = order.type.trim().toUpperCase();
+              if (t !== "LIMIT" && t !== "LIMIT_MAKER") return false;
+              return manageExternalOpenOrders ? true : this.isBotOwnedOrder(order, botPrefix);
+            });
+
             const hasBuyLimit = symbolOpenLimits.some((order) => order.side === "BUY");
             const hasSellLimit = symbolOpenLimits.some((order) => order.side === "SELL");
             const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(risk / 25)));
@@ -3201,8 +3496,8 @@ export class BotEngineService implements OnModuleInit {
               const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
               const next = {
                 ...current,
-                activeOrders: filled.activeOrders,
-                orderHistory: filled.orderHistory,
+                activeOrders: current.activeOrders,
+                orderHistory: current.orderHistory,
                 decisions: alreadyLogged
                   ? current.decisions
                   : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200),
@@ -3211,26 +3506,21 @@ export class BotEngineService implements OnModuleInit {
               this.save(next);
               return;
             }
-
-            const atr = Number.isFinite(selectedCandidate?.atrPct14) ? Math.max(0.1, selectedCandidate?.atrPct14 ?? 0.4) : 0.4;
-            const gridSpacingPct = Math.max(0.2, Math.min(2.5, atr * (0.6 - (risk / 100) * 0.25)));
             const buyLimitPrice = Number((price * (1 - gridSpacingPct / 100)).toFixed(8));
             const sellLimitPrice = Number((price * (1 + gridSpacingPct / 100)).toFixed(8));
             let placedGridOrder = false;
 
             if (!hasBuyLimit && Number.isFinite(buyLimitPrice) && buyLimitPrice > 0) {
               const buyPriceNorm = await this.marketData.normalizeLimitPrice(candidateSymbol, buyLimitPrice, "BUY");
-              if (!buyPriceNorm.ok) {
-                const summary = `Skip ${candidateSymbol}: Grid buy price invalid (${buyPriceNorm.reason})`;
-                const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
-                const next = {
-                  ...current,
-                  activeOrders: filled.activeOrders,
-                  orderHistory: filled.orderHistory,
-                  decisions: alreadyLogged
-                    ? current.decisions
-                    : [
-                        {
+	              if (!buyPriceNorm.ok) {
+	                const summary = `Skip ${candidateSymbol}: Grid buy price invalid (${buyPriceNorm.reason})`;
+	                const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+	                const next = {
+	                  ...current,
+	                  decisions: alreadyLogged
+	                    ? current.decisions
+	                    : [
+	                        {
                           id: crypto.randomUUID(),
                           ts: new Date().toISOString(),
                           kind: "SKIP",
@@ -3260,7 +3550,8 @@ export class BotEngineService implements OnModuleInit {
                     side: "BUY",
                     quantity: buyQtyStr,
                     price: buyPriceNorm.normalizedPrice,
-                    timeInForce: "GTC"
+                    timeInForce: "GTC",
+                    clientOrderId: config ? this.buildBotClientOrderId({ config, purpose: "GRID", side: "BUY" }) : undefined
                   });
                   persistLiveTrade({
                     symbol: candidateSymbol,
@@ -3291,8 +3582,8 @@ export class BotEngineService implements OnModuleInit {
                 const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
                 const next = {
                   ...current,
-                  activeOrders: filled.activeOrders,
-                  orderHistory: filled.orderHistory,
+                  activeOrders: current.activeOrders,
+                  orderHistory: current.orderHistory,
                   decisions: alreadyLogged
                     ? current.decisions
                     : [
@@ -3327,8 +3618,8 @@ export class BotEngineService implements OnModuleInit {
                   const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
                   const next = {
                     ...current,
-                    activeOrders: filled.activeOrders,
-                    orderHistory: filled.orderHistory,
+                    activeOrders: current.activeOrders,
+                    orderHistory: current.orderHistory,
                     decisions: alreadyLogged
                       ? current.decisions
                       : [
@@ -3356,7 +3647,8 @@ export class BotEngineService implements OnModuleInit {
                     side: "SELL",
                     quantity: sellQtyStr,
                     price: sellPriceNorm.normalizedPrice,
-                    timeInForce: "GTC"
+                    timeInForce: "GTC",
+                    clientOrderId: config ? this.buildBotClientOrderId({ config, purpose: "GRID", side: "SELL" }) : undefined
                   });
                   persistLiveTrade({
                     symbol: candidateSymbol,
@@ -3386,8 +3678,8 @@ export class BotEngineService implements OnModuleInit {
                   const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
                   const next = {
                     ...current,
-                    activeOrders: filled.activeOrders,
-                    orderHistory: filled.orderHistory,
+                    activeOrders: current.activeOrders,
+                    orderHistory: current.orderHistory,
                     decisions: alreadyLogged
                       ? current.decisions
                       : [
@@ -3417,16 +3709,14 @@ export class BotEngineService implements OnModuleInit {
               return;
             }
 
-            const summary = `Skip ${candidateSymbol}: Grid waiting for ladder slot or inventory`;
-            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
-            const next = {
-              ...current,
-              activeOrders: filled.activeOrders,
-              orderHistory: filled.orderHistory,
-              decisions: alreadyLogged
-                ? current.decisions
-                : [
-                    {
+	            const summary = `Skip ${candidateSymbol}: Grid waiting for ladder slot or inventory`;
+	            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+	            const next = {
+	              ...current,
+	              decisions: alreadyLogged
+	                ? current.decisions
+	                : [
+	                    {
                       id: crypto.randomUUID(),
                       ts: new Date().toISOString(),
                       kind: "SKIP",
@@ -3510,15 +3800,13 @@ export class BotEngineService implements OnModuleInit {
                 }
               : {})
           } satisfies Decision;
-          let nextState: BotState = {
-            ...current,
-            lastError: safeMsg,
-            activeOrders: filled.activeOrders,
-            orderHistory: filled.orderHistory,
-            decisions: alreadyLogged
-              ? current.decisions
-              : [skipDecision, ...current.decisions].slice(0, 200)
-          };
+	          let nextState: BotState = {
+	            ...current,
+	            lastError: safeMsg,
+	            decisions: alreadyLogged
+	              ? current.decisions
+	              : [skipDecision, ...current.decisions].slice(0, 200)
+	          };
 
           if (sizingFilterError) {
             const boundedRisk = Math.max(0, Math.min(100, config?.basic.risk ?? 50));
@@ -3666,10 +3954,11 @@ export class BotEngineService implements OnModuleInit {
     }
   }
 
-  stop(): void {
-    const state = this.getState();
+  async stop(): Promise<void> {
+    let state = this.getState();
     if (!state.running) return;
 
+    // Stop the loop first; then cancel bot-owned open orders best-effort.
     this.addDecision("ENGINE", "Stop requested");
 
     if (this.loopTimer) clearInterval(this.loopTimer);
@@ -3677,15 +3966,67 @@ export class BotEngineService implements OnModuleInit {
     this.loopTimer = null;
     this.examineTimer = null;
 
-    const next = this.getState();
-    const canceledOrders: Order[] = next.activeOrders.map((o) => ({ ...o, status: "CANCELED" }));
+    state = this.getState();
     this.save({
-      ...next,
+      ...state,
       running: false,
-      phase: "STOPPED",
-      activeOrders: [],
-      orderHistory: [...canceledOrders, ...next.orderHistory].slice(0, 500)
+      phase: "STOPPED"
     });
+
+    const config = this.configService.load();
+    if (config?.advanced.autoCancelBotOrdersOnStop) {
+      const prefix = this.resolveBotOrderClientIdPrefix(config);
+      const waitUntil = Date.now() + 5_000;
+      while (this.tickInFlight && Date.now() < waitUntil) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+
+      const stoppedState = this.getState();
+      const botOwnedOpenOrders = stoppedState.activeOrders.filter(
+        (order) => order.status === "NEW" && this.isBotOwnedOrder(order, prefix)
+      );
+      if (botOwnedOpenOrders.length === 0) {
+        this.persistBaselineStats(stoppedState);
+        return;
+      }
+
+      try {
+        const next = await this.cancelBotOwnedOpenOrders({
+          config,
+          state: stoppedState,
+          orders: botOwnedOpenOrders,
+          reason: "stop",
+          details: {
+            stage: "stop"
+          },
+          maxCancels: 50
+        });
+        this.save({
+          ...next,
+          running: false,
+          phase: "STOPPED"
+        });
+      } catch (cancelErr) {
+        const rawMsg = cancelErr instanceof Error ? cancelErr.message : String(cancelErr);
+        const safeMsg = this.sanitizeUserErrorMessage(rawMsg);
+        const summary = "Stop: failed to cancel bot open orders";
+        const latest = this.getState();
+        const alreadyLogged = latest.decisions[0]?.kind === "ENGINE" && latest.decisions[0]?.summary === summary;
+        const withDecision: BotState = {
+          ...latest,
+          lastError: safeMsg,
+          decisions: alreadyLogged
+            ? latest.decisions
+            : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "ENGINE", summary }, ...latest.decisions].slice(0, 200)
+        };
+        this.save({
+          ...withDecision,
+          running: false,
+          phase: "STOPPED"
+        });
+      }
+    }
+
     this.persistBaselineStats(this.getState());
   }
 

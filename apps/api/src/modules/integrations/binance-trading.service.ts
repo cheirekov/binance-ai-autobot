@@ -78,8 +78,18 @@ export class BinanceTradingService {
     return await this.adapter.getBalances();
   }
 
-  async placeSpotMarketOrder(params: { symbol: string; side: "BUY" | "SELL"; quantity: string }): Promise<BinanceMarketOrderResponse> {
-    return await this.adapter.placeSpotMarketOrder({ symbolId: params.symbol, side: params.side, quantity: params.quantity });
+  async placeSpotMarketOrder(params: {
+    symbol: string;
+    side: "BUY" | "SELL";
+    quantity: string;
+    clientOrderId?: string;
+  }): Promise<BinanceMarketOrderResponse> {
+    return await this.adapter.placeSpotMarketOrder({
+      symbolId: params.symbol,
+      side: params.side,
+      quantity: params.quantity,
+      clientOrderId: params.clientOrderId
+    });
   }
 
   async placeSpotLimitOrder(params: {
@@ -89,6 +99,7 @@ export class BinanceTradingService {
     price: string;
     timeInForce?: "GTC" | "IOC" | "FOK";
     postOnly?: boolean;
+    clientOrderId?: string;
   }): Promise<BinanceOrderSnapshot> {
     return await this.adapter.placeSpotLimitOrder({
       symbolId: params.symbol,
@@ -96,7 +107,8 @@ export class BinanceTradingService {
       quantity: params.quantity,
       price: params.price,
       timeInForce: params.timeInForce,
-      postOnly: params.postOnly
+      postOnly: params.postOnly,
+      clientOrderId: params.clientOrderId
     });
   }
 

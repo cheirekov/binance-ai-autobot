@@ -131,6 +131,11 @@ export class ConfigService {
         apiPort: Number.parseInt(process.env.PORT ?? "8148", 10),
         uiHost: process.env.UI_HOST ?? "0.0.0.0",
         uiPort: Number.parseInt(process.env.UI_PORT ?? "4173", 10),
+        botOrderClientIdPrefix: "ABOT",
+        botOrderAutoCancelEnabled: true,
+        autoCancelBotOrdersOnStop: true,
+        autoCancelBotOrdersOnGlobalProtectionLock: true,
+        manageExternalOpenOrders: false,
         neverTradeSymbols: [],
         autoBlacklistEnabled: true,
         autoBlacklistTtlMinutes: 180,
@@ -200,6 +205,13 @@ export class ConfigService {
     apiPort?: number;
     uiHost?: string;
     uiPort?: number;
+    botOrderClientIdPrefix?: string;
+    botOrderAutoCancelEnabled?: boolean;
+    botOrderStaleTtlMinutes?: number;
+    botOrderMaxDistancePct?: number;
+    autoCancelBotOrdersOnStop?: boolean;
+    autoCancelBotOrdersOnGlobalProtectionLock?: boolean;
+    manageExternalOpenOrders?: boolean;
     neverTradeSymbols?: string[];
     autoBlacklistEnabled?: boolean;
     autoBlacklistTtlMinutes?: number;

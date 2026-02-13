@@ -24,8 +24,8 @@ export class BotController {
   }
 
   @Post("bot/stop")
-  stop(): { ok: true } {
-    this.botEngine.stop();
+  async stop(): Promise<{ ok: true }> {
+    await this.botEngine.stop();
     return { ok: true };
   }
 

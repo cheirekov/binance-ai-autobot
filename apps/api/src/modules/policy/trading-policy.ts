@@ -17,21 +17,9 @@ const STABLE_ASSETS = new Set([
   "AEUR"
 ]);
 
-const EEA_BLOCKED_QUOTE_ASSETS = new Set([
-  "U",
-  "USDT",
-  "DAI",
-  "AEUR",
-  "XUSD",
-  "PAXG",
-  "USD1",
-  "FDUSD",
-  "FUSD",
-  "BUSD",
-  "TUSD",
-  "USDP",
-  "USDS"
-]);
+// Source: Binance MiCA stablecoin announcement (EEA spot trading pairs delisting).
+// Keep the default small and evidence-based; allow disabling via `enforceRegionPolicy=false` in Advanced.
+const EEA_BLOCKED_QUOTE_ASSETS = new Set(["USDT", "FDUSD", "TUSD", "USDP", "DAI", "AEUR", "XUSD", "PAXG"]);
 
 export function isStableAsset(asset: string | undefined): boolean {
   if (!asset) return false;

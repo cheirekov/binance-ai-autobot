@@ -246,12 +246,22 @@ export class CcxtBinanceAdapter {
     const cost = asNumber(order.cost);
     const filled = asNumber(order.filled);
     const amountOrig = asNumber(order.amount);
+    const timestamp =
+      typeof info.transactTime === "number"
+        ? info.transactTime
+        : typeof info.time === "number"
+          ? info.time
+          : typeof order.timestamp === "number"
+            ? order.timestamp
+            : typeof info.updateTime === "number"
+              ? info.updateTime
+              : undefined;
 
     return {
       symbol: mappedSymbol,
       orderId,
-      clientOrderId: asString(info.clientOrderId) ?? undefined,
-      transactTime: typeof info.transactTime === "number" ? info.transactTime : undefined,
+      clientOrderId: asString(info.clientOrderId) ?? asString(order.clientOrderId) ?? undefined,
+      transactTime: typeof timestamp === "number" ? timestamp : undefined,
       price: avg !== null ? String(avg) : typeof order.price === "number" ? String(order.price) : asString(info.price) ?? undefined,
       origQty: amountOrig !== null ? String(amountOrig) : asString(info.origQty) ?? undefined,
       executedQty: filled !== null ? String(filled) : asString(info.executedQty) ?? undefined,
@@ -296,6 +306,7 @@ export class CcxtBinanceAdapter {
     price: string;
     timeInForce?: "GTC" | "IOC" | "FOK";
     postOnly?: boolean;
+    clientOrderId?: string;
   }): Promise<CcxtBinanceOrderSnapshot> {
     const symbol = await this.toUnifiedSymbol(params.symbolId);
     const amount = Number.parseFloat(params.quantity);
@@ -310,7 +321,8 @@ export class CcxtBinanceAdapter {
     const side = params.side.toLowerCase();
     const raw = await this.exchange.createOrder(symbol, "limit", side, amount, price, {
       timeInForce: params.timeInForce ?? "GTC",
-      ...(params.postOnly ? { postOnly: true } : {})
+      ...(params.postOnly ? { postOnly: true } : {}),
+      ...(params.clientOrderId ? { newClientOrderId: params.clientOrderId } : {})
     });
     return this.mapCcxtOrder(raw, params.symbolId);
   }
@@ -319,6 +331,7 @@ export class CcxtBinanceAdapter {
     symbolId: string;
     side: "BUY" | "SELL";
     quantity: string;
+    clientOrderId?: string;
   }): Promise<CcxtBinanceMarketOrderResponse> {
     const symbol = await this.toUnifiedSymbol(params.symbolId);
     const amount = Number.parseFloat(params.quantity);
@@ -330,7 +343,8 @@ export class CcxtBinanceAdapter {
     const order = asRecord(
       await this.exchange.createOrder(symbol, "market", side, amount, undefined, {
         // Best-effort: Binance supports FULL to return fills; ccxt forwards unknown params.
-        newOrderRespType: "FULL"
+        newOrderRespType: "FULL",
+        ...(params.clientOrderId ? { newClientOrderId: params.clientOrderId } : {})
       })
     );
 

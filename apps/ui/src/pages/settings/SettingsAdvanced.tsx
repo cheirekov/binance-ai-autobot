@@ -22,6 +22,14 @@ export function SettingsAdvanced(): JSX.Element {
   const [uiHost, setUiHost] = useState("0.0.0.0");
   const [uiPort, setUiPort] = useState(4173);
 
+  const [botOrderClientIdPrefix, setBotOrderClientIdPrefix] = useState("ABOT");
+  const [botOrderAutoCancelEnabled, setBotOrderAutoCancelEnabled] = useState(true);
+  const [botOrderStaleTtlMinutes, setBotOrderStaleTtlMinutes] = useState(180);
+  const [botOrderMaxDistancePct, setBotOrderMaxDistancePct] = useState(3);
+  const [autoCancelBotOrdersOnStop, setAutoCancelBotOrdersOnStop] = useState(true);
+  const [autoCancelBotOrdersOnGlobalProtectionLock, setAutoCancelBotOrdersOnGlobalProtectionLock] = useState(true);
+  const [manageExternalOpenOrders, setManageExternalOpenOrders] = useState(false);
+
   const [binanceEnvironment, setBinanceEnvironment] = useState<"MAINNET" | "SPOT_TESTNET">("MAINNET");
   const [binanceBaseUrlOverride, setBinanceBaseUrlOverride] = useState("");
 
@@ -65,6 +73,13 @@ export function SettingsAdvanced(): JSX.Element {
     setApiPort(config.advanced.apiPort ?? 8148);
     setUiHost(config.advanced.uiHost ?? "0.0.0.0");
     setUiPort(config.advanced.uiPort ?? 4173);
+    setBotOrderClientIdPrefix(config.advanced.botOrderClientIdPrefix ?? "ABOT");
+    setBotOrderAutoCancelEnabled(config.advanced.botOrderAutoCancelEnabled ?? true);
+    setBotOrderStaleTtlMinutes(config.advanced.botOrderStaleTtlMinutes ?? 180);
+    setBotOrderMaxDistancePct(config.advanced.botOrderMaxDistancePct ?? 3);
+    setAutoCancelBotOrdersOnStop(config.advanced.autoCancelBotOrdersOnStop ?? true);
+    setAutoCancelBotOrdersOnGlobalProtectionLock(config.advanced.autoCancelBotOrdersOnGlobalProtectionLock ?? true);
+    setManageExternalOpenOrders(config.advanced.manageExternalOpenOrders ?? false);
     setBinanceEnvironment(config.advanced.binanceEnvironment ?? "MAINNET");
     setBinanceBaseUrlOverride(config.advanced.binanceBaseUrlOverride ?? "");
     setNeverTradeSymbolsText((config.advanced.neverTradeSymbols ?? []).join("\n"));
@@ -173,6 +188,13 @@ export function SettingsAdvanced(): JSX.Element {
         apiPort,
         uiHost,
         uiPort,
+        botOrderClientIdPrefix: botOrderClientIdPrefix.trim() || "ABOT",
+        botOrderAutoCancelEnabled,
+        botOrderStaleTtlMinutes,
+        botOrderMaxDistancePct,
+        autoCancelBotOrdersOnStop,
+        autoCancelBotOrdersOnGlobalProtectionLock,
+        manageExternalOpenOrders,
         neverTradeSymbols,
         autoBlacklistEnabled,
         autoBlacklistTtlMinutes,
@@ -390,6 +412,115 @@ export function SettingsAdvanced(): JSX.Element {
             {followRiskProfile
               ? `Managed by Basic risk slider (current risk ${config.basic?.risk ?? "?"}).`
               : "Manual mode: these values stay fixed until you change them here."}
+          </div>
+
+          <div className="card" style={{ marginTop: 12, background: "rgba(255,255,255,0.02)" }}>
+            <div className="title" style={{ fontSize: 14 }}>
+              Open order management (adaptive)
+            </div>
+            <div className="subtitle">
+              Autobot distinguishes its own orders via <code>clientOrderId</code> prefix and manages them automatically. External/manual open orders are not
+              canceled by default.
+            </div>
+
+            <div className="row cols-2" style={{ marginTop: 12 }}>
+              <div>
+                <label className="label">Bot order clientId prefix</label>
+                <input className="field" value={botOrderClientIdPrefix} onChange={(e) => setBotOrderClientIdPrefix(e.target.value)} />
+                <div className="subtitle">Only bot-owned orders are auto-managed and auto-canceled by default.</div>
+              </div>
+              <div>
+                <label className="label">Auto-manage bot-owned open orders</label>
+                <select
+                  className="field"
+                  value={botOrderAutoCancelEnabled ? "on" : "off"}
+                  onChange={(e) => setBotOrderAutoCancelEnabled(e.target.value === "on")}
+                >
+                  <option value="on">On (recommended)</option>
+                  <option value="off">Off</option>
+                </select>
+                <div className="subtitle">Cancels stale bot-owned LIMIT orders and refreshes grid ladders as market moves.</div>
+              </div>
+            </div>
+
+            <div className="row cols-2" style={{ marginTop: 12 }}>
+              <div>
+                <label className="label">Stale TTL (minutes)</label>
+                <input
+                  className="field"
+                  type="number"
+                  min={1}
+                  max={10080}
+                  value={botOrderStaleTtlMinutes}
+                  disabled={followRiskProfile}
+                  onChange={(e) => {
+                    const next = Number.parseInt(e.target.value, 10);
+                    if (Number.isFinite(next)) setBotOrderStaleTtlMinutes(next);
+                  }}
+                />
+                <div className="subtitle">{followRiskProfile ? "Managed by risk slider." : "Cancel bot-owned orders older than this."}</div>
+              </div>
+              <div>
+                <label className="label">Max distance from market (%)</label>
+                <input
+                  className="field"
+                  type="number"
+                  min={0.1}
+                  max={50}
+                  step={0.1}
+                  value={botOrderMaxDistancePct}
+                  disabled={followRiskProfile}
+                  onChange={(e) => {
+                    const next = Number.parseFloat(e.target.value);
+                    if (Number.isFinite(next)) setBotOrderMaxDistancePct(next);
+                  }}
+                />
+                <div className="subtitle">{followRiskProfile ? "Managed by risk slider." : "Cancel bot-owned orders too far from current price."}</div>
+              </div>
+            </div>
+
+            <div className="row cols-2" style={{ marginTop: 12 }}>
+              <div>
+                <label className="label">Cancel bot-owned orders on Stop</label>
+                <select
+                  className="field"
+                  value={autoCancelBotOrdersOnStop ? "on" : "off"}
+                  onChange={(e) => setAutoCancelBotOrdersOnStop(e.target.value === "on")}
+                >
+                  <option value="on">On (recommended)</option>
+                  <option value="off">Off</option>
+                </select>
+                <div className="subtitle">Prevents leaving hidden live LIMIT orders after stopping the engine.</div>
+              </div>
+              <div>
+                <label className="label">Cancel bot-owned orders on global protection lock</label>
+                <select
+                  className="field"
+                  value={autoCancelBotOrdersOnGlobalProtectionLock ? "on" : "off"}
+                  onChange={(e) => setAutoCancelBotOrdersOnGlobalProtectionLock(e.target.value === "on")}
+                >
+                  <option value="on">On (recommended)</option>
+                  <option value="off">Off</option>
+                </select>
+                <div className="subtitle">If the bot locks globally (drawdown/stoploss guard), cancel open bot LIMIT orders too.</div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <label className="label">Manage external/manual open orders</label>
+              <select
+                className="field"
+                value={manageExternalOpenOrders ? "on" : "off"}
+                onChange={(e) => setManageExternalOpenOrders(e.target.value === "on")}
+              >
+                <option value="off">Off (recommended)</option>
+                <option value="on">On (dangerous)</option>
+              </select>
+              <div className="subtitle">
+                If off, the bot will avoid trading a symbol when it detects external open orders. If on, the bot will treat them as part of the ladder and may
+                place additional bot-owned orders.
+              </div>
+            </div>
           </div>
 
           <div className="row cols-2" style={{ marginTop: 12 }}>

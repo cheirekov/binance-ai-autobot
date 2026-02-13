@@ -24,6 +24,7 @@ export const OrderSchema = z.object({
   id: z.string().min(1),
   ts: z.string().min(1),
   symbol: z.string().min(1),
+  clientOrderId: z.string().min(1).optional(),
   side: OrderSideSchema,
   type: z.string().min(1),
   status: OrderStatusSchema,

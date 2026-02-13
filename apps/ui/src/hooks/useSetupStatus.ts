@@ -6,7 +6,7 @@ type SetupStatus = {
   initialized: boolean;
 };
 
-export function useSetupStatus(): { loading: boolean; initialized: boolean; error?: string } {
+export function useSetupStatus(): { loading: boolean; initialized: boolean | null; error?: string } {
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState<boolean | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -41,5 +41,6 @@ export function useSetupStatus(): { loading: boolean; initialized: boolean; erro
     };
   }, []);
 
-  return { loading: loading && initialized === null, initialized: initialized ?? false, error };
+  // Avoid false onboarding redirects if the API is temporarily unreachable.
+  return { loading: loading && initialized === null && !error, initialized, error };
 }

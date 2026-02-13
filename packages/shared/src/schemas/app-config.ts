@@ -81,6 +81,13 @@ export const AdvancedSettingsSchema = z.object({
   apiPort: z.number().int().min(1).max(65535),
   uiHost: z.string().min(1),
   uiPort: z.number().int().min(1).max(65535),
+  botOrderClientIdPrefix: z.string().min(3).max(12).default("ABOT"),
+  botOrderAutoCancelEnabled: z.boolean().default(true),
+  botOrderStaleTtlMinutes: z.number().int().min(1).max(10080).default(180),
+  botOrderMaxDistancePct: z.number().min(0.1).max(50).default(3),
+  autoCancelBotOrdersOnStop: z.boolean().default(true),
+  autoCancelBotOrdersOnGlobalProtectionLock: z.boolean().default(true),
+  manageExternalOpenOrders: z.boolean().default(false),
   neverTradeSymbols: z.array(z.string().min(1)).default([]),
   autoBlacklistEnabled: z.boolean().default(true),
   autoBlacklistTtlMinutes: z.number().int().min(1).max(43200).default(180),
@@ -156,6 +163,8 @@ export function deriveAdvancedRiskProfile(risk: number): Pick<
   | "maxConsecutiveEntriesPerSymbol"
   | "conversionTopUpReserveMultiplier"
   | "conversionTopUpCooldownMs"
+  | "botOrderStaleTtlMinutes"
+  | "botOrderMaxDistancePct"
 > {
   const r = clampRisk(risk);
   const t = r / 100;
@@ -171,7 +180,9 @@ export function deriveAdvancedRiskProfile(risk: number): Pick<
     symbolEntryCooldownMs: Math.round(180_000 - t * 165_000), // 180s -> 15s
     maxConsecutiveEntriesPerSymbol: Math.max(1, Math.round(2 + t * 6)), // 2 -> 8
     conversionTopUpReserveMultiplier: round(2.8 - t * 1.6, 2), // 2.8 -> 1.2
-    conversionTopUpCooldownMs: Math.round(240_000 - t * 220_000) // 240s -> 20s
+    conversionTopUpCooldownMs: Math.round(240_000 - t * 220_000), // 240s -> 20s
+    botOrderStaleTtlMinutes: Math.max(15, Math.round(240 - t * 210)), // 240m -> 30m
+    botOrderMaxDistancePct: round(4 - t * 2.5, 2) // 4.00% -> 1.50%
   };
 }
 

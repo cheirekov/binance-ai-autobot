@@ -42,12 +42,12 @@ describe("trading-policy", () => {
 
   it("keeps EEA restrictions for non-MiCA stable-like quotes", () => {
     const reason = getPairPolicyBlockReason({
-      symbol: "BTCU",
+      symbol: "BTCFDUSD",
       baseAsset: "BTC",
-      quoteAsset: "U",
+      quoteAsset: "FDUSD",
       traderRegion: "EEA",
       enforceRegionPolicy: true
     });
-    expect(reason).toBe("EEA policy filtered quote asset U");
+    expect(reason).toBe("EEA policy filtered quote asset FDUSD");
   });
 });

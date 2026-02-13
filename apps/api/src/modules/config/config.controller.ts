@@ -13,6 +13,13 @@ const AdvancedUpdateSchema = z.object({
   apiPort: z.number().int().min(1).max(65535).optional(),
   uiHost: z.string().min(1).optional(),
   uiPort: z.number().int().min(1).max(65535).optional(),
+  botOrderClientIdPrefix: z.string().min(3).max(12).optional(),
+  botOrderAutoCancelEnabled: z.boolean().optional(),
+  botOrderStaleTtlMinutes: z.number().int().min(1).max(10080).optional(),
+  botOrderMaxDistancePct: z.number().min(0.1).max(50).optional(),
+  autoCancelBotOrdersOnStop: z.boolean().optional(),
+  autoCancelBotOrdersOnGlobalProtectionLock: z.boolean().optional(),
+  manageExternalOpenOrders: z.boolean().optional(),
   neverTradeSymbols: z.array(z.string().min(1)).optional(),
   autoBlacklistEnabled: z.boolean().optional(),
   autoBlacklistTtlMinutes: z.number().int().min(1).max(43200).optional(),
@@ -90,6 +97,13 @@ export class ConfigController {
       binanceEnvironment: "MAINNET" | "SPOT_TESTNET";
       binanceBaseUrlOverride?: string;
       apiKeyHint: string;
+      botOrderClientIdPrefix: string;
+      botOrderAutoCancelEnabled: boolean;
+      botOrderStaleTtlMinutes: number;
+      botOrderMaxDistancePct: number;
+      autoCancelBotOrdersOnStop: boolean;
+      autoCancelBotOrdersOnGlobalProtectionLock: boolean;
+      manageExternalOpenOrders: boolean;
       neverTradeSymbols: string[];
       autoBlacklistEnabled: boolean;
       autoBlacklistTtlMinutes: number;
@@ -144,6 +158,13 @@ export class ConfigController {
         binanceEnvironment: config.advanced.binanceEnvironment,
         binanceBaseUrlOverride: config.advanced.binanceBaseUrlOverride,
         apiKeyHint: config.advanced.apiKey.slice(-6),
+        botOrderClientIdPrefix: config.advanced.botOrderClientIdPrefix,
+        botOrderAutoCancelEnabled: config.advanced.botOrderAutoCancelEnabled,
+        botOrderStaleTtlMinutes: config.advanced.botOrderStaleTtlMinutes,
+        botOrderMaxDistancePct: config.advanced.botOrderMaxDistancePct,
+        autoCancelBotOrdersOnStop: config.advanced.autoCancelBotOrdersOnStop,
+        autoCancelBotOrdersOnGlobalProtectionLock: config.advanced.autoCancelBotOrdersOnGlobalProtectionLock,
+        manageExternalOpenOrders: config.advanced.manageExternalOpenOrders,
         neverTradeSymbols: config.advanced.neverTradeSymbols,
         autoBlacklistEnabled: config.advanced.autoBlacklistEnabled,
         autoBlacklistTtlMinutes: config.advanced.autoBlacklistTtlMinutes,
