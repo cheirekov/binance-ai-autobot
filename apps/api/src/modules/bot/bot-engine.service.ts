@@ -1247,7 +1247,10 @@ export class BotEngineService implements OnModuleInit {
           continue;
         }
 
-        if (remainingSymbolNotional > 0 && bufferedCost > remainingSymbolNotional + 1e-8) {
+        // Symbol exposure is mark-to-market notional (qty * price), not buffered cost.
+        // Using buffered cost here can reject every candidate when `targetNotional` already equals the remaining cap.
+        const notional = qty * price;
+        if (remainingSymbolNotional > 0 && notional > remainingSymbolNotional + 1e-8) {
           sizingRejected += 1;
           recordRejection({
             symbol,

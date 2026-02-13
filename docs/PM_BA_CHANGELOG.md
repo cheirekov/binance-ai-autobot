@@ -16,6 +16,27 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-13 15:22 UTC — P0 bot idle fix (feasibility filter: exposure cap vs buffered cost)
+- Scope: fix a live-candidate feasibility bug that could reject every candidate and leave the bot “running but doing nothing”.
+- BA requirement mapping:
+  - User reported: bot starts, scans universe, then only logs `Skip: No feasible candidates after sizing/cap filters (9 rejected)`.
+  - Feedback bundle `autobot-feedback-20260213-150356.tgz` showed all rejections were `max-symbol-exposure` with `bufferedCost` barely above `remainingSymbolNotional`.
+- PM milestone mapping: unblock `T-027` nightly validation by restoring baseline entry execution (prevents false “no feasible candidates” stalls).
+- Technical changes:
+  - API:
+    - Fixed `pickFeasibleLiveCandidate()` to enforce symbol exposure using mark-to-market notional (`qty * price`) instead of buffered cost (`qty * price * bufferFactor`) (`apps/api/src/modules/bot/bot-engine.service.ts`).
+    - Added a regression test covering the failure mode (slippage buffer > 1 while target notional equals remaining exposure) (`apps/api/src/modules/bot/bot-engine.service.test.ts`).
+- Risk slider impact:
+  - No formula changes.
+  - Behavioral impact: reduces “idle due to false exposure-cap rejects”, especially visible at higher `risk` where `maxPositionPct` is larger and `bufferFactor` is still > 1.
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (10–30 min):
+  - Redeploy, reset state, start bot.
+  - Confirm decisions no longer flood `Skip: No feasible candidates ... max-symbol-exposure` when `remainingSymbolNotional` is the binding constraint.
+- Follow-up:
+  - If wallets with `homeStable` free near zero still idle, adjust feasibility selection to allow candidates that require conversion top-up (handled later in the tick) instead of rejecting early.
+
 ## 2026-02-13 13:36 UTC — P0 UI blank-screen hotfix (Dashboard refresh handler + UI typecheck)
 - Scope: restore dashboard rendering after the snapshot refactor (a missing handler caused a runtime crash that produced a blank screen after the “Loading…” card).
 - BA requirement mapping:
