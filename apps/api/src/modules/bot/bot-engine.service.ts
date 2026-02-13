@@ -376,6 +376,14 @@ export class BotEngineService implements OnModuleInit {
     };
   }
 
+  private deriveNoActionSymbolCooldownMs(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const t = boundedRisk / 100;
+    // Used to avoid cycling on repeatedly infeasible symbols (quote shortfalls, dust sell constraints, etc.).
+    // Lower risk = longer cooldown (less thrash), higher risk = shorter cooldown (more aggressive rotation).
+    return Math.round(90_000 - t * 75_000); // 90s -> 15s
+  }
+
   private getClosedPnlEvents(state: BotState): ClosedPnlEvent[] {
     const events: ClosedPnlEvent[] = [];
     const positions = new Map<string, { netQty: number; costQuote: number }>();
@@ -2722,6 +2730,7 @@ export class BotEngineService implements OnModuleInit {
             return;
           }
           const candidateBaseAsset = rules.baseAsset.toUpperCase();
+          const gridEnabled = Boolean(config?.derived.allowGrid && config?.basic.tradeMode === "SPOT_GRID");
 
           const managedPositions = this.getManagedPositions(current);
           const managedOpenHomeSymbols = [...managedPositions.values()].filter((p) => p.netQty > 0 && p.symbol.endsWith(homeStable));
@@ -3085,7 +3094,7 @@ export class BotEngineService implements OnModuleInit {
           }
 
           let bufferedCost = qty * price * bufferFactor;
-          if (Number.isFinite(bufferedCost) && bufferedCost > quoteFree) {
+          if (!gridEnabled && Number.isFinite(bufferedCost) && bufferedCost > quoteFree) {
             const affordableQtyTarget = quoteFree / (price * bufferFactor);
             if (Number.isFinite(affordableQtyTarget) && affordableQtyTarget > 0) {
               const affordableCheck = await this.marketData.validateMarketOrderQty(candidateSymbol, affordableQtyTarget);
@@ -3140,7 +3149,7 @@ export class BotEngineService implements OnModuleInit {
               return;
             }
           }
-          if (Number.isFinite(bufferedCost) && bufferedCost > quoteFree) {
+          if (!gridEnabled && Number.isFinite(bufferedCost) && bufferedCost > quoteFree) {
             const shortfall = bufferedCost - quoteFree;
             const conversionTopUpReserveMultiplier = Math.max(1, config?.advanced.conversionTopUpReserveMultiplier ?? 2);
             const minOrderNotional = check.minNotional ? Number.parseFloat(check.minNotional) : Number.NaN;
@@ -3165,6 +3174,7 @@ export class BotEngineService implements OnModuleInit {
             const shortfallTriggerRatio = Math.max(0.3, 0.8 - (risk / 100) * 0.5); // risk 0 -> 80%, risk 100 -> 30%
             const minShortfallToConvert = floorTopUpTarget * shortfallTriggerRatio;
             if (!requiresReserveRecovery && shortfall < minShortfallToConvert) {
+              const cooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
               const summary = `Skip ${candidateSymbol}: Insufficient ${homeStable} for estimated cost`;
               const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
               const next = {
@@ -3187,14 +3197,28 @@ export class BotEngineService implements OnModuleInit {
                           reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
                           reserveHighTarget: Number(reserveHighTarget.toFixed(6)),
                           reserveTopUpNeeded: Number(reserveTopUpNeeded.toFixed(6)),
-                          capitalTier: capitalProfile.tier
+                          capitalTier: capitalProfile.tier,
+                          cooldownMs
                         }
                       },
                       ...current.decisions
                     ].slice(0, 200),
                 lastError: undefined
               } satisfies BotState;
-              this.save(next);
+              const nextWithCooldown = this.upsertProtectionLock(next, {
+                type: "COOLDOWN",
+                scope: "SYMBOL",
+                symbol: candidateSymbol,
+                reason: `Cooldown after quote shortfall skip (${Math.round(cooldownMs / 1000)}s)`,
+                expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                details: {
+                  category: "SKIP_QUOTE_SHORTFALL",
+                  cooldownMs,
+                  shortfall: Number(shortfall.toFixed(6)),
+                  minShortfallToConvert: Number(minShortfallToConvert.toFixed(6))
+                }
+              });
+              this.save(nextWithCooldown);
               return;
             }
             const conversionTarget = Math.max(shortfall * conversionTopUpReserveMultiplier, floorTopUpTarget, reserveTopUpNeeded);
@@ -3347,6 +3371,7 @@ export class BotEngineService implements OnModuleInit {
 
             const summary = `Skip ${candidateSymbol}: Insufficient ${homeStable} for estimated cost`;
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const cooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
             const next = {
               ...current,
               activeOrders: filled.activeOrders,
@@ -3373,18 +3398,31 @@ export class BotEngineService implements OnModuleInit {
                         walletTotalHome: Number(walletTotalHome.toFixed(6)),
                         price: Number(price.toFixed(8)),
                         qty: Number(qty.toFixed(8)),
-                        bufferFactor
+                        bufferFactor,
+                        cooldownMs
                       }
                     },
                     ...current.decisions
                   ].slice(0, 200),
               lastError: undefined
             } satisfies BotState;
-            this.save(next);
+            const nextWithCooldown = this.upsertProtectionLock(next, {
+              type: "COOLDOWN",
+              scope: "SYMBOL",
+              symbol: candidateSymbol,
+              reason: `Cooldown after quote-insufficient (no conversion route) (${Math.round(cooldownMs / 1000)}s)`,
+              expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+              details: {
+                category: "SKIP_QUOTE_INSUFFICIENT",
+                cooldownMs,
+                shortfall: Number(shortfall.toFixed(6)),
+                conversionTarget: Number(conversionTarget.toFixed(6))
+              }
+            });
+            this.save(nextWithCooldown);
             return;
           }
 
-          const gridEnabled = Boolean(config?.derived.allowGrid && config?.basic.tradeMode === "SPOT_GRID");
           if (gridEnabled) {
             const botPrefix = config ? this.resolveBotOrderClientIdPrefix(config) : "ABOT";
             const manageExternalOpenOrders = Boolean(config?.advanced.manageExternalOpenOrders);
@@ -3581,6 +3619,7 @@ export class BotEngineService implements OnModuleInit {
                   placedGridOrder = true;
                 }
               } else if (buyCheck.reason) {
+                const cooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
                 const summary = `Skip ${candidateSymbol}: Grid buy sizing rejected (${buyCheck.reason})`;
                 const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
                 const next = {
@@ -3599,14 +3638,28 @@ export class BotEngineService implements OnModuleInit {
                             ...buyCheck,
                             desiredQty: Number(qty.toFixed(8)),
                             maxAffordableQty: Number(maxAffordableQty.toFixed(8)),
-                            limitPrice: buyPriceNorm.normalizedPrice
+                            limitPrice: buyPriceNorm.normalizedPrice,
+                            cooldownMs
                           }
                         },
                         ...current.decisions
                       ].slice(0, 200),
                   lastError: undefined
                 } satisfies BotState;
-                this.save(next);
+                const nextWithCooldown = this.upsertProtectionLock(next, {
+                  type: "COOLDOWN",
+                  scope: "SYMBOL",
+                  symbol: candidateSymbol,
+                  reason: `Cooldown after grid buy sizing reject (${Math.round(cooldownMs / 1000)}s)`,
+                  expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                  details: {
+                    category: "GRID_BUY_SIZING_REJECT",
+                    cooldownMs,
+                    reason: buyCheck.reason,
+                    limitPrice: buyPriceNorm.normalizedPrice
+                  }
+                });
+                this.save(nextWithCooldown);
                 return;
               }
             }
@@ -3642,9 +3695,9 @@ export class BotEngineService implements OnModuleInit {
                 }
 
                 const sellCheck = await this.marketData.validateLimitOrderQty(candidateSymbol, desiredSellQty, sellPriceNorm.normalizedPrice);
-                const sellQtyStr = sellCheck.ok ? sellCheck.normalizedQty : undefined;
+                const sellQtyStr = sellCheck.ok ? sellCheck.normalizedQty : sellCheck.requiredQty;
                 const sellQty = sellQtyStr ? Number.parseFloat(sellQtyStr) : Number.NaN;
-                if (sellQtyStr && Number.isFinite(sellQty) && sellQty > 0) {
+                if (sellQtyStr && Number.isFinite(sellQty) && sellQty > 0 && sellQty <= desiredSellQty + 1e-8) {
                   const sellOrder = await this.trading.placeSpotLimitOrder({
                     symbol: candidateSymbol,
                     side: "SELL",
@@ -3677,6 +3730,7 @@ export class BotEngineService implements OnModuleInit {
                   });
                   placedGridOrder = true;
                 } else if (sellCheck.reason) {
+                  const cooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
                   const summary = `Skip ${candidateSymbol}: Grid sell sizing rejected (${sellCheck.reason})`;
                   const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
                   const next = {
@@ -3695,14 +3749,28 @@ export class BotEngineService implements OnModuleInit {
                               ...sellCheck,
                               desiredQty: Number(desiredSellQty.toFixed(8)),
                               baseFree: Number(baseFree.toFixed(8)),
-                              limitPrice: sellPriceNorm.normalizedPrice
+                              limitPrice: sellPriceNorm.normalizedPrice,
+                              cooldownMs
                             }
                           },
                           ...current.decisions
                         ].slice(0, 200),
                     lastError: undefined
                   } satisfies BotState;
-                  this.save(next);
+                  const nextWithCooldown = this.upsertProtectionLock(next, {
+                    type: "COOLDOWN",
+                    scope: "SYMBOL",
+                    symbol: candidateSymbol,
+                    reason: `Cooldown after grid sell sizing reject (${Math.round(cooldownMs / 1000)}s)`,
+                    expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                    details: {
+                      category: "GRID_SELL_SIZING_REJECT",
+                      cooldownMs,
+                      reason: sellCheck.reason,
+                      limitPrice: sellPriceNorm.normalizedPrice
+                    }
+                  });
+                  this.save(nextWithCooldown);
                   return;
                 }
               }

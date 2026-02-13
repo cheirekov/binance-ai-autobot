@@ -16,6 +16,31 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-13 16:09 UTC — Grid execution guardrails (reduce cycling; limit-mode affordability)
+- Scope: reduce “cycling SKIP” behavior in grid mode and avoid false quote-insufficient skips by sizing against LIMIT prices.
+- BA requirement mapping:
+  - User reported repeated alternation like:
+    - `Skip <symbol>: Insufficient USDC for estimated cost` (even in grid mode),
+    - `Skip <symbol>: Grid sell sizing rejected (Below minNotional...)`,
+    - `Skip <symbol>: Grid waiting for ladder slot or inventory`.
+  - Goal: autop should rotate away from infeasible candidates and stop spamming no-action skips.
+- PM milestone mapping: keep `T-027` usable for 2–4h and overnight validation by preventing “no-op loops”.
+- Technical changes:
+  - API:
+    - In `SPOT_GRID`, stop using market-price affordability / conversion shortfall gating to block the grid ladder; the grid BUY leg now sizes against the LIMIT price path only (`apps/api/src/modules/bot/bot-engine.service.ts`).
+    - Allow grid SELL leg to use `requiredQty` when it satisfies filters and is within `baseFree` (prevents unnecessary sell sizing rejects).
+    - Add short, risk-linked symbol cooldown after repeated no-action skips (quote shortfall skips and grid buy/sell sizing rejects) to prevent symbol cycling and improve candidate rotation.
+- Risk slider impact:
+  - Low risk = longer no-action cooldowns and wider grid spacing (fewer trades).
+  - High risk = shorter cooldowns and tighter grid spacing (more trades).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (30–60 min):
+  - Run `SPOT_GRID` with low `USDC` free (or minor shortfalls) and confirm the bot places/maintains LIMIT orders instead of repeatedly skipping on market-cost affordability.
+  - Confirm “cycling” reduces: the same infeasible symbol should disappear temporarily via the cooldown lock, and the bot should rotate to other candidates.
+- Follow-up:
+  - If “Grid waiting” remains noisy, switch that path from `SKIP` to a throttled `ENGINE` status update and add a global stale-order maintenance pass across all open bot-owned LIMITs.
+
 ## 2026-02-13 15:22 UTC — P0 bot idle fix (feasibility filter: exposure cap vs buffered cost)
 - Scope: fix a live-candidate feasibility bug that could reject every candidate and leave the bot “running but doing nothing”.
 - BA requirement mapping:
