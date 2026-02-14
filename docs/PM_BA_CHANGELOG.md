@@ -16,6 +16,50 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-14 16:20 UTC — T-027 Grid Guard v1 (pause BUY legs in bear trend)
+- Scope: reduce bearish “bag accumulation” risk in `SPOT_GRID` by pausing new grid BUY LIMIT placements during strong bearish regimes while keeping SELLs active.
+- BA requirement mapping:
+  - User requirement: autop must manage losses automatically in bearish conditions without manual tuning.
+  - Goal: stop adding inventory into a strong downtrend, but still allow sell-side unwinds.
+- PM milestone mapping: close remaining slices of `T-027` with realistic LIMIT lifecycle and safer unattended overnight operation.
+- Technical changes:
+  - Shared:
+    - Added protection lock type `GRID_GUARD_BUY_PAUSE` to `packages/shared/src/schemas/bot-state.ts`.
+  - API:
+    - Added risk-linked grid guard in the `SPOT_GRID` branch: if regime is `BEAR_TREND` with sufficient confidence, create/refresh a symbol-scoped `GRID_GUARD_BUY_PAUSE` lock and skip placing new BUY ladder orders (`apps/api/src/modules/bot/bot-engine.service.ts`).
+    - `isSymbolBlocked` ignores `GRID_GUARD_BUY_PAUSE` so SELL legs remain eligible; other lock types still block as before.
+    - If BUYs are paused and there is no inventory to sell, apply a short symbol `COOLDOWN` lock to rotate to other candidates instead of idling.
+- Risk slider impact:
+  - Higher risk requires **higher** regime confidence to pause buys (more aggressive trading).
+  - Higher risk uses **shorter** guard lock durations (faster re-evaluation).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (2–4h):
+  - Run `SPOT_GRID` in a bearish period; verify the dashboard shows `GRID_GUARD_BUY_PAUSE` locks and BUY ladder placement slows/stops while SELLs continue.
+  - Confirm the bot rotates away from symbols with no sellable inventory instead of repeating no-op skips.
+- Follow-up:
+  - Extend Grid Guard from “bear trend” to “volatility spike / breakout” regimes and consider optional cancellation of bot-owned BUY LIMITs when guard triggers.
+
+## 2026-02-14 16:11 UTC — Reference review: `freqtrade-strategies-main` (GPL strategy patterns)
+- Scope: review community Freqtrade strategy repository to extract reusable design patterns (no GPL code copying) and map them to our active backlog.
+- BA requirement mapping:
+  - User requested “adaptive AUTOBOT” behavior and asked if the shared strategy pool can speed up delivery.
+  - Goal: identify what can be safely reused now (patterns) vs what requires a larger subsystem (backtesting / calibration / ML lifecycle).
+- PM milestone mapping: accelerate closure of `T-027` and prepare the next milestones (`T-003`, `T-026`) with a clearer execution plan.
+- Technical changes:
+  - Updated `docs/REFERENCES_ANALYSIS.md` with license-safe guidance and specific pattern mappings:
+    - Grid guard inputs (ADX/RSI/BB style regime gating),
+    - exit primitives (break-even, ATR-based stop distance, trailing),
+    - multi-timeframe “informative” context,
+    - hyperopt-like calibration discipline.
+  - Updated `docs/DELIVERY_BOARD.md` to connect `T-026` and `T-027` to these patterns (no behavior change).
+- Risk slider impact: none (analysis/docs only).
+- Validation evidence: none required (docs only).
+- Runtime test request: none.
+- Follow-up:
+  - Implement `T-027` remaining slice “Grid Guard v1” (pause BUY legs in bearish trend/vol regimes; keep SELLs) using our existing ADX/RSI/ATR features.
+  - Use `T-026` calibration runner to tune thresholds against our own telemetry (rather than adopting strategy constants).
+
 ## 2026-02-13 16:09 UTC — Grid execution guardrails (reduce cycling; limit-mode affordability)
 - Scope: reduce “cycling SKIP” behavior in grid mode and avoid false quote-insufficient skips by sizing against LIMIT prices.
 - BA requirement mapping:
@@ -38,8 +82,6 @@ This log is mandatory for every implementation patch batch.
 - Runtime test request (30–60 min):
   - Run `SPOT_GRID` with low `USDC` free (or minor shortfalls) and confirm the bot places/maintains LIMIT orders instead of repeatedly skipping on market-cost affordability.
   - Confirm “cycling” reduces: the same infeasible symbol should disappear temporarily via the cooldown lock, and the bot should rotate to other candidates.
-- Follow-up:
-  - If “Grid waiting” remains noisy, switch that path from `SKIP` to a throttled `ENGINE` status update and add a global stale-order maintenance pass across all open bot-owned LIMITs.
 
 ## 2026-02-14 10:06 UTC — PnL mark-to-market visibility + external order warning (T-027 slice)
 - Scope: improve operator visibility during `SPOT_GRID` runs without changing trading behavior.

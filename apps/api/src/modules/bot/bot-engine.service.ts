@@ -342,19 +342,32 @@ export class BotEngineService implements OnModuleInit {
     );
   }
 
-  private getActiveSymbolProtectionLock(state: BotState, symbol: string): ProtectionLockEntry | null {
+  private getActiveSymbolProtectionLock(
+    state: BotState,
+    symbol: string,
+    opts?: {
+      excludeTypes?: string[];
+      onlyTypes?: string[];
+    }
+  ): ProtectionLockEntry | null {
     const now = Date.now();
     const normalized = symbol.trim().toUpperCase();
     if (!normalized) return null;
-    return (
-      (state.protectionLocks ?? []).find(
-        (lock) =>
-          lock.scope === "SYMBOL" &&
-          lock.symbol?.trim().toUpperCase() === normalized &&
-          Number.isFinite(Date.parse(lock.expiresAt)) &&
-          Date.parse(lock.expiresAt) > now
-      ) ?? null
-    );
+    const exclude = new Set((opts?.excludeTypes ?? []).map((t) => t.trim().toUpperCase()).filter(Boolean));
+    const only = opts?.onlyTypes
+      ? new Set(opts.onlyTypes.map((t) => t.trim().toUpperCase()).filter(Boolean))
+      : null;
+    for (const lock of state.protectionLocks ?? []) {
+      if (lock.scope !== "SYMBOL") continue;
+      if (lock.symbol?.trim().toUpperCase() !== normalized) continue;
+      const expiresAt = Date.parse(lock.expiresAt);
+      if (!Number.isFinite(expiresAt) || expiresAt <= now) continue;
+      const type = lock.type.trim().toUpperCase();
+      if (exclude.has(type)) continue;
+      if (only && !only.has(type)) continue;
+      return lock;
+    }
+    return null;
   }
 
   private deriveProtectionPolicy(risk: number): ProtectionPolicy {
@@ -647,7 +660,7 @@ export class BotEngineService implements OnModuleInit {
       return "Blocked by Advanced never-trade list";
     }
 
-    const symbolLock = this.getActiveSymbolProtectionLock(state, symbol);
+    const symbolLock = this.getActiveSymbolProtectionLock(state, symbol, { excludeTypes: ["GRID_GUARD_BUY_PAUSE"] });
     if (symbolLock) {
       return `Protection lock ${symbolLock.type}: ${symbolLock.reason}`;
     }
@@ -3516,6 +3529,7 @@ export class BotEngineService implements OnModuleInit {
             const botPrefix = config ? this.resolveBotOrderClientIdPrefix(config) : "ABOT";
             const manageExternalOpenOrders = Boolean(config?.advanced.manageExternalOpenOrders);
             const botOrderAutoCancelEnabled = Boolean(config?.advanced.botOrderAutoCancelEnabled);
+            const baseFree = balances.find((b) => b.asset.toUpperCase() === candidateBaseAsset)?.free ?? 0;
 
             const symbolOpenLimitOrdersAll = current.activeOrders.filter((order) => {
               if (order.symbol !== candidateSymbol) return false;
@@ -3557,6 +3571,34 @@ export class BotEngineService implements OnModuleInit {
               this.save(next);
               return;
             }
+
+            const existingBuyPauseLock = this.getActiveSymbolProtectionLock(current, candidateSymbol, {
+              onlyTypes: ["GRID_GUARD_BUY_PAUSE"]
+            });
+            const regime = this.buildRegimeSnapshot(selectedCandidate ?? null);
+            const t = risk / 100;
+            const pauseConfidenceThreshold = this.toRounded(0.6 + t * 0.2, 4); // risk 0 -> 0.60, risk 100 -> 0.80
+            const shouldPauseBuys =
+              regime.label === "BEAR_TREND" &&
+              typeof regime.confidence === "number" &&
+              Number.isFinite(regime.confidence) &&
+              regime.confidence >= pauseConfidenceThreshold;
+            const guardLockMs = Math.max(60_000, Math.round((3 - t * 2) * 60_000)); // 3m -> 1m
+            if (shouldPauseBuys) {
+              current = this.upsertProtectionLock(current, {
+                type: "GRID_GUARD_BUY_PAUSE",
+                scope: "SYMBOL",
+                symbol: candidateSymbol,
+                reason: `Grid guard: pause BUY legs (${regime.label} ${Math.round(regime.confidence * 100)}%)`,
+                expiresAt: new Date(Date.now() + guardLockMs).toISOString(),
+                details: {
+                  regime,
+                  pauseConfidenceThreshold,
+                  guardLockMs
+                }
+              });
+            }
+            const buyPaused = Boolean(existingBuyPauseLock) || shouldPauseBuys;
 
             const atr = Number.isFinite(selectedCandidate?.atrPct14) ? Math.max(0.1, selectedCandidate?.atrPct14 ?? 0.4) : 0.4;
             const gridSpacingPct = Math.max(0.2, Math.min(2.5, atr * (0.6 - (risk / 100) * 0.25)));
@@ -3640,7 +3682,39 @@ export class BotEngineService implements OnModuleInit {
             const sellLimitPrice = Number((price * (1 + gridSpacingPct / 100)).toFixed(8));
             let placedGridOrder = false;
 
-            if (!hasBuyLimit && Number.isFinite(buyLimitPrice) && buyLimitPrice > 0) {
+            if (!hasBuyLimit && buyPaused) {
+              const summary = `Skip ${candidateSymbol}: Grid guard paused BUY leg`;
+              const nowMs = Date.now();
+              const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+              const lastSimilar = current.decisions.find((d) => d.kind === "SKIP" && d.summary === summary);
+              const lastSimilarAt = lastSimilar ? Date.parse(lastSimilar.ts) : Number.NaN;
+              const throttleMs = 60_000;
+              const throttled = Number.isFinite(lastSimilarAt) && nowMs - lastSimilarAt < throttleMs;
+              if (!alreadyLogged && !throttled) {
+                current = {
+                  ...current,
+                  decisions: [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        regime,
+                        pauseConfidenceThreshold,
+                        buyPaused,
+                        hasBuyLimit,
+                        hasSellLimit
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
+                  lastError: undefined
+                } satisfies BotState;
+              }
+            }
+
+            if (!hasBuyLimit && !buyPaused && Number.isFinite(buyLimitPrice) && buyLimitPrice > 0) {
               const buyPriceNorm = await this.marketData.normalizeLimitPrice(candidateSymbol, buyLimitPrice, "BUY");
 	              if (!buyPriceNorm.ok) {
 	                const summary = `Skip ${candidateSymbol}: Grid buy price invalid (${buyPriceNorm.reason})`;
@@ -3760,7 +3834,6 @@ export class BotEngineService implements OnModuleInit {
             }
 
             if (!hasSellLimit && Number.isFinite(sellLimitPrice) && sellLimitPrice > 0) {
-              const baseFree = balances.find((b) => b.asset.toUpperCase() === candidateBaseAsset)?.free ?? 0;
               const desiredSellQty = Math.min(baseFree, qty);
               if (Number.isFinite(desiredSellQty) && desiredSellQty > 0) {
                 const sellPriceNorm = await this.marketData.normalizeLimitPrice(candidateSymbol, sellLimitPrice, "SELL");
@@ -3878,6 +3951,48 @@ export class BotEngineService implements OnModuleInit {
             }
 
             if (placedGridOrder) {
+              return;
+            }
+
+            if (buyPaused && !hasSellLimit && (!Number.isFinite(baseFree) || baseFree <= 0)) {
+              const summary = `Skip ${candidateSymbol}: Grid guard active (no inventory to sell)`;
+              const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+              const cooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), 60_000);
+              const next = {
+                ...current,
+                decisions: alreadyLogged
+                  ? current.decisions
+                  : [
+                      {
+                        id: crypto.randomUUID(),
+                        ts: new Date().toISOString(),
+                        kind: "SKIP",
+                        summary,
+                        details: {
+                          baseFree: Number((Number.isFinite(baseFree) ? baseFree : 0).toFixed(8)),
+                          cooldownMs,
+                          regime,
+                          pauseConfidenceThreshold
+                        }
+                      },
+                      ...current.decisions
+                    ].slice(0, 200),
+                lastError: undefined
+              } satisfies BotState;
+              const nextWithCooldown = this.upsertProtectionLock(next, {
+                type: "COOLDOWN",
+                scope: "SYMBOL",
+                symbol: candidateSymbol,
+                reason: `Grid guard active; rotating away (${Math.round(cooldownMs / 1000)}s)`,
+                expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                details: {
+                  category: "GRID_GUARD_ROTATE",
+                  cooldownMs,
+                  regime,
+                  pauseConfidenceThreshold
+                }
+              });
+              this.save(nextWithCooldown);
               return;
             }
 

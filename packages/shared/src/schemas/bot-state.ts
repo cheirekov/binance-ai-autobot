@@ -44,7 +44,13 @@ export type SymbolBlacklistEntry = z.infer<typeof SymbolBlacklistEntrySchema>;
 export const ProtectionLockScopeSchema = z.enum(["GLOBAL", "SYMBOL"]);
 export type ProtectionLockScope = z.infer<typeof ProtectionLockScopeSchema>;
 
-export const ProtectionLockTypeSchema = z.enum(["COOLDOWN", "STOPLOSS_GUARD", "MAX_DRAWDOWN", "LOW_PROFIT"]);
+export const ProtectionLockTypeSchema = z.enum([
+  "COOLDOWN",
+  "STOPLOSS_GUARD",
+  "MAX_DRAWDOWN",
+  "LOW_PROFIT",
+  "GRID_GUARD_BUY_PAUSE"
+]);
 export type ProtectionLockType = z.infer<typeof ProtectionLockTypeSchema>;
 
 export const ProtectionLockEntrySchema = z.object({

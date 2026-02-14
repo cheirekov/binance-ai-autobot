@@ -11,6 +11,7 @@ This repo now contains several third‑party codebases under `references/` for *
 | `references/binance-ai-bot-1` | Internal reference bot (v1) | TS/React | **No license file found locally** (treat as internal) | Yes (internal), but prefer porting patterns not files |
 | `references/binance-ai-bot-24` | Internal reference bot (v24) | TS/React | **No license file found locally** (treat as internal) | Yes (internal), but prefer porting patterns not files |
 | `references/freqtrade-develop` | Freqtrade trading bot framework (develop branch) | Python | **GPLv3** (`LICENSE`) | **No** (unless this repo becomes GPLv3‑compatible) |
+| `references/freqtrade-strategies-main` | Community strategy examples for Freqtrade | Python | **GPLv3** (`LICENSE`) | **No** (unless this repo becomes GPLv3‑compatible) |
 | `references/jesse-master` | Jesse algo trading framework | Python | **MIT** (`LICENSE`) | Yes (with attribution) |
 | `references/ccxt-master` | CCXT multi‑exchange trading API | JS/TS/Python/etc | **MIT** (`LICENSE.txt`) | Prefer using the published `ccxt` package; copying is allowed with attribution |
 | `references/crypto-trading-open-main` | Multi‑exchange trading system (grid/arbitrage/etc) | Python | **No license file found** (author permission required) | Only if the author explicitly grants permission; recommended to add a license file before redistribution |
@@ -38,6 +39,42 @@ For our project:
 - FreqAI-like prediction is also valuable, but it’s a **big subsystem** (data pipeline + model lifecycle).
 
 > Note: `references/freqtrade-develop` also contains a `LICENSE.txt` that looks like CCXT’s MIT license. That does **not** change Freqtrade’s project license (GPLv3 via `LICENSE`). Treat Freqtrade as GPLv3 and do not copy code into this repo.
+
+### 0b) Freqtrade community strategies (`freqtrade-strategies-main`) — what we can use
+
+Licensing reality:
+
+- The repo license is **GPLv3** (`references/freqtrade-strategies-main/LICENSE`). We should **not copy** strategy code into this project unless we intentionally make our repo GPLv3-compatible.
+- Even if a strategy file contains a permissive header, the safe/legal default is to treat the whole repo as GPLv3 unless we have **explicit, written re-licensing permission** for the specific files.
+- If you have separate permission from the authors, capture it in a lightweight text file (e.g. `docs/LEGAL_NOTES.md`) so the status stays unambiguous for future contributors.
+
+What’s inside (engineering view):
+
+- ~65 spot strategies + ~7 futures strategies, mostly on **5m / 1h / 4h** timeframes.
+- Nearly all follow the same pattern:
+  - **Indicators/features** (RSI, BBands, EMA, ADX/DI, ATR, Supertrend, Ichimoku, MACD, etc.)
+  - **Entry triggers** (crosses, thresholds, BB breaks)
+  - **Exit logic** via ROI tables, stoploss, trailing stop, and sometimes custom exits.
+- There is a `lookahead_bias/` folder: treat these as **anti-examples** (not suitable for live).
+
+Reusable patterns (safe to adapt, not copy):
+
+- **Regime gating for grid** (most relevant to our Spot+Grid MVP):
+  - Several strategies use the classic “strong trend” heuristic `ADX > ~25`.
+  - Combine `ADX`, `RSI`, and 24h change to decide when to **pause grid BUY legs** in bearish trends (keep SELLs to unwind).
+  - Mapping: directly supports `T-027` remaining slice “Grid Guard v1”.
+- **Mean reversion triggers**:
+  - Bollinger lower-band + RSI oversold as a clean entry template for mean reversion.
+  - Mapping: informs `T-006/T-023` (universe scoring + explainability) and later “only start grid when conditions are mean-reversion-friendly”.
+- **Exit management primitives**:
+  - Break-even or small-profit “unwind” modes, ATR-based stop distance, trailing profit capture.
+  - Mapping: supports `T-003` (adaptive exits) + `T-007` (PnL correctness once fees/commissions are included).
+- **Multi-timeframe + market context**:
+  - “Informative pairs” and higher-timeframe confirmation patterns (BTC/ETH context).
+  - Mapping: supports `T-006` (regime diversity) and later `T-025` (adaptive shadow model features).
+- **Optimization discipline**:
+  - Many strategies assume Hyperopt-tuned parameters. The key takeaway is the *process*, not the specific numbers.
+  - Mapping: supports `T-026` (offline calibration runner) to tune thresholds against our own telemetry/backtest data.
 
 ### 1) Exchange connectivity & reliability patterns
 
