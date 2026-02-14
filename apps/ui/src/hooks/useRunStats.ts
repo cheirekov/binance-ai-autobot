@@ -22,6 +22,18 @@ export type BaselineRunStats = {
     openExposureCost: number;
   };
   topSkipSummaries: Array<{ summary: string; count: number }>;
+  symbols?: Array<{
+    symbol: string;
+    buys: number;
+    sells: number;
+    buyNotional: number;
+    sellNotional: number;
+    netQty: number;
+    avgEntry: number;
+    openCost: number;
+    realizedPnl: number;
+    lastTradeTs?: string;
+  }>;
 };
 
 export type AdaptiveShadowEvent = {

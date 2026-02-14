@@ -41,6 +41,27 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
   - If “Grid waiting” remains noisy, switch that path from `SKIP` to a throttled `ENGINE` status update and add a global stale-order maintenance pass across all open bot-owned LIMITs.
 
+## 2026-02-14 10:06 UTC — PnL mark-to-market visibility + external order warning (T-027 slice)
+- Scope: improve operator visibility during `SPOT_GRID` runs without changing trading behavior.
+- BA requirement mapping:
+  - User requested clearer PnL and asked why “PnL” is sometimes not obvious even when the bot is trading.
+  - User reported occasional “manual/other bot” open orders appearing during runs; needs to be visible and not silently affect results.
+- PM milestone mapping: keep `T-027` validation loop tight (2–4h + overnight) by making results interpretable without log archaeology.
+- Technical changes:
+  - UI:
+    - PnL card now shows `Unrealized` and `Total` by combining baseline cost-basis (fills) with wallet mark-to-market prices from the portfolio snapshot (`apps/ui/src/pages/DashboardPage.tsx`).
+    - Renamed “Open exposure” to “Open cost” and added “Open value” + “Open positions” counters to reduce confusion.
+    - Added a warning pill when external/manual open LIMIT orders are detected (orders whose `clientOrderId` does not match the bot prefix) (`apps/ui/src/pages/DashboardPage.tsx`).
+    - Extended `BaselineRunStats` UI typing to include symbol-level stats (open cost/netQty) so the above can be computed safely (`apps/ui/src/hooks/useRunStats.ts`).
+- Risk slider impact: none (display-only changes).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (10–30 min):
+  - Ensure `Advanced → Manage external/manual open orders = Off` and cancel any manual open LIMIT orders on the exchange.
+  - Confirm dashboard shows `Realized`, `Unrealized`, `Total`, and that the external-orders warning pill is absent in a clean run.
+- Follow-up:
+  - Next step for `T-007`: include commissions in PnL, and add a small “PnL breakdown” table by open position (symbol, qty, avg entry, mark price, unrealized).
+
 ## 2026-02-13 15:22 UTC — P0 bot idle fix (feasibility filter: exposure cap vs buffered cost)
 - Scope: fix a live-candidate feasibility bug that could reject every candidate and leave the bot “running but doing nothing”.
 - BA requirement mapping:

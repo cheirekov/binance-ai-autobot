@@ -53,6 +53,21 @@ export function DashboardPage(): JSX.Element {
     return state.running ? `Running · ${state.phase}` : "Stopped";
   }, [state]);
 
+  const externalOrdersPill = useMemo(() => {
+    const prefix = (publicConfig.config?.advanced?.botOrderClientIdPrefix ?? "ABOT").trim().toUpperCase();
+    const openLimits = (state?.activeOrders ?? []).filter((o) => {
+      if (o.status !== "NEW") return false;
+      const t = (o.type ?? "").trim().toUpperCase();
+      return t === "LIMIT" || t === "LIMIT_MAKER";
+    });
+    const external = openLimits.filter((o) => {
+      const id = typeof o.clientOrderId === "string" ? o.clientOrderId.trim().toUpperCase() : "";
+      return !(id && id.startsWith(`${prefix}-`));
+    }).length;
+    if (external <= 0) return null;
+    return { label: `External open orders: ${external}`, tone: "warn" as const };
+  }, [publicConfig.config?.advanced?.botOrderClientIdPrefix, state?.activeOrders]);
+
   const apiPill = useMemo(() => {
     if (apiHealth.loading) return { label: "API: …", tone: "neutral" as const };
     return apiHealth.ok ? { label: "API: Online", tone: "ok" as const } : { label: "API: Offline", tone: "bad" as const };
@@ -114,6 +129,54 @@ export function DashboardPage(): JSX.Element {
   const latestAdaptiveEvent = adaptiveTail.length ? adaptiveTail[adaptiveTail.length - 1] : undefined;
   const adaptiveRows = [...adaptiveTail].reverse().slice(0, 30);
 
+  const pnlSummary = useMemo(() => {
+    const kpi = runStats.stats?.kpi;
+    const realized = kpi?.totals?.realizedPnl;
+    const openCost = kpi?.totals?.openExposureCost;
+    const symbols = kpi?.symbols ?? [];
+
+    const priceByAsset = new Map<string, number>();
+    for (const a of wallet.wallet?.assets ?? []) {
+      const asset = a.asset.trim().toUpperCase();
+      const p = a.estPriceHome;
+      if (!asset) continue;
+      if (typeof p === "number" && Number.isFinite(p) && p > 0) {
+        priceByAsset.set(asset, p);
+      }
+    }
+
+    const openPositions = symbols.filter((s) => typeof s.netQty === "number" && Number.isFinite(s.netQty) && s.netQty > 0);
+    let openValue = 0;
+    let pricedOpenPositions = 0;
+    for (const pos of openPositions) {
+      const symbol = (pos.symbol ?? "").trim().toUpperCase();
+      if (!symbol || !symbol.endsWith(homeStableCoin)) continue;
+      const base = symbol.slice(0, Math.max(0, symbol.length - homeStableCoin.length)).trim().toUpperCase();
+      if (!base) continue;
+      const p = priceByAsset.get(base);
+      if (!p) continue;
+      openValue += pos.netQty * p;
+      pricedOpenPositions += 1;
+    }
+
+    const unrealized =
+      typeof openCost === "number" && Number.isFinite(openCost) && pricedOpenPositions > 0 ? openValue - openCost : undefined;
+    const total =
+      typeof realized === "number" && Number.isFinite(realized) && typeof unrealized === "number" && Number.isFinite(unrealized)
+        ? realized + unrealized
+        : undefined;
+
+    return {
+      realized,
+      openCost,
+      openValue: pricedOpenPositions > 0 ? openValue : undefined,
+      unrealized,
+      total,
+      openPositions: openPositions.length,
+      pricedOpenPositions
+    };
+  }, [homeStableCoin, runStats.stats?.kpi, wallet.wallet?.assets]);
+
   function formatDecisionDetails(details: Record<string, unknown> | undefined): string | null {
     if (!details) return null;
     try {
@@ -157,6 +220,7 @@ export function DashboardPage(): JSX.Element {
         <span className={pillClass(openAiPill.tone)}>{openAiPill.label}</span>
         <span className={pillClass(livePill.tone)}>{livePill.label}</span>
         <span className={pillClass(modePill.tone)}>{modePill.label}</span>
+        {externalOrdersPill ? <span className={pillClass(externalOrdersPill.tone)}>{externalOrdersPill.label}</span> : null}
       </div>
 
       {error ? (
@@ -415,17 +479,66 @@ export function DashboardPage(): JSX.Element {
             <span className="pill">
               Realized:{" "}
               <b>
-                {runStats.stats?.kpi
-                  ? `${runStats.stats.kpi.totals.realizedPnl.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${homeStableCoin}`
+                {typeof pnlSummary.realized === "number" && Number.isFinite(pnlSummary.realized)
+                  ? `${pnlSummary.realized.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${homeStableCoin}`
                   : "—"}
               </b>
             </span>
             <span className="pill">
-              Open exposure:{" "}
+              Open cost:{" "}
               <b>
-                {runStats.stats?.kpi
-                  ? `${runStats.stats.kpi.totals.openExposureCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${homeStableCoin}`
+                {typeof pnlSummary.openCost === "number" && Number.isFinite(pnlSummary.openCost)
+                  ? `${pnlSummary.openCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${homeStableCoin}`
                   : "—"}
+              </b>
+            </span>
+            <span
+              className={pillClass(
+                typeof pnlSummary.unrealized === "number" && Number.isFinite(pnlSummary.unrealized)
+                  ? pnlSummary.unrealized >= 0
+                    ? "ok"
+                    : "bad"
+                  : "neutral"
+              )}
+            >
+              Unrealized:{" "}
+              <b>
+                {typeof pnlSummary.unrealized === "number" && Number.isFinite(pnlSummary.unrealized)
+                  ? `${pnlSummary.unrealized.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${homeStableCoin}`
+                  : "—"}
+              </b>
+            </span>
+            <span
+              className={pillClass(
+                typeof pnlSummary.total === "number" && Number.isFinite(pnlSummary.total)
+                  ? pnlSummary.total >= 0
+                    ? "ok"
+                    : "bad"
+                  : "neutral"
+              )}
+            >
+              Total:{" "}
+              <b>
+                {typeof pnlSummary.total === "number" && Number.isFinite(pnlSummary.total)
+                  ? `${pnlSummary.total.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${homeStableCoin}`
+                  : "—"}
+              </b>
+            </span>
+            <span className="pill">
+              Open value:{" "}
+              <b>
+                {typeof pnlSummary.openValue === "number" && Number.isFinite(pnlSummary.openValue)
+                  ? `${pnlSummary.openValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${homeStableCoin}`
+                  : "—"}
+              </b>
+            </span>
+            <span className="pill">
+              Open positions:{" "}
+              <b>
+                {pnlSummary.openPositions}
+                {pnlSummary.pricedOpenPositions > 0 && pnlSummary.pricedOpenPositions !== pnlSummary.openPositions
+                  ? ` (priced ${pnlSummary.pricedOpenPositions})`
+                  : ""}
               </b>
             </span>
             <span className="pill">
