@@ -62,6 +62,28 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
   - Next step for `T-007`: include commissions in PnL, and add a small “PnL breakdown” table by open position (symbol, qty, avg entry, mark price, unrealized).
 
+## 2026-02-14 13:04 UTC — Skip-storm symbol cooldown escalation (T-027 slice)
+- Scope: reduce repeated “same skip reason” loops by escalating symbol cooldowns when a symbol is repeatedly infeasible.
+- BA requirement mapping:
+  - User request (BG): `при повтарящи се skip-ове да охлажда символа и да преминава към следващ кандидат`.
+  - Goal: keep the bot adaptive in high-risk mode by rotating away from infeasible symbols instead of retrying the same one every ~15s.
+- PM milestone mapping: improve 2–4h and overnight evidence quality for `T-027` by reducing no-action churn and making protection behavior visible.
+- Technical changes:
+  - API:
+    - Added “skip storm” detection keyed by normalized skip reason (e.g., `Grid sell sizing rejected`, `Insufficient <homeStable>`, etc.). When the same key repeats within a short window, the existing symbol `COOLDOWN` lock is extended and annotated (`apps/api/src/modules/bot/bot-engine.service.ts`).
+    - Applied to the main high-noise infeasible paths: quote shortfall/insufficient skips and grid buy/sell sizing rejects.
+- Risk slider impact:
+  - Risk 0: storm threshold `4` skips in `2m`, storm cooldown ≈ `60s`.
+  - Risk 100: storm threshold `2` skips in `2m`, storm cooldown ≈ `240s`.
+  - Practical effect: high risk rotates away from infeasible symbols sooner (less cycling).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (30–60 min):
+  - Start `SPOT_GRID` with an intentionally infeasible scenario (e.g., dust base free, or repeated minNotional rejects).
+  - Confirm the dashboard shows a `COOLDOWN` protection lock reason containing `Skip storm (...)` and the bot rotates to other candidates.
+- Follow-up:
+  - If needed, extend skip-storm to also throttle non-infeasible “waiting” SKIPs by converting them to a single periodic `ENGINE` status update (reduce UI spam).
+
 ## 2026-02-13 15:22 UTC — P0 bot idle fix (feasibility filter: exposure cap vs buffered cost)
 - Scope: fix a live-candidate feasibility bug that could reject every candidate and leave the bot “running but doing nothing”.
 - BA requirement mapping:
