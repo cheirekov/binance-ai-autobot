@@ -84,6 +84,24 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
   - If needed, extend skip-storm to also throttle non-infeasible “waiting” SKIPs by converting them to a single periodic `ENGINE` status update (reduce UI spam).
 
+## 2026-02-14 15:52 UTC — Grid waiting log throttle + sizing KPI fix (T-027 slice)
+- Scope: reduce “bot does nothing” perception during quiet market periods and make KPIs reflect minQty sizing rejects.
+- BA requirement mapping:
+  - User feedback: grid runs can look “stuck” due to repeated `Grid waiting for ladder slot or inventory` messages, and sizing KPIs should reflect real reasons.
+- PM milestone mapping: improve overnight evidence quality for `T-027` without changing execution behavior.
+- Technical changes:
+  - API:
+    - Throttle `Grid waiting for ladder slot or inventory` SKIPs to at most once per symbol per minute (prevents alternating ETH/SOL waiting spam) (`apps/api/src/modules/bot/bot-engine.service.ts`).
+    - Count `minQty`/`LOT_SIZE`/`MARKET_LOT_SIZE` rejects as sizing rejects in baseline KPI telemetry (`apps/api/src/modules/bot/bot-engine.service.ts`).
+- Risk slider impact: none (log/telemetry only).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (2–4h + overnight):
+  - Confirm “waiting” spam is reduced in Decisions, while active orders still refresh and fills still appear normally.
+  - Confirm dashboard shows non-zero `Sizing rejects` when `Below minQty ...` happens.
+- Follow-up:
+  - If the bot still stays “flat” in sustained trends, implement `Grid Guard v1` (risk-linked pause of BUY legs in strong trends) and/or add a “seed inventory” option (requires PM/BA decision).
+
 ## 2026-02-13 15:22 UTC — P0 bot idle fix (feasibility filter: exposure cap vs buffered cost)
 - Scope: fix a live-candidate feasibility bug that could reject every candidate and leave the bot “running but doing nothing”.
 - BA requirement mapping:

@@ -1436,6 +1436,9 @@ export class BotEngineService implements OnModuleInit {
     const summary = decision.summary.toLowerCase();
     if (summary.includes("binance sizing filter")) return true;
     if (summary.includes("min order constraints")) return true;
+    if (summary.includes("minqty")) return true;
+    if (summary.includes("lot_size")) return true;
+    if (summary.includes("market_lot_size")) return true;
     if (summary.includes("minnotional")) return true;
     if (summary.includes("notional")) return true;
     return false;
@@ -3879,10 +3882,15 @@ export class BotEngineService implements OnModuleInit {
             }
 
 	            const summary = `Skip ${candidateSymbol}: Grid waiting for ladder slot or inventory`;
+	            const nowMs = Date.now();
 	            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+	            const lastSimilar = current.decisions.find((d) => d.kind === "SKIP" && d.summary === summary);
+	            const lastSimilarAt = lastSimilar ? Date.parse(lastSimilar.ts) : Number.NaN;
+	            const waitingThrottleMs = 60_000;
+	            const throttled = Number.isFinite(lastSimilarAt) && nowMs - lastSimilarAt < waitingThrottleMs;
 	            const next = {
 	              ...current,
-	              decisions: alreadyLogged
+	              decisions: alreadyLogged || throttled
 	                ? current.decisions
 	                : [
 	                    {
