@@ -39,7 +39,7 @@ M1: Stabilize Spot testnet automation with risk-linked execution behavior and cl
 | T-001 | DONE | Exposure-aware candidate fallback | Avoid idle bot on top-symbol exposure cap | Increase trading continuity | Implemented in bot engine; candidate rotates to next eligible symbol. |
 | T-002 | DONE | High-risk profile aggressiveness tuning | Risk slider must materially affect behavior | Faster results in high-risk mode | Live cooldown/notional/entry limits now scale aggressively at risk=100. |
 | T-003 | BLOCKED | Risk-linked adaptive exit policy (no hard fixed stop profile) | Protect downside in bearish periods while keeping automation | Reduce deep hold drawdowns | Temporarily paused by PM/BA reprioritization to deliver wallet policy first. Next after T-004: risk+regime-adjusted take-profit/stop-loss bands and hold-time logic. |
-| T-004 | TODO | Wallet policy v1 (convert/sweep/autonomous reserve) | Handle mixed assets automatically | Keep tradeable quote liquidity | Queued by single-lane rule. Delivered slices remain: stale/non-preferred asset sweep, conversion routing/cooldown checks, and conversion anti-churn guards (affordability downsize + shortfall trigger + per-source cooldown). |
+| T-004 | IN_PROGRESS | Wallet policy v1 (convert/sweep/autonomous reserve) | Handle mixed assets automatically | Keep tradeable quote liquidity | In progress: `SPOT_GRID` quote reserve recovery + reserve buffer so BUY ladders don't consume last home-stable liquidity; stable-like -> home-stable conversion top-up in grid mode (risk-linked). |
 | T-005 | TODO | Daily risk guardrails visible in UI | User requested max-loss + per-position hard cap tied to risk | Safe live operation | Enforce maxDailyLoss and expose guard state in status panel. |
 | T-006 | TODO | Universe discovery breadth + regime diversity | Improve pair selection quality and reduce single-symbol bias | Better candidate quality | Queued by single-lane rule. Pre-trade feasibility filter already delivered; next slice adds deeper regime-diversity scoring and rotation diagnostics. |
 | T-007 | TODO | PnL correctness and exposure reporting | Trustworthy dashboard for non-trader users | Clear performance visibility | Reconcile realized/unrealized PnL from fills and holdings. |
@@ -50,26 +50,25 @@ M1: Stabilize Spot testnet automation with risk-linked execution behavior and cl
 | T-024 | DONE | Protection manager v1 (global+pair locks) | Bearish-loss control without manual trader tuning | Reduced cascading losses and clearer risk state | Added risk-linked cooldown, stoploss-guard, max-drawdown, and low-profit locks with dashboard visibility. |
 | T-025 | TODO | Adaptive confidence shadow model v1 | Bot should adapt automatically while risk policy remains authoritative | Higher-quality decisions before execution promotion | Add model-age guard, outlier confidence gate, and rolling prediction statistics in shadow path. |
 | T-026 | TODO | Offline strategy calibration runner | Systematic parameter tuning from real telemetry/backtest data | Better repeatable improvements over ad-hoc tweaks | Add multi-metric objective calibration (profit, drawdown, winrate, expectancy, trade-count penalties). Seed initial parameter spaces from reference patterns (e.g. RSI/BB/ADX templates) without copying GPL code. |
-| T-027 | IN_PROGRESS | Spot limit/grid execution v1 | Replace market-only execution path with true open-order lifecycle | Realistic grid behavior and actionable PnL | Delivered slice: ccxt adapter limit/open/cancel APIs + bot exchange order sync + SPOT_GRID LIMIT ladder branch + limit-price affordability (avoid false market-cost quote blocks) + grid sell sizing fallback (`requiredQty` when within `baseFree`) + risk-linked no-action symbol cooldown (reduce cycling on infeasible sizing/quote shortfalls) + skip-storm escalation (longer cooldown after repeated identical infeasible skips; risk-linked) + per-symbol throttle for `Grid waiting...` SKIPs (reduce ETH/SOL alternating spam) + sizing KPI counts minQty/LOT_SIZE rejects + bot-owned order tagging via `clientOrderId` prefix + stale bot LIMIT auto-cancel (TTL+distance, risk-linked) + safe external-order handling (skip unless enabled) + stop/global-lock bot-order auto-cancel + P0 UI setup-status resilience + dashboard snapshot endpoint (UI polls one endpoint instead of many) + dashboard PnL shows unrealized/total (wallet mark-to-market) + external open-order warning pill + Grid Guard v1 (pause grid BUY leg in `BEAR_TREND` via `GRID_GUARD_BUY_PAUSE` lock; keeps SELLs active; rotates away when no inventory to sell) + faster open-order discovery scan (batch hint symbols per tick) so active orders repopulate quickly after a state reset. Remaining: richer grid KPI panel + ladder refresh KPIs + extend Grid Guard to volatility spikes and optional BUY-limit cancel on guard + commission-aware PnL reconciliation for LIMIT lifecycle. |
+| T-027 | DONE | Spot limit/grid execution v1 | Replace market-only execution path with true open-order lifecycle | Realistic grid behavior and actionable PnL | Delivered: ccxt adapter limit/open/cancel APIs + bot exchange order sync + SPOT_GRID LIMIT ladder lifecycle + limit-price affordability + stale bot LIMIT auto-cancel + external-order handling + dashboard snapshot + baseline PnL + Grid Guard v1 + faster open-order discovery scan. Follow-ups moved to `T-007` (commission-aware PnL) and a future KPI/UI ticket. |
 | T-028 | TODO | Compact Advanced settings UX | Reduce operator overwhelm without hiding safety controls | Faster day-to-day operation for non-trader users | When `Follow Basic risk profile=On`: collapse risk-managed numeric inputs into a short "Managed by Risk" summary + toggle "Show details". Add a small "Refresh config" action, and improve small-width layout. Priority: PM/BA review tomorrow (non-blocking). |
 
 ## Next execution batch (single patch set)
 
 ### Priority order (PM/BA default)
 
-1. Close `T-027` (Spot limit/grid execution v1) with clear LIMIT lifecycle + order visibility.
-2. `T-004` Wallet policy v1 (convert/sweep/autonomous reserve; dust policy; risk-linked).
-3. `T-005` Daily risk guardrails visible in UI (max daily loss + per-position cap tied to risk).
-4. `T-007` PnL correctness and exposure reporting.
-5. `T-023` Universe filter-chain architecture v1 (then `T-006` breadth/regime diversity).
-6. `T-025` Adaptive confidence shadow model v1 (AI specialist lane; shadow-first).
-7. `T-028` Compact Advanced settings UX (non-blocking; reduce Advanced page noise when risk-managed).
+1. `T-004` Wallet policy v1 (convert/sweep/autonomous reserve; dust policy; risk-linked).
+2. `T-005` Daily risk guardrails visible in UI (max daily loss + per-position cap tied to risk).
+3. `T-007` PnL correctness and exposure reporting.
+4. `T-023` Universe filter-chain architecture v1 (then `T-006` breadth/regime diversity).
+5. `T-025` Adaptive confidence shadow model v1 (AI specialist lane; shadow-first).
+6. `T-028` Compact Advanced settings UX (non-blocking; reduce Advanced page noise when risk-managed).
 
 ### Next batch (execute now)
 
-1. Finish `T-027` (single active lane):
-   - Make `GET /orders/active` reflect exchange open orders even after a state reset (symbol-scoped, no global open-order fetch).
-   - Ensure skip diagnostics are visible in UI (candidate rejection reasons, not just summary).
-2. Run one 2-4h validation batch with explicit KPI targets (recommended: `./scripts/run-batch.sh --minutes 240`).
+1. Start `T-004` (single active lane):
+   - Add grid-mode quote reserve recovery (stable-like -> home stable) and reserve buffer so BUY ladders don't consume the last quote.
+   - Ensure skip details show reserve and spendable quote amounts when BUY sizing rejects occur.
+2. Run one 1-2h validation batch with explicit KPI targets (recommended: `./scripts/run-batch.sh --minutes 120`).
 3. Run one overnight 8-12h batch and collect feedback bundle.
-4. Re-prioritize the next single ticket from measured gaps (default next: `T-004`).
+4. Re-prioritize the next single ticket from measured gaps (default next: `T-005`).

@@ -3538,6 +3538,25 @@ export class BotEngineService implements OnModuleInit {
             const botOrderAutoCancelEnabled = Boolean(config?.advanced.botOrderAutoCancelEnabled);
             const baseFree = balances.find((b) => b.asset.toUpperCase() === candidateBaseAsset)?.free ?? 0;
 
+            // Wallet reserve policy (T-004 slice):
+            // Keep some free home-stable liquidity so grid BUY legs don't consume the last quote and then spam minQty rejects.
+            const configuredMinTopUpTarget = config?.advanced.conversionTopUpMinTarget ?? 5;
+            const floorTopUpTarget =
+              Number.isFinite(configuredMinTopUpTarget) && configuredMinTopUpTarget > 0 ? configuredMinTopUpTarget : 5;
+            const conversionTopUpReserveMultiplier = Math.max(1, config?.advanced.conversionTopUpReserveMultiplier ?? 2);
+            const reserveScale = 1.8 - (risk / 100) * 0.8; // risk 0 -> 1.8x, risk 100 -> 1.0x
+            const reserveLowTarget = Math.max(
+              floorTopUpTarget,
+              floorTopUpTarget * conversionTopUpReserveMultiplier,
+              walletTotalHome * capitalProfile.reserveLowPct * reserveScale
+            );
+            const reserveHighTarget = Math.max(
+              reserveLowTarget,
+              reserveLowTarget * 2,
+              walletTotalHome * capitalProfile.reserveHighPct * reserveScale
+            );
+            const quoteSpendable = Math.max(0, quoteFree - reserveLowTarget);
+
             const symbolOpenLimitOrdersAll = current.activeOrders.filter((order) => {
               if (order.symbol !== candidateSymbol) return false;
               if (order.status !== "NEW") return false;
@@ -3670,6 +3689,73 @@ export class BotEngineService implements OnModuleInit {
             const hasSellLimit = symbolOpenLimits.some((order) => order.side === "SELL");
             const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(risk / 25)));
 
+            // If we have no BUY ladder and quote is below reserve, try a reserve recovery conversion (stable-like -> home stable).
+            // This supports wallets holding e.g. USDT while home stable is USDC, and reduces repeated minQty affordability rejects.
+            if (!hasBuyLimit && quoteFree < reserveLowTarget && symbolOpenLimits.length < maxGridOrdersPerSymbol && config) {
+              const conversionTarget = Math.max(floorTopUpTarget, reserveHighTarget - quoteFree);
+              const conversionTopUpCooldownMs = Math.max(0, config.advanced.conversionTopUpCooldownMs ?? 90_000);
+              const nowMs = Date.now();
+              const lastConversionTrade = conversionTopUpCooldownMs
+                ? current.decisions.find((d) => {
+                    if (d.kind !== "TRADE") return false;
+                    const details = d.details as Record<string, unknown> | undefined;
+                    return details?.mode === "conversion-router";
+                  })
+                : null;
+              const lastConversionAt = lastConversionTrade ? Date.parse(lastConversionTrade.ts) : Number.NaN;
+              const conversionCooldownActive =
+                conversionTopUpCooldownMs > 0 && Number.isFinite(lastConversionAt) && nowMs - lastConversionAt < conversionTopUpCooldownMs;
+
+              if (!conversionCooldownActive) {
+                const stableSources = balances
+                  .filter((b) => b.free > 0 && isStableAsset(b.asset) && b.asset.trim().toUpperCase() !== homeStable)
+                  .sort((a, b) => b.free - a.free);
+
+                for (const source of stableSources) {
+                  const conversion = await this.conversionRouter.convertFromSourceToTarget({
+                    sourceAsset: source.asset,
+                    sourceFree: source.free,
+                    targetAsset: homeStable,
+                    requiredTarget: conversionTarget,
+                    allowTwoHop: true
+                  });
+                  if (!conversion.ok || conversion.legs.length === 0) continue;
+
+                  conversion.legs.forEach((leg, idx) => {
+                    const fallbackQty = Number.parseFloat(leg.quantity);
+                    persistLiveTrade({
+                      symbol: leg.symbol,
+                      side: leg.side,
+                      requestedQty: leg.quantity,
+                      fallbackQty: Number.isFinite(fallbackQty) && fallbackQty > 0 ? fallbackQty : 0,
+                      response: leg.response,
+                      reason: `${leg.reason}${leg.bridgeAsset ? ` via ${leg.bridgeAsset}` : ""}`,
+                      details: {
+                        mode: "conversion-router",
+                        stage: "grid-reserve-recovery",
+                        requiredTarget: Number(conversionTarget.toFixed(6)),
+                        floorTopUpTarget: Number(floorTopUpTarget.toFixed(6)),
+                        reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
+                        reserveHighTarget: Number(reserveHighTarget.toFixed(6)),
+                        quoteFree: Number(quoteFree.toFixed(6)),
+                        quoteSpendable: Number(quoteSpendable.toFixed(6)),
+                        reserveMultiplier: conversionTopUpReserveMultiplier,
+                        capitalTier: capitalProfile.tier,
+                        walletTotalHome: Number(walletTotalHome.toFixed(6)),
+                        sourceAsset: source.asset.trim().toUpperCase(),
+                        route: leg.route,
+                        bridgeAsset: leg.bridgeAsset,
+                        leg: idx + 1,
+                        legs: conversion.legs.length,
+                        obtainedTarget: Number(leg.obtainedTarget.toFixed(8))
+                      }
+                    });
+                  });
+                  return;
+                }
+              }
+            }
+
             if (symbolOpenLimits.length >= maxGridOrdersPerSymbol) {
               const summary = `Skip ${candidateSymbol}: Grid ladder full (${symbolOpenLimits.length}/${maxGridOrdersPerSymbol})`;
               const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
@@ -3747,15 +3833,21 @@ export class BotEngineService implements OnModuleInit {
               }
 
               const buyPrice = Number.parseFloat(buyPriceNorm.normalizedPrice);
-              const maxAffordableQty = buyPrice > 0 ? quoteFree / (buyPrice * bufferFactor) : 0;
+              const maxAffordableQty = buyPrice > 0 ? quoteSpendable / (buyPrice * bufferFactor) : 0;
               const buyQtyTarget = Math.min(qty, maxAffordableQty);
               const buyCheck = await this.marketData.validateLimitOrderQty(candidateSymbol, buyQtyTarget, buyPriceNorm.normalizedPrice);
-              const buyQtyStr = buyCheck.ok ? buyCheck.normalizedQty : buyCheck.requiredQty;
+              let buyQtyStr: string | undefined = buyCheck.ok ? buyCheck.normalizedQty : undefined;
+              if (!buyQtyStr && buyCheck.requiredQty) {
+                const requiredQty = Number.parseFloat(buyCheck.requiredQty);
+                if (Number.isFinite(requiredQty) && requiredQty > 0 && requiredQty <= maxAffordableQty + 1e-12) {
+                  buyQtyStr = buyCheck.requiredQty;
+                }
+              }
               const buyQty = buyQtyStr ? Number.parseFloat(buyQtyStr) : Number.NaN;
 
               if (buyQtyStr && Number.isFinite(buyQty) && buyQty > 0) {
                 const buyNotionalEstimate = buyQty * buyPrice * bufferFactor;
-                if (Number.isFinite(buyNotionalEstimate) && buyNotionalEstimate <= quoteFree + 1e-8) {
+                if (Number.isFinite(buyNotionalEstimate) && buyNotionalEstimate <= quoteSpendable + 1e-8) {
                   const buyOrder = await this.trading.placeSpotLimitOrder({
                     symbol: candidateSymbol,
                     side: "BUY",
@@ -3811,6 +3903,9 @@ export class BotEngineService implements OnModuleInit {
                             desiredQty: Number(qty.toFixed(8)),
                             maxAffordableQty: Number(maxAffordableQty.toFixed(8)),
                             limitPrice: buyPriceNorm.normalizedPrice,
+                            quoteFree: Number(quoteFree.toFixed(6)),
+                            quoteSpendable: Number(quoteSpendable.toFixed(6)),
+                            reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
                             ...(cooldown.storm ? { storm: cooldown.storm } : {}),
                             cooldownMs
                           }

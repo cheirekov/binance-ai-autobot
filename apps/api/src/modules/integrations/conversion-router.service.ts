@@ -190,6 +190,11 @@ export class ConversionRouterService {
     const config = this.configService.load();
     if (!config) return false;
 
+    // Testnet does not reflect regional restrictions (and we cannot validate them there).
+    // Keep conversions usable on testnet even for EEA configs; mainnet remains strict.
+    const effectiveEnforceRegionPolicy =
+      Boolean(config.advanced.enforceRegionPolicy) && config.advanced.binanceEnvironment === "MAINNET";
+
     const blockReason = getPairPolicyBlockReason({
       symbol: params.symbol,
       baseAsset: params.baseAsset,
@@ -197,7 +202,7 @@ export class ConversionRouterService {
       traderRegion: config.basic.traderRegion,
       neverTradeSymbols: config.advanced.neverTradeSymbols,
       excludeStableStablePairs: false,
-      enforceRegionPolicy: config.advanced.enforceRegionPolicy
+      enforceRegionPolicy: effectiveEnforceRegionPolicy
     });
 
     return blockReason !== null;

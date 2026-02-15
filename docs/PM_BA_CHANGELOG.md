@@ -16,6 +16,31 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-15 11:48 UTC — T-004 Grid quote reserve recovery (wallet policy v1 slice)
+- Scope: prevent `SPOT_GRID` from getting stuck with near-zero home-stable liquidity by enforcing a free-quote reserve buffer and doing stable-like → home-stable top-ups when needed.
+- BA requirement mapping:
+  - Autobot must handle mixed wallets (e.g., user holds mostly USDT but home stable is USDC) without manual intervention.
+  - Reduce repeated skip loops such as `Grid buy sizing rejected (Below minQty ...)` caused by affordability when quote is exhausted.
+- PM milestone mapping: move from “LIMIT lifecycle works” to “wallet policy prevents grid deadlocks” so the bot runs unattended for hours with fewer no-op loops.
+- Technical changes:
+  - API:
+    - In `SPOT_GRID`, compute a risk-linked free-quote reserve target and use `quoteSpendable = max(0, quoteFree - reserveLowTarget)` for BUY ladder affordability checks (`apps/api/src/modules/bot/bot-engine.service.ts`).
+    - If the symbol has no BUY ladder and `quoteFree < reserveLowTarget`, attempt a stable-like → home-stable conversion top-up (records `mode=conversion-router`, `stage=grid-reserve-recovery`).
+    - Include reserve diagnostics in grid sizing reject details (`quoteFree`, `quoteSpendable`, `reserveLowTarget`) to speed up log-driven iteration.
+  - Integrations:
+    - Conversions on `SPOT_TESTNET` ignore EEA quote-asset restrictions (which do not apply on testnet); mainnet conversion policy remains strict (`apps/api/src/modules/integrations/conversion-router.service.ts`).
+- Risk slider impact:
+  - Lower risk keeps a larger free-quote reserve (more conservative; fewer BUY placements when quote is low).
+  - Higher risk keeps a smaller reserve (more aggressive; more spendable quote).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (1–2h):
+  - Start in `SPOT_GRID` with `homeStableCoin=USDC` and a wallet holding other stable-like assets (e.g., USDT) but low free USDC.
+  - Expect to see at least one conversion-router trade with `stage=grid-reserve-recovery` and a reduction in repeated `Below minQty` affordability skips.
+  - KPI target: sizing-reject skip ratio `<= 25%` after 60 minutes (previous run showed ~35% and high minQty rejects).
+- Follow-up:
+  - Extend reserve recovery sources beyond stable-like assets (non-core asset sweep) and add “idle inventory ratio” KPI visibility in dashboard (`T-004` continuation).
+
 ## 2026-02-15 07:52 UTC — T-027 Faster open-order discovery after state reset
 - Scope: make exchange open orders show up quickly in UI after a “brain reset” (deleted `state.json`) while keeping order sync symbol-scoped (no global open-order fetch).
 - BA requirement mapping:

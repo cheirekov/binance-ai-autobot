@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-15 07:52 UTC
+Last updated: 2026-02-15 11:48 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -8,37 +8,39 @@ Use this file at the start and end of every batch.
 ## 1) Batch contract (fill before coding)
 
 - Batch type: `DAY (2-4h)`
-- Active ticket: `T-027` (Spot limit/grid execution v1)
-- Goal (single sentence): after a bot “brain reset”, open exchange orders must appear quickly in UI without global open-order fetch.
+- Active ticket: `T-004` (Wallet policy v1: reserve + conversions)
+- Goal (single sentence): prevent `SPOT_GRID` from getting stuck with near-zero home-stable liquidity by enforcing a reserve buffer and doing stable-like → home-stable top-ups when needed.
 - In scope:
-  - order discovery speed when `state.activeOrders` is empty but exchange has open orders,
-  - symbol-scoped order-sync behavior and decision evidence,
-  - UI visibility of open orders after restart/reset.
+  - grid-mode quote reserve recovery via conversion router (stable-like → home stable),
+  - grid BUY sizing uses `quoteSpendable` (keeps free reserve; avoids repeated minQty rejects),
+  - testnet conversions remain usable even when EEA region policy is enabled (policy is mainnet-only for conversions).
 - Out of scope:
   - adaptive policy promotion from shadow to execution,
-  - new wallet-policy features (`T-004`),
+  - full dust sweeping and idle inventory policy,
   - PnL reconciliation refactor (`T-007`).
-- Hypothesis: scanning a small batch of hint symbols per tick will surface exchange open orders within ~20s of restart/reset (instead of ~100s worst-case).
+- Hypothesis: keeping a risk-linked free-quote reserve and topping up from stable-like assets will reduce affordability-driven grid sizing rejects and restore continuous trading on mixed wallets.
 - Target KPI delta:
-  - time-to-first-discovered open order after restart: `<= 20s` when an order exists on a top-universe symbol.
+  - sizing reject pressure: reduce from `high` (>= 35%) to `<= 25%` in a 1–2h run.
+  - fewer repeated `Grid buy sizing rejected (Below minQty ...)` skips when wallet has other stable-like assets available.
 - Stop/rollback condition:
-  - order-sync causes transient exchange backoff repeatedly, or
-  - no discovery event after `2 minutes` while a known open order exists on a scanned symbol.
+  - conversion churn/flood (repeated stable conversions without enabling trading), or
+  - sizing reject pressure remains >= 35% after 60 minutes.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
-  - after deleting `data/state.json` and restarting, engine resyncs exchange open orders without needing a global open-order fetch.
+  - In `SPOT_GRID`, when `quoteFree < reserveLowTarget` and the wallet holds stable-like assets, the bot performs a conversion top-up and resumes placing BUY ladder orders.
 - UI behavior:
-  - Dashboard `Orders (active)` becomes non-empty shortly after start when there are exchange open orders.
+  - Dashboard decisions show conversion-router trades with `stage=grid-reserve-recovery` when reserve recovery triggers.
 - Runtime evidence in decisions/logs:
-  - decision stream includes an `ENGINE` event like `Synced <n> existing open order(s) (discovery scan: <k> symbol(s))`.
+  - `Grid buy sizing rejected` details include `quoteSpendable` + `reserveLowTarget` for affordability debugging.
 - Risk slider impact (`none` or explicit low/mid/high behavior):
-  - Risk impact: none (order discovery mechanics only).
+  - Low risk: higher reserve targets (more conservative, fewer entries when quote is low).
+  - High risk: lower reserve targets (more aggressive, more spendable quote).
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
   - additional targeted command(s):
-    - `docker logs --tail 500 binance-ai-autobot_api_1` (confirm discovery event + no backoff spam)
+    - `docker logs --tail 500 binance-ai-autobot_api_1` (confirm reserve recovery conversion behavior)
 - Runtime validation plan:
   - run duration: `30-60 minutes` (plus quick restart/reset checks)
   - expected bundle name pattern: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
@@ -70,16 +72,15 @@ Use this file at the start and end of every batch.
 ## 5) Copy/paste prompt for next session
 
 ```text
-Ticket: T-027
+Ticket: T-004
 Batch: DAY (2-4h)
-Goal: After a brain reset, discover exchange open orders quickly (symbol-scoped; no global fetch).
-In scope: order-sync discovery scan, UI visibility of active orders after restart/reset.
-Out of scope: adaptive policy promotion, wallet policy expansion, PnL refactor.
+Goal: Prevent SPOT_GRID from getting stuck with near-zero USDC by enforcing reserve buffer + stable->home top-up.
+In scope: grid reserve recovery conversion + quoteSpendable sizing + clear skip details.
+Out of scope: adaptive policy promotion, full dust sweep, PnL refactor.
 DoD:
-- API: engine resyncs exchange open orders after `data/state.json` reset without global open-order fetch.
-- UI: active orders appear shortly after start when exchange has open orders.
-- Runtime evidence: decisions include `Synced <n> existing open order(s) (discovery scan: <k> symbol(s))`.
-- Risk slider mapping: Risk impact: none.
+- API: conversion-router trades occur when quote reserve is low (stage=grid-reserve-recovery).
+- UI: decisions show reserve recovery conversions; grid buy reject details include quoteSpendable/reserveLowTarget.
+- Risk slider mapping: low risk keeps higher reserve; high risk keeps lower reserve.
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```
