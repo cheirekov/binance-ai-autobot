@@ -37,6 +37,51 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
   - If skip pressure remains high across many symbols, add a short global “quote locked” throttle to avoid rotating into BUY attempts when quote is heavily locked in other open BUY orders.
 
+## 2026-02-15 17:56 UTC — T-006 SPOT_GRID candidate ranking (grid-suitable + actionable)
+- Scope: reduce “no-op” selection loops in `SPOT_GRID` by ranking universe candidates using grid suitability + current actionability (missing grid leg vs already-waiting), so high-risk mode opens/manages more symbols instead of repeatedly revisiting a symbol that already has both legs open.
+- Why (runtime evidence):
+  - In `autobot-feedback-20260215-173921.tgz`, top decisions were dominated by:
+    - `Grid waiting for ladder slot or inventory` (symbol already has both BUY+SELL open),
+    - `Grid guard active (no inventory to sell)` (bear-guard paused BUYs, but we had no base inventory).
+  - This wastes ticks and makes the bot appear “not adaptive” in high-risk mode, even though it has capacity to trade other candidates.
+- Technical changes:
+  - API:
+    - In candidate selection, when `tradeMode=SPOT_GRID`, score candidates using:
+      - grid suitability: `buildRegimeSnapshot` + `buildAdaptiveStrategyScores(...).grid` (range/mean-reversion friendly),
+      - actionability: whether the symbol is missing a grid leg (`BUY` not present and not paused, or `SELL` not present and we have inventory from managed position netQty),
+      - penalties: deprioritize symbols already waiting (both legs open) and symbols paused by grid guard without inventory.
+    - Skip symbols with external open LIMIT orders when `Advanced → Manage external/manual open orders = Off` to avoid selecting a symbol we will immediately skip later.
+- Risk slider impact:
+  - Candidate scoring reuses the same risk-linked pause confidence threshold used by Grid Guard, so higher risk requires higher confidence before treating a symbol as “BUY paused”.
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (overnight / 8–12h):
+  - Expect more symbols to get initial grid orders (spread), fewer repeated `Grid waiting...` SKIPs, and fewer `Grid guard active (no inventory to sell)` SKIPs.
+  - Expected KPI direction: higher unique-symbol distribution in active orders; lower “waiting” skip share.
+
+## 2026-02-15 18:21 UTC — T-029 Wallet policy v2 slice: dust cleanup + reduce “protected assets” scope
+- Scope: reduce “bag of tiny coins” and make wallet cleanup more adaptive by (1) lowering the effective sweep floor for large accounts (cap by min target) and (2) only protecting assets that are actually in bot orders/managed positions (instead of protecting top-universe base assets by default).
+- Why (runtime evidence):
+  - User observed persistent small holdings (e.g., ~10–20 USDC value coins) remaining in wallet after runs, especially in bear-ish conditions.
+  - Current sweep policy scaled the minimum sweep size with wallet total, which makes the sweep threshold too high on large wallets (e.g., 10k USDC wallet → 20 USDC min), leaving medium dust behind.
+  - Current sweep policy also treated “top universe bases” as protected, which prevents sweeping large holdings that are not actually being traded by the bot after state resets.
+- Technical changes:
+  - API (`apps/api/src/modules/bot/bot-engine.service.ts`):
+    - Wallet sweep now protects only:
+      - base assets referenced by current open orders (activeOrders),
+      - base assets for managed positions (from fills),
+      - and (when not in bootstrap) the current candidate base asset.
+    - Sweep minimum is now capped to a small multiple of `conversionTopUpMinTarget` (risk-linked) so large wallets can still sweep 10–20 USDC “dust band” assets.
+    - Added a “dust band” category: assets between `minSweepTargetHome` and `sweepMinValueHome` are eligible for cleanup (one per tick, respecting existing cooldown logic).
+    - Sweep trade details now include `category` (`dust` vs `stale`) for later UI/telemetry breakdown.
+- Risk slider impact:
+  - Higher risk caps sweep threshold lower (more aggressive dust cleanup), while still respecting conversion min target.
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (2–4h or overnight):
+  - Expect: fewer lingering 10–20 USDC “dust band” coins, and fewer cases where large non-traded holdings remain protected purely due to universe ranking.
+  - Verify in UI decisions: `TRADE ... wallet-sweep ... details.category=dust` appears occasionally (rate-limited).
+
 ## 2026-02-15 12:25 UTC — T-004 Unblock grid SELL leg under quote starvation
 - Scope: when the wallet has near-zero spendable home-stable (due to reserve buffer), `SPOT_GRID` must still be able to place SELL ladder orders using base inventory instead of terminating early on BUY infeasibility.
 - Why (runtime evidence):

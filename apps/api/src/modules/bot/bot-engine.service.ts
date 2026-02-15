@@ -2349,6 +2349,11 @@ export class BotEngineService implements OnModuleInit {
       }> => {
         try {
           const snap = await this.universe.getLatest();
+          const tradeMode = config?.basic.tradeMode ?? "SPOT";
+          const manageExternalOpenOrders = Boolean(config?.advanced.manageExternalOpenOrders);
+          const botPrefix = config ? this.resolveBotOrderClientIdPrefix(config) : "ABOT";
+          const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+
           const byHomeQuoteBase = new Map<string, UniverseCandidate>();
           for (const candidate of snap.candidates ?? []) {
             const quote = candidate.quoteAsset.trim().toUpperCase();
@@ -2356,6 +2361,11 @@ export class BotEngineService implements OnModuleInit {
             if (!base || quote !== homeStable) continue;
             byHomeQuoteBase.set(base, candidate);
           }
+
+          const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(boundedRisk / 25)));
+          const positions = tradeMode === "SPOT_GRID" ? this.getManagedPositions(current) : null;
+          let bestGridCandidate: { symbol: string; candidate: UniverseCandidate; score: number } | null = null;
+          let firstEligibleGridCandidate: { symbol: string; candidate: UniverseCandidate } | null = null;
 
           const seenSymbols = new Set<string>();
           for (const rawCandidate of snap.candidates ?? []) {
@@ -2385,7 +2395,74 @@ export class BotEngineService implements OnModuleInit {
             if (policyReason) continue;
             if (this.getEntryGuard({ symbol, state: current })) continue;
 
+            if (tradeMode === "SPOT_GRID") {
+              const symbolOpenLimitOrdersAll = current.activeOrders.filter((order) => {
+                if (order.symbol !== symbol) return false;
+                if (order.status !== "NEW") return false;
+                const type = order.type.trim().toUpperCase();
+                return type === "LIMIT" || type === "LIMIT_MAKER";
+              });
+              const externalOpenLimits = symbolOpenLimitOrdersAll.filter((order) => !this.isBotOwnedOrder(order, botPrefix));
+              if (externalOpenLimits.length > 0 && !manageExternalOpenOrders) {
+                continue;
+              }
+
+              const symbolOpenLimits = symbolOpenLimitOrdersAll.filter((order) => {
+                return manageExternalOpenOrders ? true : this.isBotOwnedOrder(order, botPrefix);
+              });
+              const hasBuyLimit = symbolOpenLimits.some((order) => order.side === "BUY");
+              const hasSellLimit = symbolOpenLimits.some((order) => order.side === "SELL");
+              const openLimitCount = symbolOpenLimits.length;
+
+              const regime = this.buildRegimeSnapshot(candidate);
+              const scores = this.buildAdaptiveStrategyScores(candidate, regime.label);
+
+              const existingBuyPauseLock = this.getActiveSymbolProtectionLock(current, symbol, { onlyTypes: ["GRID_GUARD_BUY_PAUSE"] });
+              const t = boundedRisk / 100;
+              const pauseConfidenceThreshold = this.toRounded(0.6 + t * 0.2, 4); // risk 0 -> 0.60, risk 100 -> 0.80
+              const shouldPauseBuys =
+                regime.label === "BEAR_TREND" &&
+                typeof regime.confidence === "number" &&
+                Number.isFinite(regime.confidence) &&
+                regime.confidence >= pauseConfidenceThreshold;
+              const buyPaused = Boolean(existingBuyPauseLock) || shouldPauseBuys;
+
+              const netQty = positions?.get(symbol)?.netQty ?? 0;
+              const hasInventory = Number.isFinite(netQty) && netQty > 0;
+
+              if (!firstEligibleGridCandidate) {
+                firstEligibleGridCandidate = { symbol, candidate };
+              }
+
+              const missingBuyLeg = !hasBuyLimit && !buyPaused;
+              const missingSellLeg = !hasSellLimit && hasInventory;
+              const canTakeAction = missingBuyLeg || missingSellLeg;
+
+              const waiting = hasBuyLimit && hasSellLimit;
+              const waitingPenalty = waiting ? 0.3 : 0;
+              const guardNoInventoryPenalty = buyPaused && !hasInventory ? 0.45 : 0;
+              const openLimitPenalty = Math.min(0.2, (openLimitCount / Math.max(1, maxGridOrdersPerSymbol)) * 0.2);
+
+              const actionability = canTakeAction ? 1 : waiting ? 0.05 : 0.3;
+              const recommendedBonus = scores.recommended === "GRID" ? 0.15 : scores.recommended === "MEAN_REVERSION" ? 0.05 : 0;
+              const score = scores.grid * 1.2 + actionability * 0.8 + recommendedBonus - waitingPenalty - guardNoInventoryPenalty - openLimitPenalty;
+
+              if (!bestGridCandidate || score > bestGridCandidate.score) {
+                bestGridCandidate = { symbol, candidate, score };
+              }
+              continue;
+            }
+
             return { symbol, candidate };
+          }
+
+          if (tradeMode === "SPOT_GRID") {
+            if (bestGridCandidate) {
+              return { symbol: bestGridCandidate.symbol, candidate: bestGridCandidate.candidate };
+            }
+            if (firstEligibleGridCandidate) {
+              return firstEligibleGridCandidate;
+            }
           }
 
           return { symbol: null, candidate: null, reason: "No eligible universe candidates after policy and lock filters" };
@@ -2905,21 +2982,28 @@ export class BotEngineService implements OnModuleInit {
           }
 
           if ((universeSnapshot?.candidates?.length ?? 0) > 0) {
-            const preferredHomeBaseAssets = new Set<string>(
-              (universeSnapshot?.candidates ?? [])
-                .filter((c) => c.quoteAsset.trim().toUpperCase() === homeStable)
-                .sort((a, b) => b.score - a.score)
-                .slice(0, Math.max(4, Math.round(12 - risk / 15)))
-                .map((c) => c.baseAsset.trim().toUpperCase())
-            );
-            preferredHomeBaseAssets.add(candidateBaseAsset);
+            const protectedHomeBaseAssets = new Set<string>();
+            for (const order of current.activeOrders) {
+              const symbol = order.symbol.trim().toUpperCase();
+              if (!symbol || !symbol.endsWith(homeStable)) continue;
+              const baseAsset = symbol.slice(0, Math.max(0, symbol.length - homeStable.length)).trim().toUpperCase();
+              if (baseAsset) protectedHomeBaseAssets.add(baseAsset);
+            }
             for (const position of managedOpenHomeSymbols) {
               const baseAsset = position.symbol.slice(0, Math.max(0, position.symbol.length - homeStable.length)).trim().toUpperCase();
-              if (baseAsset) preferredHomeBaseAssets.add(baseAsset);
+              if (baseAsset) protectedHomeBaseAssets.add(baseAsset);
+            }
+
+            const sweepBootstrapMode = protectedHomeBaseAssets.size === 0 && managedOpenHomeSymbols.length === 0;
+            if (!sweepBootstrapMode) {
+              protectedHomeBaseAssets.add(candidateBaseAsset);
             }
 
             const sweepFloorPct = risk >= 80 ? 0.002 : risk >= 50 ? 0.0035 : 0.006;
-            const sweepMinValueHome = Math.max(config?.advanced.conversionTopUpMinTarget ?? 5, walletTotalHome * sweepFloorPct);
+            const minSweepTargetHome = config?.advanced.conversionTopUpMinTarget ?? 5;
+            const sweepMinValueHomeRaw = walletTotalHome * sweepFloorPct;
+            const sweepCapMultiplier = risk >= 80 ? 2 : risk >= 50 ? 3 : 4; // caps at 2x/3x/4x min target
+            const sweepMinValueHome = Math.max(minSweepTargetHome, Math.min(sweepMinValueHomeRaw, minSweepTargetHome * sweepCapMultiplier));
             const sourceBridgeAssets = resolveRouteBridgeAssets(config, homeStable);
             const staleSources: Array<{
               asset: string;
@@ -2928,17 +3012,20 @@ export class BotEngineService implements OnModuleInit {
               sourceHomeSymbol: string;
               change24hPct: number | null;
               reason: string;
+              category: "stale" | "dust";
             }> = [];
 
             for (const balance of balances) {
               const asset = balance.asset.trim().toUpperCase();
               const free = Number.isFinite(balance.free) ? balance.free : 0;
               if (!asset || asset === homeStable || free <= 0) continue;
-              if (preferredHomeBaseAssets.has(asset)) continue;
+              if (protectedHomeBaseAssets.has(asset)) continue;
 
               const estimatedValueHome = await this.estimateAssetValueInHome(asset, free, homeStable, sourceBridgeAssets);
               if (!Number.isFinite(estimatedValueHome ?? Number.NaN) || (estimatedValueHome ?? 0) <= 0) continue;
-              if ((estimatedValueHome ?? 0) < sweepMinValueHome) continue;
+              const valueHome = estimatedValueHome ?? 0;
+              const isDustBand = valueHome >= minSweepTargetHome && valueHome < sweepMinValueHome;
+              if (valueHome < minSweepTargetHome) continue;
 
               const sourceHomeSymbol = `${asset}${homeStable}`;
               const marketCandidate = (universeSnapshot?.candidates ?? []).find(
@@ -2946,15 +3033,21 @@ export class BotEngineService implements OnModuleInit {
               );
               const change24hPct = typeof marketCandidate?.priceChangePct24h === "number" ? marketCandidate.priceChangePct24h : null;
               const weakTrend = change24hPct === null || change24hPct <= -0.35;
-              if (!weakTrend) continue;
+              const eligible = isDustBand ? true : valueHome >= sweepMinValueHome ? weakTrend : false;
+              if (!eligible) continue;
 
               staleSources.push({
                 asset,
                 free,
-                estimatedValueHome: estimatedValueHome ?? 0,
+                estimatedValueHome: valueHome,
                 sourceHomeSymbol,
                 change24hPct,
-                reason: change24hPct === null ? "not in preferred universe set" : `24h change ${change24hPct.toFixed(2)}%`
+                category: isDustBand ? "dust" : "stale",
+                reason: isDustBand
+                  ? "dust cleanup"
+                  : change24hPct === null
+                    ? "weak trend (no 24h data)"
+                    : `24h change ${change24hPct.toFixed(2)}%`
               });
             }
 
@@ -3003,6 +3096,7 @@ export class BotEngineService implements OnModuleInit {
                   reason: `wallet-sweep ${source.asset} -> ${homeStable}`,
                   details: {
                     mode: "wallet-sweep",
+                    category: source.category,
                     sourceAsset: source.asset,
                     sourceHomeSymbol: source.sourceHomeSymbol,
                     sourceEstimatedValueHome: Number(source.estimatedValueHome.toFixed(6)),

@@ -39,10 +39,11 @@ M1: Stabilize Spot testnet automation with risk-linked execution behavior and cl
 | T-001 | DONE | Exposure-aware candidate fallback | Avoid idle bot on top-symbol exposure cap | Increase trading continuity | Implemented in bot engine; candidate rotates to next eligible symbol. |
 | T-002 | DONE | High-risk profile aggressiveness tuning | Risk slider must materially affect behavior | Faster results in high-risk mode | Live cooldown/notional/entry limits now scale aggressively at risk=100. |
 | T-003 | BLOCKED | Risk-linked adaptive exit policy (no hard fixed stop profile) | Protect downside in bearish periods while keeping automation | Reduce deep hold drawdowns | Temporarily paused by PM/BA reprioritization to deliver wallet policy first. Next after T-004: risk+regime-adjusted take-profit/stop-loss bands and hold-time logic. |
-| T-004 | IN_PROGRESS | Wallet policy v1 (convert/sweep/autonomous reserve) | Handle mixed assets automatically | Keep tradeable quote liquidity | In progress: `SPOT_GRID` quote reserve recovery + risk-linked hard/soft reserve (BUY affordability uses hard reserve; top-up triggers use soft reserve); stable-like -> home-stable conversion top-up in grid mode; do not block grid SELL leg when BUY is infeasible due to quote starvation (sell-first liquidity recovery). |
+| T-004 | DONE | Wallet policy v1 (convert/sweep/autonomous reserve) | Handle mixed assets automatically | Keep tradeable quote liquidity | Delivered: `SPOT_GRID` quote reserve recovery + risk-linked hard/soft reserve (BUY affordability uses hard reserve; top-up triggers use soft reserve); stable-like -> home-stable conversion top-up in grid mode; do not block grid SELL leg when BUY is infeasible due to quote starvation (sell-first liquidity recovery). Note: this does **not** fully liquidate large non-stable holdings back to home stable; it preserves “preferred” liquid base assets for grid inventory. Follow-up: `T-029` exposure/dust/unmanaged-holdings. |
 | T-005 | TODO | Daily risk guardrails visible in UI | User requested max-loss + per-position hard cap tied to risk | Safe live operation | Enforce maxDailyLoss and expose guard state in status panel. |
-| T-006 | TODO | Universe discovery breadth + regime diversity | Improve pair selection quality and reduce single-symbol bias | Better candidate quality | Queued by single-lane rule. Pre-trade feasibility filter already delivered; next slice adds deeper regime-diversity scoring and rotation diagnostics. |
+| T-006 | DONE | Universe discovery breadth + regime diversity | Improve pair selection quality and reduce single-symbol bias | Better candidate quality | Delivered: `SPOT_GRID` candidate selection ranks by grid suitability + actionability (avoid repeatedly selecting symbols already “waiting” with both legs open, and skip guard-paused/no-inventory symbols). Needs overnight validation evidence but CI is green. |
 | T-007 | TODO | PnL correctness and exposure reporting | Trustworthy dashboard for non-trader users | Clear performance visibility | Reconcile realized/unrealized PnL from fills and holdings. |
+| T-029 | IN_PROGRESS | Wallet policy v2 (unmanaged holdings, exposure cap, dust) | Autobot must manage holdings risk automatically | Reduce “bag holding” in bear markets | In progress: dust cleanup “band” + capped sweep minimum + protect only assets referenced by open orders/managed positions (avoid protecting top-universe assets by default). Next slice: explicit non-home exposure cap + “unmanaged holdings” UI visibility. |
 | T-020 | TODO | Remove hidden ENV trading fallbacks | Keep UI/config export as single source of truth | Predictable cross-server behavior | Queued by single-lane rule. Delivered: engine/conversion cooldown/cap/buffer defaults from config defaults; remaining: move fee/spread env constants to explicit config controls. |
 | T-021 | DONE | Transient exchange error backoff controller | Avoid retry storms on network/rate-limit faults | Stable live loop under exchange turbulence | Added exponential backoff with pause window + recovery for transient exchange errors. |
 | T-022 | DONE | Freqtrade-develop deep reference mapping | Convert external best-practices into actionable backlog without GPL code copying | Faster, less-chaotic decision making for next milestones | Added concrete architecture mapping for FreqAI lifecycle, pairlist pipeline, protections, exchange sizing, and hyperopt objective design. |
@@ -66,9 +67,9 @@ M1: Stabilize Spot testnet automation with risk-linked execution behavior and cl
 
 ### Next batch (execute now)
 
-1. Start `T-004` (single active lane):
-   - Add grid-mode quote reserve recovery (stable-like -> home stable) and reserve buffer so BUY ladders don't consume the last quote.
-   - Ensure skip details show reserve and spendable quote amounts when BUY sizing rejects occur.
-2. Run one 1-2h validation batch with explicit KPI targets (recommended: `./scripts/run-batch.sh --minutes 120`).
-3. Run one overnight 8-12h batch and collect feedback bundle.
+1. Start `T-029` (single active lane):
+   - Make wallet sweep adaptive for large wallets by capping sweep minimum (keep 10–20 USDC “dust band” sweepable).
+   - Protect only assets referenced by open orders/managed positions so “unmanaged” holdings can be cleaned up.
+2. Run one 1–2h validation batch (recommended: `./scripts/run-batch.sh --minutes 120`).
+3. Run one overnight 8–12h batch and collect a feedback bundle.
 4. Re-prioritize the next single ticket from measured gaps (default next: `T-005`).

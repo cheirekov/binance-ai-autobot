@@ -1,50 +1,48 @@
 # Session Brief
 
-Last updated: 2026-02-15 15:27 UTC
+Last updated: 2026-02-15 18:21 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
 
 ## 1) Batch contract (fill before coding)
 
-- Batch type: `DAY (2-4h)`
-- Active ticket: `T-004` (Wallet policy v1: reserve + conversions)
-- Goal (single sentence): reduce grid no-op loops by making quote reserve risk-linked (hard vs soft) and ensuring SELL legs are not blocked when BUY is infeasible.
+- Batch type: `NIGHT (8-12h)`
+- Active ticket: `T-029` (Wallet policy v2: unmanaged holdings + dust cleanup)
+- Goal (single sentence): in bear-ish conditions, avoid accumulating an unmanaged “bag” by sweeping small non-strategy holdings back to home stable and by not over-protecting assets the bot isn’t actually trading.
 - In scope:
-  - grid-mode quote reserve recovery via conversion router (stable-like → home stable),
-  - grid BUY sizing uses `quoteSpendable = quoteFree - reserveHardTarget` (risk-linked hard reserve) to avoid repeated minQty/minNotional rejects,
-  - when quote is exhausted, still allow grid SELL legs to place using base inventory (liquidity recovery),
-  - testnet conversions remain usable even when EEA region policy is enabled (policy is mainnet-only for conversions).
+  - wallet sweep improvements:
+    - cap sweep minimum for large wallets (keep 10–20 USDC “dust band” sweepable),
+    - protect only assets referenced by open orders/managed positions (avoid “protect top universe assets” behavior),
+    - emit `wallet-sweep` trades with `details.category=dust|stale`.
 - Out of scope:
-  - adaptive policy promotion from shadow to execution,
-  - full dust sweeping and idle inventory policy,
+  - “sell everything to USDC” liquidation mode (needs an explicit exposure-cap policy),
+  - adaptive/AI policy promotion from shadow to execution,
   - PnL reconciliation refactor (`T-007`).
-- Hypothesis: using a risk-linked hard reserve for BUY affordability (while keeping a higher soft reserve as the conversion trigger) will materially reduce sizing rejects without sacrificing reserve recovery behavior.
+- Hypothesis: cleaning the 10–20 USDC dust band and avoiding over-protecting non-traded assets will reduce long-lived wallet clutter and reduce unmanaged bear-market downside.
 - Target KPI delta:
-  - sizing reject pressure: reduce from `high` (~42%) to `<= 30%` in a 1–2h run.
-  - fewer repeated `Grid buy sizing rejected (Below minQty ...)` skips when wallet has other stable-like assets available.
+  - fewer non-strategy “dust band” holdings remaining after the run,
+  - occasional `wallet-sweep` trades with `details.category=dust`,
+  - no conversion flood (must remain rate-limited by existing cooldowns).
 - Stop/rollback condition:
-  - conversion churn/flood (repeated stable conversions without enabling trading), or
-  - sizing reject pressure remains >= 35% after 60 minutes.
+  - repeated wallet-sweep attempts on the same asset (conversion churn), or
+  - sweeping interferes with assets used by open orders/managed positions.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
-  - In `SPOT_GRID`, when `quoteFree < reserveLowTarget` and the wallet holds stable-like assets, the bot performs a conversion top-up and resumes placing BUY ladder orders.
-  - In `SPOT_GRID`, when `quoteSpendable` is ~0 but `baseFree > 0`, the bot can still place SELL LIMIT ladder orders (no early-return on BUY infeasibility).
-- UI behavior:
-  - Dashboard decisions show conversion-router trades with `stage=grid-reserve-recovery` when reserve recovery triggers.
+  - Wallet sweep can convert medium dust (≈10–20 USDC value) on large wallets (sweep min is capped).
+  - Wallet sweep protects only assets referenced by current open orders and managed positions (not “top universe” assets by default).
 - Runtime evidence in decisions/logs:
-  - `Grid buy sizing rejected` details include `quoteSpendable` + `reserveHardTarget` + `reserveLowTarget` for affordability debugging.
+  - `TRADE ... wallet-sweep ... details.category=dust|stale` appears (rate-limited).
 - Risk slider impact (`none` or explicit low/mid/high behavior):
-  - Low risk: higher reserve targets (more conservative, fewer entries when quote is low).
-  - High risk: lower reserve targets (more aggressive, more spendable quote).
+  - High risk uses a lower sweep-cap multiplier → more aggressive dust cleanup.
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
   - additional targeted command(s):
-    - `docker logs --tail 500 binance-ai-autobot_api_1` (confirm reserve recovery conversion behavior)
+    - `docker logs --tail 500 binance-ai-autobot_api_1` (wallet sweep behavior)
 - Runtime validation plan:
-  - run duration: `30-60 minutes` (plus quick restart/reset checks)
+  - run duration: `8-12 hours`
   - expected bundle name pattern: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
 
 ## 3) Deployment handoff
@@ -56,37 +54,36 @@ Use this file at the start and end of every batch.
   - `liveTrading=true`
   - testnet endpoint and keys configured
 - Operator checklist:
-  - reset state needed? (`no` for this active night run unless explicitly testing cold start)
+  - reset state needed? (`optional` — recommended to reset `data/state.json` for clean overnight evidence)
   - keep config.json? (`yes`)
-  - start command: `docker compose up -d --build --force-recreate`
+  - start command:
+    - Compose v2: `docker compose up -d --build --force-recreate`
+    - Compose v1: `docker-compose up -d --build --force-recreate`
+  - collect bundle:
+    - `./scripts/collect-feedback.sh` (auto-detects compose; override via `AUTOBOT_COMPOSE_CMD=docker-compose`)
 
 ## 4) End-of-batch result (fill after run)
 
-- Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=8, historyLimitOrders=22, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=12.0%)
-  - sizing reject pressure: `high` (sizingRejectSkips=65, decisions=153, ratio=42.5%)
-- Decision: `pivot`
-- Decision: `continue`
-- Next ticket candidate: `T-004` (continue: reduce sizing reject pressure)
-- Open risks:
-  - sizing reject pressure is high (42.5%); risk-linked hard reserve should reduce this, otherwise add a global quote-lock throttle.
+- Observed KPI delta: `<fill after night run>`
+- Decision: `<continue|pivot>`
+- Next ticket candidate: `<T-005|T-007|T-023>`
+- Open risks: `<fill>`
 - Notes for next session:
-  - bundle: `autobot-feedback-20260215-150727.tgz`
-  - auto-updated at: `2026-02-15T15:07:33.817Z`
+  - bundle: `<fill>`
+  - manual notes: `<fill>`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
-Ticket: T-004
-Batch: DAY (2-4h)
-Goal: Reduce SPOT_GRID no-op loops by using a risk-linked hard reserve + reserve recovery top-ups; keep SELL legs active when BUY is infeasible.
-In scope: grid reserve recovery conversion + quoteSpendable sizing (hard reserve) + sell-first liquidity recovery + clear skip details.
-Out of scope: adaptive policy promotion, full dust sweep, PnL refactor.
+Ticket: T-029
+Batch: NIGHT (8-12h)
+Goal: Reduce unmanaged “bag holding” by sweeping dust/medium-dust back to home stable and by not protecting non-traded assets by default.
+In scope: wallet sweep dust band + capped sweep minimum + protect only open-order/managed assets; include `details.category=dust|stale` in sweep trades.
+Out of scope: full liquidation exposure-cap policy; adaptive/AI promotion; PnL refactor.
 DoD:
-- API: conversion-router trades occur when quote reserve is low (stage=grid-reserve-recovery).
-- UI: decisions show reserve recovery conversions; grid buy reject details include quoteSpendable/reserveHardTarget/reserveLowTarget.
-- Risk slider mapping: risk=0 keeps reserveHard near reserveLow; risk=100 keeps reserveHard near floorTopUpTarget.
+- API: wallet sweep converts 10–20 USDC “dust band” occasionally (rate-limited) and avoids sweeping assets referenced by open orders/managed positions.
+- Runtime: see `wallet-sweep` trades with `details.category=dust|stale`; fewer lingering 10–20 USDC holdings after the run.
+- Risk slider mapping: high risk is more aggressive (lower sweep cap).
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```
