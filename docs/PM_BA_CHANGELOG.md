@@ -41,6 +41,26 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
   - Extend reserve recovery sources beyond stable-like assets (non-core asset sweep) and add “idle inventory ratio” KPI visibility in dashboard (`T-004` continuation).
 
+## 2026-02-15 12:25 UTC — T-004 Unblock grid SELL leg under quote starvation
+- Scope: when the wallet has near-zero spendable home-stable (due to reserve buffer), `SPOT_GRID` must still be able to place SELL ladder orders using base inventory instead of terminating early on BUY infeasibility.
+- Why (runtime evidence):
+  - In `autobot-feedback-20260215-121714.tgz`, the bot started with ~`0.20` free USDC and no stable-like sources; it repeated `Grid buy sizing rejected (Invalid desiredQty)` and made no progress until USDT appeared (manual conversion), at which point wallet-sweep converted USDT -> USDC and grid orders could start.
+  - Root cause: the BUY sizing reject path returned early, so the SELL leg was never attempted even when `baseFree > 0`.
+- Technical changes:
+  - API:
+    - In `SPOT_GRID`, BUY infeasibility no longer terminates the tick before SELL can be attempted.
+    - When `buyQtyTarget <= 0` (quoteSpendable is effectively zero), the bot prepares a pending `SKIP` (`Insufficient spendable <homeStable> for grid BUY`) but continues to SELL placement.
+    - If any grid order is placed, pending “no-action” SKIPs are not persisted (reduces noise).
+    - If no grid order is placed, the most relevant pending SKIP is persisted (preserves debug signal and cooldown behavior).
+- Risk slider impact:
+  - Higher risk still lowers reserve targets, increasing the chance BUY orders are feasible.
+  - When BUY is infeasible, behavior now “recovers liquidity” via SELL ladder on held assets, regardless of risk.
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (60–120m):
+  - Start with a wallet that has base inventory (any tradable `*USDC` asset) and low `USDC` free.
+  - Expect: the bot places SELL LIMIT ladder orders (not blocked by BUY infeasibility), generating USDC fills over time instead of cycling “Invalid desiredQty”.
+
 ## 2026-02-15 07:52 UTC — T-027 Faster open-order discovery after state reset
 - Scope: make exchange open orders show up quickly in UI after a “brain reset” (deleted `state.json`) while keeping order sync symbol-scoped (no global open-order fetch).
 - BA requirement mapping:

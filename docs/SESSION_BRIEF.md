@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-15 11:48 UTC
+Last updated: 2026-02-15 12:25 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,16 +9,17 @@ Use this file at the start and end of every batch.
 
 - Batch type: `DAY (2-4h)`
 - Active ticket: `T-004` (Wallet policy v1: reserve + conversions)
-- Goal (single sentence): prevent `SPOT_GRID` from getting stuck with near-zero home-stable liquidity by enforcing a reserve buffer and doing stable-like → home-stable top-ups when needed.
+- Goal (single sentence): prevent `SPOT_GRID` from getting stuck with near-zero home-stable liquidity by enforcing a reserve buffer, doing stable-like → home-stable top-ups when needed, and not blocking SELL legs when BUY is infeasible.
 - In scope:
   - grid-mode quote reserve recovery via conversion router (stable-like → home stable),
   - grid BUY sizing uses `quoteSpendable` (keeps free reserve; avoids repeated minQty rejects),
+  - when quote is exhausted, still allow grid SELL legs to place using base inventory (liquidity recovery),
   - testnet conversions remain usable even when EEA region policy is enabled (policy is mainnet-only for conversions).
 - Out of scope:
   - adaptive policy promotion from shadow to execution,
   - full dust sweeping and idle inventory policy,
   - PnL reconciliation refactor (`T-007`).
-- Hypothesis: keeping a risk-linked free-quote reserve and topping up from stable-like assets will reduce affordability-driven grid sizing rejects and restore continuous trading on mixed wallets.
+- Hypothesis: keeping a risk-linked free-quote reserve, topping up from stable-like assets, and allowing SELL legs even when BUY is infeasible will reduce no-op loops and restore continuous trading on mixed wallets.
 - Target KPI delta:
   - sizing reject pressure: reduce from `high` (>= 35%) to `<= 25%` in a 1–2h run.
   - fewer repeated `Grid buy sizing rejected (Below minQty ...)` skips when wallet has other stable-like assets available.
@@ -30,6 +31,7 @@ Use this file at the start and end of every batch.
 
 - API behavior:
   - In `SPOT_GRID`, when `quoteFree < reserveLowTarget` and the wallet holds stable-like assets, the bot performs a conversion top-up and resumes placing BUY ladder orders.
+  - In `SPOT_GRID`, when `quoteSpendable` is ~0 but `baseFree > 0`, the bot can still place SELL LIMIT ladder orders (no early-return on BUY infeasibility).
 - UI behavior:
   - Dashboard decisions show conversion-router trades with `stage=grid-reserve-recovery` when reserve recovery triggers.
 - Runtime evidence in decisions/logs:
@@ -61,13 +63,16 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-- Decision: `<continue|rollback|pivot>`
-- Next ticket candidate: `<pick after run>`
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=3, historyLimitOrders=0, activeMarketOrders=0)
+  - market-only share reduced: `no` (historyMarketShare=100.0%)
+  - sizing reject pressure: `low` (sizingRejectSkips=1, decisions=25, ratio=4.0%)
+- Decision: `continue`
+- Next ticket candidate: `T-007` (if lifecycle remains stable)
 - Open risks:
-  - `<fill>`
+  - none critical from automated checks.
 - Notes for next session:
-  - bundle: `<bundle-id>`
-  - auto-updated at: `<timestamp>`
+  - bundle: `autobot-feedback-20260215-121714.tgz`
+  - auto-updated at: `2026-02-15T12:17:20.103Z`
 
 ## 5) Copy/paste prompt for next session
 

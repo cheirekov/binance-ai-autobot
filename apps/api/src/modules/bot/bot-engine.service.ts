@@ -3774,6 +3774,7 @@ export class BotEngineService implements OnModuleInit {
             const buyLimitPrice = Number((price * (1 - gridSpacingPct / 100)).toFixed(8));
             const sellLimitPrice = Number((price * (1 + gridSpacingPct / 100)).toFixed(8));
             let placedGridOrder = false;
+            let pendingNoActionState: BotState | null = null;
 
             if (!hasBuyLimit && buyPaused) {
               const summary = `Skip ${candidateSymbol}: Grid guard paused BUY leg`;
@@ -3835,7 +3836,56 @@ export class BotEngineService implements OnModuleInit {
               const buyPrice = Number.parseFloat(buyPriceNorm.normalizedPrice);
               const maxAffordableQty = buyPrice > 0 ? quoteSpendable / (buyPrice * bufferFactor) : 0;
               const buyQtyTarget = Math.min(qty, maxAffordableQty);
-              const buyCheck = await this.marketData.validateLimitOrderQty(candidateSymbol, buyQtyTarget, buyPriceNorm.normalizedPrice);
+              if (!Number.isFinite(buyQtyTarget) || buyQtyTarget <= 0) {
+                const summary = `Skip ${candidateSymbol}: Insufficient spendable ${homeStable} for grid BUY`;
+                const baseCooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
+                const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
+                const cooldownMs = cooldown.cooldownMs;
+                const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+                const next = {
+                  ...current,
+                  activeOrders: current.activeOrders,
+                  orderHistory: current.orderHistory,
+                  decisions: alreadyLogged
+                    ? current.decisions
+                    : [
+                        {
+                          id: crypto.randomUUID(),
+                          ts: new Date().toISOString(),
+                          kind: "SKIP",
+                          summary,
+                          details: {
+                            desiredQty: Number(qty.toFixed(8)),
+                            maxAffordableQty: Number(maxAffordableQty.toFixed(8)),
+                            limitPrice: buyPriceNorm.normalizedPrice,
+                            quoteFree: Number(quoteFree.toFixed(6)),
+                            quoteSpendable: Number(quoteSpendable.toFixed(6)),
+                            reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
+                            ...(cooldown.storm ? { storm: cooldown.storm } : {}),
+                            cooldownMs
+                          }
+                        },
+                        ...current.decisions
+                      ].slice(0, 200),
+                  lastError: undefined
+                } satisfies BotState;
+                pendingNoActionState = this.upsertProtectionLock(next, {
+                  type: "COOLDOWN",
+                  scope: "SYMBOL",
+                  symbol: candidateSymbol,
+                  reason: cooldown.storm
+                    ? `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`
+                    : `Cooldown after grid quote insufficiency (${Math.round(cooldownMs / 1000)}s)`,
+                  expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                  details: {
+                    category: "GRID_BUY_QUOTE_INSUFFICIENT",
+                    cooldownMs,
+                    limitPrice: buyPriceNorm.normalizedPrice,
+                    ...(cooldown.storm ? { storm: cooldown.storm } : {})
+                  }
+                });
+              } else {
+                const buyCheck = await this.marketData.validateLimitOrderQty(candidateSymbol, buyQtyTarget, buyPriceNorm.normalizedPrice);
               let buyQtyStr: string | undefined = buyCheck.ok ? buyCheck.normalizedQty : undefined;
               if (!buyQtyStr && buyCheck.requiredQty) {
                 const requiredQty = Number.parseFloat(buyCheck.requiredQty);
@@ -3914,7 +3964,7 @@ export class BotEngineService implements OnModuleInit {
                       ].slice(0, 200),
                   lastError: undefined
                 } satisfies BotState;
-                const nextWithCooldown = this.upsertProtectionLock(next, {
+                pendingNoActionState = this.upsertProtectionLock(next, {
                   type: "COOLDOWN",
                   scope: "SYMBOL",
                   symbol: candidateSymbol,
@@ -3930,8 +3980,7 @@ export class BotEngineService implements OnModuleInit {
                     ...(cooldown.storm ? { storm: cooldown.storm } : {})
                   }
                 });
-                this.save(nextWithCooldown);
-                return;
+              }
               }
             }
 
@@ -4046,13 +4095,17 @@ export class BotEngineService implements OnModuleInit {
                       ...(cooldown.storm ? { storm: cooldown.storm } : {})
                     }
                   });
-                  this.save(nextWithCooldown);
-                  return;
+                  if (!pendingNoActionState) pendingNoActionState = nextWithCooldown;
                 }
               }
             }
 
             if (placedGridOrder) {
+              return;
+            }
+
+            if (pendingNoActionState) {
+              this.save(pendingNoActionState);
               return;
             }
 
