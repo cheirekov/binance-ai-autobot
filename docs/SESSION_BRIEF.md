@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-15 12:25 UTC
+Last updated: 2026-02-15 15:07 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -63,16 +63,16 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=3, historyLimitOrders=0, activeMarketOrders=0)
-  - market-only share reduced: `no` (historyMarketShare=100.0%)
-  - sizing reject pressure: `low` (sizingRejectSkips=1, decisions=25, ratio=4.0%)
-- Decision: `continue`
-- Next ticket candidate: `T-007` (if lifecycle remains stable)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=8, historyLimitOrders=22, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=12.0%)
+  - sizing reject pressure: `high` (sizingRejectSkips=65, decisions=153, ratio=42.5%)
+- Decision: `pivot`
+- Next ticket candidate: `T-027` (continue T-027 hardening)
 - Open risks:
-  - none critical from automated checks.
+  - sizing reject pressure is high (42.5%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260215-121714.tgz`
-  - auto-updated at: `2026-02-15T12:17:20.103Z`
+  - bundle: `autobot-feedback-20260215-150727.tgz`
+  - auto-updated at: `2026-02-15T15:07:33.817Z`
 
 ## 5) Copy/paste prompt for next session
 
