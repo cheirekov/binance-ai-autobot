@@ -1642,9 +1642,15 @@ export class BotEngineService implements OnModuleInit {
     let trackedSymbols = activeSymbols;
     const discoveryMode = trackedSymbols.length === 0 && hintSymbols.length > 0;
     if (discoveryMode) {
-      const next = hintSymbols[this.orderDiscoveryCursor % hintSymbols.length];
-      this.orderDiscoveryCursor += 1;
-      trackedSymbols = [next];
+      // After a state reset we can have real open orders on the exchange but none in `state.activeOrders`.
+      // Discover them quickly by scanning a small batch of hint symbols per tick (symbol-scoped; no global fetch).
+      const batchSize = Math.min(5, hintSymbols.length);
+      const batch: string[] = [];
+      for (let i = 0; i < batchSize; i += 1) {
+        batch.push(hintSymbols[(this.orderDiscoveryCursor + i) % hintSymbols.length]);
+      }
+      this.orderDiscoveryCursor += batchSize;
+      trackedSymbols = Array.from(new Set(batch));
     }
 
     if (trackedSymbols.length === 0) return state;
@@ -1667,7 +1673,7 @@ export class BotEngineService implements OnModuleInit {
     if (closedActiveOrders.length === 0) {
       const summary =
         discoveryMode && openOrders.length > 0
-          ? `Synced ${openOrders.length} existing open order(s) for ${trackedSymbols[0]}`
+          ? `Synced ${openOrders.length} existing open order(s) (discovery scan: ${trackedSymbols.length} symbol(s))`
           : null;
       const alreadyLogged =
         summary && state.decisions[0]?.kind === "ENGINE" && state.decisions[0]?.summary === summary;
@@ -1686,7 +1692,8 @@ export class BotEngineService implements OnModuleInit {
                       summary,
                       details: {
                         stage: "order-discovery",
-                        symbol: trackedSymbols[0],
+                        scannedSymbols: trackedSymbols,
+                        foundSymbols: Array.from(new Set(openOrders.map((o) => o.symbol))).slice(0, 12),
                         orderIds: openOrders.map((o) => o.id).slice(0, 20)
                       }
                     },

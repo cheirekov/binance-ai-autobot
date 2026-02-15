@@ -16,6 +16,26 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-15 07:52 UTC — T-027 Faster open-order discovery after state reset
+- Scope: make exchange open orders show up quickly in UI after a “brain reset” (deleted `state.json`) while keeping order sync symbol-scoped (no global open-order fetch).
+- BA requirement mapping:
+  - User requirement: “Orders (active)” must reflect real exchange state and not depend on preserved local state.
+  - Reduce operator confusion after restarts/resets: open orders should be visible within seconds, not minutes.
+- PM milestone mapping: close remaining usability gaps for `T-027` open-order lifecycle before moving to wallet policy (`T-004`).
+- Technical changes:
+  - API:
+    - Improved live order discovery mode: when `state.activeOrders` is empty, scan a small batch of hint symbols per tick to discover existing open orders faster (`apps/api/src/modules/bot/bot-engine.service.ts`).
+    - Added richer decision details for discovery scans (`scannedSymbols`, `foundSymbols`) to support debugging from the dashboard.
+- Risk slider impact: none (order discovery mechanics only).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request (30–60m):
+  - Create 1–2 LIMIT open orders on testnet (manual or bot-owned), delete `data/state.json`, restart containers, start bot.
+  - Confirm within ~20 seconds the dashboard shows active orders and a discovery decision event is logged.
+  - Confirm no transient backoff spam or order-sync timeouts are introduced.
+- Follow-up:
+  - If discovery still misses orders that are not in top-universe symbols, add a bounded “wallet-holding symbol hint” (still symbol-scoped) or a one-time guarded global sync behind an Advanced toggle.
+
 ## 2026-02-14 16:20 UTC — T-027 Grid Guard v1 (pause BUY legs in bear trend)
 - Scope: reduce bearish “bag accumulation” risk in `SPOT_GRID` by pausing new grid BUY LIMIT placements during strong bearish regimes while keeping SELLs active.
 - BA requirement mapping:

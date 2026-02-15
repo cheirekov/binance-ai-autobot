@@ -1,55 +1,46 @@
 # Session Brief
 
-Last updated: 2026-02-14 15:37 UTC
+Last updated: 2026-02-15 07:52 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
 
 ## 1) Batch contract (fill before coding)
 
-- Batch type: `NIGHT (8-12h)`
+- Batch type: `DAY (2-4h)`
 - Active ticket: `T-027` (Spot limit/grid execution v1)
-- Goal (single sentence): validate that `SPOT_GRID` runs with real LIMIT open-order lifecycle instead of market-only behavior.
+- Goal (single sentence): after a bot “brain reset”, open exchange orders must appear quickly in UI without global open-order fetch.
 - In scope:
-  - runtime validation of exchange open-order sync,
-  - LIMIT ladder placement behavior in live testnet,
-  - grid-related KPI evidence from logs/state.
+  - order discovery speed when `state.activeOrders` is empty but exchange has open orders,
+  - symbol-scoped order-sync behavior and decision evidence,
+  - UI visibility of open orders after restart/reset.
 - Out of scope:
   - adaptive policy promotion from shadow to execution,
   - new wallet-policy features (`T-004`),
   - PnL reconciliation refactor (`T-007`).
-- Hypothesis: with `SPOT_GRID`, the bot should maintain real exchange LIMIT orders and reduce market-only execution dependence.
+- Hypothesis: scanning a small batch of hint symbols per tick will surface exchange open orders within ~20s of restart/reset (instead of ~100s worst-case).
 - Target KPI delta:
-  - open LIMIT orders visible in runtime (`activeOrders > 0` during grid windows),
-  - order history includes LIMIT entries with grid reasons,
-  - sizing-reject bursts do not dominate decision stream.
+  - time-to-first-discovered open order after restart: `<= 20s` when an order exists on a top-universe symbol.
 - Stop/rollback condition:
-  - repeated exchange filter errors prevent ladder placement for most cycles, or
-  - no observable open LIMIT lifecycle after sufficient runtime.
+  - order-sync causes transient exchange backoff repeatedly, or
+  - no discovery event after `2 minutes` while a known open order exists on a scanned symbol.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
-  - `GET /orders/active` returns synced exchange open orders when `SPOT_GRID` is active,
-  - `GET /orders/history` includes LIMIT entries from grid path.
+  - after deleting `data/state.json` and restarting, engine resyncs exchange open orders without needing a global open-order fetch.
 - UI behavior:
-  - Dashboard `Orders (active)` is non-empty during grid operation,
-  - order history shows LIMIT events and no market-only flood pattern when grid is enabled.
+  - Dashboard `Orders (active)` becomes non-empty shortly after start when there are exchange open orders.
 - Runtime evidence in decisions/logs:
-  - decisions include `grid-ladder-buy` / `grid-ladder-sell` reasons,
-  - support bundle includes state summary showing active order lifecycle.
+  - decision stream includes an `ENGINE` event like `Synced <n> existing open order(s) (discovery scan: <k> symbol(s))`.
 - Risk slider impact (`none` or explicit low/mid/high behavior):
-  - low risk: fewer simultaneous grid orders and wider spacing,
-  - high risk: denser grid and faster ladder refresh,
-  - current run expectation: high-risk profile should show more active ladder orders.
+  - Risk impact: none (order discovery mechanics only).
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
   - additional targeted command(s):
-    - `./scripts/collect-feedback.sh`
-    - `./scripts/update-session-brief.sh`
-    - `docker logs --tail 500 binance-ai-autobot_api_1`
+    - `docker logs --tail 500 binance-ai-autobot_api_1` (confirm discovery event + no backoff spam)
 - Runtime validation plan:
-  - run duration: `8-12h`
+  - run duration: `30-60 minutes` (plus quick restart/reset checks)
   - expected bundle name pattern: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
 
 ## 3) Deployment handoff
@@ -68,30 +59,27 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=6, historyLimitOrders=14, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=0.0%)
-  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=130, ratio=0.0%)
-- Decision: `continue`
-- Next ticket candidate: `T-007` (if lifecycle remains stable)
+- Decision: `<continue|rollback|pivot>`
+- Next ticket candidate: `<pick after run>`
 - Open risks:
-  - none critical from automated checks.
+  - `<fill>`
 - Notes for next session:
-  - bundle: `autobot-feedback-20260214-153754.tgz`
-  - auto-updated at: `2026-02-14T15:37:59.877Z`
+  - bundle: `<bundle-id>`
+  - auto-updated at: `<timestamp>`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-027
-Batch: NIGHT (8-12h)
-Goal: Validate SPOT_GRID LIMIT lifecycle and summarize gaps.
-In scope: bot engine grid path, active/history order sync, runtime KPI evidence.
+Batch: DAY (2-4h)
+Goal: After a brain reset, discover exchange open orders quickly (symbol-scoped; no global fetch).
+In scope: order-sync discovery scan, UI visibility of active orders after restart/reset.
 Out of scope: adaptive policy promotion, wallet policy expansion, PnL refactor.
 DoD:
-- API: `GET /orders/active` and `GET /orders/history` reflect real LIMIT lifecycle.
-- UI: active orders visible during grid operation; no market-only-only pattern.
-- Runtime log evidence: decisions include grid ladder reasons and exchange sync events.
-- Risk slider mapping: high risk -> denser grid than low risk.
-- CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`, `./scripts/collect-feedback.sh`, and `./scripts/update-session-brief.sh`.
+- API: engine resyncs exchange open orders after `data/state.json` reset without global open-order fetch.
+- UI: active orders appear shortly after start when exchange has open orders.
+- Runtime evidence: decisions include `Synced <n> existing open order(s) (discovery scan: <k> symbol(s))`.
+- Risk slider mapping: Risk impact: none.
+- CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```
