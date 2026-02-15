@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-15 15:07 UTC
+Last updated: 2026-02-15 15:27 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,19 +9,19 @@ Use this file at the start and end of every batch.
 
 - Batch type: `DAY (2-4h)`
 - Active ticket: `T-004` (Wallet policy v1: reserve + conversions)
-- Goal (single sentence): prevent `SPOT_GRID` from getting stuck with near-zero home-stable liquidity by enforcing a reserve buffer, doing stable-like → home-stable top-ups when needed, and not blocking SELL legs when BUY is infeasible.
+- Goal (single sentence): reduce grid no-op loops by making quote reserve risk-linked (hard vs soft) and ensuring SELL legs are not blocked when BUY is infeasible.
 - In scope:
   - grid-mode quote reserve recovery via conversion router (stable-like → home stable),
-  - grid BUY sizing uses `quoteSpendable` (keeps free reserve; avoids repeated minQty rejects),
+  - grid BUY sizing uses `quoteSpendable = quoteFree - reserveHardTarget` (risk-linked hard reserve) to avoid repeated minQty/minNotional rejects,
   - when quote is exhausted, still allow grid SELL legs to place using base inventory (liquidity recovery),
   - testnet conversions remain usable even when EEA region policy is enabled (policy is mainnet-only for conversions).
 - Out of scope:
   - adaptive policy promotion from shadow to execution,
   - full dust sweeping and idle inventory policy,
   - PnL reconciliation refactor (`T-007`).
-- Hypothesis: keeping a risk-linked free-quote reserve, topping up from stable-like assets, and allowing SELL legs even when BUY is infeasible will reduce no-op loops and restore continuous trading on mixed wallets.
+- Hypothesis: using a risk-linked hard reserve for BUY affordability (while keeping a higher soft reserve as the conversion trigger) will materially reduce sizing rejects without sacrificing reserve recovery behavior.
 - Target KPI delta:
-  - sizing reject pressure: reduce from `high` (>= 35%) to `<= 25%` in a 1–2h run.
+  - sizing reject pressure: reduce from `high` (~42%) to `<= 30%` in a 1–2h run.
   - fewer repeated `Grid buy sizing rejected (Below minQty ...)` skips when wallet has other stable-like assets available.
 - Stop/rollback condition:
   - conversion churn/flood (repeated stable conversions without enabling trading), or
@@ -35,7 +35,7 @@ Use this file at the start and end of every batch.
 - UI behavior:
   - Dashboard decisions show conversion-router trades with `stage=grid-reserve-recovery` when reserve recovery triggers.
 - Runtime evidence in decisions/logs:
-  - `Grid buy sizing rejected` details include `quoteSpendable` + `reserveLowTarget` for affordability debugging.
+  - `Grid buy sizing rejected` details include `quoteSpendable` + `reserveHardTarget` + `reserveLowTarget` for affordability debugging.
 - Risk slider impact (`none` or explicit low/mid/high behavior):
   - Low risk: higher reserve targets (more conservative, fewer entries when quote is low).
   - High risk: lower reserve targets (more aggressive, more spendable quote).
@@ -67,9 +67,10 @@ Use this file at the start and end of every batch.
   - market-only share reduced: `yes` (historyMarketShare=12.0%)
   - sizing reject pressure: `high` (sizingRejectSkips=65, decisions=153, ratio=42.5%)
 - Decision: `pivot`
-- Next ticket candidate: `T-027` (continue T-027 hardening)
+- Decision: `continue`
+- Next ticket candidate: `T-004` (continue: reduce sizing reject pressure)
 - Open risks:
-  - sizing reject pressure is high (42.5%).
+  - sizing reject pressure is high (42.5%); risk-linked hard reserve should reduce this, otherwise add a global quote-lock throttle.
 - Notes for next session:
   - bundle: `autobot-feedback-20260215-150727.tgz`
   - auto-updated at: `2026-02-15T15:07:33.817Z`
@@ -79,13 +80,13 @@ Use this file at the start and end of every batch.
 ```text
 Ticket: T-004
 Batch: DAY (2-4h)
-Goal: Prevent SPOT_GRID from getting stuck with near-zero USDC by enforcing reserve buffer + stable->home top-up.
-In scope: grid reserve recovery conversion + quoteSpendable sizing + clear skip details.
+Goal: Reduce SPOT_GRID no-op loops by using a risk-linked hard reserve + reserve recovery top-ups; keep SELL legs active when BUY is infeasible.
+In scope: grid reserve recovery conversion + quoteSpendable sizing (hard reserve) + sell-first liquidity recovery + clear skip details.
 Out of scope: adaptive policy promotion, full dust sweep, PnL refactor.
 DoD:
 - API: conversion-router trades occur when quote reserve is low (stage=grid-reserve-recovery).
-- UI: decisions show reserve recovery conversions; grid buy reject details include quoteSpendable/reserveLowTarget.
-- Risk slider mapping: low risk keeps higher reserve; high risk keeps lower reserve.
+- UI: decisions show reserve recovery conversions; grid buy reject details include quoteSpendable/reserveHardTarget/reserveLowTarget.
+- Risk slider mapping: risk=0 keeps reserveHard near reserveLow; risk=100 keeps reserveHard near floorTopUpTarget.
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

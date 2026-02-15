@@ -3555,7 +3555,12 @@ export class BotEngineService implements OnModuleInit {
               reserveLowTarget * 2,
               walletTotalHome * capitalProfile.reserveHighPct * reserveScale
             );
-            const quoteSpendable = Math.max(0, quoteFree - reserveLowTarget);
+            const reserveHardTarget = (() => {
+              const t = Math.max(0, Math.min(1, risk / 100));
+              // risk=0 => hard reserve ~= low target (conservative), risk=100 => hard reserve ~= floor (aggressive)
+              return floorTopUpTarget + (reserveLowTarget - floorTopUpTarget) * (1 - t);
+            })();
+            const quoteSpendable = Math.max(0, quoteFree - reserveHardTarget);
 
             const symbolOpenLimitOrdersAll = current.activeOrders.filter((order) => {
               if (order.symbol !== candidateSymbol) return false;
@@ -3736,6 +3741,7 @@ export class BotEngineService implements OnModuleInit {
                         requiredTarget: Number(conversionTarget.toFixed(6)),
                         floorTopUpTarget: Number(floorTopUpTarget.toFixed(6)),
                         reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
+                        reserveHardTarget: Number(reserveHardTarget.toFixed(6)),
                         reserveHighTarget: Number(reserveHighTarget.toFixed(6)),
                         quoteFree: Number(quoteFree.toFixed(6)),
                         quoteSpendable: Number(quoteSpendable.toFixed(6)),
@@ -3860,6 +3866,7 @@ export class BotEngineService implements OnModuleInit {
                             limitPrice: buyPriceNorm.normalizedPrice,
                             quoteFree: Number(quoteFree.toFixed(6)),
                             quoteSpendable: Number(quoteSpendable.toFixed(6)),
+                            reserveHardTarget: Number(reserveHardTarget.toFixed(6)),
                             reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
                             ...(cooldown.storm ? { storm: cooldown.storm } : {}),
                             cooldownMs
@@ -3955,6 +3962,7 @@ export class BotEngineService implements OnModuleInit {
                             limitPrice: buyPriceNorm.normalizedPrice,
                             quoteFree: Number(quoteFree.toFixed(6)),
                             quoteSpendable: Number(quoteSpendable.toFixed(6)),
+                            reserveHardTarget: Number(reserveHardTarget.toFixed(6)),
                             reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
                             ...(cooldown.storm ? { storm: cooldown.storm } : {}),
                             cooldownMs
