@@ -4,16 +4,33 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Docker Compose compatibility:
+# - Prefer `docker compose` (v2 plugin)
+# - Fallback to `docker-compose` (v1 standalone)
+COMPOSE=()
+if [[ -n "${AUTOBOT_COMPOSE_CMD:-}" ]]; then
+  read -r -a COMPOSE <<<"${AUTOBOT_COMPOSE_CMD}"
+else
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    COMPOSE=(docker compose)
+  elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE=(docker-compose)
+  else
+    echo "Docker Compose not found. Install either 'docker compose' (v2) or 'docker-compose' (v1)." >&2
+    exit 1
+  fi
+fi
+
 usage() {
   cat <<'USAGE'
 Usage: ./scripts/run-batch.sh [options]
 
-Runs a timed batch: brings up docker compose, waits, then collects a feedback bundle
+Runs a timed batch: brings up docker compose (or docker-compose), waits, then collects a feedback bundle
 and updates docs/SESSION_BRIEF.md from that bundle.
 
 Options:
   -m, --minutes <n>        Run duration in minutes (default: 240)
-  --down                  Run `docker compose down` before starting
+  --down                  Run `docker compose down` (or `docker-compose down`) before starting
   --no-build              Do not build images (skips `--build`)
   --no-recreate           Do not force recreate (skips `--force-recreate`)
   --reset-state           Delete `data/state.json` before starting
@@ -84,6 +101,7 @@ fi
 
 echo "Batch start (utc): $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 echo "Run minutes: $MINUTES"
+echo "Compose: ${COMPOSE[*]}"
 
 if [[ "$RESET_STATE" -eq 1 ]]; then
   rm -f data/state.json
@@ -100,7 +118,7 @@ if [[ "$RESET_TELEMETRY" -eq 1 ]]; then
 fi
 
 if [[ "$DO_DOWN" -eq 1 ]]; then
-  docker compose down
+  "${COMPOSE[@]}" down
 fi
 
 UP_ARGS=(up -d)
@@ -111,8 +129,8 @@ if [[ "$DO_RECREATE" -eq 1 ]]; then
   UP_ARGS+=(--force-recreate)
 fi
 
-docker compose "${UP_ARGS[@]}"
-docker compose ps || true
+"${COMPOSE[@]}" "${UP_ARGS[@]}"
+"${COMPOSE[@]}" ps || true
 
 echo "Sleeping for ${MINUTES}m..."
 sleep "$((MINUTES * 60))"
@@ -125,8 +143,12 @@ if [[ -z "$BUNDLE" || ! -f "$BUNDLE" ]]; then
   exit 1
 fi
 
-echo "Updating session brief from bundle: $BUNDLE"
-./scripts/update-session-brief.sh "$BUNDLE" >/dev/null
+if command -v node >/dev/null 2>&1; then
+  echo "Updating session brief from bundle: $BUNDLE"
+  ./scripts/update-session-brief.sh "$BUNDLE" >/dev/null
+else
+  echo "Skipping session brief update (node not found on host)."
+fi
 
 echo "Batch end (utc): $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 echo "Bundle: $BUNDLE"

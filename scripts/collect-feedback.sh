@@ -4,6 +4,23 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Docker Compose compatibility:
+# - Prefer `docker compose` (v2 plugin)
+# - Fallback to `docker-compose` (v1 standalone)
+COMPOSE=()
+if [[ -n "${AUTOBOT_COMPOSE_CMD:-}" ]]; then
+  read -r -a COMPOSE <<<"${AUTOBOT_COMPOSE_CMD}"
+else
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    COMPOSE=(docker compose)
+  elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE=(docker-compose)
+  else
+    echo "Docker Compose not found. Install either 'docker compose' (v2) or 'docker-compose' (v1)." >&2
+    exit 1
+  fi
+fi
+
 STAMP="$(date -u +"%Y%m%d-%H%M%S")"
 OUT_FILE="autobot-feedback-${STAMP}.tgz"
 
@@ -76,7 +93,7 @@ process.stdout.write(JSON.stringify(cfg, null, 2));
 NODE
   else
     # Fallback: use node inside the api container (reads /data/config.json).
-    docker compose exec -T api node - <<'NODE' >"$TMP_DIR/data/config.redacted.json" 2>/dev/null || true
+    "${COMPOSE[@]}" exec -T api node - <<'NODE' >"$TMP_DIR/data/config.redacted.json" 2>/dev/null || true
 const fs = require("node:fs");
 
 const raw = fs.readFileSync("/data/config.json", "utf8");
@@ -112,12 +129,13 @@ fi
 {
   echo "date_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   echo "git_sha=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
-  echo "docker_compose_version=$(docker compose version 2>/dev/null | head -n 1 || echo unknown)"
+  echo "docker_compose_cmd=${COMPOSE[*]}"
+  echo "docker_compose_version=$("${COMPOSE[@]}" version 2>/dev/null | head -n 1 || echo unknown)"
 } >"$TMP_DIR/meta/info.txt"
 
-docker compose ps >"$TMP_DIR/meta/docker-compose-ps.txt" 2>/dev/null || true
-docker compose logs --no-color --tail=500 api >"$TMP_DIR/meta/docker-api-tail.log" 2>/dev/null || true
-docker compose logs --no-color --tail=500 ui >"$TMP_DIR/meta/docker-ui-tail.log" 2>/dev/null || true
+"${COMPOSE[@]}" ps >"$TMP_DIR/meta/docker-compose-ps.txt" 2>&1 || true
+"${COMPOSE[@]}" logs --no-color --tail=500 api >"$TMP_DIR/meta/docker-api-tail.log" 2>&1 || true
+"${COMPOSE[@]}" logs --no-color --tail=500 ui >"$TMP_DIR/meta/docker-ui-tail.log" 2>&1 || true
 
 if [[ -f "data/state.json" ]] && command -v node >/dev/null 2>&1; then
   node - <<'NODE' >"$TMP_DIR/meta/state-summary.txt" 2>/dev/null || true
