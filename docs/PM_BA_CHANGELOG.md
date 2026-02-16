@@ -16,6 +16,33 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-16 10:00 UTC — T-027 periodic external-order discovery while trading
+- Scope: fix missing exchange open orders in UI/state when the bot already has active tracked orders and `Manage external/manual open orders` is enabled.
+- BA requirement mapping:
+  - Active Orders UI must stay aligned with real exchange open orders, including orders created in previous runs/resets.
+  - External/manual/open orders must be discoverable without forcing a full state reset.
+- PM milestone mapping: close the remaining `T-027` sync reliability gap discovered from `autobot-feedback-20260216-094713.tgz`.
+- Technical changes:
+  - API (`apps/api/src/modules/bot/bot-engine.service.ts`):
+    - Added periodic supplemental discovery in `syncLiveOrders(...)`:
+      - keeps tracking current active-order symbols,
+      - every ~60s also scans a small rotating batch of hinted symbols,
+      - merges newly found exchange open orders into `state.activeOrders`.
+    - Added explicit decision event when periodic scan discovers additional open orders:
+      - `Discovered N additional open order(s) during periodic scan`.
+    - Refactored discovery batching into helper methods (`pickOrderDiscoveryBatch`, `shouldRunSupplementalOrderDiscovery`).
+  - Tests (`apps/api/src/modules/bot/bot-engine.service.test.ts`):
+    - Added regression test proving a hinted external order is discovered even when state already contains active orders.
+- Risk slider impact: none (order synchronization/discovery behavior only).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request:
+  - Keep one open order on exchange from previous run/symbol.
+  - Start bot with existing active orders and wait 1–3 minutes.
+  - Expected: missing order appears in Active Orders UI; decision log shows periodic discovery event.
+- Follow-up:
+  - If discovery still misses symbols outside hints, add optional guarded “full open-order sync” toggle in Advanced settings.
+
 ## 2026-02-16 09:55 UTC — T-029 Wallet policy v2: pre-submit feasibility + reject storm control
 - Scope: stop overnight `insufficient balance` reject waves by adding pre-submit balance guards, stage-aware reject diagnostics, and risk-linked cooldown/blacklist escalation for repeated insufficient-balance errors.
 - BA requirement mapping:

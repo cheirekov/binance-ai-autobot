@@ -213,6 +213,7 @@ export class BotEngineService implements OnModuleInit {
   private lastBaselineFingerprint: string | null = null;
   private transientExchangeBackoffState: TransientExchangeBackoffState | null = null;
   private orderDiscoveryCursor = 0;
+  private lastSupplementalOrderDiscoveryAtMs = 0;
 
   constructor(
     private readonly configService: ConfigService,
@@ -1657,6 +1658,26 @@ export class BotEngineService implements OnModuleInit {
     return out;
   }
 
+  private pickOrderDiscoveryBatch(symbols: string[], batchSize: number): string[] {
+    const normalizedBatchSize = Math.max(0, Math.min(batchSize, symbols.length));
+    if (normalizedBatchSize === 0) return [];
+    const batch: string[] = [];
+    for (let i = 0; i < normalizedBatchSize; i += 1) {
+      batch.push(symbols[(this.orderDiscoveryCursor + i) % symbols.length]);
+    }
+    this.orderDiscoveryCursor = (this.orderDiscoveryCursor + normalizedBatchSize) % symbols.length;
+    return Array.from(new Set(batch));
+  }
+
+  private shouldRunSupplementalOrderDiscovery(nowMs: number): boolean {
+    const intervalMs = 60_000;
+    if (nowMs - this.lastSupplementalOrderDiscoveryAtMs < intervalMs) {
+      return false;
+    }
+    this.lastSupplementalOrderDiscoveryAtMs = nowMs;
+    return true;
+  }
+
   private async syncLiveOrders(
     state: BotState,
     opts?: {
@@ -1680,16 +1701,17 @@ export class BotEngineService implements OnModuleInit {
 
     let trackedSymbols = activeSymbols;
     const discoveryMode = trackedSymbols.length === 0 && hintSymbols.length > 0;
+    const supplementalDiscoveryMode =
+      trackedSymbols.length > 0 && hintSymbols.length > 0 && this.shouldRunSupplementalOrderDiscovery(Date.now());
     if (discoveryMode) {
       // After a state reset we can have real open orders on the exchange but none in `state.activeOrders`.
       // Discover them quickly by scanning a small batch of hint symbols per tick (symbol-scoped; no global fetch).
-      const batchSize = Math.min(5, hintSymbols.length);
-      const batch: string[] = [];
-      for (let i = 0; i < batchSize; i += 1) {
-        batch.push(hintSymbols[(this.orderDiscoveryCursor + i) % hintSymbols.length]);
-      }
-      this.orderDiscoveryCursor += batchSize;
-      trackedSymbols = Array.from(new Set(batch));
+      trackedSymbols = this.pickOrderDiscoveryBatch(hintSymbols, 5);
+    } else if (supplementalDiscoveryMode) {
+      // While we already track some open orders, periodically scan additional hint symbols
+      // so older/external exchange orders can still be discovered and reconciled.
+      const discoveryBatch = this.pickOrderDiscoveryBatch(hintSymbols, 3);
+      trackedSymbols = Array.from(new Set([...trackedSymbols, ...discoveryBatch]));
     }
 
     if (trackedSymbols.length === 0) return state;
@@ -1710,10 +1732,16 @@ export class BotEngineService implements OnModuleInit {
 
     const closedActiveOrders = state.activeOrders.filter((order) => !openById.has(order.id));
     if (closedActiveOrders.length === 0) {
+      const previousActiveIds = new Set(state.activeOrders.map((order) => order.id));
+      const supplementalDiscoveredOrders = supplementalDiscoveryMode
+        ? openOrders.filter((order) => !previousActiveIds.has(order.id))
+        : [];
       const summary =
         discoveryMode && openOrders.length > 0
           ? `Synced ${openOrders.length} existing open order(s) (discovery scan: ${trackedSymbols.length} symbol(s))`
-          : null;
+          : supplementalDiscoveredOrders.length > 0
+            ? `Discovered ${supplementalDiscoveredOrders.length} additional open order(s) during periodic scan`
+            : null;
       const alreadyLogged =
         summary && state.decisions[0]?.kind === "ENGINE" && state.decisions[0]?.summary === summary;
       return {
@@ -1730,10 +1758,16 @@ export class BotEngineService implements OnModuleInit {
                       kind: "ENGINE",
                       summary,
                       details: {
-                        stage: "order-discovery",
+                        stage: discoveryMode ? "order-discovery" : "order-discovery-periodic",
                         scannedSymbols: trackedSymbols,
-                        foundSymbols: Array.from(new Set(openOrders.map((o) => o.symbol))).slice(0, 12),
-                        orderIds: openOrders.map((o) => o.id).slice(0, 20)
+                        foundSymbols:
+                          discoveryMode
+                            ? Array.from(new Set(openOrders.map((o) => o.symbol))).slice(0, 12)
+                            : Array.from(new Set(supplementalDiscoveredOrders.map((o) => o.symbol))).slice(0, 12),
+                        orderIds:
+                          discoveryMode
+                            ? openOrders.map((o) => o.id).slice(0, 20)
+                            : supplementalDiscoveredOrders.map((o) => o.id).slice(0, 20)
                       }
                     },
                     ...state.decisions

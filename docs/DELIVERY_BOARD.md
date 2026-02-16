@@ -1,6 +1,6 @@
 # Delivery Board
 
-Last updated: 2026-02-15
+Last updated: 2026-02-16
 Owner: Codex + User
 
 ## Current milestone
@@ -51,7 +51,7 @@ M1: Stabilize Spot testnet automation with risk-linked execution behavior and cl
 | T-024 | DONE | Protection manager v1 (global+pair locks) | Bearish-loss control without manual trader tuning | Reduced cascading losses and clearer risk state | Added risk-linked cooldown, stoploss-guard, max-drawdown, and low-profit locks with dashboard visibility. |
 | T-025 | TODO | Adaptive confidence shadow model v1 | Bot should adapt automatically while risk policy remains authoritative | Higher-quality decisions before execution promotion | Add model-age guard, outlier confidence gate, and rolling prediction statistics in shadow path. |
 | T-026 | TODO | Offline strategy calibration runner | Systematic parameter tuning from real telemetry/backtest data | Better repeatable improvements over ad-hoc tweaks | Add multi-metric objective calibration (profit, drawdown, winrate, expectancy, trade-count penalties). Seed initial parameter spaces from reference patterns (e.g. RSI/BB/ADX templates) without copying GPL code. |
-| T-027 | DONE | Spot limit/grid execution v1 | Replace market-only execution path with true open-order lifecycle | Realistic grid behavior and actionable PnL | Delivered: ccxt adapter limit/open/cancel APIs + bot exchange order sync + SPOT_GRID LIMIT ladder lifecycle + limit-price affordability + stale bot LIMIT auto-cancel + external-order handling + dashboard snapshot + baseline PnL + Grid Guard v1 + faster open-order discovery scan. Follow-ups moved to `T-007` (commission-aware PnL) and a future KPI/UI ticket. |
+| T-027 | DONE | Spot limit/grid execution v1 | Replace market-only execution path with true open-order lifecycle | Realistic grid behavior and actionable PnL | Delivered: ccxt adapter limit/open/cancel APIs + bot exchange order sync + SPOT_GRID LIMIT ladder lifecycle + limit-price affordability + stale bot LIMIT auto-cancel + external-order handling + dashboard snapshot + baseline PnL + Grid Guard v1 + faster open-order discovery scan + periodic supplemental discovery while active orders exist (fixes missing “yesterday” open orders after reset/restart). Follow-ups moved to `T-007` (commission-aware PnL) and a future KPI/UI ticket. |
 | T-028 | TODO | Compact Advanced settings UX | Reduce operator overwhelm without hiding safety controls | Faster day-to-day operation for non-trader users | When `Follow Basic risk profile=On`: collapse risk-managed numeric inputs into a short "Managed by Risk" summary + toggle "Show details". Add a small "Refresh config" action, and improve small-width layout. Priority: PM/BA review tomorrow (non-blocking). |
 
 ## Next execution batch (single patch set)

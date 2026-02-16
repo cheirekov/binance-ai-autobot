@@ -1,51 +1,44 @@
 # Session Brief
 
-Last updated: 2026-02-16 09:55 UTC
+Last updated: 2026-02-16 10:02 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
 
 ## 1) Batch contract (fill before coding)
 
-- Batch type: `DAY (2-4h)`
-- Active ticket: `T-029` (Wallet policy v2: unmanaged holdings + dust cleanup)
-- Goal (single sentence): suppress insufficient-balance reject storms by validating funds right before submit and logging precise stage-level reject context.
+- Batch type: `HOTFIX`
+- Active ticket: `T-027` (open-order sync reliability)
+- Goal (single sentence): ensure exchange open orders are discovered even when bot already has active tracked orders, so UI/state does not miss “yesterday” orders.
 - In scope:
-  - pre-submit feasibility checks before live submits for:
-    - `position-exit-market-sell`,
-    - `grid-buy-limit`,
-    - `grid-sell-limit`,
-    - `entry-market-buy`,
-    - conversion-router market legs.
-  - stage-aware reject messages and insufficient-balance escalation controls.
+  - periodic supplemental open-order discovery (hinted symbols) while active orders exist.
+  - decision visibility for newly discovered open orders.
+  - regression test for missing external order scenario.
 - Out of scope:
   - full non-home exposure cap/liquidation policy (`T-029` next slice),
   - adaptive/AI promotion from shadow to execution,
   - PnL reconciliation refactor (`T-007`).
-- Hypothesis: most overnight reject bursts are caused by stale/optimistic balance assumptions at submit time; fresh pre-checks plus cooldown escalation will reduce rejects and improve tick quality.
+- Hypothesis: current sync logic misses older open orders because discovery-only mode runs when `activeOrders` is empty; periodic supplemental discovery closes this gap.
 - Target KPI delta:
-  - lower count/share of `Order rejected ... insufficient balance`,
-  - appearance of `Skip ... pre-check insufficient ...` with stage and required/free details,
-  - fewer multi-symbol reject bursts in short windows.
+  - fewer operator reports of “order visible on Binance but missing in bot UI”,
+  - appearance of `Discovered N additional open order(s) during periodic scan` decisions,
+  - active-order parity after reset/restart within 1–3 minutes.
 - Stop/rollback condition:
-  - if pre-check logic blocks valid orders excessively (trade starvation), or
-  - if conversion path regresses (no conversion despite clear reserve shortfall).
+  - if periodic discovery introduces order-sync instability/timeouts.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
-  - Orders are not submitted when fresh balance check shows insufficient funds.
-  - Reject summaries include operation stage (`grid-buy-limit`, `grid-sell-limit`, `position-exit-market-sell`, etc.).
-  - Repeated insufficient-balance rejects produce longer cooldown/blacklist durations.
+  - Sync scans active symbols every tick and hinted symbols periodically even when active orders are non-empty.
+  - Newly discovered open orders are merged into `state.activeOrders`.
+  - A discovery decision is logged when periodic scan finds additional orders.
 - Runtime evidence in decisions/logs:
-  - reduced `Order rejected ... insufficient balance` frequency vs previous run,
-  - explicit `pre-check insufficient` skip decisions visible.
+  - at least one periodic discovery decision for delayed/open external order scenarios.
 - Risk slider impact (`none` or explicit low/mid/high behavior):
-  - High risk keeps shorter base cooldown, but repeated insufficient-balance rejects still escalate lock durations.
+  - none.
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
-  - additional targeted command(s):
-    - `docker logs --tail 500 binance-ai-autobot_api_1` (stage reject diagnostics)
+  - additional targeted command(s): none.
 - Runtime validation plan:
   - run duration: `2-4 hours`
   - expected bundle name pattern: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
@@ -70,26 +63,28 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
--  - pending runtime validation (`2-4h` run not collected yet)
-- Decision: `pending`
-- Next ticket candidate: `T-029` next slice (non-home exposure cap) or `T-007` (if reject storm is resolved)
+  - CI status: `green`
+  - supplemental discovery path: `implemented + tested`
+- Decision: `continue`
+- Next ticket candidate: `T-029` (non-home exposure cap + unmanaged holdings visibility)
 - Open risks:
-  - pre-check guard may reduce valid trade rate if thresholds are too strict.
+  - symbols outside hint set can still be delayed until hinted/scanned.
 - Notes for next session:
-  - collect next bundle after this patch deploy: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
+  - bundle: `autobot-feedback-20260216-094713.tgz`
+  - user-reported issue: one prior open order visible on exchange but not in UI, despite `manageExternalOpenOrders=true`.
 
 ## 5) Copy/paste prompt for next session
 
 ```text
-Ticket: T-029
-Batch: DAY (2-4h)
-Goal: Reduce insufficient-balance reject storms with pre-submit fund checks and stage-aware diagnostics.
-In scope: pre-checks before live submit (`position-exit-market-sell`, `grid-buy-limit`, `grid-sell-limit`, `entry-market-buy`, conversion legs) + cooldown/blacklist escalation for repeated insufficient-balance rejects.
-Out of scope: full liquidation exposure-cap policy; adaptive/AI promotion; PnL refactor.
+Ticket: T-027
+Batch: HOTFIX
+Goal: Keep open-order sync accurate when active orders already exist.
+In scope: periodic supplemental hint-symbol discovery in `syncLiveOrders`; decision visibility; regression test.
+Out of scope: wallet liquidation policy, adaptive/AI promotion, PnL refactor.
 DoD:
-- API: no submit when fresh free balance is insufficient; catch-path includes operation stage in reject summary.
-- Runtime: fewer `Order rejected ... insufficient balance`; more `pre-check insufficient` skips with stage details.
-- Risk slider mapping: base cooldown remains risk-linked; repeated insufficient rejects escalate duration.
+- API: previously missing open orders become discoverable without clearing `state.activeOrders`.
+- Runtime: periodic discovery decision appears when additional open orders are found.
+- Risk slider mapping: none.
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```
