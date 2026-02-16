@@ -3124,6 +3124,7 @@ export class BotEngineService implements OnModuleInit {
           for (const position of managedOpenHomeSymbols) {
             const baseAsset = position.symbol.slice(0, Math.max(0, position.symbol.length - homeStable.length));
             if (!baseAsset) continue;
+            if (this.isSymbolBlocked(position.symbol, current)) continue;
             const baseFree = balances.find((b) => b.asset.toUpperCase() === baseAsset.toUpperCase())?.free ?? 0;
             if (!Number.isFinite(baseFree) || baseFree <= 0) continue;
 

@@ -16,6 +16,29 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-16 16:18 UTC — T-029 Exit-loop suppression: respect symbol cooldown in position-exit scan
+- Scope: stop repeated position-exit pre-check skip storms by honoring symbol protection/cooldown locks before re-attempting exits.
+- BA requirement mapping:
+  - Autobot should avoid noisy loop behavior when an exit is currently infeasible (min-notional/min-qty edge or temporary balance delta).
+  - Runtime should preserve tick budget for other symbols instead of retrying the same blocked exit every cycle.
+- PM milestone mapping: follow-up from `autobot-feedback-20260216-161144.tgz` where skip pressure was dominated by repeated exit pre-check insufficient messages.
+- Technical changes:
+  - API (`apps/api/src/modules/bot/bot-engine.service.ts`):
+    - Position-exit loop now skips symbols currently blocked by active symbol/global locks (`isSymbolBlocked(...)`) before trying market-exit sizing/submission.
+  - Tests (`apps/api/src/modules/bot/bot-engine.service.test.ts`):
+    - Added lock-behavior coverage verifying symbol cooldown lock is treated as blocked.
+- Risk slider impact:
+  - none directly; this uses existing lock durations (already risk-linked elsewhere).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request:
+  - Run 1–3h without resetting state.
+  - Expected:
+    - lower repetition of `position-exit-market-sell pre-check insufficient ...` skip lines for the same symbol,
+    - more symbol rotation and fewer max-open-position stall loops.
+- Follow-up:
+  - If exit loops still persist, add dedicated exit-retry backoff lock category with longer escalation for repeated min-notional edge cases.
+
 ## 2026-02-16 14:23 UTC — T-029 Position-exit tiny shortfall fallback (anti-loop)
 - Scope: stop repeated `position-exit-market-sell pre-check insufficient` loops caused by tiny free-balance deltas vs computed exit quantity.
 - BA requirement mapping:

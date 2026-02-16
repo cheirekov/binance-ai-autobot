@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-16 14:24 UTC
+Last updated: 2026-02-16 16:19 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -15,6 +15,7 @@ Use this file at the start and end of every batch.
   - risk-linked unmanaged exposure cap and rebalance trigger.
   - telemetry details in wallet-sweep trade events.
   - tiny-shortfall position-exit fallback (sell validated available qty instead of repeating pre-check skips).
+  - respect symbol/global protection locks before re-attempting position exits.
 - Out of scope:
   - full liquidation of protected assets used by active orders/managed positions.
   - adaptive/AI promotion from shadow to execution,
@@ -36,6 +37,7 @@ Use this file at the start and end of every batch.
 - Runtime evidence in decisions/logs:
   - observe at least one `wallet-sweep` trade with `category=rebalance` when exposure is over cap.
   - reduced repetition of `position-exit-market-sell pre-check insufficient ...` skips.
+  - reduced same-symbol exit retry storms while cooldown lock is active.
 - Risk slider impact (`none` or explicit low/mid/high behavior):
   - unmanaged exposure cap scales from strict (low risk) to loose (high risk).
 - Validation commands:
@@ -66,14 +68,14 @@ Use this file at the start and end of every batch.
 
 - Observed KPI delta:
   - CI status: `green`
-  - from analyzed run `autobot-feedback-20260216-141521.tgz`: dominant issue was repeated tiny-shortfall exit skips (`ZAMAUSDC`, `SOLUSDC`), now patched.
+  - analyzed run (`autobot-feedback-20260216-161144.tgz`) showed dominant repeated exit pre-check loops (`ZAMAUSDC` and others), now patched by lock-respecting exit scan.
 - Decision: `continue`
-- Next ticket candidate: `T-007` (if lifecycle remains stable)
+- Next ticket candidate: `T-029` (runtime verify loop suppression)
 - Open risks:
-  - verify fallback path does not over-trigger on meaningful balance gaps.
+  - verify lock-respecting exit scan does not delay legitimate exits in fast moves.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260216-141521.tgz`
-  - expected evidence in next run: fewer repeated position-exit insufficient skips; possible exit trades with `partialExitDueToBalanceDelta=true`.
+  - bundle: `autobot-feedback-20260216-161144.tgz`
+  - expected in next run: fewer repeated same-symbol exit-insufficient skips and reduced max-open-position stall.
 
 ## 5) Copy/paste prompt for next session
 
@@ -81,12 +83,13 @@ Use this file at the start and end of every batch.
 Ticket: T-029
 Batch: DAY (2-4h)
 Goal: Trigger adaptive wallet rebalance when unmanaged non-home exposure exceeds a risk-linked cap.
-In scope: unmanaged exposure valuation + cap trigger + sweep telemetry details + tiny-shortfall exit fallback.
+In scope: unmanaged exposure valuation + cap trigger + sweep telemetry details + tiny-shortfall exit fallback + lock-respecting position-exit scan.
 Out of scope: forced liquidation of protected/in-strategy assets; adaptive/AI promotion; PnL refactor.
 DoD:
 - API: wallet policy can select `category=rebalance` sweep sources when over cap.
 - Runtime: `wallet-sweep` trade details include unmanaged exposure values.
 - Runtime: repeated `position-exit-market-sell pre-check insufficient` loops are reduced.
+- Runtime: same-symbol exit retries are throttled by existing protection locks.
 - Risk slider mapping: cap widens at high risk and tightens at low risk.
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.

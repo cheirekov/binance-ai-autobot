@@ -174,6 +174,40 @@ describe("bot-engine ownership detection", () => {
   });
 });
 
+describe("bot-engine symbol lock checks", () => {
+  const service = new BotEngineService(
+    { load: () => ({ advanced: { neverTradeSymbols: [] } }) } as unknown as ConfigService,
+    {} as unknown as BinanceMarketDataService,
+    {} as unknown as BinanceTradingService,
+    {} as unknown as ConversionRouterService,
+    {} as unknown as UniverseService
+  );
+
+  it("treats active symbol cooldown lock as blocked", () => {
+    const helpers = service as unknown as {
+      isSymbolBlocked: (symbol: string, state: BotState) => string | null;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      protectionLocks: [
+        {
+          id: "lock-1",
+          type: "COOLDOWN",
+          createdAt: "2026-02-16T11:00:00.000Z",
+          scope: "SYMBOL",
+          symbol: "ZAMAUSDC",
+          reason: "test",
+          expiresAt: "2099-01-01T00:00:00.000Z"
+        }
+      ]
+    };
+
+    expect(helpers.isSymbolBlocked("ZAMAUSDC", state)).not.toBeNull();
+    expect(helpers.isSymbolBlocked("BTCUSDC", state)).toBeNull();
+  });
+});
+
 describe("bot-engine live order sync", () => {
   it("periodically discovers external open orders on hinted symbols even with active tracked orders", async () => {
     const calls: string[] = [];
