@@ -1514,7 +1514,11 @@ export class BotEngineService implements OnModuleInit {
   private isBotOwnedOrder(order: Order, prefix: string): boolean {
     const clientOrderId = typeof order.clientOrderId === "string" ? order.clientOrderId.trim().toUpperCase() : "";
     if (!clientOrderId) return false;
-    return clientOrderId.startsWith(`${prefix}-`);
+    if (clientOrderId.startsWith(`${prefix}-`)) return true;
+    if (clientOrderId.startsWith("ABOT-")) return true; // legacy default prefix compatibility after prefix changes/reset
+    // Signature fallback for previously generated bot client ids from older runs.
+    // Format emitted by buildBotClientOrderId: <PREFIX>-<2 chars + side(B|S)>-<time36+rand>
+    return /^[A-Z0-9]{3,12}-[A-Z0-9]{2}[BS]-[A-Z0-9]{8,}$/.test(clientOrderId);
   }
 
   private buildBotClientOrderId(params: { config: AppConfig; purpose: string; side: "BUY" | "SELL" }): string {
@@ -3226,6 +3230,48 @@ export class BotEngineService implements OnModuleInit {
             const sweepCapMultiplier = risk >= 80 ? 2 : risk >= 50 ? 3 : 4; // caps at 2x/3x/4x min target
             const sweepMinValueHome = Math.max(minSweepTargetHome, Math.min(sweepMinValueHomeRaw, minSweepTargetHome * sweepCapMultiplier));
             const sourceBridgeAssets = resolveRouteBridgeAssets(config, homeStable);
+            const unmanagedExposureCapPct = this.toRounded(12 + (risk / 100) * 38, 2); // 12% -> 50%
+            const unmanagedExposureCapHome = walletTotalHome * (unmanagedExposureCapPct / 100);
+
+            const valuedNonHomeBalances: Array<{
+              asset: string;
+              free: number;
+              estimatedValueHome: number;
+              sourceHomeSymbol: string;
+              change24hPct: number | null;
+              isProtected: boolean;
+            }> = [];
+
+            for (const balance of balances) {
+              const asset = balance.asset.trim().toUpperCase();
+              const free = Number.isFinite(balance.free) ? balance.free : 0;
+              if (!asset || asset === homeStable || free <= 0) continue;
+
+              const estimatedValueHome = await this.estimateAssetValueInHome(asset, free, homeStable, sourceBridgeAssets);
+              if (!Number.isFinite(estimatedValueHome ?? Number.NaN) || (estimatedValueHome ?? 0) <= 0) continue;
+
+              const sourceHomeSymbol = `${asset}${homeStable}`;
+              const marketCandidate = (universeSnapshot?.candidates ?? []).find(
+                (candidate) => candidate.symbol.trim().toUpperCase() === sourceHomeSymbol
+              );
+              const change24hPct = typeof marketCandidate?.priceChangePct24h === "number" ? marketCandidate.priceChangePct24h : null;
+
+              valuedNonHomeBalances.push({
+                asset,
+                free,
+                estimatedValueHome: estimatedValueHome ?? 0,
+                sourceHomeSymbol,
+                change24hPct,
+                isProtected: protectedHomeBaseAssets.has(asset)
+              });
+            }
+
+            const unmanagedNonHomeValue = valuedNonHomeBalances.reduce((sum, item) => {
+              return item.isProtected ? sum : sum + item.estimatedValueHome;
+            }, 0);
+            const unmanagedExposurePct = walletTotalHome > 0 ? (unmanagedNonHomeValue / walletTotalHome) * 100 : 0;
+            const unmanagedExposureOverCap = unmanagedNonHomeValue > unmanagedExposureCapHome + minSweepTargetHome * 0.5;
+
             const staleSources: Array<{
               asset: string;
               free: number;
@@ -3233,42 +3279,33 @@ export class BotEngineService implements OnModuleInit {
               sourceHomeSymbol: string;
               change24hPct: number | null;
               reason: string;
-              category: "stale" | "dust";
+              category: "stale" | "dust" | "rebalance";
             }> = [];
 
-            for (const balance of balances) {
-              const asset = balance.asset.trim().toUpperCase();
-              const free = Number.isFinite(balance.free) ? balance.free : 0;
-              if (!asset || asset === homeStable || free <= 0) continue;
-              if (protectedHomeBaseAssets.has(asset)) continue;
-
-              const estimatedValueHome = await this.estimateAssetValueInHome(asset, free, homeStable, sourceBridgeAssets);
-              if (!Number.isFinite(estimatedValueHome ?? Number.NaN) || (estimatedValueHome ?? 0) <= 0) continue;
-              const valueHome = estimatedValueHome ?? 0;
+            for (const valued of valuedNonHomeBalances) {
+              if (valued.isProtected) continue;
+              const valueHome = valued.estimatedValueHome;
               const isDustBand = valueHome >= minSweepTargetHome && valueHome < sweepMinValueHome;
               if (valueHome < minSweepTargetHome) continue;
 
-              const sourceHomeSymbol = `${asset}${homeStable}`;
-              const marketCandidate = (universeSnapshot?.candidates ?? []).find(
-                (candidate) => candidate.symbol.trim().toUpperCase() === sourceHomeSymbol
-              );
-              const change24hPct = typeof marketCandidate?.priceChangePct24h === "number" ? marketCandidate.priceChangePct24h : null;
-              const weakTrend = change24hPct === null || change24hPct <= -0.35;
-              const eligible = isDustBand ? true : valueHome >= sweepMinValueHome ? weakTrend : false;
+              const weakTrend = valued.change24hPct === null || valued.change24hPct <= -0.35;
+              const eligible = unmanagedExposureOverCap ? true : isDustBand ? true : valueHome >= sweepMinValueHome ? weakTrend : false;
               if (!eligible) continue;
 
               staleSources.push({
-                asset,
-                free,
+                asset: valued.asset,
+                free: valued.free,
                 estimatedValueHome: valueHome,
-                sourceHomeSymbol,
-                change24hPct,
-                category: isDustBand ? "dust" : "stale",
-                reason: isDustBand
-                  ? "dust cleanup"
-                  : change24hPct === null
-                    ? "weak trend (no 24h data)"
-                    : `24h change ${change24hPct.toFixed(2)}%`
+                sourceHomeSymbol: valued.sourceHomeSymbol,
+                change24hPct: valued.change24hPct,
+                category: unmanagedExposureOverCap ? "rebalance" : isDustBand ? "dust" : "stale",
+                reason: unmanagedExposureOverCap
+                  ? `unmanaged exposure ${unmanagedExposurePct.toFixed(2)}% > cap ${unmanagedExposureCapPct.toFixed(2)}%`
+                  : isDustBand
+                    ? "dust cleanup"
+                    : valued.change24hPct === null
+                      ? "weak trend (no 24h data)"
+                      : `24h change ${valued.change24hPct.toFixed(2)}%`
               });
             }
 
@@ -3329,6 +3366,10 @@ export class BotEngineService implements OnModuleInit {
                     sourceHomeSymbol: source.sourceHomeSymbol,
                     sourceEstimatedValueHome: Number(source.estimatedValueHome.toFixed(6)),
                     sweepMinValueHome: Number(sweepMinValueHome.toFixed(6)),
+                    unmanagedNonHomeValue: Number(unmanagedNonHomeValue.toFixed(6)),
+                    unmanagedExposurePct: Number(unmanagedExposurePct.toFixed(6)),
+                    unmanagedExposureCapPct: Number(unmanagedExposureCapPct.toFixed(6)),
+                    unmanagedExposureCapHome: Number(unmanagedExposureCapHome.toFixed(6)),
                     change24hPct: source.change24hPct === null ? null : Number(source.change24hPct.toFixed(6)),
                     sweepReason: source.reason,
                     route: leg.route,

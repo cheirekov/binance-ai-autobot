@@ -16,6 +16,62 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-16 11:24 UTC — T-027 ownership continuity after state reset/prefix drift
+- Scope: prevent bot-owned orders from being misclassified as “external” after state reset or prefix changes.
+- BA requirement mapping:
+  - Orders created by previous bot runs must still be recognized as bot-owned where possible.
+  - Avoid accidental policy split where old bot orders become unmanaged/external.
+- PM milestone mapping: harden open-order lifecycle consistency before extended T-029 runtime validation.
+- Technical changes:
+  - API (`apps/api/src/modules/bot/bot-engine.service.ts`):
+    - Expanded `isBotOwnedOrder(...)` detection:
+      - current configured prefix,
+      - legacy default `ABOT-` prefix,
+      - fallback signature pattern for generated historical bot client ids.
+  - Tests (`apps/api/src/modules/bot/bot-engine.service.test.ts`):
+    - added ownership detection test for current-prefix, legacy-prefix, signature fallback, and external id.
+- Risk slider impact: none.
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request:
+  - Keep one older bot LIMIT order with previous prefix/signature.
+  - Restart with cleaned state and verify stale-order/cancel policies still treat it as bot-owned.
+- Follow-up:
+  - If user actively rotates custom prefixes frequently, add explicit “legacy bot prefixes” list in Advanced settings.
+
+## 2026-02-16 11:12 UTC — T-029 Wallet policy v2: unmanaged exposure rebalance trigger
+- Scope: make wallet sweep adaptive when the bot holds too much unmanaged non-home inventory by adding a risk-linked unmanaged exposure cap and forcing rebalance sweeps above that cap.
+- BA requirement mapping:
+  - Autobot must reduce idle “bag holdings” automatically instead of waiting only for weak-trend filters.
+  - Behavior must remain risk-slider driven (aggressive at high risk, stricter at low risk).
+- PM milestone mapping: continue single-lane `T-029` and move from dust cleanup to active unmanaged-exposure control.
+- Technical changes:
+  - API (`apps/api/src/modules/bot/bot-engine.service.ts`):
+    - Added valuation pass for all non-home balances (protected vs unmanaged classification).
+    - Added risk-linked unmanaged exposure cap:
+      - `unmanagedExposureCapPct = 12% .. 50%` (derived from risk slider).
+    - If unmanaged non-home exposure exceeds cap, wallet sweep enters rebalance mode:
+      - selects largest unmanaged assets (respecting minimum tradable floor),
+      - no longer waits only for weak 24h trend in that mode.
+    - Extended wallet-sweep trade details with:
+      - `unmanagedNonHomeValue`,
+      - `unmanagedExposurePct`,
+      - `unmanagedExposureCapPct`,
+      - `unmanagedExposureCapHome`,
+      - category now includes `rebalance`.
+- Risk slider impact:
+  - Low risk -> tighter unmanaged exposure cap.
+  - High risk -> wider cap, less frequent forced rebalances.
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request:
+  - Run 2–4h with mixed wallet inventory.
+  - Expected:
+    - when unmanaged exposure is high, occasional `wallet-sweep ... category=rebalance` trades,
+    - lower persistence of non-traded coin bags over time.
+- Follow-up:
+  - Add dashboard/UI card for unmanaged exposure cap vs current value (visibility slice).
+
 ## 2026-02-16 10:00 UTC — T-027 periodic external-order discovery while trading
 - Scope: fix missing exchange open orders in UI/state when the bot already has active tracked orders and `Manage external/manual open orders` is enabled.
 - BA requirement mapping:

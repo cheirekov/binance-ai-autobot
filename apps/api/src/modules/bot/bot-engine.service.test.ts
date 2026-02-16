@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { AppConfig, BotState, UniverseCandidate } from "@autobot/shared";
+import type { AppConfig, BotState, Order, UniverseCandidate } from "@autobot/shared";
 import { defaultBotState } from "@autobot/shared";
 
 import { BotEngineService } from "./bot-engine.service";
@@ -112,6 +112,54 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.deriveInsufficientBalanceBlacklistTtlMinutes(30, 2)).toBe(60);
     expect(helpers.deriveInsufficientBalanceBlacklistTtlMinutes(30, 4)).toBe(90);
     expect(helpers.deriveInsufficientBalanceBlacklistTtlMinutes(30, 6)).toBe(120);
+  });
+});
+
+describe("bot-engine ownership detection", () => {
+  const service = new BotEngineService(
+    { load: () => null } as unknown as ConfigService,
+    {} as unknown as BinanceMarketDataService,
+    {} as unknown as BinanceTradingService,
+    {} as unknown as ConversionRouterService,
+    {} as unknown as UniverseService
+  );
+
+  it("treats legacy ABOT prefix and generated signature ids as bot-owned", () => {
+    const helpers = service as unknown as {
+      isBotOwnedOrder: (order: Order, prefix: string) => boolean;
+    };
+
+    const byCurrentPrefix = {
+      id: "1",
+      ts: "2026-02-16T11:00:00.000Z",
+      symbol: "BTCUSDC",
+      clientOrderId: "MINE-GRB-MLOABC1234ABCD",
+      side: "BUY",
+      type: "LIMIT",
+      status: "NEW",
+      qty: 0.001,
+      price: 100000
+    } satisfies Order;
+
+    const byLegacyPrefix = {
+      ...byCurrentPrefix,
+      clientOrderId: "ABOT-GRS-MLOABC1234ABCD"
+    } satisfies Order;
+
+    const bySignatureFallback = {
+      ...byCurrentPrefix,
+      clientOrderId: "OLDPX-ENB-MLOZZZZ1234AA"
+    } satisfies Order;
+
+    const external = {
+      ...byCurrentPrefix,
+      clientOrderId: "MANUAL-123"
+    } satisfies Order;
+
+    expect(helpers.isBotOwnedOrder(byCurrentPrefix, "MINE")).toBe(true);
+    expect(helpers.isBotOwnedOrder(byLegacyPrefix, "MINE")).toBe(true);
+    expect(helpers.isBotOwnedOrder(bySignatureFallback, "MINE")).toBe(true);
+    expect(helpers.isBotOwnedOrder(external, "MINE")).toBe(false);
   });
 });
 
