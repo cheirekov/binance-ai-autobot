@@ -16,6 +16,42 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-16 09:55 UTC — T-029 Wallet policy v2: pre-submit feasibility + reject storm control
+- Scope: stop overnight `insufficient balance` reject waves by adding pre-submit balance guards, stage-aware reject diagnostics, and risk-linked cooldown/blacklist escalation for repeated insufficient-balance errors.
+- BA requirement mapping:
+  - Autobot must stay autonomous and avoid noisy reject loops while funds are locked in active orders.
+  - Runtime diagnostics must be explicit enough for user/operator review (what stage failed and why).
+- PM milestone mapping: keep single-lane `T-029` and harden live execution reliability before promoting next ticket.
+- Technical changes:
+  - API (`apps/api/src/modules/bot/bot-engine.service.ts`):
+    - Added fresh-balance pre-check guard before live order submit in stages:
+      - `position-exit-market-sell`
+      - `grid-buy-limit`
+      - `grid-sell-limit`
+      - `entry-market-buy`
+    - Added stage-aware reject context in catch-path summaries:
+      - `Order rejected (<stage>:<side>) for <symbol> ...`
+    - Added insufficient-balance specific handling:
+      - symbol cooldown lock with storm-aware duration escalation,
+      - repeated-error aware auto-blacklist TTL multiplier.
+  - Conversion router (`apps/api/src/modules/integrations/conversion-router.service.ts`):
+    - Added fresh source-balance guard before market conversion submits.
+    - Converts insufficient-balance submission failures into graceful `ok:false` conversion results instead of bubbling hard errors.
+  - Tests (`apps/api/src/modules/bot/bot-engine.service.test.ts`):
+    - Added helper coverage for insufficient-balance error detection and TTL escalation logic.
+- Risk slider impact:
+  - Cooldown escalation uses existing risk-linked base cooldown (`deriveNoActionSymbolCooldownMs`) and then increases duration as repeated insufficient-balance rejects accumulate.
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request:
+  - Run 2–4h live `SPOT_GRID` with existing testnet wallet.
+  - Expected:
+    - lower count of `Order rejected ... insufficient balance`,
+    - more `Skip ... pre-check insufficient ...` decisions with stage details,
+    - reduced symbol-rotation reject bursts.
+- Follow-up:
+  - If reject pressure still persists, add a short global liquidity-lock throttle when open exposure ratio is high and free quote is below threshold.
+
 ## 2026-02-15 15:27 UTC — T-004 Risk-linked hard reserve to reduce sizing reject loops
 - Scope: reduce repeated `Grid buy sizing rejected (...)` skips when free quote hovers around the reserve by allowing grid BUY affordability to spend down to a smaller “hard” reserve at higher risk.
 - Why (runtime evidence):

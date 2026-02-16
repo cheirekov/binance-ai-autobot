@@ -1,48 +1,53 @@
 # Session Brief
 
-Last updated: 2026-02-15 18:21 UTC
+Last updated: 2026-02-16 09:55 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
 
 ## 1) Batch contract (fill before coding)
 
-- Batch type: `NIGHT (8-12h)`
+- Batch type: `DAY (2-4h)`
 - Active ticket: `T-029` (Wallet policy v2: unmanaged holdings + dust cleanup)
-- Goal (single sentence): in bear-ish conditions, avoid accumulating an unmanaged “bag” by sweeping small non-strategy holdings back to home stable and by not over-protecting assets the bot isn’t actually trading.
+- Goal (single sentence): suppress insufficient-balance reject storms by validating funds right before submit and logging precise stage-level reject context.
 - In scope:
-  - wallet sweep improvements:
-    - cap sweep minimum for large wallets (keep 10–20 USDC “dust band” sweepable),
-    - protect only assets referenced by open orders/managed positions (avoid “protect top universe assets” behavior),
-    - emit `wallet-sweep` trades with `details.category=dust|stale`.
+  - pre-submit feasibility checks before live submits for:
+    - `position-exit-market-sell`,
+    - `grid-buy-limit`,
+    - `grid-sell-limit`,
+    - `entry-market-buy`,
+    - conversion-router market legs.
+  - stage-aware reject messages and insufficient-balance escalation controls.
 - Out of scope:
-  - “sell everything to USDC” liquidation mode (needs an explicit exposure-cap policy),
-  - adaptive/AI policy promotion from shadow to execution,
+  - full non-home exposure cap/liquidation policy (`T-029` next slice),
+  - adaptive/AI promotion from shadow to execution,
   - PnL reconciliation refactor (`T-007`).
-- Hypothesis: cleaning the 10–20 USDC dust band and avoiding over-protecting non-traded assets will reduce long-lived wallet clutter and reduce unmanaged bear-market downside.
+- Hypothesis: most overnight reject bursts are caused by stale/optimistic balance assumptions at submit time; fresh pre-checks plus cooldown escalation will reduce rejects and improve tick quality.
 - Target KPI delta:
-  - fewer non-strategy “dust band” holdings remaining after the run,
-  - occasional `wallet-sweep` trades with `details.category=dust`,
-  - no conversion flood (must remain rate-limited by existing cooldowns).
+  - lower count/share of `Order rejected ... insufficient balance`,
+  - appearance of `Skip ... pre-check insufficient ...` with stage and required/free details,
+  - fewer multi-symbol reject bursts in short windows.
 - Stop/rollback condition:
-  - repeated wallet-sweep attempts on the same asset (conversion churn), or
-  - sweeping interferes with assets used by open orders/managed positions.
+  - if pre-check logic blocks valid orders excessively (trade starvation), or
+  - if conversion path regresses (no conversion despite clear reserve shortfall).
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
-  - Wallet sweep can convert medium dust (≈10–20 USDC value) on large wallets (sweep min is capped).
-  - Wallet sweep protects only assets referenced by current open orders and managed positions (not “top universe” assets by default).
+  - Orders are not submitted when fresh balance check shows insufficient funds.
+  - Reject summaries include operation stage (`grid-buy-limit`, `grid-sell-limit`, `position-exit-market-sell`, etc.).
+  - Repeated insufficient-balance rejects produce longer cooldown/blacklist durations.
 - Runtime evidence in decisions/logs:
-  - `TRADE ... wallet-sweep ... details.category=dust|stale` appears (rate-limited).
+  - reduced `Order rejected ... insufficient balance` frequency vs previous run,
+  - explicit `pre-check insufficient` skip decisions visible.
 - Risk slider impact (`none` or explicit low/mid/high behavior):
-  - High risk uses a lower sweep-cap multiplier → more aggressive dust cleanup.
+  - High risk keeps shorter base cooldown, but repeated insufficient-balance rejects still escalate lock durations.
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
   - additional targeted command(s):
-    - `docker logs --tail 500 binance-ai-autobot_api_1` (wallet sweep behavior)
+    - `docker logs --tail 500 binance-ai-autobot_api_1` (stage reject diagnostics)
 - Runtime validation plan:
-  - run duration: `8-12 hours`
+  - run duration: `2-4 hours`
   - expected bundle name pattern: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
 
 ## 3) Deployment handoff
@@ -64,26 +69,27 @@ Use this file at the start and end of every batch.
 
 ## 4) End-of-batch result (fill after run)
 
-- Observed KPI delta: `<fill after night run>`
-- Decision: `<continue|pivot>`
-- Next ticket candidate: `<T-005|T-007|T-023>`
-- Open risks: `<fill>`
+- Observed KPI delta:
+-  - pending runtime validation (`2-4h` run not collected yet)
+- Decision: `pending`
+- Next ticket candidate: `T-029` next slice (non-home exposure cap) or `T-007` (if reject storm is resolved)
+- Open risks:
+  - pre-check guard may reduce valid trade rate if thresholds are too strict.
 - Notes for next session:
-  - bundle: `<fill>`
-  - manual notes: `<fill>`
+  - collect next bundle after this patch deploy: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-029
-Batch: NIGHT (8-12h)
-Goal: Reduce unmanaged “bag holding” by sweeping dust/medium-dust back to home stable and by not protecting non-traded assets by default.
-In scope: wallet sweep dust band + capped sweep minimum + protect only open-order/managed assets; include `details.category=dust|stale` in sweep trades.
+Batch: DAY (2-4h)
+Goal: Reduce insufficient-balance reject storms with pre-submit fund checks and stage-aware diagnostics.
+In scope: pre-checks before live submit (`position-exit-market-sell`, `grid-buy-limit`, `grid-sell-limit`, `entry-market-buy`, conversion legs) + cooldown/blacklist escalation for repeated insufficient-balance rejects.
 Out of scope: full liquidation exposure-cap policy; adaptive/AI promotion; PnL refactor.
 DoD:
-- API: wallet sweep converts 10–20 USDC “dust band” occasionally (rate-limited) and avoids sweeping assets referenced by open orders/managed positions.
-- Runtime: see `wallet-sweep` trades with `details.category=dust|stale`; fewer lingering 10–20 USDC holdings after the run.
-- Risk slider mapping: high risk is more aggressive (lower sweep cap).
+- API: no submit when fresh free balance is insufficient; catch-path includes operation stage in reject summary.
+- Runtime: fewer `Order rejected ... insufficient balance`; more `pre-check insufficient` skips with stage details.
+- Risk slider mapping: base cooldown remains risk-linked; repeated insufficient rejects escalate duration.
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

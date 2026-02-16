@@ -83,3 +83,34 @@ describe("bot-engine pickFeasibleLiveCandidate", () => {
     expect(result.reason).toBeUndefined();
   });
 });
+
+describe("bot-engine insufficient-balance helpers", () => {
+  const service = new BotEngineService(
+    { load: () => null } as unknown as ConfigService,
+    {} as unknown as BinanceMarketDataService,
+    {} as unknown as BinanceTradingService,
+    {} as unknown as ConversionRouterService,
+    {} as unknown as UniverseService
+  );
+
+  it("detects insufficient-balance exchange errors", () => {
+    const helpers = service as unknown as {
+      isInsufficientBalanceError: (message: string) => boolean;
+    };
+
+    expect(helpers.isInsufficientBalanceError("binance Account has insufficient balance for requested action.")).toBe(true);
+    expect(helpers.isInsufficientBalanceError('{"code":-2010,"msg":"Account has insufficient balance for requested action."}')).toBe(true);
+    expect(helpers.isInsufficientBalanceError("Filter failure: NOTIONAL")).toBe(false);
+  });
+
+  it("escalates blacklist ttl for repeated insufficient-balance rejects", () => {
+    const helpers = service as unknown as {
+      deriveInsufficientBalanceBlacklistTtlMinutes: (baseTtlMinutes: number, recentCount: number) => number;
+    };
+
+    expect(helpers.deriveInsufficientBalanceBlacklistTtlMinutes(30, 1)).toBe(30);
+    expect(helpers.deriveInsufficientBalanceBlacklistTtlMinutes(30, 2)).toBe(60);
+    expect(helpers.deriveInsufficientBalanceBlacklistTtlMinutes(30, 4)).toBe(90);
+    expect(helpers.deriveInsufficientBalanceBlacklistTtlMinutes(30, 6)).toBe(120);
+  });
+});

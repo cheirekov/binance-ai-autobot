@@ -174,6 +174,27 @@ export class ConversionRouterService {
     return Number.isFinite(n) && n > 0 ? n : null;
   }
 
+  private isInsufficientBalanceError(rawMessage: string): boolean {
+    const message = rawMessage.toUpperCase();
+    return (
+      message.includes("ACCOUNT HAS INSUFFICIENT BALANCE") ||
+      message.includes("INSUFFICIENT BALANCE") ||
+      message.includes("\"CODE\":-2010")
+    );
+  }
+
+  private async getFreshFreeBalance(asset: string): Promise<number | null> {
+    const normalized = asset.trim().toUpperCase();
+    if (!normalized) return null;
+    try {
+      const balances = await this.trading.getBalances();
+      const free = balances.find((balance) => balance.asset.trim().toUpperCase() === normalized)?.free ?? 0;
+      return Number.isFinite(free) ? Math.max(0, free) : 0;
+    } catch {
+      return null;
+    }
+  }
+
   private async getRulesSafe(symbol: string): Promise<Awaited<ReturnType<BinanceMarketDataService["getSymbolRules"]>> | null> {
     try {
       return await this.marketData.getSymbolRules(symbol);
@@ -268,12 +289,28 @@ export class ConversionRouterService {
         const desiredQty = Math.min(requiredTarget, maxAffordableQty);
         if (Number.isFinite(desiredQty) && desiredQty > 0) {
           const check = await this.marketData.validateMarketOrderQty(buySymbol, desiredQty);
-          const qtyStr = this.chooseQtyWithin(
+          let qtyStr = this.chooseQtyWithin(
             [check.ok ? check.normalizedQty : undefined, check.requiredQty],
             maxAffordableQty
           );
           if (qtyStr) {
-            const response = await this.trading.placeSpotMarketOrder({ symbol: buySymbol, side: "BUY", quantity: qtyStr });
+            const refreshedSourceFree = await this.getFreshFreeBalance(sourceAsset);
+            if (refreshedSourceFree !== null) {
+              const refreshedMaxAffordableQty = refreshedSourceFree / (price * this.buyBuffer * this.feeBuffer);
+              qtyStr = this.chooseQtyWithin([qtyStr], refreshedMaxAffordableQty);
+            }
+          }
+          if (qtyStr) {
+            let response: BinanceMarketOrderResponse;
+            try {
+              response = await this.trading.placeSpotMarketOrder({ symbol: buySymbol, side: "BUY", quantity: qtyStr });
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              if (this.isInsufficientBalanceError(message)) {
+                return { ok: false, obtainedTarget: 0 };
+              }
+              throw error;
+            }
             const obtained = this.parsePositiveFloat(response.executedQty) ?? this.parsePositiveFloat(qtyStr) ?? 0;
             return {
               ok: obtained > 0,
@@ -316,12 +353,27 @@ export class ConversionRouterService {
         const desiredQty = Math.min(sourceFree, (requiredTarget / price) * this.sellBuffer * this.feeBuffer);
         if (Number.isFinite(desiredQty) && desiredQty > 0) {
           const check = await this.marketData.validateMarketOrderQty(sellSymbol, desiredQty);
-          const qtyStr = this.chooseQtyWithin(
+          let qtyStr = this.chooseQtyWithin(
             [check.ok ? check.normalizedQty : undefined, check.requiredQty],
             sourceFree
           );
           if (qtyStr) {
-            const response = await this.trading.placeSpotMarketOrder({ symbol: sellSymbol, side: "SELL", quantity: qtyStr });
+            const refreshedSourceFree = await this.getFreshFreeBalance(sourceAsset);
+            if (refreshedSourceFree !== null) {
+              qtyStr = this.chooseQtyWithin([qtyStr], refreshedSourceFree);
+            }
+          }
+          if (qtyStr) {
+            let response: BinanceMarketOrderResponse;
+            try {
+              response = await this.trading.placeSpotMarketOrder({ symbol: sellSymbol, side: "SELL", quantity: qtyStr });
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              if (this.isInsufficientBalanceError(message)) {
+                return { ok: false, obtainedTarget: 0 };
+              }
+              throw error;
+            }
             const quoteQty = this.parsePositiveFloat(response.cummulativeQuoteQty);
             const executedBase = this.parsePositiveFloat(response.executedQty) ?? this.parsePositiveFloat(qtyStr) ?? 0;
             const obtained = quoteQty ?? executedBase * price;

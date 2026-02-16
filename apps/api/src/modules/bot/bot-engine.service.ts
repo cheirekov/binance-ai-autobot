@@ -736,10 +736,49 @@ export class BotEngineService implements OnModuleInit {
     );
   }
 
+  private isInsufficientBalanceError(rawMessage: string): boolean {
+    const message = rawMessage.toUpperCase();
+    return (
+      message.includes("ACCOUNT HAS INSUFFICIENT BALANCE") ||
+      message.includes("INSUFFICIENT BALANCE") ||
+      message.includes("\"CODE\":-2010")
+    );
+  }
+
   private shouldAutoBlacklistError(rawMessage: string): boolean {
     if (this.isSizingFilterError(rawMessage)) return false;
     if (this.isTransientExchangeError(rawMessage)) return false;
     return true;
+  }
+
+  private countRecentSymbolErrorSkips(params: {
+    state: BotState;
+    symbol: string;
+    matcher: RegExp;
+    windowMs: number;
+  }): number {
+    const now = Date.now();
+    const normalized = params.symbol.trim().toUpperCase();
+    let count = 0;
+    for (const decision of params.state.decisions) {
+      if (decision.kind !== "SKIP") continue;
+      const ts = Date.parse(decision.ts);
+      if (!Number.isFinite(ts)) continue;
+      if (now - ts > params.windowMs) break;
+      const summary = decision.summary.toUpperCase();
+      if (!summary.includes(normalized)) continue;
+      if (!params.matcher.test(summary)) continue;
+      count += 1;
+    }
+    return count;
+  }
+
+  private deriveInsufficientBalanceBlacklistTtlMinutes(baseTtlMinutes: number, recentCount: number): number {
+    const safeBase = Math.max(1, Math.round(baseTtlMinutes));
+    if (recentCount >= 6) return Math.min(24 * 60, safeBase * 4);
+    if (recentCount >= 4) return Math.min(24 * 60, safeBase * 3);
+    if (recentCount >= 2) return Math.min(24 * 60, safeBase * 2);
+    return safeBase;
   }
 
   private extractExchangeErrorCode(rawMessage: string): string | undefined {
@@ -2602,6 +2641,25 @@ export class BotEngineService implements OnModuleInit {
           return;
         }
 
+        type LiveOperationContext = {
+          stage: string;
+          symbol: string;
+          side?: "BUY" | "SELL";
+          asset?: string;
+          required?: number;
+          available?: number;
+        };
+        let liveOperation: LiveOperationContext = {
+          stage: "candidate",
+          symbol: candidateSymbol
+        };
+        const setLiveOperation = (patch: Partial<LiveOperationContext>): void => {
+          liveOperation = {
+            ...liveOperation,
+            ...patch
+          };
+        };
+
         try {
           const persistLiveTrade = (params: {
             symbol: string;
@@ -2690,7 +2748,107 @@ export class BotEngineService implements OnModuleInit {
             current = nextState;
           };
 
-          const balances = await this.trading.getBalances();
+          let balances = await this.trading.getBalances();
+          const getAssetFree = (asset: string): number => {
+            const normalized = asset.trim().toUpperCase();
+            if (!normalized) return 0;
+            const value = balances.find((b) => b.asset.trim().toUpperCase() === normalized)?.free ?? 0;
+            return Number.isFinite(value) ? value : 0;
+          };
+          const refreshBalances = async (): Promise<boolean> => {
+            try {
+              balances = await this.trading.getBalances();
+              return true;
+            } catch {
+              return false;
+            }
+          };
+          const ensureFundsBeforeOrder = async (params: {
+            asset: string;
+            required: number;
+          }): Promise<{ ok: boolean; available: number; refreshed: boolean }> => {
+            const required = Number.isFinite(params.required) ? Math.max(0, params.required) : 0;
+            if (required <= 0) {
+              return { ok: true, available: getAssetFree(params.asset), refreshed: false };
+            }
+            const refreshed = await refreshBalances();
+            const available = getAssetFree(params.asset);
+            return {
+              ok: available + 1e-8 >= required,
+              available,
+              refreshed
+            };
+          };
+          const buildInsufficientFundsSkipState = (params: {
+            symbol: string;
+            stage: string;
+            side: "BUY" | "SELL";
+            asset: string;
+            required: number;
+            available: number;
+            details?: Record<string, unknown>;
+          }): BotState => {
+            const required = Number.isFinite(params.required) ? Math.max(0, params.required) : 0;
+            const available = Number.isFinite(params.available) ? Math.max(0, params.available) : 0;
+            const summary = `Skip ${params.symbol}: ${params.stage} pre-check insufficient ${params.asset} balance (need ${required.toFixed(6)}, free ${available.toFixed(6)})`;
+            const baseCooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
+            const cooldown = this.deriveInfeasibleSymbolCooldown({
+              state: current,
+              symbol: params.symbol,
+              risk,
+              baseCooldownMs,
+              summary
+            });
+            const cooldownMs = cooldown.cooldownMs;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: current.activeOrders,
+              orderHistory: current.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        stage: params.stage,
+                        side: params.side,
+                        asset: params.asset,
+                        required: Number(required.toFixed(8)),
+                        available: Number(available.toFixed(8)),
+                        ...(cooldown.storm ? { storm: cooldown.storm } : {}),
+                        cooldownMs,
+                        ...params.details
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            return this.upsertProtectionLock(next, {
+              type: "COOLDOWN",
+              scope: "SYMBOL",
+              symbol: params.symbol,
+              reason: cooldown.storm
+                ? `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`
+                : `Cooldown after ${params.stage} insufficient ${params.asset} (${Math.round(cooldownMs / 1000)}s)`,
+              expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+              details: {
+                category: "PRECHECK_INSUFFICIENT_BALANCE",
+                stage: params.stage,
+                side: params.side,
+                asset: params.asset,
+                required: Number(required.toFixed(8)),
+                available: Number(available.toFixed(8)),
+                cooldownMs,
+                ...(cooldown.storm ? { storm: cooldown.storm } : {})
+              }
+            });
+          };
+
           const quoteFree = balances.find((b) => b.asset === homeStable)?.free ?? 0;
           if (!Number.isFinite(quoteFree) || quoteFree < 0) {
             const summary = `Skip ${candidateSymbol}: Invalid ${homeStable} balance`;
@@ -2957,6 +3115,35 @@ export class BotEngineService implements OnModuleInit {
             const sellQty = Number.parseFloat(sellQtyStr);
             if (!Number.isFinite(sellQty) || sellQty <= 0) continue;
 
+            setLiveOperation({
+              stage: "position-exit-market-sell",
+              symbol: position.symbol,
+              side: "SELL",
+              asset: baseAsset,
+              required: sellQty
+            });
+            const exitFunds = await ensureFundsBeforeOrder({ asset: baseAsset, required: sellQty });
+            if (!exitFunds.ok) {
+              current = buildInsufficientFundsSkipState({
+                symbol: position.symbol,
+                stage: "position-exit-market-sell",
+                side: "SELL",
+                asset: baseAsset,
+                required: sellQty,
+                available: exitFunds.available,
+                details: {
+                  avgEntryPrice: Number(avgEntryPrice.toFixed(8)),
+                  marketPrice: Number(nowPrice.toFixed(8)),
+                  pnlPct: Number(pnlPct.toFixed(4)),
+                  takeProfitPct: Number(takeProfitPct.toFixed(4)),
+                  stopLossPct: Number(stopLossPct.toFixed(4)),
+                  refreshedBalances: exitFunds.refreshed
+                }
+              });
+              this.save(current);
+              continue;
+            }
+
             const sellRes = await this.trading.placeSpotMarketOrder({
               symbol: position.symbol,
               side: "SELL",
@@ -3076,6 +3263,13 @@ export class BotEngineService implements OnModuleInit {
               }
 
               const conversionTarget = Math.max(config?.advanced.conversionTopUpMinTarget ?? 5, source.estimatedValueHome * 0.98);
+              setLiveOperation({
+                stage: "wallet-sweep-conversion",
+                symbol: source.sourceHomeSymbol,
+                side: "SELL",
+                asset: source.asset,
+                required: source.free
+              });
               const conversion = await this.conversionRouter.convertFromSourceToTarget({
                 sourceAsset: source.asset,
                 sourceFree: source.free,
@@ -3811,6 +4005,13 @@ export class BotEngineService implements OnModuleInit {
                   .sort((a, b) => b.free - a.free);
 
                 for (const source of stableSources) {
+                  setLiveOperation({
+                    stage: "grid-reserve-recovery-conversion",
+                    symbol: `${source.asset.trim().toUpperCase()}${homeStable}`,
+                    side: "SELL",
+                    asset: source.asset.trim().toUpperCase(),
+                    required: source.free
+                  });
                   const conversion = await this.conversionRouter.convertFromSourceToTarget({
                     sourceAsset: source.asset,
                     sourceFree: source.free,
@@ -3999,6 +4200,32 @@ export class BotEngineService implements OnModuleInit {
               if (buyQtyStr && Number.isFinite(buyQty) && buyQty > 0) {
                 const buyNotionalEstimate = buyQty * buyPrice * bufferFactor;
                 if (Number.isFinite(buyNotionalEstimate) && buyNotionalEstimate <= quoteSpendable + 1e-8) {
+                  setLiveOperation({
+                    stage: "grid-buy-limit",
+                    symbol: candidateSymbol,
+                    side: "BUY",
+                    asset: homeStable,
+                    required: buyNotionalEstimate
+                  });
+                  const buyFunds = await ensureFundsBeforeOrder({ asset: homeStable, required: buyNotionalEstimate });
+                  if (!buyFunds.ok) {
+                    pendingNoActionState = buildInsufficientFundsSkipState({
+                      symbol: candidateSymbol,
+                      stage: "grid-buy-limit",
+                      side: "BUY",
+                      asset: homeStable,
+                      required: buyNotionalEstimate,
+                      available: buyFunds.available,
+                      details: {
+                        desiredQty: Number(qty.toFixed(8)),
+                        normalizedQty: buyQtyStr,
+                        limitPrice: buyPriceNorm.normalizedPrice,
+                        quoteSpendable: Number(quoteSpendable.toFixed(8)),
+                        reserveHardTarget: Number(reserveHardTarget.toFixed(8)),
+                        refreshedBalances: buyFunds.refreshed
+                      }
+                    });
+                  } else {
                   const buyOrder = await this.trading.placeSpotLimitOrder({
                     symbol: candidateSymbol,
                     side: "BUY",
@@ -4030,6 +4257,7 @@ export class BotEngineService implements OnModuleInit {
                     }
                   });
                   placedGridOrder = true;
+                  }
                 }
               } else if (buyCheck.reason) {
                 const summary = `Skip ${candidateSymbol}: Grid buy sizing rejected (${buyCheck.reason})`;
@@ -4119,37 +4347,63 @@ export class BotEngineService implements OnModuleInit {
                 const sellQtyStr = sellCheck.ok ? sellCheck.normalizedQty : sellCheck.requiredQty;
                 const sellQty = sellQtyStr ? Number.parseFloat(sellQtyStr) : Number.NaN;
                 if (sellQtyStr && Number.isFinite(sellQty) && sellQty > 0 && sellQty <= desiredSellQty + 1e-8) {
-                  const sellOrder = await this.trading.placeSpotLimitOrder({
+                  setLiveOperation({
+                    stage: "grid-sell-limit",
                     symbol: candidateSymbol,
                     side: "SELL",
-                    quantity: sellQtyStr,
-                    price: sellPriceNorm.normalizedPrice,
-                    timeInForce: "GTC",
-                    clientOrderId: config ? this.buildBotClientOrderId({ config, purpose: "GRID", side: "SELL" }) : undefined
+                    asset: candidateBaseAsset,
+                    required: sellQty
                   });
-                  persistLiveTrade({
-                    symbol: candidateSymbol,
-                    side: "SELL",
-                    requestedQty: sellQtyStr,
-                    fallbackQty: sellQty,
-                    response: sellOrder,
-                    reason: "grid-ladder-sell",
-                    details: {
-                      mode: "grid-ladder",
-                      gridSide: "SELL",
-                      anchorPrice: Number(price.toFixed(8)),
-                      gridSpacingPct: Number(gridSpacingPct.toFixed(6)),
-                      limitPrice: sellPriceNorm.normalizedPrice,
-                      validation: {
-                        ok: sellCheck.ok,
-                        normalizedQty: sellCheck.normalizedQty,
-                        requiredQty: sellCheck.requiredQty,
-                        notional: sellCheck.notional,
-                        minNotional: sellCheck.minNotional
+                  const sellFunds = await ensureFundsBeforeOrder({ asset: candidateBaseAsset, required: sellQty });
+                  if (!sellFunds.ok) {
+                    const nextWithInsufficient = buildInsufficientFundsSkipState({
+                      symbol: candidateSymbol,
+                      stage: "grid-sell-limit",
+                      side: "SELL",
+                      asset: candidateBaseAsset,
+                      required: sellQty,
+                      available: sellFunds.available,
+                      details: {
+                        desiredQty: Number(desiredSellQty.toFixed(8)),
+                        normalizedQty: sellQtyStr,
+                        limitPrice: sellPriceNorm.normalizedPrice,
+                        refreshedBalances: sellFunds.refreshed
                       }
-                    }
-                  });
-                  placedGridOrder = true;
+                    });
+                    if (!pendingNoActionState) pendingNoActionState = nextWithInsufficient;
+                  } else {
+                    const sellOrder = await this.trading.placeSpotLimitOrder({
+                      symbol: candidateSymbol,
+                      side: "SELL",
+                      quantity: sellQtyStr,
+                      price: sellPriceNorm.normalizedPrice,
+                      timeInForce: "GTC",
+                      clientOrderId: config ? this.buildBotClientOrderId({ config, purpose: "GRID", side: "SELL" }) : undefined
+                    });
+                    persistLiveTrade({
+                      symbol: candidateSymbol,
+                      side: "SELL",
+                      requestedQty: sellQtyStr,
+                      fallbackQty: sellQty,
+                      response: sellOrder,
+                      reason: "grid-ladder-sell",
+                      details: {
+                        mode: "grid-ladder",
+                        gridSide: "SELL",
+                        anchorPrice: Number(price.toFixed(8)),
+                        gridSpacingPct: Number(gridSpacingPct.toFixed(6)),
+                        limitPrice: sellPriceNorm.normalizedPrice,
+                        validation: {
+                          ok: sellCheck.ok,
+                          normalizedQty: sellCheck.normalizedQty,
+                          requiredQty: sellCheck.requiredQty,
+                          notional: sellCheck.notional,
+                          minNotional: sellCheck.minNotional
+                        }
+                      }
+                    });
+                    placedGridOrder = true;
+                  }
                 } else if (sellCheck.reason) {
                   const summary = `Skip ${candidateSymbol}: Grid sell sizing rejected (${sellCheck.reason})`;
                   const baseCooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
@@ -4289,6 +4543,36 @@ export class BotEngineService implements OnModuleInit {
           let entryQty = qty;
           let retriedSizing = false;
           while (true) {
+            const entryRequiredQuote = entryQty * price * bufferFactor;
+            setLiveOperation({
+              stage: "entry-market-buy",
+              symbol: candidateSymbol,
+              side: "BUY",
+              asset: homeStable,
+              required: entryRequiredQuote
+            });
+            const entryFunds = await ensureFundsBeforeOrder({ asset: homeStable, required: entryRequiredQuote });
+            if (!entryFunds.ok) {
+              const nextWithInsufficient = buildInsufficientFundsSkipState({
+                symbol: candidateSymbol,
+                stage: "entry-market-buy",
+                side: "BUY",
+                asset: homeStable,
+                required: entryRequiredQuote,
+                available: entryFunds.available,
+                details: {
+                  desiredQty: Number(qty.toFixed(8)),
+                  normalizedQty: entryQtyStr,
+                  price: Number(price.toFixed(8)),
+                  bufferFactor,
+                  retriedSizing,
+                  refreshedBalances: entryFunds.refreshed
+                }
+              });
+              this.save(nextWithInsufficient);
+              return;
+            }
+
             try {
               const res = await this.trading.placeSpotMarketOrder({ symbol: candidateSymbol, side: "BUY", quantity: entryQtyStr });
               persistLiveTrade({
@@ -4326,28 +4610,50 @@ export class BotEngineService implements OnModuleInit {
           const safeMsg = this.sanitizeUserErrorMessage(rawMsg);
           const transient = this.isTransientExchangeError(rawMsg);
           const sizingFilterError = this.isSizingFilterError(rawMsg);
+          const insufficientBalanceError = this.isInsufficientBalanceError(rawMsg);
+          const operationStage = liveOperation.stage || "unknown";
+          const operationSide = liveOperation.side;
+          const operationSymbol = liveOperation.symbol?.trim().toUpperCase() || candidateSymbol;
+          const operationTag = operationSide ? `${operationStage}:${operationSide}` : operationStage;
+          const recentInsufficientCount = insufficientBalanceError
+            ? this.countRecentSymbolErrorSkips({
+                state: current,
+                symbol: operationSymbol,
+                matcher: /INSUFFICIENT BALANCE/i,
+                windowMs: 30 * 60_000
+              }) + 1
+            : 0;
           const backoffDetails = transient ? this.registerTransientExchangeError(rawMsg, safeMsg) : null;
           const summary = sizingFilterError
-            ? `Skip ${candidateSymbol}: Binance sizing filter (${safeMsg})`
+            ? `Skip ${operationSymbol}: Binance sizing filter (${safeMsg})`
             : transient
-              ? `Skip ${candidateSymbol}: Temporary exchange/network issue (${safeMsg})`
-              : `Order rejected for ${candidateSymbol} (${envLabel}): ${safeMsg}`;
+              ? `Skip ${operationSymbol}: Temporary exchange/network issue (${safeMsg})`
+              : `Order rejected (${operationTag}) for ${operationSymbol} (${envLabel}): ${safeMsg}`;
           const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+          const decisionDetails: Record<string, unknown> = {
+            stage: operationStage,
+            ...(operationSide ? { side: operationSide } : {}),
+            ...(liveOperation.asset ? { asset: liveOperation.asset } : {}),
+            ...(Number.isFinite(liveOperation.required) ? { required: Number((liveOperation.required ?? 0).toFixed(8)) } : {}),
+            ...(Number.isFinite(liveOperation.available) ? { available: Number((liveOperation.available ?? 0).toFixed(8)) } : {}),
+            ...(insufficientBalanceError ? { insufficientBalanceRejectCount30m: recentInsufficientCount } : {})
+          };
           const skipDecision = {
             id: crypto.randomUUID(),
             ts: new Date().toISOString(),
             kind: "SKIP",
             summary,
-            ...(backoffDetails
-              ? {
-                  details: {
+            details: {
+              ...decisionDetails,
+              ...(backoffDetails
+                ? {
                     backoffMs: backoffDetails.pauseMs,
                     pauseUntil: backoffDetails.pauseUntilIso,
                     errorCount: backoffDetails.errorCount,
                     lastErrorCode: backoffDetails.lastErrorCode
                   }
-                }
-              : {})
+                : {})
+            }
           } satisfies Decision;
 	          let nextState: BotState = {
 	            ...current,
@@ -4363,7 +4669,7 @@ export class BotEngineService implements OnModuleInit {
             nextState = this.upsertProtectionLock(nextState, {
               type: "COOLDOWN",
               scope: "SYMBOL",
-              symbol: candidateSymbol,
+              symbol: operationSymbol,
               reason: `Sizing cooldown after Binance filter error (${Math.round(sizingCooldownMs / 1000)}s)`,
               expiresAt: new Date(Date.now() + sizingCooldownMs).toISOString(),
               details: {
@@ -4374,11 +4680,45 @@ export class BotEngineService implements OnModuleInit {
             });
           }
 
+          if (insufficientBalanceError) {
+            const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), 60_000);
+            const repeatMultiplier = Math.max(1, Math.min(4, recentInsufficientCount));
+            const insufficientBaseCooldownMs = baseCooldownMs * repeatMultiplier;
+            const cooldown = this.deriveInfeasibleSymbolCooldown({
+              state: current,
+              symbol: operationSymbol,
+              risk,
+              baseCooldownMs: insufficientBaseCooldownMs,
+              summary
+            });
+            const cooldownMs = Math.max(cooldown.cooldownMs, insufficientBaseCooldownMs);
+            nextState = this.upsertProtectionLock(nextState, {
+              type: "COOLDOWN",
+              scope: "SYMBOL",
+              symbol: operationSymbol,
+              reason: cooldown.storm
+                ? `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`
+                : `Cooldown after insufficient balance (${operationTag}, ${Math.round(cooldownMs / 1000)}s)`,
+              expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+              details: {
+                category: "INSUFFICIENT_BALANCE",
+                stage: operationStage,
+                ...(operationSide ? { side: operationSide } : {}),
+                cooldownMs,
+                recentCount30m: recentInsufficientCount,
+                ...(cooldown.storm ? { storm: cooldown.storm } : {})
+              }
+            });
+          }
+
           if (config?.advanced.autoBlacklistEnabled && this.shouldAutoBlacklistError(rawMsg)) {
-            const ttlMinutes = config.advanced.autoBlacklistTtlMinutes ?? 180;
+            const baseTtlMinutes = config.advanced.autoBlacklistTtlMinutes ?? 180;
+            const ttlMinutes = insufficientBalanceError
+              ? this.deriveInsufficientBalanceBlacklistTtlMinutes(baseTtlMinutes, recentInsufficientCount)
+              : baseTtlMinutes;
             const now = new Date();
             nextState = this.addSymbolBlacklist(nextState, {
-              symbol: candidateSymbol,
+              symbol: operationSymbol,
               reason: safeMsg.slice(0, 120),
               createdAt: now.toISOString(),
               expiresAt: new Date(now.getTime() + ttlMinutes * 60_000).toISOString()
