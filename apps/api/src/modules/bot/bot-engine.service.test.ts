@@ -113,6 +113,17 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.deriveInsufficientBalanceBlacklistTtlMinutes(30, 4)).toBe(90);
     expect(helpers.deriveInsufficientBalanceBlacklistTtlMinutes(30, 6)).toBe(120);
   });
+
+  it("allows tiny balance delta fallback for position exits", () => {
+    const helpers = service as unknown as {
+      shouldAttemptBalanceDeltaSellFallback: (required: number, available: number) => boolean;
+    };
+
+    expect(helpers.shouldAttemptBalanceDeltaSellFallback(1506, 1505.771)).toBe(true);
+    expect(helpers.shouldAttemptBalanceDeltaSellFallback(0.138, 0.137791)).toBe(true);
+    expect(helpers.shouldAttemptBalanceDeltaSellFallback(100, 95)).toBe(false);
+    expect(helpers.shouldAttemptBalanceDeltaSellFallback(100, 0)).toBe(false);
+  });
 });
 
 describe("bot-engine ownership detection", () => {

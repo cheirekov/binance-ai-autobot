@@ -16,6 +16,35 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-16 14:23 UTC — T-029 Position-exit tiny shortfall fallback (anti-loop)
+- Scope: stop repeated `position-exit-market-sell pre-check insufficient` loops caused by tiny free-balance deltas vs computed exit quantity.
+- BA requirement mapping:
+  - Autobot must adapt to exchange/wallet precision drift and continue risk-reduction exits instead of cycling skips.
+  - Runtime should avoid long skip storms that block new opportunities due to max-open-position pressure.
+- PM milestone mapping: continue T-029 runtime hardening after `autobot-feedback-20260216-141521.tgz` showed dominant exit-loop behavior.
+- Technical changes:
+  - API (`apps/api/src/modules/bot/bot-engine.service.ts`):
+    - Added helper `shouldAttemptBalanceDeltaSellFallback(...)` to detect small pre-check shortfalls (<=3%).
+    - In `position-exit-market-sell`, when pre-check fails with a small shortfall:
+      - revalidate market qty against currently available free balance,
+      - submit adjusted SELL market order if valid instead of skipping.
+    - Persisted exit trade details now flag this path:
+      - `partialExitDueToBalanceDelta`,
+      - `originalRequiredQty`,
+      - `availableQty`.
+  - Tests (`apps/api/src/modules/bot/bot-engine.service.test.ts`):
+    - Added coverage for tiny-shortfall fallback threshold behavior.
+- Risk slider impact: none (execution reliability fix for exit path).
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request:
+  - Run 2–4h and watch for reduction of repeated:
+    - `Skip ... position-exit-market-sell pre-check insufficient ...`
+  - Expected replacement behavior:
+    - `TRADE ... take-profit-exit/stop-loss-exit` with `partialExitDueToBalanceDelta=true` in details.
+- Follow-up:
+  - If residual loops remain, add symbol-level temporary lock specifically for repeated exit shortfalls with increasing duration.
+
 ## 2026-02-16 11:24 UTC — T-027 ownership continuity after state reset/prefix drift
 - Scope: prevent bot-owned orders from being misclassified as “external” after state reset or prefix changes.
 - BA requirement mapping:

@@ -1521,6 +1521,15 @@ export class BotEngineService implements OnModuleInit {
     return /^[A-Z0-9]{3,12}-[A-Z0-9]{2}[BS]-[A-Z0-9]{8,}$/.test(clientOrderId);
   }
 
+  private shouldAttemptBalanceDeltaSellFallback(required: number, available: number): boolean {
+    if (!Number.isFinite(required) || !Number.isFinite(available)) return false;
+    if (required <= 0 || available <= 0) return false;
+    const shortfall = required - available;
+    if (!(shortfall > 0)) return false;
+    const shortfallRatio = shortfall / required;
+    return Number.isFinite(shortfallRatio) && shortfallRatio <= 0.03; // up to 3% shortfall
+  }
+
   private buildBotClientOrderId(params: { config: AppConfig; purpose: string; side: "BUY" | "SELL" }): string {
     const prefix = this.resolveBotOrderClientIdPrefix(params.config);
     const purposeCode = (params.purpose.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 2) || "O").padEnd(2, "O");
@@ -3162,6 +3171,58 @@ export class BotEngineService implements OnModuleInit {
             });
             const exitFunds = await ensureFundsBeforeOrder({ asset: baseAsset, required: sellQty });
             if (!exitFunds.ok) {
+              if (this.shouldAttemptBalanceDeltaSellFallback(sellQty, exitFunds.available)) {
+                const adjustedCheck = await this.marketData.validateMarketOrderQty(position.symbol, exitFunds.available);
+                let adjustedQtyStr = adjustedCheck.ok ? adjustedCheck.normalizedQty : undefined;
+                if (!adjustedQtyStr && adjustedCheck.requiredQty) {
+                  const requiredQty = Number.parseFloat(adjustedCheck.requiredQty);
+                  if (Number.isFinite(requiredQty) && requiredQty > 0 && requiredQty <= exitFunds.available) {
+                    adjustedQtyStr = adjustedCheck.requiredQty;
+                  }
+                }
+
+                const adjustedQty = adjustedQtyStr ? Number.parseFloat(adjustedQtyStr) : Number.NaN;
+                if (
+                  adjustedQtyStr &&
+                  Number.isFinite(adjustedQty) &&
+                  adjustedQty > 0 &&
+                  adjustedQty <= exitFunds.available + 1e-8
+                ) {
+                  setLiveOperation({
+                    stage: "position-exit-market-sell",
+                    symbol: position.symbol,
+                    side: "SELL",
+                    asset: baseAsset,
+                    required: adjustedQty
+                  });
+                  const sellRes = await this.trading.placeSpotMarketOrder({
+                    symbol: position.symbol,
+                    side: "SELL",
+                    quantity: adjustedQtyStr
+                  });
+                  persistLiveTrade({
+                    symbol: position.symbol,
+                    side: "SELL",
+                    requestedQty: adjustedQtyStr,
+                    fallbackQty: adjustedQty,
+                    response: sellRes,
+                    reason: shouldTakeProfit ? "take-profit-exit" : "stop-loss-exit",
+                    details: {
+                      mode: "position-exit",
+                      partialExitDueToBalanceDelta: true,
+                      originalRequiredQty: Number(sellQty.toFixed(8)),
+                      availableQty: Number(exitFunds.available.toFixed(8)),
+                      pnlPct: Number(pnlPct.toFixed(4)),
+                      avgEntryPrice: Number(avgEntryPrice.toFixed(8)),
+                      marketPrice: Number(nowPrice.toFixed(8)),
+                      takeProfitPct: Number(takeProfitPct.toFixed(4)),
+                      stopLossPct: Number(stopLossPct.toFixed(4))
+                    }
+                  });
+                  return;
+                }
+              }
+
               current = buildInsufficientFundsSkipState({
                 symbol: position.symbol,
                 stage: "position-exit-market-sell",

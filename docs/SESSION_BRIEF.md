@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-16 11:15 UTC
+Last updated: 2026-02-16 14:24 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,11 +9,12 @@ Use this file at the start and end of every batch.
 
 - Batch type: `DAY (2-4h)`
 - Active ticket: `T-029` (Wallet policy v2: unmanaged exposure control)
-- Goal (single sentence): reduce idle bag-holding by forcing wallet-sweep rebalance when unmanaged non-home exposure exceeds a risk-linked cap.
+- Goal (single sentence): reduce idle bag-holding and stop tiny-shortfall exit skip loops that block inventory reduction.
 - In scope:
   - unmanaged non-home exposure valuation during wallet policy path.
   - risk-linked unmanaged exposure cap and rebalance trigger.
   - telemetry details in wallet-sweep trade events.
+  - tiny-shortfall position-exit fallback (sell validated available qty instead of repeating pre-check skips).
 - Out of scope:
   - full liquidation of protected assets used by active orders/managed positions.
   - adaptive/AI promotion from shadow to execution,
@@ -31,8 +32,10 @@ Use this file at the start and end of every batch.
   - Wallet policy computes unmanaged non-home exposure and compares it to a risk-linked cap.
   - If over cap, sweep can rebalance unmanaged assets even without weak-trend signal.
   - Sweep telemetry includes unmanaged exposure metrics.
+  - Position exits can fallback to available validated qty when shortfall is small (<=3%).
 - Runtime evidence in decisions/logs:
   - observe at least one `wallet-sweep` trade with `category=rebalance` when exposure is over cap.
+  - reduced repetition of `position-exit-market-sell pre-check insufficient ...` skips.
 - Risk slider impact (`none` or explicit low/mid/high behavior):
   - unmanaged exposure cap scales from strict (low risk) to loose (high risk).
 - Validation commands:
@@ -63,15 +66,14 @@ Use this file at the start and end of every batch.
 
 - Observed KPI delta:
   - CI status: `green`
-  - unmanaged exposure rebalance trigger: `implemented`
+  - from analyzed run `autobot-feedback-20260216-141521.tgz`: dominant issue was repeated tiny-shortfall exit skips (`ZAMAUSDC`, `SOLUSDC`), now patched.
 - Decision: `continue`
-- Next ticket candidate: `T-029` (UI visibility for unmanaged exposure cap)
+- Next ticket candidate: `T-007` (if lifecycle remains stable)
 - Open risks:
-  - rebalance mode depends on tradable conversion routes for unmanaged assets.
+  - verify fallback path does not over-trigger on meaningful balance gaps.
 - Notes for next session:
-  - request 2–4h bundle after deploy with mixed holdings.
-  - imported/manual policy: synced and treated as ladder when enabled; not auto-canceled by current policy.
-  - ownership continuity hardening added: legacy/default prefix and signature-based bot order recognition after reset.
+  - bundle: `autobot-feedback-20260216-141521.tgz`
+  - expected evidence in next run: fewer repeated position-exit insufficient skips; possible exit trades with `partialExitDueToBalanceDelta=true`.
 
 ## 5) Copy/paste prompt for next session
 
@@ -79,11 +81,12 @@ Use this file at the start and end of every batch.
 Ticket: T-029
 Batch: DAY (2-4h)
 Goal: Trigger adaptive wallet rebalance when unmanaged non-home exposure exceeds a risk-linked cap.
-In scope: unmanaged exposure valuation + cap trigger + sweep telemetry details.
+In scope: unmanaged exposure valuation + cap trigger + sweep telemetry details + tiny-shortfall exit fallback.
 Out of scope: forced liquidation of protected/in-strategy assets; adaptive/AI promotion; PnL refactor.
 DoD:
 - API: wallet policy can select `category=rebalance` sweep sources when over cap.
 - Runtime: `wallet-sweep` trade details include unmanaged exposure values.
+- Runtime: repeated `position-exit-market-sell pre-check insufficient` loops are reduced.
 - Risk slider mapping: cap widens at high risk and tightens at low risk.
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
