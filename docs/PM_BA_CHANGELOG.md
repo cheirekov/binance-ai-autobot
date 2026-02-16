@@ -16,6 +16,31 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-16 18:22 UTC — T-029 Grid-wait storm cooldown (night build)
+- Scope: reduce repeated `Grid waiting for ladder slot or inventory` loops by escalating symbol cooldown when the same wait skip repeats in a short window.
+- BA requirement mapping:
+  - Autobot should rotate away from temporary no-action symbols instead of burning ticks on the same candidate.
+  - Behavior must stay adaptive and not tied to specific symbols/market phases.
+- PM milestone mapping: pre-night stabilization after `autobot-feedback-20260216-181631.tgz` showed dominant wait-loop skips (XRPUSDC).
+- Technical changes:
+  - API (`apps/api/src/modules/bot/bot-engine.service.ts`):
+    - `getSkipStormKey(...)` now treats `Grid waiting for ladder slot or inventory` as storm-eligible.
+    - In grid no-action path, added storm-aware cooldown derivation and lock upsert (`category=GRID_WAIT_ROTATE`) when repeats exceed threshold.
+    - Existing 60s decision-log throttle remains, but repeated waiting now also triggers symbol rotation cooldown.
+  - Tests (`apps/api/src/modules/bot/bot-engine.service.test.ts`):
+    - Added coverage that grid-wait summary is classified as skip-storm key.
+- Risk slider impact:
+  - Uses existing storm threshold/cooldown scaling (`deriveInfeasibleSymbolCooldown`): higher risk triggers faster storm detection and longer rotate cooldown.
+- Validation evidence:
+  - Docker CI passed: `docker compose -f docker-compose.ci.yml run --rm ci`.
+- Runtime test request:
+  - Run overnight without state reset.
+  - Expected:
+    - fewer repeated identical `Grid waiting...` skips for one symbol,
+    - better candidate rotation under the same market.
+- Follow-up:
+  - If wait loops persist, add a lightweight “pending grid fullness” metric in UI/KPI to distinguish healthy waiting from starvation.
+
 ## 2026-02-16 16:18 UTC — T-029 Exit-loop suppression: respect symbol cooldown in position-exit scan
 - Scope: stop repeated position-exit pre-check skip storms by honoring symbol protection/cooldown locks before re-attempting exits.
 - BA requirement mapping:

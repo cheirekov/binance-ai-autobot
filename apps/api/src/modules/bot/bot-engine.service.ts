@@ -404,7 +404,6 @@ export class BotEngineService implements OnModuleInit {
     const lower = raw.toLowerCase();
     if (!lower.startsWith("skip ")) return null;
     if (lower.startsWith("skip:")) return null; // global skips, not symbol-specific
-    if (lower.includes("waiting for ladder slot or inventory")) return null; // normal idle state
 
     const key = (lower.includes("(") ? lower.slice(0, lower.indexOf("(")) : lower).trim();
     const eligible =
@@ -413,6 +412,7 @@ export class BotEngineService implements OnModuleInit {
       key.includes("conversion cooldown") ||
       key.includes("binance sizing filter") ||
       key.includes("temporarily blacklisted") ||
+      key.includes("waiting for ladder slot or inventory") ||
       key.includes("no feasible candidates") ||
       key.includes("invalid");
     return eligible ? key : null;
@@ -4644,19 +4644,22 @@ export class BotEngineService implements OnModuleInit {
               return;
             }
 
-	            const summary = `Skip ${candidateSymbol}: Grid waiting for ladder slot or inventory`;
-	            const nowMs = Date.now();
-	            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
-	            const lastSimilar = current.decisions.find((d) => d.kind === "SKIP" && d.summary === summary);
-	            const lastSimilarAt = lastSimilar ? Date.parse(lastSimilar.ts) : Number.NaN;
-	            const waitingThrottleMs = 60_000;
-	            const throttled = Number.isFinite(lastSimilarAt) && nowMs - lastSimilarAt < waitingThrottleMs;
-	            const next = {
-	              ...current,
-	              decisions: alreadyLogged || throttled
-	                ? current.decisions
-	                : [
-	                    {
+            const summary = `Skip ${candidateSymbol}: Grid waiting for ladder slot or inventory`;
+            const nowMs = Date.now();
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const lastSimilar = current.decisions.find((d) => d.kind === "SKIP" && d.summary === summary);
+            const lastSimilarAt = lastSimilar ? Date.parse(lastSimilar.ts) : Number.NaN;
+            const waitingThrottleMs = 60_000;
+            const throttled = Number.isFinite(lastSimilarAt) && nowMs - lastSimilarAt < waitingThrottleMs;
+            const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), 60_000);
+            const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
+            const cooldownMs = cooldown.cooldownMs;
+            const next = {
+              ...current,
+              decisions: alreadyLogged || throttled
+                ? current.decisions
+                : [
+                    {
                       id: crypto.randomUUID(),
                       ts: new Date().toISOString(),
                       kind: "SKIP",
@@ -4665,13 +4668,31 @@ export class BotEngineService implements OnModuleInit {
                         hasBuyLimit,
                         hasSellLimit,
                         openLimitOrders: symbolOpenLimits.length,
-                        maxGridOrdersPerSymbol
+                        maxGridOrdersPerSymbol,
+                        ...(cooldown.storm ? { storm: cooldown.storm } : {}),
+                        cooldownMs
                       }
                     },
                     ...current.decisions
                   ].slice(0, 200),
               lastError: undefined
             } satisfies BotState;
+            if (cooldown.storm) {
+              const nextWithCooldown = this.upsertProtectionLock(next, {
+                type: "COOLDOWN",
+                scope: "SYMBOL",
+                symbol: candidateSymbol,
+                reason: `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`,
+                expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                details: {
+                  category: "GRID_WAIT_ROTATE",
+                  cooldownMs,
+                  ...(cooldown.storm ? { storm: cooldown.storm } : {})
+                }
+              });
+              this.save(nextWithCooldown);
+              return;
+            }
             this.save(next);
             return;
           }

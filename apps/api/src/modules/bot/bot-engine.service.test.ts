@@ -124,6 +124,15 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.shouldAttemptBalanceDeltaSellFallback(100, 95)).toBe(false);
     expect(helpers.shouldAttemptBalanceDeltaSellFallback(100, 0)).toBe(false);
   });
+
+  it("classifies grid waiting skips as storm-eligible", () => {
+    const helpers = service as unknown as {
+      getSkipStormKey: (summary: string) => string | null;
+    };
+
+    const key = helpers.getSkipStormKey("Skip XRPUSDC: Grid waiting for ladder slot or inventory");
+    expect(key).toBe("skip xrpusdc: grid waiting for ladder slot or inventory");
+  });
 });
 
 describe("bot-engine ownership detection", () => {
