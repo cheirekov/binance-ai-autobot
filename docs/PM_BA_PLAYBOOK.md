@@ -67,3 +67,15 @@ Track only these to avoid noisy interpretation:
    - compare observed KPI delta vs target,
    - decide `continue`, `rollback`, or `pivot`,
    - set next single ticket.
+
+## No-loop / anti-hallucination control (hard)
+
+1. Evidence classes in review notes:
+   - `observed`: directly from bundle/log/metrics,
+   - `inferred`: logical interpretation of observed data,
+   - `assumption`: not yet verified.
+2. PM/BA decisions cannot rely on `assumption` items alone.
+3. If two consecutive bundles for one ticket have the same dominant failure pattern, the next batch must be one of:
+   - direct mitigation batch for that exact failure,
+   - explicit pivot/de-scope with reason.
+4. Use `./scripts/pmba-gate.sh start` before implementation and `./scripts/pmba-gate.sh end` before handoff.

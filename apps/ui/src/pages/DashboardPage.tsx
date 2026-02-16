@@ -128,6 +128,7 @@ export function DashboardPage(): JSX.Element {
   const adaptiveTail = runStats.stats?.adaptiveShadowTail ?? [];
   const latestAdaptiveEvent = adaptiveTail.length ? adaptiveTail[adaptiveTail.length - 1] : undefined;
   const adaptiveRows = [...adaptiveTail].reverse().slice(0, 30);
+  const walletPolicySnapshot = runStats.stats?.walletPolicy ?? null;
 
   const pnlSummary = useMemo(() => {
     const kpi = runStats.stats?.kpi;
@@ -274,6 +275,40 @@ export function DashboardPage(): JSX.Element {
               Buys/Sells:{" "}
               {runStats.stats?.kpi ? `${runStats.stats.kpi.totals.buys}/${runStats.stats.kpi.totals.sells}` : "—"}
             </span>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <div className="subtitle">Wallet policy (latest telemetry)</div>
+            {walletPolicySnapshot ? (
+              <>
+                <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <span className={pillClass(walletPolicySnapshot.overCap ? "bad" : "ok")}>
+                    Unmanaged exposure: {walletPolicySnapshot.unmanagedExposurePct.toFixed(2)}%
+                  </span>
+                  <span className="pill">Cap: {walletPolicySnapshot.unmanagedExposureCapPct.toFixed(2)}%</span>
+                  {typeof walletPolicySnapshot.unmanagedNonHomeValue === "number" ? (
+                    <span className="pill">
+                      Value: {walletPolicySnapshot.unmanagedNonHomeValue.toFixed(2)} {homeStableCoin}
+                    </span>
+                  ) : null}
+                  {typeof walletPolicySnapshot.unmanagedExposureCapHome === "number" ? (
+                    <span className="pill">
+                      Cap value: {walletPolicySnapshot.unmanagedExposureCapHome.toFixed(2)} {homeStableCoin}
+                    </span>
+                  ) : null}
+                  {walletPolicySnapshot.category ? <span className="pill">Category: {walletPolicySnapshot.category}</span> : null}
+                  {walletPolicySnapshot.sourceAsset ? <span className="pill">Source: {walletPolicySnapshot.sourceAsset}</span> : null}
+                </div>
+                <div className="subtitle" style={{ marginTop: 6 }}>
+                  Observed: {new Date(walletPolicySnapshot.observedAt).toLocaleTimeString()}
+                  {walletPolicySnapshot.reason ? ` · ${walletPolicySnapshot.reason}` : ""}
+                </div>
+              </>
+            ) : (
+              <div className="subtitle" style={{ marginTop: 6 }}>
+                Waiting for wallet-sweep telemetry sample.
+              </div>
+            )}
           </div>
 
           {(state?.symbolBlacklist?.length ?? 0) > 0 ? (

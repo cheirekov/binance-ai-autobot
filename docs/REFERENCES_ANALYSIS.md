@@ -12,6 +12,8 @@ This repo now contains several third‑party codebases under `references/` for *
 | `references/binance-ai-bot-24` | Internal reference bot (v24) | TS/React | **No license file found locally** (treat as internal) | Yes (internal), but prefer porting patterns not files |
 | `references/freqtrade-develop` | Freqtrade trading bot framework (develop branch) | Python | **GPLv3** (`LICENSE`) | **No** (unless this repo becomes GPLv3‑compatible) |
 | `references/freqtrade-strategies-main` | Community strategy examples for Freqtrade | Python | **GPLv3** (`LICENSE`) | **No** (unless this repo becomes GPLv3‑compatible) |
+| `references/NostalgiaForInfinity-main` | Freqtrade strategy pack (NFI X series) | Python | **MIT** (`LICENSE`) | Yes (with attribution), but prefer extracting patterns vs monolithic code copy |
+| `references/Gekko-Strategies-master` | Mixed Gekko community strategy collection | JavaScript | **No top-level license**; mixed per-file headers (many CC‑BY‑SA / source links) | **No direct copying** until per-file license provenance is normalized |
 | `references/jesse-master` | Jesse algo trading framework | Python | **MIT** (`LICENSE`) | Yes (with attribution) |
 | `references/ccxt-master` | CCXT multi‑exchange trading API | JS/TS/Python/etc | **MIT** (`LICENSE.txt`) | Prefer using the published `ccxt` package; copying is allowed with attribution |
 | `references/crypto-trading-open-main` | Multi‑exchange trading system (grid/arbitrage/etc) | Python | **No license file found** (author permission required) | Only if the author explicitly grants permission; recommended to add a license file before redistribution |
@@ -533,3 +535,119 @@ Mapping to our architecture:
 3. Implement universe filter chain (`T-023`) for broader, explainable candidate selection.
 4. Implement adaptive confidence/model-health shadow layer (`T-025`).
 5. Add offline calibration runner (`T-026`) after telemetry corpus is sufficient.
+
+## New review update: `NostalgiaForInfinity-main` + `Gekko-Strategies-master` (Feb 16, 2026)
+
+### A) `NostalgiaForInfinity-main` (MIT) — practical patterns worth porting
+
+Reference files:
+
+- `references/NostalgiaForInfinity-main/configs/pairlist-volume-binance-usdc.json`
+- `references/NostalgiaForInfinity-main/configs/blacklist-binance.json`
+- `references/NostalgiaForInfinity-main/NostalgiaForInfinityX6.py`
+
+Patterns extracted:
+
+- Pairlist pipeline style for universe construction:
+  - liquidity first (`VolumePairList`),
+  - listing age filter,
+  - spread guard,
+  - range-stability/volatility band filters.
+- Multi-timeframe context model (`5m` execution + `15m/1h/4h/1d` informative frames).
+- Regime/tagged mode concept (normal / rapid / rebuy / grind) with mode-specific stake and exit behavior.
+- Explicit “no leveraged/fiat/stable-stable garbage pairs” blacklist discipline.
+
+Mapping to our architecture:
+
+- `apps/api/src/modules/universe/universe.service.ts`:
+  - extend current scoring into a true filter-chain with per-stage reject reasons.
+  - add optional spread/range/volatility/age filters tied to risk profile defaults.
+- `apps/api/src/modules/bot/bot-engine.service.ts`:
+  - add lightweight mode profiles (execution profile state) rather than a giant monolithic strategy.
+  - keep our rule: risk policy remains hard gate; adaptive logic cannot bypass it.
+
+### B) `Gekko-Strategies-master` (mixed licensing) — safe concept extraction only
+
+Reference files:
+
+- `references/Gekko-Strategies-master/RSI Bull and Bear - ADX modifier/RSI_BULL_BEAR_ADX.js`
+- `references/Gekko-Strategies-master/RSI_BB_ADX_Peak/RSI_BB_ADX_Peak.js`
+- `references/Gekko-Strategies-master/Supertrend_Gab0/Supertrend_Gab0.js`
+- `references/Gekko-Strategies-master/RsiStopLoss/RsiStopLoss.js`
+- `references/Gekko-Strategies-master/backtest_database.csv`
+
+Patterns extracted:
+
+- Regime switching by trend state: separate RSI thresholds in bull vs bear, then modulate thresholds by ADX strength.
+- Mean-reversion trigger blend (RSI + Bollinger band position).
+- ATR/Supertrend as a simple trend-following confirmation and exit guard.
+- Progressive stop/profit ratchet concept (move protection as trade goes in favor).
+
+Quality/licensing caveats:
+
+- Repository has no unified root license and includes mixed per-file origin/license headers.
+- Backtest CSV contains many unrealistic/overfit outliers (huge `%/day`) and should not be used as performance truth.
+- Use these as design ideas only; no direct code reuse unless provenance is made explicit per file.
+
+Mapping to our architecture:
+
+- `apps/api/src/modules/bot/bot-engine.service.ts`:
+  - upgrade regime classifier to risk-linked dynamic thresholds (bull/bear RSI bands + ADX modifiers).
+  - add supertrend/ATR-based “trend-break” guard for existing grid/position exits.
+- `packages/shared/src/schemas/app-config.ts`:
+  - expose only compact, risk-linked knobs in Advanced/Expert (not raw strategy spaghetti).
+
+### PM/BA ticket proposals from this review
+
+These were converted into backlog tickets (`T-030`, `T-031`, `T-032`) in `docs/DELIVERY_BOARD.md`:
+
+- `T-030` Universe filter-chain v2 (NFI-style liquidity/spread/age/range/volatility).
+- `T-031` Regime engine v2 (RSI bull/bear + ADX modifiers + risk-linked thresholds).
+- `T-032` Exit manager v2 (supertrend/ATR guard + progressive stop/profit ratchet).
+
+## New review update: `CryptoCurrencyTrader-master` (Feb 16, 2026)
+
+Reference files:
+
+- `references/CryptoCurrencyTrader-master/README.md`
+- `references/CryptoCurrencyTrader-master/data_input_processing.py`
+- `references/CryptoCurrencyTrader-master/machine_learning.py`
+- `references/CryptoCurrencyTrader-master/trading_strategy_fitting.py`
+- `references/CryptoCurrencyTrader-master/strategy_evaluation.py`
+
+License/status:
+
+- Contains `LICENSE` with MIT text, so concept/code reuse is legally possible with attribution.
+- Technical stack is very old (Python 2.7, TensorFlow `contrib`, sklearn 0.18 era, Poloniex wrapper).
+
+What is useful for our ML lane:
+
+- **Fee/spread-aware target labeling**:
+  - target score generation uses `effective_fee = 1 - fee - spread` and only marks opportunities above that threshold.
+  - good concept for our future supervised labels: do not predict raw direction; predict net-tradeable edge.
+- **Two-layer search design**:
+  - first choose model family/preprocessing, then hyperparameter random search.
+  - aligns with our `T-026` offline calibration runner architecture.
+- **Offset-scan robustness check**:
+  - evaluate fitted settings across multiple time offsets to estimate overfitting.
+  - should be added as a mandatory stability gate before promoting tuned parameters.
+- **Cross-market feature stacking**:
+  - combines features from traded pair + reference pair (`ticker_1` + `ticker_2`).
+  - useful for our adaptive shadow features (market context, base/quote dependency).
+
+What we should not copy directly:
+
+- Legacy training/runtime code and dependency stack (not production-safe for our TS/NestJS runtime).
+- Direct strategy execution logic (single-market, simplistic thresholding, high overfit risk).
+- Any assumption that historical “ideal score” can be used online without strict walk-forward controls.
+
+Mapping to current backlog (no new ticket required):
+
+- `T-025` Adaptive confidence shadow model v1:
+  - add net-edge label concept (edge after fee/spread/slippage baseline).
+  - include reference-market context features in shadow telemetry.
+- `T-026` Offline strategy calibration runner:
+  - add meta-search over model/preprocessor choices.
+  - add offset/walk-forward stability criteria as pass/fail gate.
+- `T-007` PnL correctness:
+  - keep priority on fee inclusion so ML labels and realized PnL are consistent.

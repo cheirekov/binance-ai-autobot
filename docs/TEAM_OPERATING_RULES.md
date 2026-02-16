@@ -55,16 +55,33 @@ Companion docs:
 20. Adaptive/AI logic must ship in shadow-first mode unless PM/BA explicitly approves promotion with measurable gates.
 21. Every batch must start by updating `docs/SESSION_BRIEF.md` with active ticket, scope, DoD, KPIs, and stop condition.
 22. Ticket prioritization and DoD must follow `docs/PM_BA_PLAYBOOK.md`; ad-hoc priority decisions are not allowed.
+23. Before coding starts, run `./scripts/pmba-gate.sh start`; if it fails, fix board/session alignment first.
+24. Before handoff, run `./scripts/pmba-gate.sh end`; if it fails, complete missing session evidence first.
+25. Every runtime claim must be evidence-tagged in changelog/summary as one of:
+   - `observed` (from bundle/log/metric),
+   - `inferred` (reasoned from observed data),
+   - `assumption` (not yet verified).
+26. Do not present `assumption` as fact. If verification is required, add a concrete validation step.
+27. No-loop rule: if the same dominant failure reason appears in two consecutive bundles for the same ticket, next patch must include either:
+   - a direct mitigation for that reason, or
+   - explicit ticket pivot/de-scope approved by PM/BA.
+28. WIP limits:
+   - max one `IN_PROGRESS` ticket,
+   - max one active runtime hypothesis per batch.
+29. Each patch must close with a short “what changed / why / expected KPI effect” note.
+30. If context resets, restore from `docs/SESSION_BRIEF.md` + latest `docs/PM_BA_CHANGELOG.md` before new coding.
 
 ## Delivery workflow (mandatory)
 
 1. Update `docs/SESSION_BRIEF.md` (timebox, hypothesis, DoD, KPI targets, stop condition).
 2. Select the next `TODO` ticket in `docs/DELIVERY_BOARD.md` using `docs/PM_BA_PLAYBOOK.md`.
 3. Move it to `IN_PROGRESS` and note date/owner.
-4. Implement code + tests.
-5. Run `docker compose -f docker-compose.ci.yml run --rm ci`.
-6. Add a structured entry in `docs/PM_BA_CHANGELOG.md`.
-7. Mark ticket `DONE` (or `BLOCKED` with reason and next action).
+4. Run `./scripts/pmba-gate.sh start`.
+5. Implement code + tests.
+6. Run `docker compose -f docker-compose.ci.yml run --rm ci`.
+7. Add a structured entry in `docs/PM_BA_CHANGELOG.md`.
+8. Run `./scripts/pmba-gate.sh end`.
+9. Mark ticket `DONE` (or `BLOCKED` with reason and next action).
 
 ## Batch cadence (mandatory)
 

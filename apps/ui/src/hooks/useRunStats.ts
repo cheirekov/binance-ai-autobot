@@ -49,6 +49,17 @@ export type RunStatsSnapshot = {
   generatedAt: string;
   kpi: BaselineRunStats | null;
   adaptiveShadowTail: AdaptiveShadowEvent[];
+  walletPolicy: {
+    observedAt: string;
+    overCap: boolean;
+    unmanagedExposurePct: number;
+    unmanagedExposureCapPct: number;
+    unmanagedNonHomeValue?: number;
+    unmanagedExposureCapHome?: number;
+    category?: string;
+    sourceAsset?: string;
+    reason?: string;
+  } | null;
   notes: {
     activeOrders: string;
   };

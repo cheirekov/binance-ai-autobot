@@ -16,6 +16,118 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-16 19:22 UTC — T-029 wallet policy cap telemetry in dashboard (night-safe)
+- Scope: expose latest wallet-policy exposure/cap telemetry in run-stats and UI without changing execution behavior.
+- BA requirement mapping:
+  - User must see whether unmanaged holdings are above policy cap in plain dashboard status.
+  - Keep night build risk low (observability-only slice).
+- PM milestone mapping: closes the “UI visibility” sub-slice under active `T-029` before final ticket closure.
+- Technical changes:
+  - API run-stats (`apps/api/src/modules/bot/bot-engine.service.ts`):
+    - adds `walletPolicy` snapshot payload (latest `wallet-sweep` decision sample),
+    - reports unmanaged exposure %, cap %, over-cap flag, optional value/cap value, category/source/reason.
+  - UI types (`apps/ui/src/hooks/useRunStats.ts`):
+    - adds `walletPolicy` to `RunStatsSnapshot`.
+  - Dashboard (`apps/ui/src/pages/DashboardPage.tsx`):
+    - renders “Wallet policy (latest telemetry)” pills in Status panel,
+    - shows exposure/cap/over-cap tone + optional values + observed timestamp.
+  - Unit test (`apps/api/src/modules/bot/bot-engine.service.test.ts`):
+    - validates wallet policy snapshot extraction from decision details.
+- Risk slider impact:
+  - none (read-only telemetry surface).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - optional: leave running night bot unchanged; deploy this patch on next run and verify Status shows wallet-policy telemetry once a sweep sample exists.
+- Follow-up:
+  - keep `T-029` in progress for remaining behavior-side closure items; this batch is observability-only.
+
+## 2026-02-16 19:07 UTC — T-033 PM/BA gate automation + anti-loop control
+- Scope: tighten execution discipline to prevent ticket drift, looping patches, and unsupported runtime claims during long multi-session delivery.
+- BA requirement mapping:
+  - Project must run in professional mode with deterministic PM/BA control.
+  - Team should avoid loops/hallucination and keep one clear active lane.
+- PM milestone mapping: process hardening layer added on top of existing board/changelog/brief workflow.
+- Technical changes:
+  - Added `scripts/pmba-gate.sh`:
+    - validates exactly one `IN_PROGRESS` ticket in `docs/DELIVERY_BOARD.md`,
+    - validates `docs/SESSION_BRIEF.md` active ticket alignment,
+    - validates end-of-batch decision/KPI block presence (`end` phase).
+  - Updated `docs/TEAM_OPERATING_RULES.md`:
+    - mandatory gate calls (`start`/`end`),
+    - evidence taxonomy (`observed`/`inferred`/`assumption`),
+    - explicit no-loop escalation rule for repeated dominant failures.
+  - Updated `docs/PM_BA_PLAYBOOK.md`:
+    - added hard anti-loop and anti-hallucination control section.
+  - Updated `docs/DELIVERY_BOARD.md`:
+    - added `T-033` as DONE process ticket.
+- Risk slider impact:
+  - none (process/tooling only).
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start` (pass in current repo state).
+  - `./scripts/pmba-gate.sh end` (pass in current repo state).
+- Runtime test request:
+  - none; this batch changes execution governance, not trading logic.
+- Follow-up:
+  - keep `T-029` as single active delivery lane; apply gate checks on every batch.
+
+## 2026-02-16 19:00 UTC — Reference intake: `CryptoCurrencyTrader-master` (ML lane)
+- Scope: evaluate `references/CryptoCurrencyTrader-master` for reusable ML architecture ideas and map only safe patterns into existing backlog.
+- BA requirement mapping:
+  - Adaptive AUTOBOT should learn from market history with fee-aware logic, not raw price-only labels.
+  - ML path must reduce overfitting risk and remain auditable.
+- PM milestone mapping: supports `T-025` (shadow adaptivity) and `T-026` (offline calibration) without creating a new execution lane.
+- Technical changes:
+  - `docs/REFERENCES_ANALYSIS.md`:
+    - added dedicated review section for `CryptoCurrencyTrader-master`,
+    - extracted reusable concepts:
+      - fee/spread-aware target labeling,
+      - two-layer model+hyperparameter search,
+      - offset-scan robustness validation,
+      - cross-market feature stacking.
+    - documented non-reusable parts (legacy Python 2/TensorFlow contrib runtime).
+  - `docs/DELIVERY_BOARD.md`:
+    - extended `T-026` notes with:
+      - offset/walk-forward stability gate,
+      - model/preprocessor meta-search concept.
+- Risk slider impact:
+  - none in this docs-only intake; implementation impact planned for `T-025`/`T-026`.
+- Validation evidence:
+  - Documentation/backlog update only (no runtime code changes).
+- Runtime test request:
+  - none.
+- Follow-up:
+  - keep single-lane execution on current runtime tickets; apply these ML concepts when `T-025`/`T-026` becomes active.
+
+## 2026-02-16 18:51 UTC — Reference intake: NostalgiaForInfinity + Gekko strategies
+- Scope: analyze newly added reference folders `references/NostalgiaForInfinity-main` and `references/Gekko-Strategies-master`, map reusable strategy patterns to our NestJS/React bot, and convert findings into PM/BA backlog tickets.
+- BA requirement mapping:
+  - Bot must adapt by market regime without symbol hardcoding.
+  - Universe discovery must be explainable and reduce noisy/non-actionable candidates.
+  - Wallet/position handling should reduce bearish bag-holding via adaptive exits, not fixed one-off rules.
+- PM milestone mapping: supports post-`T-029` execution plan for adaptive strategy improvement while keeping single-lane delivery discipline.
+- Technical changes:
+  - `docs/REFERENCES_ANALYSIS.md`:
+    - added license/safety rows for both new references,
+    - added concrete extraction notes:
+      - NFI pairlist/filter pipeline + multi-timeframe context + mode profile patterns,
+      - Gekko regime/ADX-RSI/supertrend/progressive stop concepts,
+      - explicit licensing caveat for mixed Gekko provenance.
+  - `docs/DELIVERY_BOARD.md`:
+    - added new TODO backlog items from this analysis:
+      - `T-030` Universe filter-chain v2,
+      - `T-031` Regime engine v2,
+      - `T-032` Exit manager v2.
+    - updated PM priority order to queue these after active risk/PnL stabilization tickets.
+- Risk slider impact:
+  - Planned by design: all three new tickets are defined as risk-profile-driven defaults with Advanced override support.
+- Validation evidence:
+  - Documentation/backlog update only (no runtime or CI-affecting code changes).
+- Runtime test request:
+  - none for this docs-only batch; keep collecting night-run evidence for open `T-029`.
+- Follow-up:
+  - execute `T-029` closeout first, then start `T-005`/`T-007`; open `T-030` as the next strategy lane once risk/PnL telemetry is stable.
+
 ## 2026-02-16 18:22 UTC — T-029 Grid-wait storm cooldown (night build)
 - Scope: reduce repeated `Grid waiting for ladder slot or inventory` loops by escalating symbol cooldown when the same wait skip repeats in a short window.
 - BA requirement mapping:

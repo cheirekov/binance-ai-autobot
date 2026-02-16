@@ -194,6 +194,17 @@ export type BotRunStatsResponse = {
   generatedAt: string;
   kpi: BaselineRunStats | null;
   adaptiveShadowTail: AdaptiveShadowEvent[];
+  walletPolicy: {
+    observedAt: string;
+    overCap: boolean;
+    unmanagedExposurePct: number;
+    unmanagedExposureCapPct: number;
+    unmanagedNonHomeValue?: number;
+    unmanagedExposureCapHome?: number;
+    category?: string;
+    sourceAsset?: string;
+    reason?: string;
+  } | null;
   notes: {
     activeOrders: string;
   };
@@ -2162,7 +2173,52 @@ export class BotEngineService implements OnModuleInit {
     }
   }
 
+  private readNumericDecisionDetail(details: Record<string, unknown> | undefined, key: string): number | null {
+    const raw = details?.[key];
+    if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+    if (typeof raw === "string") {
+      const parsed = Number.parseFloat(raw);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  }
+
+  private extractWalletPolicySnapshot(state: BotState): BotRunStatsResponse["walletPolicy"] {
+    for (const decision of state.decisions) {
+      if (decision.kind !== "TRADE") continue;
+      const details = decision.details as Record<string, unknown> | undefined;
+      if (typeof details?.mode !== "string" || details.mode !== "wallet-sweep") continue;
+
+      const unmanagedExposurePct = this.readNumericDecisionDetail(details, "unmanagedExposurePct");
+      const unmanagedExposureCapPct = this.readNumericDecisionDetail(details, "unmanagedExposureCapPct");
+      if (unmanagedExposurePct === null || unmanagedExposureCapPct === null) continue;
+
+      const unmanagedNonHomeValue = this.readNumericDecisionDetail(details, "unmanagedNonHomeValue");
+      const unmanagedExposureCapHome = this.readNumericDecisionDetail(details, "unmanagedExposureCapHome");
+      const category = typeof details.category === "string" ? details.category : undefined;
+      const sourceAsset = typeof details.sourceAsset === "string" ? details.sourceAsset : undefined;
+      const reason = typeof details.sweepReason === "string" ? details.sweepReason : undefined;
+
+      return {
+        observedAt: decision.ts,
+        overCap: unmanagedExposurePct > unmanagedExposureCapPct,
+        unmanagedExposurePct: Number(unmanagedExposurePct.toFixed(6)),
+        unmanagedExposureCapPct: Number(unmanagedExposureCapPct.toFixed(6)),
+        ...(unmanagedNonHomeValue === null ? {} : { unmanagedNonHomeValue: Number(unmanagedNonHomeValue.toFixed(6)) }),
+        ...(unmanagedExposureCapHome === null
+          ? {}
+          : { unmanagedExposureCapHome: Number(unmanagedExposureCapHome.toFixed(6)) }),
+        ...(category ? { category } : {}),
+        ...(sourceAsset ? { sourceAsset } : {}),
+        ...(reason ? { reason } : {})
+      };
+    }
+
+    return null;
+  }
+
   getRunStats(): BotRunStatsResponse {
+    const state = this.getState();
     let kpi: BaselineRunStats | null = null;
     if (fs.existsSync(this.baselineStatsPath)) {
       try {
@@ -2172,7 +2228,7 @@ export class BotEngineService implements OnModuleInit {
         kpi = null;
       }
     } else {
-      this.persistBaselineStats(this.getState());
+      this.persistBaselineStats(state);
       if (fs.existsSync(this.baselineStatsPath)) {
         try {
           const raw = fs.readFileSync(this.baselineStatsPath, "utf-8");
@@ -2187,6 +2243,7 @@ export class BotEngineService implements OnModuleInit {
       generatedAt: new Date().toISOString(),
       kpi,
       adaptiveShadowTail: this.readAdaptiveShadowTail(200),
+      walletPolicy: this.extractWalletPolicySnapshot(state),
       notes: {
         activeOrders:
           "SPOT mode uses MARKET execution (active may stay 0). SPOT_GRID keeps resting LIMIT orders, so active orders should be visible."

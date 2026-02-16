@@ -133,6 +133,45 @@ describe("bot-engine insufficient-balance helpers", () => {
     const key = helpers.getSkipStormKey("Skip XRPUSDC: Grid waiting for ladder slot or inventory");
     expect(key).toBe("skip xrpusdc: grid waiting for ladder slot or inventory");
   });
+
+  it("extracts wallet policy snapshot from latest wallet-sweep decision", () => {
+    const helpers = service as unknown as {
+      extractWalletPolicySnapshot: (state: BotState) => {
+        observedAt: string;
+        overCap: boolean;
+        unmanagedExposurePct: number;
+        unmanagedExposureCapPct: number;
+        category?: string;
+      } | null;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "trade-1",
+          ts: "2026-02-16T18:00:00.000Z",
+          kind: "TRADE",
+          summary: "wallet-sweep sample",
+          details: {
+            mode: "wallet-sweep",
+            unmanagedExposurePct: 31.25,
+            unmanagedExposureCapPct: 25,
+            category: "rebalance",
+            sourceAsset: "XRP"
+          }
+        }
+      ]
+    };
+
+    const snapshot = helpers.extractWalletPolicySnapshot(state);
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.observedAt).toBe("2026-02-16T18:00:00.000Z");
+    expect(snapshot?.overCap).toBe(true);
+    expect(snapshot?.unmanagedExposurePct).toBe(31.25);
+    expect(snapshot?.unmanagedExposureCapPct).toBe(25);
+    expect(snapshot?.category).toBe("rebalance");
+  });
 });
 
 describe("bot-engine ownership detection", () => {
