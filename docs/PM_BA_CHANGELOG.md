@@ -16,6 +16,43 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-17 11:45 UTC — T-029 adaptive anti-loop slice (grid feasibility + cooldown escalation)
+- Scope: reduce persistent skip loops (`minQty`/`minNotional`, fee-edge churn, max-open-position repeats) without symbol hardcoding or market-specific constants.
+- BA requirement mapping:
+  - Bot should adapt to non-actionable symbols and rotate candidates automatically.
+  - Risk slider high mode should stay active while avoiding dead-loop cycle waste.
+- PM milestone mapping: `T-029` behavior-side closure progress before moving to `T-005/T-007`.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added adaptive cooldown helpers:
+      - `deriveFeeEdgeCooldownMs(...)`,
+      - `deriveGridSizingRejectCooldownMs(...)`,
+      - `countRecentSymbolSkipMatches(...)`.
+    - extended skip-storm key coverage:
+      - `Fee/edge filter`,
+      - `Max open positions reached`.
+    - improved grid candidate selection in `SPOT_GRID`:
+      - pre-filters when open-position cap is already reached (avoid selecting new-position symbols),
+      - uses recent per-symbol reject counts (buy/sell sizing, fee-edge) as dynamic actionability penalties,
+      - suppresses legs when reject storm persists (time-window based, not hardcoded by symbol),
+      - checks likely sell-leg feasibility from exchange filters (minQty/minNotional) using symbol rules.
+    - adds cooldown locks for:
+      - max-open-position skips,
+      - fee/edge filter skips.
+    - escalates grid buy/sell sizing reject cooldowns with side-aware adaptive windows (longer for persistent sell-side dust rejects).
+- Risk slider impact:
+  - preserved and wired: cooldown windows scale by risk (higher risk still faster, but rejects now get stronger rotation to reduce waste).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - 1–2h run check:
+    - lower `% sizing rejects`,
+    - fewer repeated `DOGE/SUI/... minQty` storms,
+    - fewer `Max open positions reached` repeats,
+    - stable trade cadence with active LIMIT lifecycle.
+- Follow-up:
+  - keep `T-029` open for long-run evidence and wallet-exposure behavior tuning; next default lane remains `T-005` after closure criteria are met.
+
 ## 2026-02-17 03:55 UTC — T-016 feedback bundle hardening (compose v1/v2 + log-tail fallback)
 - Scope: fix missing `meta/docker-api-tail.log` and `meta/docker-ui-tail.log` in support bundles when collection runs on hosts without active compose services (common remote-copy workflow).
 - BA requirement mapping:

@@ -409,6 +409,60 @@ export class BotEngineService implements OnModuleInit {
     return Math.round(90_000 - t * 75_000); // 90s -> 15s
   }
 
+  private deriveFeeEdgeCooldownMs(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const t = boundedRisk / 100;
+    // Fee/edge skips can persist for long periods on low-vol symbols.
+    // Cool down modestly to encourage rotation, but keep recovery quick in higher risk profiles.
+    return Math.round(240_000 - t * 150_000); // 240s -> 90s
+  }
+
+  private deriveGridSizingRejectCooldownMs(params: { risk: number; side: "BUY" | "SELL"; reason?: string }): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const t = boundedRisk / 100;
+    const reason = (params.reason ?? "").toLowerCase();
+    const floorReject =
+      reason.includes("minqty") ||
+      reason.includes("minnotional") ||
+      reason.includes("notional") ||
+      reason.includes("lot_size");
+
+    if (params.side === "SELL" && floorReject) {
+      // Sell-side floor rejects on tiny inventory ("dust") are usually persistent; rotate away longer.
+      return Math.round((45 - t * 30) * 60_000); // 45m -> 15m
+    }
+    if (params.side === "BUY" && floorReject) {
+      // Buy-side floor rejects can recover sooner as quote/mode changes.
+      return Math.round((20 - t * 12) * 60_000); // 20m -> 8m
+    }
+    return Math.round((8 - t * 5) * 60_000); // 8m -> 3m
+  }
+
+  private countRecentSymbolSkipMatches(params: {
+    state: BotState;
+    symbol: string;
+    contains: string;
+    windowMs: number;
+  }): number {
+    const symbol = params.symbol.trim().toUpperCase();
+    const needle = params.contains.trim().toLowerCase();
+    if (!symbol || !needle) return 0;
+
+    const nowMs = Date.now();
+    let count = 0;
+    for (const decision of params.state.decisions) {
+      if (decision.kind !== "SKIP") continue;
+      const ts = Date.parse(decision.ts);
+      if (Number.isFinite(ts) && nowMs - ts > params.windowMs) break;
+
+      const summary = decision.summary.trim();
+      if (!summary.toUpperCase().startsWith(`SKIP ${symbol}:`)) continue;
+      if (!summary.toLowerCase().includes(needle)) continue;
+      count += 1;
+    }
+    return count;
+  }
+
   private getSkipStormKey(summary: string): string | null {
     const raw = summary.trim();
     if (!raw) return null;
@@ -424,6 +478,8 @@ export class BotEngineService implements OnModuleInit {
       key.includes("binance sizing filter") ||
       key.includes("temporarily blacklisted") ||
       key.includes("waiting for ladder slot or inventory") ||
+      key.includes("fee/edge filter") ||
+      key.includes("max open positions reached") ||
       key.includes("no feasible candidates") ||
       key.includes("invalid");
     return eligible ? key : null;
@@ -2507,6 +2563,11 @@ export class BotEngineService implements OnModuleInit {
 
           const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(boundedRisk / 25)));
           const positions = tradeMode === "SPOT_GRID" ? this.getManagedPositions(current) : null;
+          const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
+          const openHomePositionCount =
+            positions?.size && tradeMode === "SPOT_GRID"
+              ? [...positions.values()].filter((position) => position.netQty > 0 && position.symbol.endsWith(homeStable)).length
+              : 0;
           let bestGridCandidate: { symbol: string; candidate: UniverseCandidate; score: number } | null = null;
           let firstEligibleGridCandidate: { symbol: string; candidate: UniverseCandidate } | null = null;
 
@@ -2572,23 +2633,90 @@ export class BotEngineService implements OnModuleInit {
 
               const netQty = positions?.get(symbol)?.netQty ?? 0;
               const hasInventory = Number.isFinite(netQty) && netQty > 0;
+              const openPositionCapReached = openHomePositionCount >= maxOpenPositions;
+              if (openPositionCapReached && !hasInventory) {
+                continue;
+              }
+
+              const recentGridBuySizingRejects = this.countRecentSymbolSkipMatches({
+                state: current,
+                symbol,
+                contains: "grid buy sizing rejected",
+                windowMs: 15 * 60_000
+              });
+              const recentGridSellSizingRejects = this.countRecentSymbolSkipMatches({
+                state: current,
+                symbol,
+                contains: "grid sell sizing rejected",
+                windowMs: 15 * 60_000
+              });
+              const recentFeeEdgeRejects = this.countRecentSymbolSkipMatches({
+                state: current,
+                symbol,
+                contains: "fee/edge filter",
+                windowMs: 15 * 60_000
+              });
+              const sizingRejectThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
+              const suppressBuyLegFromRejectStorm = recentGridBuySizingRejects >= sizingRejectThreshold;
+              const suppressSellLegFromRejectStorm = recentGridSellSizingRejects >= sizingRejectThreshold;
+
+              let sellLegLikelyFeasible = !hasInventory;
+              if (!hasSellLimit && hasInventory) {
+                sellLegLikelyFeasible = true;
+                try {
+                  const rules = await this.marketData.getSymbolRules(symbol);
+                  const minQtyRaw = rules.lotSize?.minQty ?? rules.marketLotSize?.minQty;
+                  const stepRaw = rules.lotSize?.stepSize ?? rules.marketLotSize?.stepSize;
+                  const minQty = typeof minQtyRaw === "string" ? Number.parseFloat(minQtyRaw) : Number.NaN;
+                  const step = typeof stepRaw === "string" ? Number.parseFloat(stepRaw) : Number.NaN;
+                  let normalizedSellQty = netQty;
+                  if (Number.isFinite(step) && step > 0) {
+                    normalizedSellQty = Math.floor((normalizedSellQty + 1e-12) / step) * step;
+                  }
+                  const minNotional = typeof rules.notional?.minNotional === "string" ? Number.parseFloat(rules.notional.minNotional) : Number.NaN;
+                  const candidatePrice = Number.isFinite(candidate.lastPrice) ? candidate.lastPrice : Number.NaN;
+                  const estimatedNotional =
+                    Number.isFinite(candidatePrice) && candidatePrice > 0 ? normalizedSellQty * candidatePrice : Number.NaN;
+                  if (Number.isFinite(minQty) && normalizedSellQty + 1e-12 < minQty) {
+                    sellLegLikelyFeasible = false;
+                  } else if (Number.isFinite(minNotional) && Number.isFinite(estimatedNotional) && estimatedNotional + 1e-8 < minNotional) {
+                    sellLegLikelyFeasible = false;
+                  }
+                } catch {
+                  // keep current estimate if rules are temporarily unavailable
+                }
+              }
 
               if (!firstEligibleGridCandidate) {
                 firstEligibleGridCandidate = { symbol, candidate };
               }
 
-              const missingBuyLeg = !hasBuyLimit && !buyPaused;
-              const missingSellLeg = !hasSellLimit && hasInventory;
+              const missingBuyLeg =
+                !hasBuyLimit && !buyPaused && !suppressBuyLegFromRejectStorm && (!openPositionCapReached || hasInventory);
+              const missingSellLeg = !hasSellLimit && hasInventory && sellLegLikelyFeasible && !suppressSellLegFromRejectStorm;
               const canTakeAction = missingBuyLeg || missingSellLeg;
 
               const waiting = hasBuyLimit && hasSellLimit;
               const waitingPenalty = waiting ? 0.3 : 0;
               const guardNoInventoryPenalty = buyPaused && !hasInventory ? 0.45 : 0;
               const openLimitPenalty = Math.min(0.2, (openLimitCount / Math.max(1, maxGridOrdersPerSymbol)) * 0.2);
+              const rejectPenalty = Math.min(
+                0.55,
+                recentGridBuySizingRejects * 0.06 + recentGridSellSizingRejects * 0.08 + recentFeeEdgeRejects * 0.04
+              );
+              const infeasibleSellPenalty = !sellLegLikelyFeasible && hasInventory ? 0.35 : 0;
 
               const actionability = canTakeAction ? 1 : waiting ? 0.05 : 0.3;
               const recommendedBonus = scores.recommended === "GRID" ? 0.15 : scores.recommended === "MEAN_REVERSION" ? 0.05 : 0;
-              const score = scores.grid * 1.2 + actionability * 0.8 + recommendedBonus - waitingPenalty - guardNoInventoryPenalty - openLimitPenalty;
+              const score =
+                scores.grid * 1.2 +
+                actionability * 0.8 +
+                recommendedBonus -
+                waitingPenalty -
+                guardNoInventoryPenalty -
+                openLimitPenalty -
+                rejectPenalty -
+                infeasibleSellPenalty;
 
               if (!bestGridCandidate || score > bestGridCandidate.score) {
                 bestGridCandidate = { symbol, candidate, score };
@@ -3505,6 +3633,9 @@ export class BotEngineService implements OnModuleInit {
 
           if (managedOpenHomeSymbols.length >= maxOpenPositions && !candidateIsOpen) {
             const summary = `Skip ${candidateSymbol}: Max open positions reached (${maxOpenPositions})`;
+            const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), 60_000);
+            const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
+            const cooldownMs = cooldown.cooldownMs;
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
             const next = {
               ...current,
@@ -3520,14 +3651,32 @@ export class BotEngineService implements OnModuleInit {
                       summary,
                       details: {
                         openPositions: managedOpenHomeSymbols.length,
-                        maxOpenPositions
+                        maxOpenPositions,
+                        cooldownMs,
+                        ...(cooldown.storm ? { storm: cooldown.storm } : {})
                       }
                     },
                     ...current.decisions
                   ].slice(0, 200),
               lastError: undefined
             } satisfies BotState;
-            this.save(next);
+            const nextWithCooldown = this.upsertProtectionLock(next, {
+              type: "COOLDOWN",
+              scope: "SYMBOL",
+              symbol: candidateSymbol,
+              reason: cooldown.storm
+                ? `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`
+                : `Cooldown after max-open-position skip (${Math.round(cooldownMs / 1000)}s)`,
+              expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+              details: {
+                category: "MAX_OPEN_POSITIONS",
+                openPositions: managedOpenHomeSymbols.length,
+                maxOpenPositions,
+                cooldownMs,
+                ...(cooldown.storm ? { storm: cooldown.storm } : {})
+              }
+            });
+            this.save(nextWithCooldown);
             return;
           }
 
@@ -3547,6 +3696,9 @@ export class BotEngineService implements OnModuleInit {
             const netEdgePct = (estimatedEdgePct ?? 0) - roundTripCostPct;
             if (netEdgePct < riskAdjustedMinNetEdgePct) {
               const summary = `Skip ${candidateSymbol}: Fee/edge filter (net ${netEdgePct.toFixed(3)}% < ${riskAdjustedMinNetEdgePct.toFixed(3)}%)`;
+              const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveFeeEdgeCooldownMs(risk));
+              const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
+              const cooldownMs = cooldown.cooldownMs;
               const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
               const next = {
                 ...current,
@@ -3570,14 +3722,32 @@ export class BotEngineService implements OnModuleInit {
                           rsi14: selectedCandidate?.rsi14,
                           adx14: selectedCandidate?.adx14,
                           atrPct14: selectedCandidate?.atrPct14,
-                          score: selectedCandidate?.score
+                          score: selectedCandidate?.score,
+                          cooldownMs,
+                          ...(cooldown.storm ? { storm: cooldown.storm } : {})
                         }
                       },
                       ...current.decisions
                     ].slice(0, 200),
                 lastError: undefined
               } satisfies BotState;
-              this.save(next);
+              const nextWithCooldown = this.upsertProtectionLock(next, {
+                type: "COOLDOWN",
+                scope: "SYMBOL",
+                symbol: candidateSymbol,
+                reason: cooldown.storm
+                  ? `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`
+                  : `Cooldown after fee/edge filter (${Math.round(cooldownMs / 1000)}s)`,
+                expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                details: {
+                  category: "FEE_EDGE_FILTER",
+                  cooldownMs,
+                  netEdgePct: Number(netEdgePct.toFixed(6)),
+                  minNetEdgePct: Number(riskAdjustedMinNetEdgePct.toFixed(6)),
+                  ...(cooldown.storm ? { storm: cooldown.storm } : {})
+                }
+              });
+              this.save(nextWithCooldown);
               return;
             }
           }
@@ -4455,7 +4625,10 @@ export class BotEngineService implements OnModuleInit {
                 }
               } else if (buyCheck.reason) {
                 const summary = `Skip ${candidateSymbol}: Grid buy sizing rejected (${buyCheck.reason})`;
-                const baseCooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
+                const baseCooldownMs = Math.max(
+                  this.deriveNoActionSymbolCooldownMs(risk),
+                  this.deriveGridSizingRejectCooldownMs({ risk, side: "BUY", reason: buyCheck.reason })
+                );
                 const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
                 const cooldownMs = cooldown.cooldownMs;
                 const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
@@ -4600,7 +4773,10 @@ export class BotEngineService implements OnModuleInit {
                   }
                 } else if (sellCheck.reason) {
                   const summary = `Skip ${candidateSymbol}: Grid sell sizing rejected (${sellCheck.reason})`;
-                  const baseCooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
+                  const baseCooldownMs = Math.max(
+                    this.deriveNoActionSymbolCooldownMs(risk),
+                    this.deriveGridSizingRejectCooldownMs({ risk, side: "SELL", reason: sellCheck.reason })
+                  );
                   const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
                   const cooldownMs = cooldown.cooldownMs;
                   const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
