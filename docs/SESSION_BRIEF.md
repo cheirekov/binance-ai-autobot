@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-16 18:23 UTC
+Last updated: 2026-02-17 03:32 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -69,15 +69,16 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-  - CI status: `green`
-  - analyzed run (`autobot-feedback-20260216-181631.tgz`) showed dominant wait-loop skip concentration (`XRPUSDC`), now patched with storm cooldown rotation.
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=17, historyLimitOrders=191, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=4.5%)
+  - sizing reject pressure: `medium` (sizingRejectSkips=48, decisions=200, ratio=24.0%)
 - Decision: `continue`
-- Next ticket candidate: `T-029` (overnight verify loop suppression)
+- Next ticket candidate: `T-007` (if lifecycle remains stable)
 - Open risks:
-  - verify rotation cooldown does not over-throttle symbols during healthy ladder waiting periods.
+  - sizing reject pressure is medium (24.0%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260216-181631.tgz`
-  - night build focus: confirm lower repeated wait-skip clusters and improved symbol rotation.
+  - bundle: `autobot-feedback-20260217-033237.tgz`
+  - auto-updated at: `2026-02-17T03:32:43.817Z`
 
 ## 5) Copy/paste prompt for next session
 

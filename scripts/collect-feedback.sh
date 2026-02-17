@@ -134,8 +134,39 @@ fi
 } >"$TMP_DIR/meta/info.txt"
 
 "${COMPOSE[@]}" ps >"$TMP_DIR/meta/docker-compose-ps.txt" 2>&1 || true
-"${COMPOSE[@]}" logs --no-color --tail=500 api >"$TMP_DIR/meta/docker-api-tail.log" 2>&1 || true
-"${COMPOSE[@]}" logs --no-color --tail=500 ui >"$TMP_DIR/meta/docker-ui-tail.log" 2>&1 || true
+
+compose_services_running=0
+if awk 'NR>1 && NF>0 { found=1 } END { exit(found?0:1) }' "$TMP_DIR/meta/docker-compose-ps.txt"; then
+  compose_services_running=1
+fi
+
+write_service_tail() {
+  local service="$1"
+  local out_file="$2"
+  local fallback_file="$3"
+  local header="[$service tail]"
+
+  if [[ "$compose_services_running" -eq 1 ]]; then
+    "${COMPOSE[@]}" logs --no-color --tail=500 "$service" >"$out_file" 2>&1 || true
+  fi
+
+  if [[ -s "$out_file" ]]; then
+    return
+  fi
+
+  {
+    echo "$header compose logs unavailable in this environment."
+    if [[ -f "$fallback_file" ]]; then
+      echo "$header fallback from $fallback_file"
+      tail -n 500 "$fallback_file"
+    else
+      echo "$header no fallback file found."
+    fi
+  } >"$out_file"
+}
+
+write_service_tail "api" "$TMP_DIR/meta/docker-api-tail.log" "data/logs/api.log"
+write_service_tail "ui" "$TMP_DIR/meta/docker-ui-tail.log" "data/logs/ui.log"
 
 if [[ -f "data/state.json" ]] && command -v node >/dev/null 2>&1; then
   node - <<'NODE' >"$TMP_DIR/meta/state-summary.txt" 2>/dev/null || true

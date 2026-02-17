@@ -16,6 +16,30 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-17 03:55 UTC — T-016 feedback bundle hardening (compose v1/v2 + log-tail fallback)
+- Scope: fix missing `meta/docker-api-tail.log` and `meta/docker-ui-tail.log` in support bundles when collection runs on hosts without active compose services (common remote-copy workflow).
+- BA requirement mapping:
+  - Runtime evidence bundles must be complete and reviewable every session.
+  - Must support mixed infra (`docker compose` v2 and `docker-compose` v1) without manual script rewrites.
+- PM milestone mapping: improves telemetry/support-loop reliability while `T-029` remains active.
+- Technical changes:
+  - `scripts/collect-feedback.sh`:
+    - detects whether compose services are actually running from `compose ps` output,
+    - keeps compose log capture when services exist,
+    - adds fallback tails when compose logs are unavailable:
+      - API fallback: `data/logs/api.log`,
+      - UI fallback: `data/logs/ui.log` (if present),
+    - writes explicit note into tail files when fallback path is used.
+- Risk slider impact:
+  - none (tooling only).
+- Validation evidence:
+  - `bash -n scripts/collect-feedback.sh scripts/run-batch.sh scripts/update-session-brief.sh` ✅
+  - local dry run produced non-empty `meta/docker-api-tail.log` with fallback marker.
+- Runtime test request:
+  - next remote bundle should include non-empty API tail even when compose containers are not running on collector host.
+- Follow-up:
+  - keep this as a support-ops improvement; no trading behavior changed.
+
 ## 2026-02-16 19:22 UTC — T-029 wallet policy cap telemetry in dashboard (night-safe)
 - Scope: expose latest wallet-policy exposure/cap telemetry in run-stats and UI without changing execution behavior.
 - BA requirement mapping:
