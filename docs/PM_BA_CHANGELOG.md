@@ -16,6 +16,32 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-17 18:40 UTC — T-029 night build: pre-check loop fix + guard-no-action candidate filter
+- Scope: remove a high-frequency false skip loop and reduce non-actionable candidate picks before night run.
+- BA requirement mapping:
+  - Bot should adapt/rotate when a symbol is temporarily non-actionable (`buyPaused` + no inventory) instead of repeatedly selecting it.
+  - Avoid false insufficient-balance loops from quantity normalization edge cases.
+- PM milestone mapping: short pre-night stabilization slice after `autobot-feedback-20260217-180331.tgz` showed repeated `PAXGUSDC` guard skips and `position-exit-market-sell pre-check insufficient` churn.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - in `SPOT_GRID` candidate ranking, skip symbols that are guard-paused with no inventory and no existing ladder legs (`buyPaused && !hasInventory && !hasBuyLimit && !hasSellLimit`), so the engine rotates to actionable candidates.
+  - `apps/api/src/modules/integrations/binance-market-data.service.ts`:
+    - fixed market qty normalization to avoid rounding up integer-step quantities:
+      - `validateMarketOrderQty` now uses `desiredQty.toFixed(decimals + 8)` before truncation/step normalization.
+    - this prevents cases like `13962.8717` becoming `13963` and then failing pre-check balance.
+  - `apps/api/src/modules/integrations/binance-market-data.service.test.ts`:
+    - added regression tests for integer-step quantity flooring in market and limit validation paths.
+- Risk slider impact:
+  - none to policy formulas; behavior improvement is deterministic across risk levels.
+- Validation evidence:
+  - `docker-compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - night run should show reduced repeats of:
+    - `Grid guard paused BUY leg` / `Grid guard active (no inventory to sell)` on the same symbol,
+    - `position-exit-market-sell pre-check insufficient ...` when shortfall is tiny.
+- Follow-up:
+  - if guard-no-action still dominates, next slice should add explicit candidate-level actionability counters to run-stats for PM/BA visibility.
+
 ## 2026-02-17 16:25 UTC — T-029 grid-wait storm tuning (high-risk anti-stall)
 - Scope: reduce candidate starvation from overly aggressive `GRID_WAIT_ROTATE` storms while keeping anti-loop protection.
 - BA requirement mapping:

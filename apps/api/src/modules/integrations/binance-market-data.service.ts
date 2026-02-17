@@ -435,7 +435,7 @@ export class BinanceMarketDataService {
     const stepInt = toScaledInt(lot.stepSize, decimals);
     const minQtyInt = toScaledInt(lot.minQty, decimals);
 
-    const desiredQtyFixed = desiredQty.toFixed(decimals);
+    const desiredQtyFixed = desiredQty.toFixed(decimals + 8);
     let qtyInt = toScaledInt(desiredQtyFixed, decimals);
 
     if (qtyInt < minQtyInt) {

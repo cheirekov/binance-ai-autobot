@@ -2891,14 +2891,18 @@ export class BotEngineService implements OnModuleInit {
                 continue;
               }
 
-              if (!firstEligibleGridCandidate) {
-                firstEligibleGridCandidate = { symbol, candidate };
-              }
-
               const missingBuyLeg =
                 !hasBuyLimit && !buyPaused && !suppressBuyLegFromRejectStorm && (!openPositionCapReached || hasInventory);
               const missingSellLeg = !hasSellLimit && hasInventory && sellLegLikelyFeasible && !suppressSellLegFromRejectStorm;
               const canTakeAction = missingBuyLeg || missingSellLeg;
+              const hasGuardNoInventoryNoLadder = buyPaused && !hasInventory && !hasBuyLimit && !hasSellLimit;
+              if (hasGuardNoInventoryNoLadder) {
+                continue;
+              }
+
+              if (canTakeAction && !firstEligibleGridCandidate) {
+                firstEligibleGridCandidate = { symbol, candidate };
+              }
 
               const waiting = hasBuyLimit && hasSellLimit;
               const waitingPenalty = waiting ? 0.3 : 0;
