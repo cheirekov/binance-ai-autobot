@@ -650,9 +650,14 @@ export class BotEngineService implements OnModuleInit {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
     const t = boundedRisk / 100;
     const nowMs = Date.now();
-    const windowMs = 2 * 60_000;
-    const threshold = Math.max(2, Math.round(4 - t * 2)); // risk 0 -> 4, risk 100 -> 2
-    const stormCooldownMs = Math.round(60_000 + t * 180_000); // risk 0 -> 60s, risk 100 -> 240s
+    const isGridWaitKey = key.includes("grid waiting for ladder slot or inventory");
+    const windowMs = isGridWaitKey ? 3 * 60_000 : 2 * 60_000;
+    const threshold = isGridWaitKey
+      ? Math.max(3, Math.round(5 - t * 2)) // risk 0 -> 5, risk 100 -> 3
+      : Math.max(2, Math.round(4 - t * 2)); // risk 0 -> 4, risk 100 -> 2
+    const stormCooldownMs = isGridWaitKey
+      ? Math.round(90_000 + t * 60_000) // risk 0 -> 90s, risk 100 -> 150s
+      : Math.round(60_000 + t * 180_000); // risk 0 -> 60s, risk 100 -> 240s
 
     let recent = 0;
     for (const d of params.state.decisions) {

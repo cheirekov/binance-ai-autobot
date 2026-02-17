@@ -134,6 +134,63 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(key).toBe("skip xrpusdc: grid waiting for ladder slot or inventory");
   });
 
+  it("uses gentler skip-storm trigger for grid waiting loops", () => {
+    const helpers = service as unknown as {
+      deriveInfeasibleSymbolCooldown: (params: {
+        state: BotState;
+        symbol: string;
+        risk: number;
+        baseCooldownMs: number;
+        summary: string;
+      }) => { cooldownMs: number; storm?: { threshold: number } };
+    };
+
+    const summary = "Skip XRPUSDC: Grid waiting for ladder slot or inventory";
+    const now = Date.now();
+    const oneRecentState: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "wait-1",
+          ts: new Date(now - 20_000).toISOString(),
+          kind: "SKIP",
+          summary
+        }
+      ]
+    };
+
+    const withOneRecent = helpers.deriveInfeasibleSymbolCooldown({
+      state: oneRecentState,
+      symbol: "XRPUSDC",
+      risk: 100,
+      baseCooldownMs: 60_000,
+      summary
+    });
+    expect(withOneRecent.storm).toBeUndefined();
+
+    const twoRecentState: BotState = {
+      ...oneRecentState,
+      decisions: [
+        ...oneRecentState.decisions,
+        {
+          id: "wait-2",
+          ts: new Date(now - 40_000).toISOString(),
+          kind: "SKIP",
+          summary
+        }
+      ]
+    };
+    const withTwoRecent = helpers.deriveInfeasibleSymbolCooldown({
+      state: twoRecentState,
+      symbol: "XRPUSDC",
+      risk: 100,
+      baseCooldownMs: 60_000,
+      summary
+    });
+    expect(withTwoRecent.storm?.threshold).toBe(3);
+    expect(withTwoRecent.cooldownMs).toBeGreaterThanOrEqual(150_000);
+  });
+
   it("classifies skip reason clusters for KPI counters", () => {
     const helpers = service as unknown as {
       classifySkipReasonCluster: (summary: string) => "FEE_EDGE" | "MIN_ORDER" | "INVENTORY_WAITING" | "OTHER";

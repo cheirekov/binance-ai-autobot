@@ -16,6 +16,30 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-17 16:25 UTC — T-029 grid-wait storm tuning (high-risk anti-stall)
+- Scope: reduce candidate starvation from overly aggressive `GRID_WAIT_ROTATE` storms while keeping anti-loop protection.
+- BA requirement mapping:
+  - Bot should continue rotating/trading in high-risk mode instead of entering long no-feasible phases.
+  - Keep behavior adaptive without symbol hardcoding.
+- PM milestone mapping: short-run tuning slice for the next 1–2h validation before night build.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - tuned `deriveInfeasibleSymbolCooldown(...)` for `Grid waiting for ladder slot or inventory` keys:
+      - wider storm window (`3m`),
+      - higher storm threshold (`5→3` across risk, instead of `4→2`),
+      - shorter storm cooldown (`90s→150s`, instead of up to `240s`).
+    - non-wait skip families keep previous storm policy.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added coverage proving one recent wait skip no longer triggers storm at risk=100; two recent skips do trigger (threshold=3 including current).
+- Risk slider impact:
+  - explicit: high risk still reacts quickly, but grid-wait rotation is less punitive to avoid over-locking the candidate universe.
+- Validation evidence:
+  - `docker-compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - 1–2h run: expect fewer `Skip: No feasible candidates after policy/exposure filters` bursts and less prolonged symbol lockout while retaining loop control.
+- Follow-up:
+  - if wait/no-feasible remains dominant overnight, next slice should add “soft bypass when all candidates are wait-locked” (without disabling hard risk/protection locks).
+
 ## 2026-02-17 13:55 UTC — T-029 reason-quarantine + KPI reason clusters
 - Scope: reduce repeated skip churn by adding reason-level quarantine and make dominant skip families visible in UI KPIs.
 - BA requirement mapping:

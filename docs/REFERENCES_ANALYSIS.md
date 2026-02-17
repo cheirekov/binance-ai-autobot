@@ -16,6 +16,7 @@ This repo now contains several third‑party codebases under `references/` for *
 | `references/Gekko-Strategies-master` | Mixed Gekko community strategy collection | JavaScript | **No top-level license**; mixed per-file headers (many CC‑BY‑SA / source links) | **No direct copying** until per-file license provenance is normalized |
 | `references/jesse-master` | Jesse algo trading framework | Python | **MIT** (`LICENSE`) | Yes (with attribution) |
 | `references/ccxt-master` | CCXT multi‑exchange trading API | JS/TS/Python/etc | **MIT** (`LICENSE.txt`) | Prefer using the published `ccxt` package; copying is allowed with attribution |
+| `references/Crypto-Signal-master` | Indicator-scan + notifier bot (multi-exchange) | Python | **MIT** (`LICENSE`) | Yes (with attribution), but better to port architecture patterns than copy files |
 | `references/crypto-trading-open-main` | Multi‑exchange trading system (grid/arbitrage/etc) | Python | **No license file found** (author permission required) | Only if the author explicitly grants permission; recommended to add a license file before redistribution |
 
 ### Notes on `crypto-trading-open-main` (friend project)
@@ -651,3 +652,51 @@ Mapping to current backlog (no new ticket required):
   - add offset/walk-forward stability criteria as pass/fail gate.
 - `T-007` PnL correctness:
   - keep priority on fee inclusion so ML labels and realized PnL are consistent.
+
+## New review update: `Crypto-Signal-master` (Feb 17, 2026)
+
+Reference files:
+
+- `references/Crypto-Signal-master/LICENSE`
+- `references/Crypto-Signal-master/app/analysis.py`
+- `references/Crypto-Signal-master/app/behaviour.py`
+- `references/Crypto-Signal-master/app/exchange.py`
+- `references/Crypto-Signal-master/app/notification.py`
+- `references/Crypto-Signal-master/app/defaults.yml`
+- `references/Crypto-Signal-master/docs/config.md`
+
+License/status:
+
+- MIT license is present (`references/Crypto-Signal-master/LICENSE`), so reuse is legally possible with attribution.
+- Project focus is signal generation + notifications; it is not a full execution/risk engine.
+
+Patterns we should port (not copy verbatim):
+
+- **Analyzer registry pattern**:
+  - dynamic dispatchers for indicators/informants/crossovers (`analysis.py`) keep strategy modules composable.
+  - useful for our planned strategy plugin lane (clear separation between feature providers and decision logic).
+- **Per-timeframe historical cache in one scan cycle**:
+  - `behaviour.py` caches OHLCV per candle period while evaluating many analyzers for one pair.
+  - we should apply the same approach in universe/regime scoring to reduce duplicate market-data calls.
+- **CCXT reliability basics**:
+  - `exchange.py` uses `enableRateLimit`, retry on network errors (`tenacity`), and timeframe capability checks before querying.
+  - aligns with our anti-loop/noise goals; helps reduce transient-error churn in scans.
+- **Alert de-dup policy**:
+  - `notification.py` stores previous status and supports `alert_frequency: once` to suppress repeated same-state alerts.
+  - directly useful for our decision-stream hygiene (same family as skip-storm throttling, but for outbound alerts/events).
+- **Config-driven indicator matrix**:
+  - `defaults.yml` + `docs/config.md` define analyzer thresholds and frequencies as data, not hardcoded logic.
+  - relevant for our Advanced/Expert strategy tuning model.
+
+What is less useful / should not drive core design:
+
+- no portfolio/account risk framework (drawdown governor, exposure caps, inventory policy),
+- no true order lifecycle for grid inventory management,
+- no PnL reconciliation model suitable for live autonomous trading.
+
+Mapping to our backlog:
+
+- `T-029` (current): can borrow alert-like dedup ideas for remaining loop/noise suppression.
+- `T-030`: reinforce staged filter/analyzer pipeline with reusable registry style.
+- `T-025`: reuse notifier dedup pattern for adaptive-policy event emission.
+- `T-028`: use config-as-data style to keep Advanced/Expert strategy settings structured and less hardcoded.
