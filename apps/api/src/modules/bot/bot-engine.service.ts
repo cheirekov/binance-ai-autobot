@@ -135,9 +135,15 @@ type BaselineRunStats = {
     conversions: number;
     entryTrades: number;
     sizingRejectSkips: number;
+    feeEdgeSkips: number;
+    minOrderSkips: number;
+    inventoryWaitingSkips: number;
     conversionTradePct: number;
     entryTradePct: number;
     sizingRejectSkipPct: number;
+    feeEdgeSkipPct: number;
+    minOrderSkipPct: number;
+    inventoryWaitingSkipPct: number;
     buyNotional: number;
     sellNotional: number;
     realizedPnl: number;
@@ -189,6 +195,8 @@ type ProtectionPolicy = {
   lowProfitThresholdPct: number;
   lowProfitLockMs: number;
 };
+
+type ReasonQuarantineFamily = "FEE_EDGE" | "GRID_BUY_SIZING" | "GRID_SELL_SIZING";
 
 export type BotRunStatsResponse = {
   generatedAt: string;
@@ -345,13 +353,51 @@ export class BotEngineService implements OnModuleInit {
     return { ...state, protectionLocks: [nextLock, ...existingLocks].slice(0, 300) };
   }
 
+  private readLockDetails(lock: ProtectionLockEntry): Record<string, unknown> | undefined {
+    if (!lock.details || typeof lock.details !== "object") return undefined;
+    return lock.details as Record<string, unknown>;
+  }
+
+  private isReasonQuarantineLock(lock: ProtectionLockEntry): boolean {
+    if (lock.scope !== "GLOBAL") return false;
+    const details = this.readLockDetails(lock);
+    return details?.category === "REASON_QUARANTINE";
+  }
+
+  private getReasonQuarantineFamilyFromLock(lock: ProtectionLockEntry): ReasonQuarantineFamily | null {
+    if (!this.isReasonQuarantineLock(lock)) return null;
+    const details = this.readLockDetails(lock);
+    const raw = typeof details?.family === "string" ? details.family.trim().toUpperCase() : "";
+    if (raw === "FEE_EDGE" || raw === "GRID_BUY_SIZING" || raw === "GRID_SELL_SIZING") {
+      return raw;
+    }
+    return null;
+  }
+
   private getActiveGlobalProtectionLock(state: BotState): ProtectionLockEntry | null {
     const now = Date.now();
     return (
       (state.protectionLocks ?? []).find(
-        (lock) => lock.scope === "GLOBAL" && Number.isFinite(Date.parse(lock.expiresAt)) && Date.parse(lock.expiresAt) > now
+        (lock) =>
+          lock.scope === "GLOBAL" &&
+          !this.isReasonQuarantineLock(lock) &&
+          Number.isFinite(Date.parse(lock.expiresAt)) &&
+          Date.parse(lock.expiresAt) > now
       ) ?? null
     );
+  }
+
+  private getActiveReasonQuarantineFamilies(state: BotState): Set<ReasonQuarantineFamily> {
+    const now = Date.now();
+    const families = new Set<ReasonQuarantineFamily>();
+    for (const lock of state.protectionLocks ?? []) {
+      if (!this.isReasonQuarantineLock(lock)) continue;
+      const expiresAt = Date.parse(lock.expiresAt);
+      if (!Number.isFinite(expiresAt) || expiresAt <= now) continue;
+      const family = this.getReasonQuarantineFamilyFromLock(lock);
+      if (family) families.add(family);
+    }
+    return families;
   }
 
   private getActiveSymbolProtectionLock(
@@ -436,6 +482,100 @@ export class BotEngineService implements OnModuleInit {
       return Math.round((20 - t * 12) * 60_000); // 20m -> 8m
     }
     return Math.round((8 - t * 5) * 60_000); // 8m -> 3m
+  }
+
+  private isSizingFloorRejectReason(reason: string): boolean {
+    const normalized = reason.toLowerCase();
+    return (
+      normalized.includes("minqty") ||
+      normalized.includes("minnotional") ||
+      normalized.includes("notional") ||
+      normalized.includes("lot_size") ||
+      normalized.includes("market_lot_size")
+    );
+  }
+
+  private getReasonQuarantineFamily(summary: string): ReasonQuarantineFamily | null {
+    const lower = summary.trim().toLowerCase();
+    if (!lower.startsWith("skip ")) return null;
+
+    if (lower.includes("fee/edge filter")) return "FEE_EDGE";
+    if (lower.includes("grid sell sizing rejected")) {
+      const detail = lower.includes("(") ? lower.slice(lower.indexOf("(")) : lower;
+      if (this.isSizingFloorRejectReason(detail)) return "GRID_SELL_SIZING";
+    }
+    if (lower.includes("grid buy sizing rejected")) {
+      const detail = lower.includes("(") ? lower.slice(lower.indexOf("(")) : lower;
+      if (this.isSizingFloorRejectReason(detail)) return "GRID_BUY_SIZING";
+    }
+    return null;
+  }
+
+  private deriveReasonQuarantinePolicy(params: {
+    family: ReasonQuarantineFamily;
+    risk: number;
+  }): { threshold: number; windowMs: number; cooldownMs: number } {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const t = boundedRisk / 100;
+
+    if (params.family === "FEE_EDGE") {
+      return {
+        threshold: Math.max(3, Math.round(4 + t * 2)), // risk 0 -> 4, risk 100 -> 6
+        windowMs: 10 * 60_000,
+        cooldownMs: Math.round((12 - t * 7) * 60_000) // 12m -> 5m
+      };
+    }
+    if (params.family === "GRID_SELL_SIZING") {
+      return {
+        threshold: Math.max(2, Math.round(3 + t * 2)), // risk 0 -> 3, risk 100 -> 5
+        windowMs: 12 * 60_000,
+        cooldownMs: Math.round((20 - t * 12) * 60_000) // 20m -> 8m
+      };
+    }
+    return {
+      threshold: Math.max(2, Math.round(3 + t * 2)), // risk 0 -> 3, risk 100 -> 5
+      windowMs: 10 * 60_000,
+      cooldownMs: Math.round((14 - t * 8) * 60_000) // 14m -> 6m
+    };
+  }
+
+  private maybeApplyReasonQuarantineLock(params: {
+    state: BotState;
+    summary: string;
+    risk: number;
+  }): BotState {
+    const family = this.getReasonQuarantineFamily(params.summary);
+    if (!family) return params.state;
+
+    const policy = this.deriveReasonQuarantinePolicy({ family, risk: params.risk });
+    const nowMs = Date.now();
+
+    let count = 0;
+    for (const decision of params.state.decisions) {
+      if (decision.kind !== "SKIP") continue;
+      const ts = Date.parse(decision.ts);
+      if (!Number.isFinite(ts)) continue;
+      if (nowMs - ts > policy.windowMs) break;
+      if (this.getReasonQuarantineFamily(decision.summary) === family) count += 1;
+    }
+    if (count < policy.threshold) return params.state;
+
+    const untilMs = nowMs + policy.cooldownMs;
+    return this.upsertProtectionLock(params.state, {
+      type: "COOLDOWN",
+      scope: "GLOBAL",
+      symbol: `REASON_QUARANTINE:${family}`,
+      reason: `Reason quarantine ${family} (${count}/${policy.threshold}, ${Math.round(policy.cooldownMs / 1000)}s)`,
+      expiresAt: new Date(untilMs).toISOString(),
+      details: {
+        category: "REASON_QUARANTINE",
+        family,
+        count,
+        threshold: policy.threshold,
+        windowMs: policy.windowMs,
+        cooldownMs: policy.cooldownMs
+      }
+    });
   }
 
   private countRecentSymbolSkipMatches(params: {
@@ -1564,6 +1704,33 @@ export class BotEngineService implements OnModuleInit {
     return false;
   }
 
+  private classifySkipReasonCluster(summary: string): "FEE_EDGE" | "MIN_ORDER" | "INVENTORY_WAITING" | "OTHER" {
+    const lower = summary.trim().toLowerCase();
+    if (lower.includes("fee/edge filter")) return "FEE_EDGE";
+    if (
+      lower.includes("grid waiting for ladder slot or inventory") ||
+      lower.includes("grid guard paused buy leg") ||
+      lower.includes("grid guard active (no inventory to sell)") ||
+      lower.includes("waiting for ladder slot") ||
+      lower.includes("no inventory")
+    ) {
+      return "INVENTORY_WAITING";
+    }
+    if (
+      lower.includes("binance sizing filter") ||
+      lower.includes("min order constraints") ||
+      lower.includes("minqty") ||
+      lower.includes("lot_size") ||
+      lower.includes("market_lot_size") ||
+      lower.includes("minnotional") ||
+      lower.includes("notional") ||
+      lower.includes("sizing rejected")
+    ) {
+      return "MIN_ORDER";
+    }
+    return "OTHER";
+  }
+
   private mapBinanceStatus(status: string | undefined): Order["status"] {
     const normalized = (status ?? "").trim().toUpperCase();
     if (normalized === "FILLED") return "FILLED";
@@ -1968,6 +2135,9 @@ export class BotEngineService implements OnModuleInit {
     let conversions = 0;
     let entryTrades = 0;
     let sizingRejectSkips = 0;
+    let feeEdgeSkips = 0;
+    let minOrderSkips = 0;
+    let inventoryWaitingSkips = 0;
 
     for (const decision of decisionList) {
       byDecisionKind[decision.kind] = (byDecisionKind[decision.kind] ?? 0) + 1;
@@ -1985,6 +2155,10 @@ export class BotEngineService implements OnModuleInit {
         if (this.isSizingRejectSkipDecision(decision)) {
           sizingRejectSkips += 1;
         }
+        const cluster = this.classifySkipReasonCluster(decision.summary);
+        if (cluster === "FEE_EDGE") feeEdgeSkips += 1;
+        if (cluster === "MIN_ORDER") minOrderSkips += 1;
+        if (cluster === "INVENTORY_WAITING") inventoryWaitingSkips += 1;
         skipSummaryCounts.set(decision.summary, (skipSummaryCounts.get(decision.summary) ?? 0) + 1);
       }
     }
@@ -2092,9 +2266,15 @@ export class BotEngineService implements OnModuleInit {
         conversions,
         entryTrades,
         sizingRejectSkips,
+        feeEdgeSkips,
+        minOrderSkips,
+        inventoryWaitingSkips,
         conversionTradePct: this.toRounded(trades > 0 ? (conversions / trades) * 100 : 0, 4),
         entryTradePct: this.toRounded(trades > 0 ? (entryTrades / trades) * 100 : 0, 4),
         sizingRejectSkipPct: this.toRounded(skips > 0 ? (sizingRejectSkips / skips) * 100 : 0, 4),
+        feeEdgeSkipPct: this.toRounded(skips > 0 ? (feeEdgeSkips / skips) * 100 : 0, 4),
+        minOrderSkipPct: this.toRounded(skips > 0 ? (minOrderSkips / skips) * 100 : 0, 4),
+        inventoryWaitingSkipPct: this.toRounded(skips > 0 ? (inventoryWaitingSkips / skips) * 100 : 0, 4),
         buyNotional: this.toRounded(buyNotional, 8),
         sellNotional: this.toRounded(sellNotional, 8),
         realizedPnl,
@@ -2564,6 +2744,7 @@ export class BotEngineService implements OnModuleInit {
           const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(boundedRisk / 25)));
           const positions = tradeMode === "SPOT_GRID" ? this.getManagedPositions(current) : null;
           const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
+          const activeReasonQuarantineFamilies = this.getActiveReasonQuarantineFamilies(current);
           const openHomePositionCount =
             positions?.size && tradeMode === "SPOT_GRID"
               ? [...positions.values()].filter((position) => position.netQty > 0 && position.symbol.endsWith(homeStable)).length
@@ -2656,6 +2837,10 @@ export class BotEngineService implements OnModuleInit {
                 contains: "fee/edge filter",
                 windowMs: 15 * 60_000
               });
+              const feeEdgeQuarantined = activeReasonQuarantineFamilies.has("FEE_EDGE") && recentFeeEdgeRejects > 0;
+              if (feeEdgeQuarantined) {
+                continue;
+              }
               const sizingRejectThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
               const suppressBuyLegFromRejectStorm = recentGridBuySizingRejects >= sizingRejectThreshold;
               const suppressSellLegFromRejectStorm = recentGridSellSizingRejects >= sizingRejectThreshold;
@@ -2685,6 +2870,20 @@ export class BotEngineService implements OnModuleInit {
                 } catch {
                   // keep current estimate if rules are temporarily unavailable
                 }
+              }
+
+              if (
+                activeReasonQuarantineFamilies.has("GRID_SELL_SIZING") &&
+                recentGridSellSizingRejects > 0 &&
+                !hasSellLimit &&
+                hasInventory &&
+                !sellLegLikelyFeasible
+              ) {
+                continue;
+              }
+
+              if (activeReasonQuarantineFamilies.has("GRID_BUY_SIZING") && recentGridBuySizingRejects > 0 && !hasBuyLimit) {
+                continue;
               }
 
               if (!firstEligibleGridCandidate) {
@@ -3747,7 +3946,7 @@ export class BotEngineService implements OnModuleInit {
                   ...(cooldown.storm ? { storm: cooldown.storm } : {})
                 }
               });
-              this.save(nextWithCooldown);
+              this.save(this.maybeApplyReasonQuarantineLock({ state: nextWithCooldown, summary, risk }));
               return;
             }
           }
@@ -4677,6 +4876,7 @@ export class BotEngineService implements OnModuleInit {
                     ...(cooldown.storm ? { storm: cooldown.storm } : {})
                   }
                 });
+                pendingNoActionState = this.maybeApplyReasonQuarantineLock({ state: pendingNoActionState, summary, risk });
               }
               }
             }
@@ -4821,7 +5021,8 @@ export class BotEngineService implements OnModuleInit {
                       ...(cooldown.storm ? { storm: cooldown.storm } : {})
                     }
                   });
-                  if (!pendingNoActionState) pendingNoActionState = nextWithCooldown;
+                  const withReasonQuarantine = this.maybeApplyReasonQuarantineLock({ state: nextWithCooldown, summary, risk });
+                  if (!pendingNoActionState) pendingNoActionState = withReasonQuarantine;
                 }
               }
             }

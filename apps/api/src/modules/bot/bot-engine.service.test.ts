@@ -134,6 +134,46 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(key).toBe("skip xrpusdc: grid waiting for ladder slot or inventory");
   });
 
+  it("classifies skip reason clusters for KPI counters", () => {
+    const helpers = service as unknown as {
+      classifySkipReasonCluster: (summary: string) => "FEE_EDGE" | "MIN_ORDER" | "INVENTORY_WAITING" | "OTHER";
+    };
+
+    expect(helpers.classifySkipReasonCluster("Skip BNBUSDC: Fee/edge filter (net 0.02% < 0.05%)")).toBe("FEE_EDGE");
+    expect(helpers.classifySkipReasonCluster("Skip DOGEUSDC: Grid sell sizing rejected (Below minQty 1.00000000)")).toBe("MIN_ORDER");
+    expect(helpers.classifySkipReasonCluster("Skip SUIUSDC: Grid waiting for ladder slot or inventory")).toBe("INVENTORY_WAITING");
+  });
+
+  it("activates reason-level quarantine after repeated fee-edge skips", () => {
+    const helpers = service as unknown as {
+      maybeApplyReasonQuarantineLock: (params: { state: BotState; summary: string; risk: number }) => BotState;
+      getActiveReasonQuarantineFamilies: (state: BotState) => Set<"FEE_EDGE" | "GRID_BUY_SIZING" | "GRID_SELL_SIZING">;
+    };
+
+    const now = Date.now();
+    const skipSummary = "Skip BNBUSDC: Fee/edge filter (net 0.021% < 0.052%)";
+    const decisions = Array.from({ length: 5 }).map((_, idx) => ({
+      id: `d-${idx}`,
+      ts: new Date(now - idx * 15_000).toISOString(),
+      kind: "SKIP",
+      summary: skipSummary
+    }));
+
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions
+    };
+
+    const next = helpers.maybeApplyReasonQuarantineLock({
+      state,
+      summary: skipSummary,
+      risk: 50
+    });
+
+    const families = helpers.getActiveReasonQuarantineFamilies(next);
+    expect(families.has("FEE_EDGE")).toBe(true);
+  });
+
   it("extracts wallet policy snapshot from latest wallet-sweep decision", () => {
     const helpers = service as unknown as {
       extractWalletPolicySnapshot: (state: BotState) => {
@@ -252,6 +292,33 @@ describe("bot-engine symbol lock checks", () => {
     };
 
     expect(helpers.isSymbolBlocked("ZAMAUSDC", state)).not.toBeNull();
+    expect(helpers.isSymbolBlocked("BTCUSDC", state)).toBeNull();
+  });
+
+  it("does not treat reason-quarantine global cooldown as hard global lock", () => {
+    const helpers = service as unknown as {
+      isSymbolBlocked: (symbol: string, state: BotState) => string | null;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      protectionLocks: [
+        {
+          id: "lock-rq",
+          type: "COOLDOWN",
+          createdAt: "2026-02-17T11:00:00.000Z",
+          scope: "GLOBAL",
+          symbol: "REASON_QUARANTINE:FEE_EDGE",
+          reason: "Reason quarantine FEE_EDGE",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "REASON_QUARANTINE",
+            family: "FEE_EDGE"
+          }
+        }
+      ]
+    };
+
     expect(helpers.isSymbolBlocked("BTCUSDC", state)).toBeNull();
   });
 });

@@ -16,6 +16,33 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-17 13:55 UTC — T-029 reason-quarantine + KPI reason clusters
+- Scope: reduce repeated skip churn by adding reason-level quarantine and make dominant skip families visible in UI KPIs.
+- BA requirement mapping:
+  - Avoid loops from recurring `fee/edge` and `minQty/minNotional` failures.
+  - Keep adaptation observable (not hidden in logs).
+- PM milestone mapping: behavior-side closure slice under active `T-029` before moving lane to `T-005/T-007`.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added reason-quarantine family detection (`FEE_EDGE`, `GRID_BUY_SIZING`, `GRID_SELL_SIZING`) and risk-linked quarantine policy,
+    - added adaptive reason-quarantine lock writer (`category=REASON_QUARANTINE`) on repeated skip families,
+    - made hard global lock detection ignore reason-quarantine locks (so they steer ranking, not freeze the bot),
+    - integrated reason-quarantine prefilter in `SPOT_GRID` candidate ranking (fee-edge and repeated sizing-failure symbols deprioritized/skipped),
+    - extended baseline KPI totals with skip reason clusters:
+      - `feeEdgeSkips/%`, `minOrderSkips/%`, `inventoryWaitingSkips/%`.
+  - `apps/ui/src/hooks/useRunStats.ts` + `apps/ui/src/pages/DashboardPage.tsx`:
+    - exposed new KPI percentages in Adaptive panel.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added tests for skip cluster classification, reason-quarantine activation, and non-blocking behavior of reason-quarantine global locks.
+- Risk slider impact:
+  - explicit and preserved: quarantine thresholds/cooldowns scale by risk (high risk still more permissive, but loops are throttled).
+- Validation evidence:
+  - `docker-compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - 2–3h run: verify lower `Fee-edge skips %` and fewer repeated `Grid sell sizing rejected (Below minQty...)` storms; confirm trade cadence stays active.
+- Follow-up:
+  - keep `T-029` open until long-run evidence confirms sustained reduction in skip pressure and improved candidate rotation.
+
 ## 2026-02-17 11:45 UTC — T-029 adaptive anti-loop slice (grid feasibility + cooldown escalation)
 - Scope: reduce persistent skip loops (`minQty`/`minNotional`, fee-edge churn, max-open-position repeats) without symbol hardcoding or market-specific constants.
 - BA requirement mapping:

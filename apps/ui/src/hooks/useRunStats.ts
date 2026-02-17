@@ -15,9 +15,15 @@ export type BaselineRunStats = {
     conversions: number;
     entryTrades?: number;
     sizingRejectSkips?: number;
+    feeEdgeSkips?: number;
+    minOrderSkips?: number;
+    inventoryWaitingSkips?: number;
     conversionTradePct?: number;
     entryTradePct?: number;
     sizingRejectSkipPct?: number;
+    feeEdgeSkipPct?: number;
+    minOrderSkipPct?: number;
+    inventoryWaitingSkipPct?: number;
     realizedPnl: number;
     openExposureCost: number;
   };

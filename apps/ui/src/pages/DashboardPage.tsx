@@ -625,6 +625,30 @@ export function DashboardPage(): JSX.Element {
             </b>
           </span>
           <span className="pill">
+            Fee-edge skips:{" "}
+            <b>
+              {runStats.stats?.kpi
+                ? `${runStats.stats.kpi.totals.feeEdgeSkipPct?.toFixed(1) ?? "0.0"}%`
+                : "—"}
+            </b>
+          </span>
+          <span className="pill">
+            Min-order skips:{" "}
+            <b>
+              {runStats.stats?.kpi
+                ? `${runStats.stats.kpi.totals.minOrderSkipPct?.toFixed(1) ?? "0.0"}%`
+                : "—"}
+            </b>
+          </span>
+          <span className="pill">
+            Inventory/wait skips:{" "}
+            <b>
+              {runStats.stats?.kpi
+                ? `${runStats.stats.kpi.totals.inventoryWaitingSkipPct?.toFixed(1) ?? "0.0"}%`
+                : "—"}
+            </b>
+          </span>
+          <span className="pill">
             Last regime: <b>{latestAdaptiveEvent?.regime.label ?? "—"}</b>
           </span>
           <span className="pill">
