@@ -45,6 +45,7 @@ type CapitalProfile = {
 type RegimeLabel = "BULL_TREND" | "BEAR_TREND" | "RANGE" | "NEUTRAL" | "UNKNOWN";
 
 type AdaptiveStrategy = "TREND" | "MEAN_REVERSION" | "GRID";
+type AdaptiveExecutionLane = "GRID" | "MARKET" | "DEFENSIVE";
 
 type AdaptiveRegimeSnapshot = {
   label: RegimeLabel;
@@ -72,6 +73,7 @@ type AdaptiveShadowEvent = {
   environment: "LIVE" | "PAPER";
   homeStableCoin: string;
   candidateSymbol: string;
+  executionLane?: AdaptiveExecutionLane;
   candidateFeatures?: {
     score?: number;
     strategyHint?: string;
@@ -162,6 +164,7 @@ type TickTelemetryContext = {
   risk: number;
   candidateSymbol: string;
   candidate: UniverseCandidate | null;
+  executionLane?: AdaptiveExecutionLane;
   walletTotalHome?: number;
   maxOpenPositions?: number;
   maxPositionPct?: number;
@@ -2095,6 +2098,38 @@ export class BotEngineService implements OnModuleInit {
     return this.toRounded(0.54 + t * 0.16, 4); // risk 0 -> 0.54, risk 100 -> 0.70
   }
 
+  private resolveExecutionLane(params: {
+    tradeMode: "SPOT" | "SPOT_GRID";
+    gridEnabled: boolean;
+    risk: number;
+    regime: AdaptiveRegimeSnapshot;
+    strategy: AdaptiveStrategyScores;
+  }): AdaptiveExecutionLane {
+    if (params.tradeMode !== "SPOT_GRID" || !params.gridEnabled) return "MARKET";
+
+    const bearPauseThreshold = this.getBearPauseConfidenceThreshold(params.risk);
+    const bullTrendThreshold = this.toRounded(0.56 + (Math.max(0, Math.min(100, params.risk)) / 100) * 0.18, 4); // 0.56..0.74
+    const regimeConfidence = Number.isFinite(params.regime.confidence) ? params.regime.confidence : 0;
+
+    if (params.regime.label === "BEAR_TREND" && regimeConfidence >= bearPauseThreshold) {
+      return "DEFENSIVE";
+    }
+
+    if (params.regime.label === "BULL_TREND" && regimeConfidence >= bullTrendThreshold) {
+      return "MARKET";
+    }
+
+    if (params.regime.label === "RANGE") {
+      return "GRID";
+    }
+
+    if (params.strategy.recommended === "TREND" && params.strategy.trend >= params.strategy.grid + 0.08) {
+      return "MARKET";
+    }
+
+    return "GRID";
+  }
+
   private buildAdaptiveStrategyScores(candidate: UniverseCandidate | null, regime: RegimeLabel): AdaptiveStrategyScores {
     const adx = Number.isFinite(candidate?.adx14) ? Math.max(0, candidate?.adx14 ?? 0) : 0;
     const rsi = Number.isFinite(candidate?.rsi14) ? Math.max(0, Math.min(100, candidate?.rsi14 ?? 50)) : 50;
@@ -2356,6 +2391,7 @@ export class BotEngineService implements OnModuleInit {
         environment: tickContext.liveTrading ? "LIVE" : "PAPER",
         homeStableCoin: tickContext.homeStableCoin,
         candidateSymbol: tickContext.candidateSymbol,
+        ...(tickContext.executionLane ? { executionLane: tickContext.executionLane } : {}),
         ...(tickContext.candidate
           ? {
               candidateFeatures: {
@@ -3509,7 +3545,19 @@ export class BotEngineService implements OnModuleInit {
             return;
           }
           const candidateBaseAsset = rules.baseAsset.toUpperCase();
-          const gridEnabled = Boolean(config?.derived.allowGrid && config?.basic.tradeMode === "SPOT_GRID");
+          const tradeMode = config?.basic.tradeMode ?? "SPOT";
+          const configuredGridEnabled = Boolean(config?.derived.allowGrid && tradeMode === "SPOT_GRID");
+          const selectedRegime = this.buildRegimeSnapshot(selectedCandidate ?? null);
+          const selectedStrategy = this.buildAdaptiveStrategyScores(selectedCandidate ?? null, selectedRegime.label);
+          const executionLane = this.resolveExecutionLane({
+            tradeMode,
+            gridEnabled: configuredGridEnabled,
+            risk,
+            regime: selectedRegime,
+            strategy: selectedStrategy
+          });
+          tickContext.executionLane = executionLane;
+          const gridEnabled = configuredGridEnabled && executionLane !== "MARKET";
 
           const managedPositions = this.getManagedPositions(current);
           const managedOpenHomeSymbols = [...managedPositions.values()].filter((p) => p.netQty > 0 && p.symbol.endsWith(homeStable));
@@ -4429,7 +4477,7 @@ export class BotEngineService implements OnModuleInit {
             })();
             const quoteSpendable = Math.max(0, quoteFree - reserveHardTarget);
 
-            const symbolOpenLimitOrdersAll = current.activeOrders.filter((order) => {
+            let symbolOpenLimitOrdersAll = current.activeOrders.filter((order) => {
               if (order.symbol !== candidateSymbol) return false;
               if (order.status !== "NEW") return false;
               const t = order.type.trim().toUpperCase();
@@ -4470,10 +4518,38 @@ export class BotEngineService implements OnModuleInit {
               return;
             }
 
+            if (executionLane === "DEFENSIVE" && config) {
+              const defensiveBuyOrders = symbolOpenLimitOrdersAll.filter(
+                (order) => order.side === "BUY" && this.isBotOwnedOrder(order, botPrefix)
+              );
+              if (defensiveBuyOrders.length > 0) {
+                current = await this.cancelBotOwnedOpenOrders({
+                  config,
+                  state: current,
+                  orders: defensiveBuyOrders,
+                  reason: `defensive-bear-cancel-buy ${candidateSymbol}`,
+                  details: {
+                    executionLane,
+                    regime: selectedRegime,
+                    strategy: selectedStrategy,
+                    canceledBuyOrders: defensiveBuyOrders.length
+                  },
+                  maxCancels: Math.min(5, defensiveBuyOrders.length)
+                });
+                symbolOpenLimitOrdersAll = current.activeOrders.filter((order) => {
+                  if (order.symbol !== candidateSymbol) return false;
+                  if (order.status !== "NEW") return false;
+                  const t = order.type.trim().toUpperCase();
+                  return t === "LIMIT" || t === "LIMIT_MAKER";
+                });
+                this.save(current);
+              }
+            }
+
             const existingBuyPauseLock = this.getActiveSymbolProtectionLock(current, candidateSymbol, {
               onlyTypes: ["GRID_GUARD_BUY_PAUSE"]
             });
-            const regime = this.buildRegimeSnapshot(selectedCandidate ?? null);
+            const regime = selectedRegime;
             const t = risk / 100;
             const pauseConfidenceThreshold = this.getBearPauseConfidenceThreshold(risk);
             const shouldPauseBuys =

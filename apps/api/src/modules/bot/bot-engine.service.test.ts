@@ -305,6 +305,48 @@ describe("bot-engine insufficient-balance helpers", () => {
     const range = helpers.buildAdaptiveStrategyScores(candidate, "RANGE");
     expect(bear.grid).toBeLessThan(range.grid);
   });
+
+  it("routes SPOT_GRID execution lane by regime and confidence", () => {
+    const helpers = service as unknown as {
+      resolveExecutionLane: (params: {
+        tradeMode: "SPOT" | "SPOT_GRID";
+        gridEnabled: boolean;
+        risk: number;
+        regime: { label: "BULL_TREND" | "BEAR_TREND" | "RANGE" | "NEUTRAL" | "UNKNOWN"; confidence: number };
+        strategy: { trend: number; meanReversion: number; grid: number; recommended: "TREND" | "MEAN_REVERSION" | "GRID" };
+      }) => "GRID" | "MARKET" | "DEFENSIVE";
+    };
+
+    expect(
+      helpers.resolveExecutionLane({
+        tradeMode: "SPOT_GRID",
+        gridEnabled: true,
+        risk: 100,
+        regime: { label: "BEAR_TREND", confidence: 0.75 },
+        strategy: { trend: 0.2, meanReversion: 0.5, grid: 0.4, recommended: "MEAN_REVERSION" }
+      })
+    ).toBe("DEFENSIVE");
+
+    expect(
+      helpers.resolveExecutionLane({
+        tradeMode: "SPOT_GRID",
+        gridEnabled: true,
+        risk: 100,
+        regime: { label: "BULL_TREND", confidence: 0.8 },
+        strategy: { trend: 0.7, meanReversion: 0.3, grid: 0.35, recommended: "TREND" }
+      })
+    ).toBe("MARKET");
+
+    expect(
+      helpers.resolveExecutionLane({
+        tradeMode: "SPOT_GRID",
+        gridEnabled: true,
+        risk: 50,
+        regime: { label: "RANGE", confidence: 0.55 },
+        strategy: { trend: 0.3, meanReversion: 0.4, grid: 0.6, recommended: "GRID" }
+      })
+    ).toBe("GRID");
+  });
 });
 
 describe("bot-engine ownership detection", () => {

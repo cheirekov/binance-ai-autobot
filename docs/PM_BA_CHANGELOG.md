@@ -16,6 +16,34 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-18 04:55 UTC — T-029 adaptive regime router hard switch (RANGE/BULL/BEAR)
+- Scope: implement explicit execution gates so `SPOT_GRID` adapts by regime instead of running one lane continuously.
+- BA requirement mapping:
+  - Autobot decides execution lane automatically (no manual user tuning required for this switch).
+  - Improve profit protection in market transitions (especially bear flips after early gains).
+- PM milestone mapping: 1–3h adaptive patch requested after analyzing `autobot-feedback-20260218-041719.tgz`.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added `resolveExecutionLane(...)` with hard regime gates for `SPOT_GRID`:
+      - `RANGE` → `GRID`,
+      - strong `BULL_TREND` → `MARKET` entry lane,
+      - strong `BEAR_TREND` → `DEFENSIVE` lane.
+    - execution lane is now computed per tick from regime + strategy + risk slider and stored in tick telemetry context.
+    - in `DEFENSIVE` lane, bot cancels bot-owned symbol BUY LIMITs to avoid accumulating into bearish legs.
+    - in `MARKET` lane, grid placement path is bypassed and normal market-entry path is used.
+    - added `executionLane` field to adaptive shadow events for post-run analysis.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added unit coverage for lane routing behavior by regime confidence/risk.
+- Risk slider impact:
+  - direct: gate thresholds remain risk-linked (high risk stays more permissive, but bear defense still engages earlier than before).
+- Validation evidence:
+  - `docker-compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - 1–3h run should show lane switching in shadow telemetry and reduced bear-side over-accumulation.
+  - expect fewer new BUY LIMIT inventories when regime stays bearish.
+- Follow-up:
+  - if results are positive, next step is UI exposure of current execution lane and lane-wise PnL counters.
+
 ## 2026-02-18 04:26 UTC — T-029 night stabilization: bear-regime anti-overtrade tuning
 - Scope: address “profit then decay to loss” pattern by reducing fresh grid aggressiveness in bear regimes and tightening buy-pause trigger.
 - BA requirement mapping:
