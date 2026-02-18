@@ -2098,6 +2098,23 @@ export class BotEngineService implements OnModuleInit {
     return this.toRounded(0.54 + t * 0.16, 4); // risk 0 -> 0.54, risk 100 -> 0.70
   }
 
+  private getRegimeAdjustedStopLossPct(params: {
+    risk: number;
+    baseStopLossPct: number;
+    regime: AdaptiveRegimeSnapshot;
+  }): number {
+    const { risk, baseStopLossPct, regime } = params;
+    if (!Number.isFinite(baseStopLossPct)) return baseStopLossPct;
+    if (regime.label !== "BEAR_TREND" || !Number.isFinite(regime.confidence)) return baseStopLossPct;
+
+    const threshold = this.getBearPauseConfidenceThreshold(risk);
+    if (regime.confidence < threshold) return baseStopLossPct;
+
+    const t = Math.max(0, Math.min(1, Number.isFinite(risk) ? risk / 100 : 0.5));
+    const tightenedStopLossPct = -(0.35 + t * 0.55); // risk 0 -> -0.35%, risk 100 -> -0.90%
+    return Math.max(baseStopLossPct, tightenedStopLossPct);
+  }
+
   private resolveExecutionLane(params: {
     tradeMode: "SPOT" | "SPOT_GRID";
     gridEnabled: boolean;
@@ -3590,9 +3607,19 @@ export class BotEngineService implements OnModuleInit {
             const nowPrice = Number.parseFloat(nowPriceStr);
             if (!Number.isFinite(nowPrice) || nowPrice <= 0) continue;
 
+            const positionCandidate =
+              (universeSnapshot?.candidates ?? []).find(
+                (candidate) => candidate.symbol.trim().toUpperCase() === position.symbol.trim().toUpperCase()
+              ) ?? null;
+            const positionRegime = this.buildRegimeSnapshot(positionCandidate);
+            const adjustedStopLossPct = this.getRegimeAdjustedStopLossPct({
+              risk,
+              baseStopLossPct: stopLossPct,
+              regime: positionRegime
+            });
             const pnlPct = ((nowPrice - avgEntryPrice) / avgEntryPrice) * 100;
             const shouldTakeProfit = pnlPct >= takeProfitPct;
-            const shouldStopLoss = pnlPct <= stopLossPct;
+            const shouldStopLoss = pnlPct <= adjustedStopLossPct;
             if (!shouldTakeProfit && !shouldStopLoss) continue;
 
             const sellQtyDesired = Math.min(position.netQty, baseFree);
@@ -3665,7 +3692,8 @@ export class BotEngineService implements OnModuleInit {
                       avgEntryPrice: Number(avgEntryPrice.toFixed(8)),
                       marketPrice: Number(nowPrice.toFixed(8)),
                       takeProfitPct: Number(takeProfitPct.toFixed(4)),
-                      stopLossPct: Number(stopLossPct.toFixed(4))
+                      stopLossPct: Number(adjustedStopLossPct.toFixed(4)),
+                      regime: positionRegime
                     }
                   });
                   return;
@@ -3684,7 +3712,8 @@ export class BotEngineService implements OnModuleInit {
                   marketPrice: Number(nowPrice.toFixed(8)),
                   pnlPct: Number(pnlPct.toFixed(4)),
                   takeProfitPct: Number(takeProfitPct.toFixed(4)),
-                  stopLossPct: Number(stopLossPct.toFixed(4)),
+                  stopLossPct: Number(adjustedStopLossPct.toFixed(4)),
+                  regime: positionRegime,
                   refreshedBalances: exitFunds.refreshed
                 }
               });
@@ -3710,7 +3739,8 @@ export class BotEngineService implements OnModuleInit {
                 avgEntryPrice: Number(avgEntryPrice.toFixed(8)),
                 marketPrice: Number(nowPrice.toFixed(8)),
                 takeProfitPct: Number(takeProfitPct.toFixed(4)),
-                stopLossPct: Number(stopLossPct.toFixed(4))
+                stopLossPct: Number(adjustedStopLossPct.toFixed(4)),
+                regime: positionRegime
               }
             });
             return;

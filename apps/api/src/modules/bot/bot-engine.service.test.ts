@@ -280,6 +280,41 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.getBearPauseConfidenceThreshold(100)).toBe(0.7);
   });
 
+  it("tightens stop-loss in confirmed bear regime", () => {
+    const helpers = service as unknown as {
+      getRegimeAdjustedStopLossPct: (params: {
+        risk: number;
+        baseStopLossPct: number;
+        regime: {
+          label: "BULL_TREND" | "BEAR_TREND" | "RANGE" | "NEUTRAL" | "UNKNOWN";
+          confidence: number;
+          inputs: Record<string, unknown>;
+        };
+      }) => number;
+    };
+
+    const bearAdjusted = helpers.getRegimeAdjustedStopLossPct({
+      risk: 100,
+      baseStopLossPct: -2,
+      regime: { label: "BEAR_TREND", confidence: 0.9, inputs: {} }
+    });
+    expect(bearAdjusted).toBe(-0.9);
+
+    const bearLowConfidence = helpers.getRegimeAdjustedStopLossPct({
+      risk: 100,
+      baseStopLossPct: -2,
+      regime: { label: "BEAR_TREND", confidence: 0.5, inputs: {} }
+    });
+    expect(bearLowConfidence).toBe(-2);
+
+    const bullUnchanged = helpers.getRegimeAdjustedStopLossPct({
+      risk: 100,
+      baseStopLossPct: -2,
+      regime: { label: "BULL_TREND", confidence: 0.95, inputs: {} }
+    });
+    expect(bullUnchanged).toBe(-2);
+  });
+
   it("penalizes grid score in bear trend", () => {
     const helpers = service as unknown as {
       buildAdaptiveStrategyScores: (candidate: UniverseCandidate | null, regime: "BEAR_TREND" | "RANGE") => {

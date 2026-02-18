@@ -16,6 +16,31 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-18 10:45 UTC — T-029 regime-aware stop-loss tightening for managed positions
+- Scope: reduce “profit turns into loss” drift by tightening stop-loss for managed positions when symbol regime is confidently bearish.
+- BA requirement mapping:
+  - Bot must adapt automatically to market phase changes and control downside without user micro-tuning.
+  - Risk slider remains the single control; thresholds stay risk-linked.
+- PM milestone mapping: follow-up after `autobot-feedback-20260218-103930.tgz` where realized PnL improved but large open bags remained vulnerable in falling legs.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added `getRegimeAdjustedStopLossPct(...)`,
+    - for each managed open position, computes symbol regime from universe candidate snapshot and applies adjusted stop-loss:
+      - base stop-loss remains existing `risk` formula,
+      - in confirmed `BEAR_TREND` (confidence >= risk-linked threshold), stop-loss tightens to `-0.35% .. -0.90%` by risk.
+    - position-exit trade/skip details now include adjusted stop-loss and regime snapshot for telemetry/debug.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added unit coverage for bear-regime stop-loss tightening and non-bear no-op behavior.
+- Risk slider impact:
+  - explicit: high risk still allows wider behavior generally, but confirmed bearish regimes force earlier downside defense.
+- Validation evidence:
+  - `docker-compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - 1–3h run: compare reduction of deep negative unrealized drifts on managed symbols after bear flips.
+  - overnight: check whether early gains are preserved better (lower realized giveback).
+- Follow-up:
+  - if open-bag decay persists, next slice should add partial de-risk ladder (sell fraction on mild drawdown, full exit on severe drawdown).
+
 ## 2026-02-18 04:55 UTC — T-029 adaptive regime router hard switch (RANGE/BULL/BEAR)
 - Scope: implement explicit execution gates so `SPOT_GRID` adapts by regime instead of running one lane continuously.
 - BA requirement mapping:
