@@ -1,0 +1,521 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://binance-ai-autobot.local/schemas/last_run_summary.schema.json",
+  "title": "LastRunSummary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "environment",
+    "started_at_utc",
+    "ended_at_utc",
+    "exchange",
+    "effective_config_hash",
+    "sliders",
+    "risk_state",
+    "pnl",
+    "exposure",
+    "activity",
+    "ai",
+    "health"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 8
+    },
+    "environment": {
+      "type": "string",
+      "enum": [
+        "testnet",
+        "mainnet",
+        "paper"
+      ]
+    },
+    "exchange": {
+      "type": "string",
+      "minLength": 2
+    },
+    "started_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ended_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "effective_config_hash": {
+      "type": "string",
+      "minLength": 8
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        }
+      }
+    },
+    "sliders": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "risk",
+        "ai"
+      ],
+      "properties": {
+        "risk": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "ai": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "risk_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason_codes",
+        "unwind_only"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "NORMAL",
+            "CAUTION",
+            "HALT"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "unwind_only": {
+          "type": "boolean"
+        },
+        "resume_conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      }
+    },
+    "pnl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "equity_usdt",
+        "realized_usdt",
+        "unrealized_usdt",
+        "fees_usdt",
+        "net_usdt",
+        "daily_net_usdt",
+        "daily_net_pct"
+      ],
+      "properties": {
+        "equity_usdt": {
+          "type": "number"
+        },
+        "realized_usdt": {
+          "type": "number"
+        },
+        "unrealized_usdt": {
+          "type": "number"
+        },
+        "fees_usdt": {
+          "type": "number"
+        },
+        "net_usdt": {
+          "type": "number"
+        },
+        "daily_net_usdt": {
+          "type": "number"
+        },
+        "daily_net_pct": {
+          "type": "number"
+        },
+        "max_drawdown_pct": {
+          "type": "number"
+        },
+        "win_rate_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_alloc_pct",
+        "open_positions",
+        "unmanaged_exposure_pct"
+      ],
+      "properties": {
+        "total_alloc_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "open_positions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unmanaged_exposure_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "largest_position": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "symbol": {
+              "type": "string"
+            },
+            "pct": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        },
+        "by_symbol_pct": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "symbol",
+              "pct"
+            ],
+            "properties": {
+              "symbol": {
+                "type": "string"
+              },
+              "pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            }
+          },
+          "default": []
+        }
+      }
+    },
+    "activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trades",
+        "orders",
+        "skips",
+        "locks"
+      ],
+      "properties": {
+        "trades": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "buys",
+            "sells"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "buys": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "sells": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "orders": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "submitted",
+            "filled",
+            "rejected",
+            "canceled"
+          ],
+          "properties": {
+            "submitted": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "filled": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "rejected": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "canceled": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "skips": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "top_reasons"
+          ],
+          "properties": {
+            "top_reasons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "reason",
+                  "count"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "default": []
+            }
+          }
+        },
+        "locks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "active",
+              "count"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "active": {
+                "type": "boolean"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "default": []
+        }
+      }
+    },
+    "ai": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "mode",
+        "calls",
+        "cache",
+        "budget",
+        "signals"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "OFF",
+            "SHADOW",
+            "LIMITED",
+            "ACTIVE"
+          ]
+        },
+        "calls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "total",
+            "hourly_limit"
+          ],
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "hourly_limit": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "cache": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "hit_rate_pct"
+          ],
+          "properties": {
+            "hit_rate_pct": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "ttl_sec": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tokens_used",
+            "tokens_limit",
+            "over_budget"
+          ],
+          "properties": {
+            "tokens_used": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tokens_limit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "over_budget": {
+              "type": "boolean"
+            },
+            "estimated_cost_usd": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "signals": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "accepted",
+            "rejected",
+            "reject_reasons"
+          ],
+          "properties": {
+            "accepted": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "rejected": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "reject_reasons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "reason",
+                  "count"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "default": []
+            }
+          }
+        }
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "errors",
+        "warnings",
+        "restart_count",
+        "loop_stalls"
+      ],
+      "properties": {
+        "errors": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warnings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "restart_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "loop_stalls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reason",
+              "count"
+            ],
+            "properties": {
+              "reason": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "default": []
+        }
+      }
+    }
+  }
+}

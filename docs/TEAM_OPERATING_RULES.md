@@ -6,6 +6,8 @@ Companion docs:
 
 - `docs/PM_BA_PLAYBOOK.md` (how PM/BA prioritize and define done)
 - `docs/SESSION_BRIEF.md` (single-session handoff and execution contract)
+- `docs/TRIAGE_NOTE_TEMPLATE.md` (mandatory format for non-P0/P1 issue capture)
+- `docs/AI_DECISION_CONTRACT.md` (AI signal interface and hard safety constraints)
 
 ## Team roles (mandatory)
 
@@ -39,6 +41,7 @@ Companion docs:
 9. Each patch batch must be tested with Docker CI before handoff.
 10. Avoid micro-churn. Group related fixes into a single testable batch.
 11. If scope changes, update board/changelog before additional code changes.
+11a. New findings during an active ticket must be captured as a triage note first; only P0/P1 may interrupt.
 12. If a decision is postponed, capture reason + owner + trigger for revisit.
 13. Commit messages must be actionable and structured. Disallow generic subjects (`Implemented`, `Patched`, `Code changes`, `What changed`).
 14. Commit subject format: `<type>(<scope>): <outcome>` (preferred) or concise imperative summary.
@@ -53,6 +56,7 @@ Companion docs:
    - stop/rollback condition
 19. If two consecutive batches show no KPI improvement, feature expansion pauses until root-cause analysis is documented.
 20. Adaptive/AI logic must ship in shadow-first mode unless PM/BA explicitly approves promotion with measurable gates.
+20a. AI integration must use structured JSON contract messages only; prose output cannot directly drive execution.
 21. Every batch must start by updating `docs/SESSION_BRIEF.md` with active ticket, scope, DoD, KPIs, and stop condition.
 22. Ticket prioritization and DoD must follow `docs/PM_BA_PLAYBOOK.md`; ad-hoc priority decisions are not allowed.
 23. Before coding starts, run `./scripts/pmba-gate.sh start`; if it fails, fix board/session alignment first.

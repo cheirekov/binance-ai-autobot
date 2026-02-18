@@ -39,12 +39,18 @@ copy_if_exists() {
   fi
 }
 
+# Generate compact last-run summary if generator exists.
+if [[ -x "scripts/generate-last-run-summary.sh" ]]; then
+  ./scripts/generate-last-run-summary.sh >/dev/null 2>&1 || true
+fi
+
 # Core artifacts (no secrets)
 copy_if_exists "data/state.json" "$TMP_DIR/data/state.json"
 copy_if_exists "data/universe.json" "$TMP_DIR/data/universe.json"
 copy_if_exists "data/news.json" "$TMP_DIR/data/news.json"
 copy_if_exists "data/logs/api.log" "$TMP_DIR/data/logs/api.log"
 copy_if_exists "data/telemetry/baseline-kpis.json" "$TMP_DIR/data/telemetry/baseline-kpis.json"
+copy_if_exists "data/telemetry/last_run_summary.json" "$TMP_DIR/data/telemetry/last_run_summary.json"
 
 if [[ -f "data/telemetry/adaptive-shadow.jsonl" ]]; then
   tail -n 5000 "data/telemetry/adaptive-shadow.jsonl" >"$TMP_DIR/data/telemetry/adaptive-shadow.tail.jsonl" || true
@@ -54,6 +60,8 @@ fi
 copy_if_exists "docs/TEAM_OPERATING_RULES.md" "$TMP_DIR/meta/docs/TEAM_OPERATING_RULES.md"
 copy_if_exists "docs/DELIVERY_BOARD.md" "$TMP_DIR/meta/docs/DELIVERY_BOARD.md"
 copy_if_exists "docs/PM_BA_CHANGELOG.md" "$TMP_DIR/meta/docs/PM_BA_CHANGELOG.md"
+copy_if_exists "docs/AI_DECISION_CONTRACT.md" "$TMP_DIR/meta/docs/AI_DECISION_CONTRACT.md"
+copy_if_exists "docs/schemas/last_run_summary.schema.json" "$TMP_DIR/meta/docs/last_run_summary.schema.json"
 for retro in docs/RETROSPECTIVE_*.md; do
   [[ -f "$retro" ]] || continue
   copy_if_exists "$retro" "$TMP_DIR/meta/docs/$(basename "$retro")"

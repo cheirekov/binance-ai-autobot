@@ -1712,3 +1712,42 @@ This log is mandatory for every implementation patch batch.
 - PM estimate:
   - `T-029` closure target: `2` short runs + `1` overnight run if KPI guardrails pass.
   - `T-034` first implementation slice: 1 patch + 1 short validation + 1 overnight validation.
+
+## 2026-02-18 14:05 UTC — Board v2 adoption (Gates + Tracks + triage control)
+- Scope: align PM/BA execution model with gate-based flow and strict interruption protocol.
+- BA requirement mapping: reduce chaotic ticket switching and keep adaptive/autobot roadmap traceable.
+- PM milestone mapping: make Gate A blockers explicit before enabling broader AI execution influence.
+- Technical changes:
+  - Replaced `docs/DELIVERY_BOARD.md` with gate/track layout:
+    - Gate A/B/C criteria,
+    - NOW/NEXT/LATER sequencing,
+    - explicit `T-029` scope freeze,
+    - added new AI lane tickets `T-035`..`T-038`.
+  - Added `docs/TRIAGE_NOTE_TEMPLATE.md` and linked it from the board.
+- Risk slider impact: none (process/documentation update only).
+- Validation evidence: documentation-only change; no runtime code behavior changed.
+- Runtime test request: continue active `T-029` overnight run unchanged and evaluate against gate-ready KPIs.
+- Follow-up:
+  - Proposed artifacts from user-side analysis are requested for next patch:
+    - `docs/AI_DECISION_CONTRACT.md` proposal,
+    - `data/telemetry/last_run_summary.schema.json` proposal.
+
+## 2026-02-18 14:25 UTC — AI contract + summary schema adoption
+- Scope: adopt user-proposed AI governance artifacts into repo process and feedback workflow.
+- BA requirement mapping: ensure AI can become action-driving without bypassing hard risk controls.
+- PM milestone mapping: Gate A/B preparation with explicit contract and evidence schema.
+- Technical changes:
+  - Added `docs/AI_DECISION_CONTRACT.md` (message types, envelope, slider autonomy mapping, non-bypass rules).
+  - Added canonical schema `docs/schemas/last_run_summary.schema.json`.
+  - Added `scripts/generate-last-run-summary.sh` to build `data/telemetry/last_run_summary.json` from runtime artifacts.
+  - Updated `scripts/collect-feedback.sh` to include:
+    - auto-generation of `data/telemetry/last_run_summary.json` before bundling,
+    - `data/telemetry/last_run_summary.json` in bundle artifacts,
+    - contract + schema snapshots in bundle docs.
+  - Updated board and operating rules to reference contract/schema and JSON-only AI decision flow.
+- Risk slider impact: none (process/interface artifact update only).
+- Validation evidence: documentation + script changes only; runtime engine behavior unchanged.
+- Runtime test request:
+  - For next bundle, include `data/telemetry/last_run_summary.json` generation in runtime patch lane.
+- Follow-up:
+  - Implement `T-036` to enforce contract validation + AI budget gates in execution path.
