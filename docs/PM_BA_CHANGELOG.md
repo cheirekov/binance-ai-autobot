@@ -1696,3 +1696,19 @@ This log is mandatory for every implementation patch batch.
   - Verify a `TRADE` decision appears with reason `no-feasible-liquidity-recovery` and skip-loop frequency drops.
 - Follow-up:
   - If recovery is blocked by locked sell inventory, add optional stale SELL-limit cancel before recovery sell as next T-029 sub-step.
+
+## 2026-02-18 13:05 UTC — PM/BA + AI specialist scope checkpoint (home-quote vs multi-quote)
+- Scope: resolve recurring question why live trading executes mostly `*HOME_STABLE` pairs while universe shows non-home quotes.
+- Decision:
+  - Keep current `homeStableCoin`-centric execution policy during `T-029` closure (risk containment and deterministic PnL accounting).
+  - Track adaptive multi-quote execution as a separate ticket (`T-034`) to avoid reopening `T-029` scope.
+- Rationale:
+  - Single-quote execution currently anchors risk caps, reserve recovery, and wallet policy behavior.
+  - Mixing multi-quote execution inside `T-029` would confound wallet-policy validation and invalidate current KPI comparisons.
+  - AI specialist recommendation: introduce multi-quote only with explicit quote->home normalization + conversion-edge gating + per-quote exposure caps, otherwise adaptation can degrade into conversion-churn/fee bleed.
+- Reference alignment:
+  - Freqtrade-style `stake_currency` discipline for base execution safety (`references/freqtrade-develop/config_examples/config_binance.example.json`).
+  - `binance-ai-bot-24` pattern for adaptive quote sets and non-home quote handling with conversion safeguards (`references/binance-ai-bot-24/backend/src/services/strategyService.ts`, `references/binance-ai-bot-24/backend/src/services/gridTrader.ts`).
+- PM estimate:
+  - `T-029` closure target: `2` short runs + `1` overnight run if KPI guardrails pass.
+  - `T-034` first implementation slice: 1 patch + 1 short validation + 1 overnight validation.
