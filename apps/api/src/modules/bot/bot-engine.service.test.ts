@@ -191,6 +191,94 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(withTwoRecent.cooldownMs).toBeGreaterThanOrEqual(150_000);
   });
 
+  it("enables no-feasible recovery after repeated sizing-cap skips", () => {
+    const helpers = service as unknown as {
+      deriveNoFeasibleRecoveryPolicy: (params: {
+        state: BotState;
+        reason: string | undefined;
+        risk: number;
+        nowMs: number;
+      }) => { enabled: boolean; recentCount: number; threshold: number; cooldownMs: number };
+    };
+
+    const now = Date.now();
+    const summary = "Skip: No feasible candidates after sizing/cap filters (9 rejected)";
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "nf-1",
+          ts: new Date(now - 45_000).toISOString(),
+          kind: "SKIP",
+          summary
+        }
+      ]
+    };
+
+    const policy = helpers.deriveNoFeasibleRecoveryPolicy({
+      state,
+      reason: "No feasible candidates after sizing/cap filters (10 rejected)",
+      risk: 100,
+      nowMs: now
+    });
+
+    expect(policy.enabled).toBe(true);
+    expect(policy.threshold).toBe(2);
+    expect(policy.recentCount).toBe(2);
+    expect(policy.cooldownMs).toBe(600_000);
+  });
+
+  it("keeps no-feasible recovery disabled during cooldown after recovery trade", () => {
+    const helpers = service as unknown as {
+      deriveNoFeasibleRecoveryPolicy: (params: {
+        state: BotState;
+        reason: string | undefined;
+        risk: number;
+        nowMs: number;
+      }) => { enabled: boolean; recentCount: number; threshold: number; cooldownMs: number };
+    };
+
+    const now = Date.now();
+    const summary = "Skip: No feasible candidates after sizing/cap filters (11 rejected)";
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "trade-1",
+          ts: new Date(now - 120_000).toISOString(),
+          kind: "TRADE",
+          summary: "Recovery sell",
+          details: {
+            reason: "no-feasible-liquidity-recovery"
+          }
+        },
+        {
+          id: "nf-2",
+          ts: new Date(now - 180_000).toISOString(),
+          kind: "SKIP",
+          summary
+        },
+        {
+          id: "nf-1",
+          ts: new Date(now - 240_000).toISOString(),
+          kind: "SKIP",
+          summary
+        }
+      ]
+    };
+
+    const policy = helpers.deriveNoFeasibleRecoveryPolicy({
+      state,
+      reason: "No feasible candidates after sizing/cap filters (11 rejected)",
+      risk: 100,
+      nowMs: now
+    });
+
+    expect(policy.enabled).toBe(false);
+    expect(policy.recentCount).toBe(3);
+    expect(policy.threshold).toBe(2);
+  });
+
   it("classifies skip reason clusters for KPI counters", () => {
     const helpers = service as unknown as {
       classifySkipReasonCluster: (summary: string) => "FEE_EDGE" | "MIN_ORDER" | "INVENTORY_WAITING" | "OTHER";

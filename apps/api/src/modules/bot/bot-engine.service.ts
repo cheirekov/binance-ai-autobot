@@ -1772,6 +1772,50 @@ export class BotEngineService implements OnModuleInit {
     return Number.isFinite(shortfallRatio) && shortfallRatio <= 0.03; // up to 3% shortfall
   }
 
+  private deriveNoFeasibleRecoveryPolicy(params: {
+    state: BotState;
+    reason: string | undefined;
+    risk: number;
+    nowMs: number;
+  }): { enabled: boolean; recentCount: number; threshold: number; cooldownMs: number } {
+    const reason = (params.reason ?? "").toLowerCase();
+    if (!reason.includes("no feasible candidates after sizing/cap filters")) {
+      return { enabled: false, recentCount: 0, threshold: 0, cooldownMs: 0 };
+    }
+
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const threshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
+    const windowMs = 10 * 60_000;
+    const recentSkips = params.state.decisions.filter((decision) => {
+      if (decision.kind !== "SKIP") return false;
+      if (!decision.summary.toLowerCase().includes("no feasible candidates after sizing/cap filters")) return false;
+      const ts = Date.parse(decision.ts);
+      return Number.isFinite(ts) && params.nowMs - ts <= windowMs;
+    }).length;
+    const recentCount = recentSkips + 1; // include current skip
+
+    const cooldownMs = Math.round(900_000 - (boundedRisk / 100) * 300_000); // risk 0 -> 15m, risk 100 -> 10m
+    const recentRecoveryTrade = params.state.decisions.some((decision) => {
+      if (decision.kind !== "TRADE") return false;
+      const details = decision.details as Record<string, unknown> | undefined;
+      if (details?.reason !== "no-feasible-liquidity-recovery") return false;
+      const ts = Date.parse(decision.ts);
+      return Number.isFinite(ts) && params.nowMs - ts <= cooldownMs;
+    });
+
+    return {
+      enabled: recentCount >= threshold && !recentRecoveryTrade,
+      recentCount,
+      threshold,
+      cooldownMs
+    };
+  }
+
+  private deriveNoFeasibleRecoverySellFraction(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    return this.toRounded(0.03 + (boundedRisk / 100) * 0.07, 4); // 3% .. 10%
+  }
+
   private buildBotClientOrderId(params: { config: AppConfig; purpose: string; side: "BUY" | "SELL" }): string {
     const prefix = this.resolveBotOrderClientIdPrefix(params.config);
     const purposeCode = (params.purpose.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 2) || "O").padEnd(2, "O");
@@ -3483,6 +3527,113 @@ export class BotEngineService implements OnModuleInit {
             bufferFactor
           });
           if (!feasibleCandidateSelection.candidate) {
+            const nowMs = Date.now();
+            const noFeasibleRecoveryPolicy = this.deriveNoFeasibleRecoveryPolicy({
+              state: current,
+              reason: feasibleCandidateSelection.reason,
+              risk,
+              nowMs
+            });
+            const quoteLiquidityThreshold = this.toRounded(1 + (1 - Math.max(0, Math.min(100, risk)) / 100) * 2, 4); // 1..3
+            let noFeasibleRecoveryAttempt:
+              | {
+                  symbol?: string;
+                  reason: string;
+                }
+              | null = null;
+            if (noFeasibleRecoveryPolicy.enabled && quoteFree <= quoteLiquidityThreshold) {
+              const managedPositions = [...this.getManagedPositions(current).values()]
+                .filter((position) => {
+                  if (position.netQty <= 0) return false;
+                  if (!position.symbol.endsWith(homeStable)) return false;
+                  return this.isSymbolBlocked(position.symbol, current) === null;
+                })
+                .sort((left, right) => right.costQuote - left.costQuote);
+              const recoverySellFraction = this.deriveNoFeasibleRecoverySellFraction(risk);
+              for (const position of managedPositions) {
+                const baseAsset = position.symbol.slice(0, Math.max(0, position.symbol.length - homeStable.length));
+                if (!baseAsset) continue;
+                const baseFree = getAssetFree(baseAsset);
+                if (!Number.isFinite(baseFree) || baseFree <= 0) {
+                  noFeasibleRecoveryAttempt = {
+                    symbol: position.symbol,
+                    reason: `No free ${baseAsset} balance for recovery sell`
+                  };
+                  continue;
+                }
+                const desiredQty = Math.min(position.netQty, baseFree) * recoverySellFraction;
+                if (!Number.isFinite(desiredQty) || desiredQty <= 0) continue;
+                const sellCheck = await this.marketData.validateMarketOrderQty(position.symbol, desiredQty);
+                let sellQtyStr = sellCheck.ok ? sellCheck.normalizedQty : undefined;
+                if (!sellQtyStr && sellCheck.requiredQty) {
+                  const requiredQty = Number.parseFloat(sellCheck.requiredQty);
+                  if (
+                    Number.isFinite(requiredQty) &&
+                    requiredQty > 0 &&
+                    requiredQty <= Math.min(position.netQty, baseFree) + 1e-8
+                  ) {
+                    sellQtyStr = sellCheck.requiredQty;
+                  }
+                }
+                if (!sellQtyStr) {
+                  noFeasibleRecoveryAttempt = {
+                    symbol: position.symbol,
+                    reason: sellCheck.reason ?? "Recovery sell min-order validation failed"
+                  };
+                  continue;
+                }
+
+                const sellQty = Number.parseFloat(sellQtyStr);
+                if (!Number.isFinite(sellQty) || sellQty <= 0) continue;
+
+                setLiveOperation({
+                  stage: "no-feasible-liquidity-recovery-market-sell",
+                  symbol: position.symbol,
+                  side: "SELL",
+                  asset: baseAsset,
+                  required: sellQty
+                });
+                const recoveryFunds = await ensureFundsBeforeOrder({
+                  asset: baseAsset,
+                  required: sellQty
+                });
+                if (!recoveryFunds.ok) {
+                  noFeasibleRecoveryAttempt = {
+                    symbol: position.symbol,
+                    reason: `No spendable ${baseAsset} for recovery sell (need ${sellQty.toFixed(8)}, free ${recoveryFunds.available.toFixed(8)})`
+                  };
+                  continue;
+                }
+
+                const sellRes = await this.trading.placeSpotMarketOrder({
+                  symbol: position.symbol,
+                  side: "SELL",
+                  quantity: sellQtyStr
+                });
+                persistLiveTrade({
+                  symbol: position.symbol,
+                  side: "SELL",
+                  requestedQty: sellQtyStr,
+                  fallbackQty: sellQty,
+                  response: sellRes,
+                  reason: "no-feasible-liquidity-recovery",
+                  details: {
+                    mode: "liquidity-recovery",
+                    triggerReason: feasibleCandidateSelection.reason ?? null,
+                    quoteFree: Number(quoteFree.toFixed(8)),
+                    quoteLiquidityThreshold: Number(quoteLiquidityThreshold.toFixed(8)),
+                    recoverySellFraction,
+                    managedPositionCost: Number(position.costQuote.toFixed(8)),
+                    managedPositionQty: Number(position.netQty.toFixed(8)),
+                    noFeasibleRecentCount: noFeasibleRecoveryPolicy.recentCount,
+                    noFeasibleThreshold: noFeasibleRecoveryPolicy.threshold,
+                    noFeasibleCooldownMs: noFeasibleRecoveryPolicy.cooldownMs
+                  }
+                });
+                return;
+              }
+            }
+
             const summary = `Skip: ${feasibleCandidateSelection.reason ?? "No feasible live candidate"}`;
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
             const next = {
@@ -3506,7 +3657,16 @@ export class BotEngineService implements OnModuleInit {
                         quoteFree: Number(quoteFree.toFixed(6)),
                         liveTradeNotionalCap: Number.isFinite(notionalCap) ? notionalCap : null,
                         bufferFactor,
-                        rejectionSamples: feasibleCandidateSelection.rejectionSamples
+                        rejectionSamples: feasibleCandidateSelection.rejectionSamples,
+                        noFeasibleRecovery: {
+                          enabled: noFeasibleRecoveryPolicy.enabled,
+                          recentCount: noFeasibleRecoveryPolicy.recentCount,
+                          threshold: noFeasibleRecoveryPolicy.threshold,
+                          cooldownMs: noFeasibleRecoveryPolicy.cooldownMs,
+                          quoteLiquidityThreshold: Number(quoteLiquidityThreshold.toFixed(6)),
+                          attemptedSymbol: noFeasibleRecoveryAttempt?.symbol ?? null,
+                          attemptedReason: noFeasibleRecoveryAttempt?.reason ?? null
+                        }
                       }
                     },
                     ...current.decisions

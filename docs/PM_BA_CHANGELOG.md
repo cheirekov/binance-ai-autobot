@@ -1679,3 +1679,20 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
   - Complete `T-003` adaptive exits using these lock signals.
   - Expose optional Advanced overrides for protection thresholds in a later patch if runtime data indicates need.
+
+## 2026-02-18 12:30 UTC — T-029 no-feasible loop liquidity recovery
+- Scope: reduce repeated `No feasible candidates after sizing/cap filters` loops when quote balance is near zero.
+- BA requirement mapping: autobot should adapt instead of stalling on repeated skip loops.
+- PM milestone mapping: wallet policy v2 closure for long-run stability.
+- Technical changes:
+  - Added `deriveNoFeasibleRecoveryPolicy` + risk-linked recovery sell fraction helper.
+  - In live loop, when no feasible candidate repeats and quote is below recovery threshold, bot attempts a partial market SELL from largest managed home-stable position to restore quote liquidity.
+  - Added recovery telemetry in skip details (`noFeasibleRecovery.*`) for diagnostics (threshold, cooldown, attempted symbol/reason).
+  - Added unit tests for recovery policy trigger + cooldown behavior.
+- Risk slider impact: explicit; higher risk lowers trigger threshold and increases recovery sell fraction.
+- Validation evidence: local tests/CI requested after patch in this session.
+- Runtime test request:
+  - Run 1–2h batch with low quote balance scenario.
+  - Verify a `TRADE` decision appears with reason `no-feasible-liquidity-recovery` and skip-loop frequency drops.
+- Follow-up:
+  - If recovery is blocked by locked sell inventory, add optional stale SELL-limit cancel before recovery sell as next T-029 sub-step.
