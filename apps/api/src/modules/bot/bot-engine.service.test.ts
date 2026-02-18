@@ -269,6 +269,42 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(snapshot?.unmanagedExposureCapPct).toBe(25);
     expect(snapshot?.category).toBe("rebalance");
   });
+
+  it("keeps bear buy-pause confidence threshold risk-linked and tighter", () => {
+    const helpers = service as unknown as {
+      getBearPauseConfidenceThreshold: (risk: number) => number;
+    };
+
+    expect(helpers.getBearPauseConfidenceThreshold(0)).toBe(0.54);
+    expect(helpers.getBearPauseConfidenceThreshold(50)).toBe(0.62);
+    expect(helpers.getBearPauseConfidenceThreshold(100)).toBe(0.7);
+  });
+
+  it("penalizes grid score in bear trend", () => {
+    const helpers = service as unknown as {
+      buildAdaptiveStrategyScores: (candidate: UniverseCandidate | null, regime: "BEAR_TREND" | "RANGE") => {
+        grid: number;
+      };
+    };
+
+    const candidate: UniverseCandidate = {
+      symbol: "SOLUSDC",
+      baseAsset: "SOL",
+      quoteAsset: "USDC",
+      lastPrice: 80,
+      quoteVolume24h: 1_000_000,
+      priceChangePct24h: -3.1,
+      adx14: 31,
+      rsi14: 39,
+      atrPct14: 1.4,
+      score: 1,
+      reasons: []
+    };
+
+    const bear = helpers.buildAdaptiveStrategyScores(candidate, "BEAR_TREND");
+    const range = helpers.buildAdaptiveStrategyScores(candidate, "RANGE");
+    expect(bear.grid).toBeLessThan(range.grid);
+  });
 });
 
 describe("bot-engine ownership detection", () => {

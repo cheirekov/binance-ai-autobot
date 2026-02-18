@@ -2090,6 +2090,11 @@ export class BotEngineService implements OnModuleInit {
     };
   }
 
+  private getBearPauseConfidenceThreshold(risk: number): number {
+    const t = Math.max(0, Math.min(1, Number.isFinite(risk) ? risk / 100 : 0.5));
+    return this.toRounded(0.54 + t * 0.16, 4); // risk 0 -> 0.54, risk 100 -> 0.70
+  }
+
   private buildAdaptiveStrategyScores(candidate: UniverseCandidate | null, regime: RegimeLabel): AdaptiveStrategyScores {
     const adx = Number.isFinite(candidate?.adx14) ? Math.max(0, candidate?.adx14 ?? 0) : 0;
     const rsi = Number.isFinite(candidate?.rsi14) ? Math.max(0, Math.min(100, candidate?.rsi14 ?? 50)) : 50;
@@ -2101,9 +2106,9 @@ export class BotEngineService implements OnModuleInit {
     let grid = this.clamp01((regime === "RANGE" ? 0.65 : 0.25) + Math.min(1.4, atr) * 0.2);
 
     if (regime === "BEAR_TREND") {
-      trend *= 0.45;
-      meanReversion = this.clamp01(meanReversion + 0.1);
-      grid = this.clamp01(grid + 0.08);
+      trend *= 0.5;
+      meanReversion = this.clamp01(meanReversion + 0.04);
+      grid = this.clamp01(grid - 0.14);
     } else if (regime === "BULL_TREND") {
       trend = this.clamp01(trend + 0.12);
     }
@@ -2808,8 +2813,7 @@ export class BotEngineService implements OnModuleInit {
               const scores = this.buildAdaptiveStrategyScores(candidate, regime.label);
 
               const existingBuyPauseLock = this.getActiveSymbolProtectionLock(current, symbol, { onlyTypes: ["GRID_GUARD_BUY_PAUSE"] });
-              const t = boundedRisk / 100;
-              const pauseConfidenceThreshold = this.toRounded(0.6 + t * 0.2, 4); // risk 0 -> 0.60, risk 100 -> 0.80
+              const pauseConfidenceThreshold = this.getBearPauseConfidenceThreshold(risk);
               const shouldPauseBuys =
                 regime.label === "BEAR_TREND" &&
                 typeof regime.confidence === "number" &&
@@ -2907,6 +2911,8 @@ export class BotEngineService implements OnModuleInit {
               const waiting = hasBuyLimit && hasSellLimit;
               const waitingPenalty = waiting ? 0.3 : 0;
               const guardNoInventoryPenalty = buyPaused && !hasInventory ? 0.45 : 0;
+              const bearTrendGridPenalty =
+                regime.label === "BEAR_TREND" ? this.toRounded(0.22 - (risk / 100) * 0.1, 4) : 0;
               const openLimitPenalty = Math.min(0.2, (openLimitCount / Math.max(1, maxGridOrdersPerSymbol)) * 0.2);
               const rejectPenalty = Math.min(
                 0.55,
@@ -2922,6 +2928,7 @@ export class BotEngineService implements OnModuleInit {
                 recommendedBonus -
                 waitingPenalty -
                 guardNoInventoryPenalty -
+                bearTrendGridPenalty -
                 openLimitPenalty -
                 rejectPenalty -
                 infeasibleSellPenalty;
@@ -4468,7 +4475,7 @@ export class BotEngineService implements OnModuleInit {
             });
             const regime = this.buildRegimeSnapshot(selectedCandidate ?? null);
             const t = risk / 100;
-            const pauseConfidenceThreshold = this.toRounded(0.6 + t * 0.2, 4); // risk 0 -> 0.60, risk 100 -> 0.80
+            const pauseConfidenceThreshold = this.getBearPauseConfidenceThreshold(risk);
             const shouldPauseBuys =
               regime.label === "BEAR_TREND" &&
               typeof regime.confidence === "number" &&

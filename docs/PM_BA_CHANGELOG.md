@@ -16,6 +16,33 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-18 04:26 UTC — T-029 night stabilization: bear-regime anti-overtrade tuning
+- Scope: address “profit then decay to loss” pattern by reducing fresh grid aggressiveness in bear regimes and tightening buy-pause trigger.
+- BA requirement mapping:
+  - Bot should adapt to bearish phases and avoid turning early gains into later drawdowns.
+  - Behavior remains risk-linked and non-hardcoded.
+- PM milestone mapping: immediate follow-up after `autobot-feedback-20260218-041719.tgz` (`realizedPnl -30.20`, high `inventoryWaitingSkips`, repeated bear-grid waits).
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added `getBearPauseConfidenceThreshold(risk)` and used it in both candidate-scoring and execution paths,
+      - new threshold: `0.54..0.70` (risk `0..100`) instead of `0.60..0.80`.
+    - tuned adaptive strategy scoring in `BEAR_TREND`:
+      - stronger trend dampening (`*0.5`),
+      - reduced mean-reversion boost (`+0.04`),
+      - grid penalty (`-0.14`).
+    - added additional risk-linked candidate-score penalty for bear grid contexts (`0.22..0.12` by risk).
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added tests for bear pause threshold mapping and bear-vs-range grid scoring behavior.
+- Risk slider impact:
+  - explicit: high risk still trades more, but bear-entry pausing activates earlier and bear-grid scoring is less dominant.
+- Validation evidence:
+  - `docker-compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - 1–2h run: expect fewer repeated bear-symbol grid waits and reduced rapid inventory build-up during down legs.
+  - overnight: compare realized PnL drift and open-exposure concentration against prior run.
+- Follow-up:
+  - if realized decay persists, next slice should add risk-linked position heat cap (pause new BUY legs when symbol unrealized drawdown exceeds threshold).
+
 ## 2026-02-17 18:40 UTC — T-029 night build: pre-check loop fix + guard-no-action candidate filter
 - Scope: remove a high-frequency false skip loop and reduce non-actionable candidate picks before night run.
 - BA requirement mapping:
