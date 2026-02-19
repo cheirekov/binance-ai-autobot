@@ -193,10 +193,21 @@ type ProtectionPolicy = {
   maxDrawdownLookbackMs: number;
   maxDrawdownPct: number;
   maxDrawdownLockMs: number;
+  maxDailyLossLookbackMs: number;
+  maxDailyLossPct: number;
   lowProfitLookbackMs: number;
   lowProfitTradeLimit: number;
   lowProfitThresholdPct: number;
   lowProfitLockMs: number;
+};
+
+type DailyLossGuardSnapshot = {
+  active: boolean;
+  dailyRealizedPnl: number;
+  maxDailyLossAbs: number;
+  maxDailyLossPct: number;
+  lookbackMs: number;
+  windowStartIso: string;
 };
 
 type ReasonQuarantineFamily = "FEE_EDGE" | "GRID_BUY_SIZING" | "GRID_SELL_SIZING";
@@ -443,10 +454,48 @@ export class BotEngineService implements OnModuleInit {
       maxDrawdownLookbackMs: Math.round((24 - t * 12) * 60 * 60_000), // 24h -> 12h
       maxDrawdownPct: Math.max(2.5, Number((4 + t * 10).toFixed(2))), // 4% -> 14%
       maxDrawdownLockMs: Math.round((120 - t * 90) * 60_000), // 120m -> 30m
+      maxDailyLossLookbackMs: 24 * 60 * 60_000, // 24h rolling window
+      maxDailyLossPct: Number((1.5 + t * 7.5).toFixed(2)), // 1.5% -> 9.0%
       lowProfitLookbackMs: Math.round((180 - t * 135) * 60_000), // 180m -> 45m
       lowProfitTradeLimit: Math.max(2, Math.round(2 + t * 3)), // 2 -> 5
       lowProfitThresholdPct: Number((-0.5 - t * 2).toFixed(2)), // -0.5% -> -2.5%
       lowProfitLockMs: Math.round((120 - t * 90) * 60_000) // 120m -> 30m
+    };
+  }
+
+  private deriveStopLossEntryCooldownMs(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const t = boundedRisk / 100;
+    return Math.round((30 - t * 25) * 60_000); // 30m -> 5m
+  }
+
+  private evaluateDailyLossGuard(params: {
+    state: BotState;
+    risk: number;
+    walletTotalHome: number;
+    nowMs: number;
+  }): DailyLossGuardSnapshot {
+    const policy = this.deriveProtectionPolicy(params.risk);
+    const walletTotalHome = Number.isFinite(params.walletTotalHome) ? Math.max(0, params.walletTotalHome) : 0;
+    const maxDailyLossAbs = Math.max(5, walletTotalHome * (policy.maxDailyLossPct / 100));
+    const windowStartMs = params.nowMs - policy.maxDailyLossLookbackMs;
+    const windowStartIso = new Date(windowStartMs).toISOString();
+
+    const dailyRealizedPnl = this.getClosedPnlEvents(params.state)
+      .filter((event) => {
+        const ts = Date.parse(event.ts);
+        return Number.isFinite(ts) && ts >= windowStartMs;
+      })
+      .reduce((sum, event) => sum + event.pnlAbs, 0);
+
+    const active = walletTotalHome > 0 && dailyRealizedPnl <= -maxDailyLossAbs;
+    return {
+      active,
+      dailyRealizedPnl: this.toRounded(dailyRealizedPnl, 8),
+      maxDailyLossAbs: this.toRounded(maxDailyLossAbs, 8),
+      maxDailyLossPct: policy.maxDailyLossPct,
+      lookbackMs: policy.maxDailyLossLookbackMs,
+      windowStartIso
     };
   }
 
@@ -1154,6 +1203,7 @@ export class BotEngineService implements OnModuleInit {
     if (!config) return null;
 
     const history = this.getRecentSymbolOrders(params.state, params.symbol);
+    const normalizedSymbol = params.symbol.trim().toUpperCase();
     const cooldownMs = config.advanced.symbolEntryCooldownMs;
     if (cooldownMs > 0) {
       const lastBuy = history.find((o) => o.side === "BUY");
@@ -1169,6 +1219,34 @@ export class BotEngineService implements OnModuleInit {
               lastBuyTs: lastBuy?.ts
             }
           };
+        }
+      }
+    }
+
+    const configuredRisk = (config as Partial<AppConfig>).basic?.risk;
+    const riskForEntryGuard = typeof configuredRisk === "number" && Number.isFinite(configuredRisk) ? configuredRisk : 50;
+    const stopLossEntryCooldownMs = this.deriveStopLossEntryCooldownMs(riskForEntryGuard);
+    if (stopLossEntryCooldownMs > 0) {
+      const lastStopLossExit = params.state.decisions.find((decision) => {
+        if (decision.kind !== "TRADE") return false;
+        const details = this.getDecisionDetails(decision);
+        if (details?.reason !== "stop-loss-exit") return false;
+        return decision.summary.toUpperCase().includes(normalizedSymbol);
+      });
+      if (lastStopLossExit) {
+        const stopLossAt = Date.parse(lastStopLossExit.ts);
+        if (Number.isFinite(stopLossAt)) {
+          const elapsed = Date.now() - stopLossAt;
+          if (elapsed < stopLossEntryCooldownMs) {
+            return {
+              summary: "Post stop-loss cooldown active",
+              details: {
+                stopLossEntryCooldownMs,
+                remainingMs: Math.max(0, Math.round(stopLossEntryCooldownMs - elapsed)),
+                lastStopLossTs: lastStopLossExit.ts
+              }
+            };
+          }
         }
       }
     }
@@ -3412,6 +3490,12 @@ export class BotEngineService implements OnModuleInit {
 
           const walletTotalHome = await this.estimateWalletTotalInHome(balances, homeStable);
           const capitalProfile = this.getCapitalProfile(walletTotalHome);
+          const dailyLossGuard = this.evaluateDailyLossGuard({
+            state: current,
+            risk,
+            walletTotalHome,
+            nowMs: Date.now()
+          });
           tickContext.walletTotalHome = walletTotalHome;
           const maxPositionPct = config?.derived.maxPositionPct ?? 1;
           tickContext.maxPositionPct = maxPositionPct;
@@ -4082,6 +4166,39 @@ export class BotEngineService implements OnModuleInit {
               });
               return;
             }
+          }
+
+          if (dailyLossGuard.active) {
+            const summary = `Skip: Daily loss guard active (${dailyLossGuard.dailyRealizedPnl.toFixed(2)} ${homeStable} <= -${dailyLossGuard.maxDailyLossAbs.toFixed(2)} ${homeStable})`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        stage: "daily-loss-guard",
+                        dailyRealizedPnl: dailyLossGuard.dailyRealizedPnl,
+                        maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs,
+                        maxDailyLossPct: dailyLossGuard.maxDailyLossPct,
+                        lookbackMs: dailyLossGuard.lookbackMs,
+                        windowStart: dailyLossGuard.windowStartIso,
+                        candidateSymbol
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            this.save(next);
+            return;
           }
 
           if (managedOpenHomeSymbols.length >= maxOpenPositions && !candidateIsOpen) {

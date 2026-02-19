@@ -39,6 +39,8 @@ Companion docs:
 7. Do not start a new ticket before closing or deferring the current one.
 8. Runtime issues must be triaged from bundle artifacts first (`state`, telemetry, API log tail), then patched.
 9. Each patch batch must be tested with Docker CI before handoff.
+   - Dev/local (primary): `docker compose -f docker-compose.ci.yml run --rm ci` (Compose v2).
+   - Remote/runtime compatibility: `docker-compose -f docker-compose.ci.yml run --rm ci` (Compose v1) when v2 is unavailable.
 10. Avoid micro-churn. Group related fixes into a single testable batch.
 11. If scope changes, update board/changelog before additional code changes.
 11a. New findings during an active ticket must be captured as a triage note first; only P0/P1 may interrupt.
@@ -82,7 +84,9 @@ Companion docs:
 3. Move it to `IN_PROGRESS` and note date/owner.
 4. Run `./scripts/pmba-gate.sh start`.
 5. Implement code + tests.
-6. Run `docker compose -f docker-compose.ci.yml run --rm ci`.
+6. Run Docker CI (compose command based on environment):
+   - `docker compose -f docker-compose.ci.yml run --rm ci` (v2)
+   - or `docker-compose -f docker-compose.ci.yml run --rm ci` (v1)
 7. Add a structured entry in `docs/PM_BA_CHANGELOG.md`.
 8. Run `./scripts/pmba-gate.sh end`.
 9. Mark ticket `DONE` (or `BLOCKED` with reason and next action).

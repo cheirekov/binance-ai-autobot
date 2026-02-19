@@ -1775,3 +1775,47 @@ This log is mandatory for every implementation patch batch.
   - generated summary + bundle check confirms inclusion of session brief, changelog tail, and summary artifact.
 - Runtime test request:
   - keep night run unchanged; verify next morning bundle contains `meta/docs/SESSION_BRIEF.md` and `meta/docs/PM_BA_CHANGELOG.tail.md`.
+
+## 2026-02-19 13:20 UTC — T-005 started (daily-loss guardrails slice) after overnight review
+- Scope: move active lane from `T-029` to `T-005` after reviewing `autobot-feedback-20260219-103043.tgz`.
+- Overnight findings summary:
+  - Wallet policy objective from `T-029` is stable: unmanaged exposure observed `8.51%` vs cap `50%`, no dominant no-feasible recovery churn.
+  - Realized PnL remains negative (`-146.36 USDC`) with repeated churn signatures (stop-loss exits followed by quick re-entry on the same symbols).
+- PM/BA decision:
+  - Mark `T-029` as done for current scope.
+  - Start `T-005` guardrails lane to reduce downside churn before further strategy refactors.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - Added rolling daily-loss guard evaluation (`24h` realized PnL window, risk-linked max-loss threshold `1.5% -> 9.0%`).
+    - Added runtime enforcement: when guard is active, new exposure actions are skipped with explicit telemetry details.
+    - Added risk-linked post-stop-loss symbol entry cooldown (`30m -> 5m`) to prevent immediate re-entry loops.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - Added tests for post-stop-loss entry cooldown behavior.
+    - Added tests for daily-loss guard activation threshold logic.
+  - Process artifacts:
+    - Updated `docs/DELIVERY_BOARD.md` to set `T-005` as `IN_PROGRESS`.
+    - Updated `docs/SESSION_BRIEF.md` batch contract and DoD to `T-005`.
+- Risk slider impact:
+  - explicit: higher risk allows larger daily drawdown and shorter post-stop-loss cooldown; lower risk tightens both.
+- Validation evidence requested for this slice:
+  - `pnpm -C apps/api test -- --passWithNoTests`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime request:
+  - run `2-4h` bundle and confirm:
+    - `Skip: Daily loss guard active (...)` appears when threshold is breached,
+    - no immediate same-symbol re-entry after `stop-loss-exit`,
+    - exits/sweeps still occur before guard hold.
+
+## 2026-02-19 11:01 UTC — Architect decision: Docker validation command policy (v2 local, v1 remote fallback)
+- Scope: clarify CI/test command usage across environments to prevent local-toolchain drift.
+- BA requirement mapping: validations must be reproducible and dockerized regardless of host differences.
+- PM milestone mapping: process hardening for stable patch cadence and reduced environment confusion.
+- Solution Architect decision:
+  - Local/dev validation uses Compose v2 as primary command.
+  - Remote/runtime hosts may use Compose v1 fallback without changing feature behavior.
+  - Local non-docker checks are allowed only as supplementary diagnostics, not as release gate evidence.
+- Documentation changes:
+  - Updated `docs/TEAM_OPERATING_RULES.md` hard rule + delivery workflow to explicitly support both commands.
+- Risk slider impact: none (process-only update).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed in local dev environment.

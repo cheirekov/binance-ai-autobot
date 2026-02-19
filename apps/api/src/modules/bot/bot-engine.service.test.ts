@@ -403,6 +403,103 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(bullUnchanged).toBe(-2);
   });
 
+  it("applies post stop-loss entry cooldown per symbol", () => {
+    const config = {
+      basic: { risk: 80 },
+      advanced: {
+        symbolEntryCooldownMs: 0,
+        maxConsecutiveEntriesPerSymbol: 0
+      }
+    } as unknown as AppConfig;
+
+    const guardedService = new BotEngineService(
+      { load: () => config } as unknown as ConfigService,
+      {} as unknown as BinanceMarketDataService,
+      {} as unknown as BinanceTradingService,
+      {} as unknown as ConversionRouterService,
+      {} as unknown as UniverseService
+    );
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "sl-1",
+          ts: new Date(now - 60_000).toISOString(),
+          kind: "TRADE",
+          summary: "Binance testnet SELL MARKET ORCAUSDC qty 10 → FILLED (orderId 1 · stop-loss-exit)",
+          details: { reason: "stop-loss-exit" }
+        }
+      ]
+    };
+
+    const helpers = guardedService as unknown as {
+      getEntryGuard: (params: { symbol: string; state: BotState }) => { summary: string } | null;
+    };
+
+    const guarded = helpers.getEntryGuard({ symbol: "ORCAUSDC", state });
+    expect(guarded?.summary).toBe("Post stop-loss cooldown active");
+
+    const otherSymbol = helpers.getEntryGuard({ symbol: "BTCUSDC", state });
+    expect(otherSymbol).toBeNull();
+  });
+
+  it("activates daily loss guard when realized losses exceed risk-linked threshold", () => {
+    const helpers = service as unknown as {
+      evaluateDailyLossGuard: (params: {
+        state: BotState;
+        risk: number;
+        walletTotalHome: number;
+        nowMs: number;
+      }) => {
+        active: boolean;
+        dailyRealizedPnl: number;
+        maxDailyLossAbs: number;
+        maxDailyLossPct: number;
+      };
+    };
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      orderHistory: [
+        {
+          id: "buy-1",
+          ts: new Date(now - 20 * 60_000).toISOString(),
+          symbol: "AAAUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          price: 100,
+          qty: 1
+        },
+        {
+          id: "sell-1",
+          ts: new Date(now - 10 * 60_000).toISOString(),
+          symbol: "AAAUSDC",
+          side: "SELL",
+          type: "MARKET",
+          status: "FILLED",
+          price: 80,
+          qty: 1
+        }
+      ]
+    };
+
+    const guard = helpers.evaluateDailyLossGuard({
+      state,
+      risk: 0,
+      walletTotalHome: 1_000,
+      nowMs: now
+    });
+
+    expect(guard.active).toBe(true);
+    expect(guard.dailyRealizedPnl).toBeCloseTo(-20, 6);
+    expect(guard.maxDailyLossPct).toBe(1.5);
+    expect(guard.maxDailyLossAbs).toBeCloseTo(15, 6);
+  });
+
   it("penalizes grid score in bear trend", () => {
     const helpers = service as unknown as {
       buildAdaptiveStrategyScores: (candidate: UniverseCandidate | null, regime: "BEAR_TREND" | "RANGE") => {

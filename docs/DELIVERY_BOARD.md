@@ -88,17 +88,17 @@ Must pass all:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-029 | IN_PROGRESS | Wallet policy v2 (unmanaged exposure, dust, anti-loop) | No regime rewrite, no multi-quote execution expansion, no AI promotion |
+| T-005 | IN_PROGRESS | Daily guardrails + unwind-only behavior | No PnL ledger refactor, no AI promotion, no multi-quote expansion |
 
-`T-029` closure target: `2` short runs + `1` overnight run with acceptable skip-loop and unmanaged-exposure behavior.
+`T-029` status: moved to DONE after overnight evidence (`autobot-feedback-20260219-103043.tgz`) showed unmanaged exposure controlled and no dominant no-feasible conversion loop.
 
 ### NEXT (Gate A blockers)
 
 | Priority | ID | Status | Title | Acceptance focus |
 |---|---|---|---|---|
-| 1 | T-005 | TODO | Daily guardrails + UI visibility | NORMAL/CAUTION/HALT + unwind-only behavior |
-| 2 | T-007 | TODO | PnL correctness + exposure reporting | commission/fill-aware and restart-stable |
-| 3 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source |
+| 1 | T-007 | TODO | PnL correctness + exposure reporting | commission/fill-aware and restart-stable |
+| 2 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source |
+| 3 | T-030 | TODO | Universe filter-chain v2 | staged rejection reasons and anti-churn visibility |
 
 ### LATER (after Gate A)
 
@@ -128,11 +128,11 @@ Must pass all:
 
 ### Completed baseline (already delivered)
 
-`T-000`, `T-001`, `T-002`, `T-004`, `T-006`, `T-008`, `T-009`, `T-010`, `T-011`, `T-012`, `T-013`, `T-014`, `T-015`, `T-016`, `T-017`, `T-019`, `T-021`, `T-022`, `T-024`, `T-027`, `T-033`
+`T-000`, `T-001`, `T-002`, `T-004`, `T-006`, `T-008`, `T-009`, `T-010`, `T-011`, `T-012`, `T-013`, `T-014`, `T-015`, `T-016`, `T-017`, `T-019`, `T-021`, `T-022`, `T-024`, `T-027`, `T-029`, `T-033`
 
 ### Open backlog
 
-`T-003`, `T-005`, `T-007`, `T-020`, `T-023`, `T-025`, `T-026`, `T-028`, `T-029`, `T-030`, `T-031`, `T-032`, `T-034`, `T-035`, `T-036`, `T-037`, `T-038`
+`T-003`, `T-005`, `T-007`, `T-020`, `T-023`, `T-025`, `T-026`, `T-028`, `T-030`, `T-031`, `T-032`, `T-034`, `T-035`, `T-036`, `T-037`, `T-038`
 
 ---
 

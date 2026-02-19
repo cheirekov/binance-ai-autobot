@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-18 13:49 UTC
+Last updated: 2026-02-19 13:20 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -8,43 +8,39 @@ Use this file at the start and end of every batch.
 ## 1) Batch contract (fill before coding)
 
 - Batch type: `DAY (2-4h)`
-- Active ticket: `T-029` (Wallet policy v2: unmanaged exposure control)
-- Goal (single sentence): reduce idle bag-holding and stop tiny-shortfall exit skip loops that block inventory reduction.
+- Active ticket: `T-005` (Daily guardrails + unwind-only behavior)
+- Goal (single sentence): enforce a risk-linked daily-loss guard that halts new exposure while still allowing exits/sweeps.
 - In scope:
-  - unmanaged non-home exposure valuation during wallet policy path.
-  - risk-linked unmanaged exposure cap and rebalance trigger.
-  - telemetry details in wallet-sweep trade events.
-  - tiny-shortfall position-exit fallback (sell validated available qty instead of repeating pre-check skips).
-  - respect symbol/global protection locks before re-attempting position exits.
-  - rotate away from repeated grid-wait symbols via storm cooldown (`GRID_WAIT_ROTATE`).
+  - compute rolling 24h realized PnL guard threshold from risk slider.
+  - block new entry/grid placement when guard is active.
+  - keep position-exit and wallet-sweep paths available before guard return.
+  - add post-stop-loss symbol re-entry cooldown (risk-linked) to reduce churn.
 - Out of scope:
-  - full liquidation of protected assets used by active orders/managed positions.
-  - adaptive/AI promotion from shadow to execution,
+  - full ledger/commission reconciliation (`T-007`),
+  - regime strategy rewrite (`T-031/T-032`),
   - PnL reconciliation refactor (`T-007`).
-- Hypothesis: weak-trend-only sweep gating leaves too many unmanaged holdings untouched; exposure-cap trigger will make cleanup adaptive and less passive.
+- Hypothesis: most current losses are entry churn after stop-loss and weak trend continuation; daily guard + post-stop-loss cooldown reduces that bleed without freezing exits.
 - Target KPI delta:
-  - appearance of `wallet-sweep ... category=rebalance` trades when unmanaged exposure is high.
-  - gradual reduction of unmanaged non-home holdings value over runtime.
+  - when rolling realized loss breaches guard, decisions show `Daily loss guard active` and no new entries are placed.
+  - stop-loss -> immediate re-entry loops per symbol drop.
 - Stop/rollback condition:
-  - if sweep becomes over-aggressive and starves normal grid inventory behavior.
+  - if guard blocks all trading actions including exits/sweeps.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
-  - Wallet policy computes unmanaged non-home exposure and compares it to a risk-linked cap.
-  - If over cap, sweep can rebalance unmanaged assets even without weak-trend signal.
-  - Sweep telemetry includes unmanaged exposure metrics.
-  - Position exits can fallback to available validated qty when shortfall is small (<=3%).
+  - Daily-loss guard computes rolling 24h realized loss vs risk-linked threshold.
+  - When triggered, bot skips new exposure actions and records guard details in decision telemetry.
+  - Entry guard applies additional post-stop-loss symbol cooldown.
 - Runtime evidence in decisions/logs:
-  - observe at least one `wallet-sweep` trade with `category=rebalance` when exposure is over cap.
-  - reduced repetition of `position-exit-market-sell pre-check insufficient ...` skips.
-  - reduced same-symbol exit retry storms while cooldown lock is active.
-  - reduced repeated `Grid waiting for ladder slot or inventory` skips for one symbol.
+  - `Skip: Daily loss guard active (...)` appears with threshold details when tripped.
+  - fewer same-symbol BUY entries immediately after `stop-loss-exit`.
 - Risk slider impact (`none` or explicit low/mid/high behavior):
-  - unmanaged exposure cap scales from strict (low risk) to loose (high risk).
+  - max daily loss threshold scales from strict (low risk) to loose (high risk).
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
-  - additional targeted command(s): none.
+  - additional targeted command(s):
+    - `pnpm -C apps/api test -- --passWithNoTests`
 - Runtime validation plan:
   - run duration: `2-4 hours`
   - expected bundle name pattern: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
@@ -69,32 +65,30 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=11, historyLimitOrders=80, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=60.0%)
-  - sizing reject pressure: `low` (sizingRejectSkips=7, decisions=200, ratio=3.5%)
-- Decision: `continue`
-- Next ticket candidate: `T-007` (if lifecycle remains stable)
+  - overnight bundle reviewed: `autobot-feedback-20260219-103043.tgz`
+  - unmanaged exposure path is stable (`8.51%` vs cap `50%`), no dominant no-feasible recovery loop.
+  - realized PnL remains negative (`-146.36 USDC`) with repeated trend-churn signatures (`stop-loss-exit` + re-entry on high-ATR symbols).
+- Decision: `pivot`
+- Next ticket candidate: `T-005` (daily guardrails + unwind-only behavior)
 - Open risks:
-  - none critical from automated checks.
+  - strategy quality remains a separate lane (`T-031/T-032`); this batch only adds guardrails/churn control.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260218-134833.tgz`
-  - auto-updated at: `2026-02-18T13:49:11.765Z`
+  - bundle: `autobot-feedback-20260219-103043.tgz`
+  - patch adds daily-loss guard + post-stop-loss entry cooldown.
 
 ## 5) Copy/paste prompt for next session
 
 ```text
-Ticket: T-029
+Ticket: T-005
 Batch: DAY (2-4h)
-Goal: Trigger adaptive wallet rebalance when unmanaged non-home exposure exceeds a risk-linked cap.
-In scope: unmanaged exposure valuation + cap trigger + sweep telemetry details + tiny-shortfall exit fallback + lock-respecting position-exit scan + grid-wait storm cooldown rotation.
-Out of scope: forced liquidation of protected/in-strategy assets; adaptive/AI promotion; PnL refactor.
+Goal: enforce daily-loss guardrails that stop new exposure while preserving exit paths.
+In scope: rolling daily-loss guard check, guard skip telemetry, post-stop-loss symbol re-entry cooldown.
+Out of scope: strategy rewrite, multi-quote routing, commission ledger refactor.
 DoD:
-- API: wallet policy can select `category=rebalance` sweep sources when over cap.
-- Runtime: `wallet-sweep` trade details include unmanaged exposure values.
-- Runtime: repeated `position-exit-market-sell pre-check insufficient` loops are reduced.
-- Runtime: same-symbol exit retries are throttled by existing protection locks.
-- Runtime: repeated same-symbol `Grid waiting for ladder slot or inventory` loops are reduced.
-- Risk slider mapping: cap widens at high risk and tightens at low risk.
+- API: daily-loss guard computes and enforces risk-linked max daily loss.
+- Runtime: guard blocks new entries and records clear skip details.
+- Runtime: symbol post-stop-loss re-entry cooldown is observed.
+- Risk slider mapping: max daily loss threshold widens at high risk and tightens at low risk.
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```
