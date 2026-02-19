@@ -1751,3 +1751,27 @@ This log is mandatory for every implementation patch batch.
   - For next bundle, include `data/telemetry/last_run_summary.json` generation in runtime patch lane.
 - Follow-up:
   - Implement `T-036` to enforce contract validation + AI budget gates in execution path.
+
+## 2026-02-18 15:55 UTC — Bundle/runtime process hardening from retro feedback
+- Scope: apply low-risk process improvements from external retro review without changing trading behavior.
+- BA requirement mapping: make session handoff artifacts more context-proof and less noisy.
+- PM milestone mapping: strengthen Gate A evidence workflow while keeping active `T-029` lane stable.
+- Technical changes:
+  - `scripts/collect-feedback.sh`
+    - includes `docs/SESSION_BRIEF.md` in bundle snapshots,
+    - stores `PM_BA_CHANGELOG` as tail-only (`PM_BA_CHANGELOG.tail.md`) by default,
+    - supports full changelog inclusion via `AUTOBOT_INCLUDE_FULL_CHANGELOG=1`,
+    - auto-generates `data/telemetry/last_run_summary.json` before bundling,
+    - degrades gracefully when Docker Compose is unavailable (local artifacts only).
+  - `scripts/update-session-brief.sh`
+    - removed hardcoded “next ticket” suggestions,
+    - now defaults next ticket candidate to current active lane or `PM/BA-TRIAGE` on pivot.
+  - `scripts/generate-last-run-summary.sh`
+    - AI slider now reads optional config fields when present, with safe fallback,
+    - risk state output now explicitly marks best-effort mode until canonical guardrails (`T-005`) exist.
+- Risk slider impact: none (reporting/process behavior only).
+- Validation evidence:
+  - `bash -n scripts/collect-feedback.sh scripts/update-session-brief.sh scripts/generate-last-run-summary.sh`
+  - generated summary + bundle check confirms inclusion of session brief, changelog tail, and summary artifact.
+- Runtime test request:
+  - keep night run unchanged; verify next morning bundle contains `meta/docs/SESSION_BRIEF.md` and `meta/docs/PM_BA_CHANGELOG.tail.md`.

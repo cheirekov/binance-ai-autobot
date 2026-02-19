@@ -7,17 +7,23 @@ cd "$ROOT_DIR"
 # Docker Compose compatibility:
 # - Prefer `docker compose` (v2 plugin)
 # - Fallback to `docker-compose` (v1 standalone)
+# - If unavailable, continue with local file artifacts only.
 COMPOSE=()
+COMPOSE_AVAILABLE=0
 if [[ -n "${AUTOBOT_COMPOSE_CMD:-}" ]]; then
   read -r -a COMPOSE <<<"${AUTOBOT_COMPOSE_CMD}"
+  COMPOSE_AVAILABLE=1
 else
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
     COMPOSE=(docker compose)
+    COMPOSE_AVAILABLE=1
   elif command -v docker-compose >/dev/null 2>&1; then
     COMPOSE=(docker-compose)
+    COMPOSE_AVAILABLE=1
   else
-    echo "Docker Compose not found. Install either 'docker compose' (v2) or 'docker-compose' (v1)." >&2
-    exit 1
+    echo "Docker Compose not found. Proceeding with local artifacts only." >&2
+    COMPOSE=()
+    COMPOSE_AVAILABLE=0
   fi
 fi
 
@@ -59,7 +65,14 @@ fi
 # Delivery context snapshots (team memory + ticket state)
 copy_if_exists "docs/TEAM_OPERATING_RULES.md" "$TMP_DIR/meta/docs/TEAM_OPERATING_RULES.md"
 copy_if_exists "docs/DELIVERY_BOARD.md" "$TMP_DIR/meta/docs/DELIVERY_BOARD.md"
-copy_if_exists "docs/PM_BA_CHANGELOG.md" "$TMP_DIR/meta/docs/PM_BA_CHANGELOG.md"
+copy_if_exists "docs/SESSION_BRIEF.md" "$TMP_DIR/meta/docs/SESSION_BRIEF.md"
+if [[ -f "docs/PM_BA_CHANGELOG.md" ]]; then
+  local_changelog_tail_lines="${AUTOBOT_CHANGELOG_TAIL_LINES:-500}"
+  tail -n "$local_changelog_tail_lines" "docs/PM_BA_CHANGELOG.md" >"$TMP_DIR/meta/docs/PM_BA_CHANGELOG.tail.md" || true
+  if [[ "${AUTOBOT_INCLUDE_FULL_CHANGELOG:-0}" == "1" ]]; then
+    copy_if_exists "docs/PM_BA_CHANGELOG.md" "$TMP_DIR/meta/docs/PM_BA_CHANGELOG.md"
+  fi
+fi
 copy_if_exists "docs/AI_DECISION_CONTRACT.md" "$TMP_DIR/meta/docs/AI_DECISION_CONTRACT.md"
 copy_if_exists "docs/schemas/last_run_summary.schema.json" "$TMP_DIR/meta/docs/last_run_summary.schema.json"
 for retro in docs/RETROSPECTIVE_*.md; do
@@ -137,11 +150,19 @@ fi
 {
   echo "date_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   echo "git_sha=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
-  echo "docker_compose_cmd=${COMPOSE[*]}"
-  echo "docker_compose_version=$("${COMPOSE[@]}" version 2>/dev/null | head -n 1 || echo unknown)"
+  echo "docker_compose_cmd=${COMPOSE[*]:-none}"
+  if [[ "$COMPOSE_AVAILABLE" -eq 1 ]]; then
+    echo "docker_compose_version=$("${COMPOSE[@]}" version 2>/dev/null | head -n 1 || echo unknown)"
+  else
+    echo "docker_compose_version=unavailable"
+  fi
 } >"$TMP_DIR/meta/info.txt"
 
-"${COMPOSE[@]}" ps >"$TMP_DIR/meta/docker-compose-ps.txt" 2>&1 || true
+if [[ "$COMPOSE_AVAILABLE" -eq 1 ]]; then
+  "${COMPOSE[@]}" ps >"$TMP_DIR/meta/docker-compose-ps.txt" 2>&1 || true
+else
+  echo "compose unavailable" >"$TMP_DIR/meta/docker-compose-ps.txt"
+fi
 
 compose_services_running=0
 if awk 'NR>1 && NF>0 { found=1 } END { exit(found?0:1) }' "$TMP_DIR/meta/docker-compose-ps.txt"; then
@@ -154,7 +175,7 @@ write_service_tail() {
   local fallback_file="$3"
   local header="[$service tail]"
 
-  if [[ "$compose_services_running" -eq 1 ]]; then
+  if [[ "$COMPOSE_AVAILABLE" -eq 1 && "$compose_services_running" -eq 1 ]]; then
     "${COMPOSE[@]}" logs --no-color --tail=500 "$service" >"$out_file" 2>&1 || true
   fi
 

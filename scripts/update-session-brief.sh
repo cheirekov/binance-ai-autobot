@@ -50,6 +50,7 @@ const readJson = (filePath) => {
 const stateSummary = readJson(stateSummaryPath) ?? {};
 const state = readJson(statePath) ?? {};
 const kpis = readJson(kpiPath) ?? {};
+const sessionRaw = fs.readFileSync(sessionFile, "utf8");
 
 const activeOrders = Array.isArray(state.activeOrders) ? state.activeOrders : [];
 const historyOrders = Array.isArray(state.orderHistory) ? state.orderHistory : [];
@@ -111,7 +112,9 @@ let decision = "continue";
 if (!limitLifecycleObserved || sizingRejectPressure === "high") {
   decision = "pivot";
 }
-const nextTicket = decision === "continue" ? "T-007" : "T-027";
+const activeTicketMatch = sessionRaw.match(/^- Active ticket:\s*`([^`]+)`/m);
+const activeTicket = activeTicketMatch ? activeTicketMatch[1].trim() : "T-029";
+const nextTicket = decision === "continue" ? activeTicket : "PM/BA-TRIAGE";
 
 const conversionTrades = Number.isFinite(totals.conversions) ? totals.conversions : 0;
 const totalTrades = Number.isFinite(totals.trades) ? totals.trades : 0;
@@ -142,7 +145,7 @@ const block = [
   `  - market-only share reduced: \`${marketOnlyReduced ? "yes" : "no"}\`${marketOrderShare === null ? "" : ` (historyMarketShare=${marketOrderShare.toFixed(1)}%)`}`,
   `  - sizing reject pressure: \`${sizingRejectPressure}\` (sizingRejectSkips=${sizingRejectSkips}, decisions=${decisions}, ratio=${(sizingRejectRatio * 100).toFixed(1)}%)`,
   `- Decision: \`${decision}\``,
-  `- Next ticket candidate: \`${nextTicket}\`${decision === "continue" ? " (if lifecycle remains stable)" : " (continue T-027 hardening)"}`,
+  `- Next ticket candidate: \`${nextTicket}\`${decision === "continue" ? " (continue active lane unless PM/BA reprioritizes)" : " (triage required before lane change)"}`,
   "- Open risks:",
   ...risks.map((risk) => `  - ${risk}`),
   "- Notes for next session:",
@@ -150,7 +153,6 @@ const block = [
   `  - auto-updated at: \`${nowIso}\``
 ].join("\n");
 
-const sessionRaw = fs.readFileSync(sessionFile, "utf8");
 const sectionPattern = /## 4\) End-of-batch result \(fill after run\)[\s\S]*?(?=## 5\) Copy\/paste prompt for next session)/m;
 if (!sectionPattern.test(sessionRaw)) {
   console.error("Could not find Section 4 in docs/SESSION_BRIEF.md");

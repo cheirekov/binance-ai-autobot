@@ -73,15 +73,36 @@ const environment = !liveTrading
     : "mainnet";
 
 const riskSlider = Math.max(0, Math.min(100, Math.round(safeNum(config?.basic?.risk, 50))));
-const aiSlider = config?.basic?.aiEnabled ? 30 : 0;
+const aiSliderCandidate = [
+  config?.basic?.aiAutonomy,
+  config?.basic?.aiSlider,
+  config?.expert?.aiAutonomy,
+  config?.expert?.aiSlider
+].find((value) => Number.isFinite(Number(value)));
+const aiSlider = config?.basic?.aiEnabled
+  ? Math.max(0, Math.min(100, Math.round(safeNum(aiSliderCandidate, 30))))
+  : 0;
 
 const activeGlobalLocks = locks.filter((lock) => String(lock?.scope ?? "").toUpperCase() === "GLOBAL");
-const reasonCodes = activeGlobalLocks.map((lock) => String(lock?.type ?? "UNKNOWN"));
-const unwindOnly = activeGlobalLocks.some((lock) => {
+const canonicalRiskStateRaw = String(state?.riskState?.state ?? state?.riskState ?? "").toUpperCase();
+const hasCanonicalRiskState = ["NORMAL", "CAUTION", "HALT"].includes(canonicalRiskStateRaw);
+const fallbackUnwindOnly = activeGlobalLocks.some((lock) => {
   const type = String(lock?.type ?? "").toUpperCase();
   return type === "MAX_DRAWDOWN" || type === "STOPLOSS_GUARD";
 });
-const riskState = unwindOnly ? "HALT" : activeGlobalLocks.length > 0 ? "CAUTION" : "NORMAL";
+const fallbackRiskState = fallbackUnwindOnly ? "HALT" : activeGlobalLocks.length > 0 ? "CAUTION" : "NORMAL";
+const riskState = hasCanonicalRiskState ? canonicalRiskStateRaw : fallbackRiskState;
+const reasonCodes = hasCanonicalRiskState
+  ? Array.isArray(state?.riskState?.reason_codes)
+    ? state.riskState.reason_codes.map((reason) => String(reason))
+    : Array.isArray(state?.riskState?.reasonCodes)
+      ? state.riskState.reasonCodes.map((reason) => String(reason))
+      : []
+  : [
+      "BEST_EFFORT_PROTECTION_LOCKS",
+      ...activeGlobalLocks.map((lock) => String(lock?.type ?? "UNKNOWN"))
+    ];
+const unwindOnly = hasCanonicalRiskState ? Boolean(state?.riskState?.unwind_only ?? state?.riskState?.unwindOnly ?? false) : fallbackUnwindOnly;
 
 const realized = safeNum(totals.realizedPnl, 0);
 const unrealized = 0;
@@ -174,7 +195,7 @@ const output = {
     state: riskState,
     reason_codes: reasonCodes,
     unwind_only: unwindOnly,
-    resume_conditions: []
+    resume_conditions: hasCanonicalRiskState ? [] : ["Best-effort risk state until T-005 canonical guardrails"]
   },
   pnl: {
     equity_usdt: equity,
