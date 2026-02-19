@@ -202,6 +202,7 @@ type ProtectionPolicy = {
 };
 
 type DailyLossGuardSnapshot = {
+  state: "NORMAL" | "CAUTION" | "HALT";
   active: boolean;
   dailyRealizedPnl: number;
   maxDailyLossAbs: number;
@@ -455,7 +456,7 @@ export class BotEngineService implements OnModuleInit {
       maxDrawdownPct: Math.max(2.5, Number((4 + t * 10).toFixed(2))), // 4% -> 14%
       maxDrawdownLockMs: Math.round((120 - t * 90) * 60_000), // 120m -> 30m
       maxDailyLossLookbackMs: 24 * 60 * 60_000, // 24h rolling window
-      maxDailyLossPct: Number((1.5 + t * 7.5).toFixed(2)), // 1.5% -> 9.0%
+      maxDailyLossPct: Number((1.2 + t * 4.8).toFixed(2)), // 1.2% -> 6.0%
       lowProfitLookbackMs: Math.round((180 - t * 135) * 60_000), // 180m -> 45m
       lowProfitTradeLimit: Math.max(2, Math.round(2 + t * 3)), // 2 -> 5
       lowProfitThresholdPct: Number((-0.5 - t * 2).toFixed(2)), // -0.5% -> -2.5%
@@ -466,7 +467,7 @@ export class BotEngineService implements OnModuleInit {
   private deriveStopLossEntryCooldownMs(risk: number): number {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
     const t = boundedRisk / 100;
-    return Math.round((30 - t * 25) * 60_000); // 30m -> 5m
+    return Math.round((45 - t * 33) * 60_000); // 45m -> 12m
   }
 
   private evaluateDailyLossGuard(params: {
@@ -488,8 +489,18 @@ export class BotEngineService implements OnModuleInit {
       })
       .reduce((sum, event) => sum + event.pnlAbs, 0);
 
-    const active = walletTotalHome > 0 && dailyRealizedPnl <= -maxDailyLossAbs;
+    const cautionLossAbs = maxDailyLossAbs * 0.4;
+    const state =
+      walletTotalHome <= 0
+        ? "NORMAL"
+        : dailyRealizedPnl <= -maxDailyLossAbs
+          ? "HALT"
+          : dailyRealizedPnl <= -cautionLossAbs
+            ? "CAUTION"
+            : "NORMAL";
+    const active = state === "HALT";
     return {
+      state,
       active,
       dailyRealizedPnl: this.toRounded(dailyRealizedPnl, 8),
       maxDailyLossAbs: this.toRounded(maxDailyLossAbs, 8),
@@ -3496,6 +3507,33 @@ export class BotEngineService implements OnModuleInit {
             walletTotalHome,
             nowMs: Date.now()
           });
+          const nextRiskState = {
+            state: dailyLossGuard.state,
+            reason_codes:
+              dailyLossGuard.state === "NORMAL"
+                ? []
+                : [
+                    "DAILY_LOSS_GUARD",
+                    `dailyRealized=${dailyLossGuard.dailyRealizedPnl.toFixed(2)}${homeStable}`,
+                    `maxLoss=${dailyLossGuard.maxDailyLossAbs.toFixed(2)}${homeStable}`
+                  ],
+            unwind_only: dailyLossGuard.state === "HALT",
+            resume_conditions:
+              dailyLossGuard.state === "NORMAL"
+                ? []
+                : [
+                    `Rolling PnL window (${Math.round(dailyLossGuard.lookbackMs / 3_600_000)}h) must recover above threshold`
+                  ]
+          } as const;
+          const riskStateChanged =
+            JSON.stringify(current.riskState ?? null) !== JSON.stringify(nextRiskState);
+          if (riskStateChanged) {
+            current = {
+              ...current,
+              riskState: nextRiskState
+            };
+            this.save(current);
+          }
           tickContext.walletTotalHome = walletTotalHome;
           const maxPositionPct = config?.derived.maxPositionPct ?? 1;
           tickContext.maxPositionPct = maxPositionPct;

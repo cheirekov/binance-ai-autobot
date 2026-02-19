@@ -1819,3 +1819,28 @@ This log is mandatory for every implementation patch batch.
 - Risk slider impact: none (process-only update).
 - Validation evidence:
   - `docker compose -f docker-compose.ci.yml run --rm ci` passed in local dev environment.
+
+## 2026-02-19 13:42 UTC — T-005 refinement: tighter daily guard + runtime risk-state visibility
+- Scope: continue active `T-005` lane using `autobot-feedback-20260219-132253.tgz` evidence.
+- Bundle findings (2-4h run evidence):
+  - runtime `47.31h`, realized PnL `-165.82 USDC`, open exposure cost `7192.70 USDC`.
+  - conversion trades remain high (`35.87%`), skip mix dominated by fee-edge + inventory waiting.
+  - no `Daily loss guard active` or `Post stop-loss cooldown active` decisions observed in this bundle, so guard thresholds/cooling needed tighter calibration for risk=100 behavior.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - tightened daily-loss threshold curve from `1.5% -> 9.0%` to `1.2% -> 6.0%`.
+    - changed post-stop-loss re-entry cooldown curve from `30m -> 5m` to `45m -> 12m`.
+    - introduced canonical runtime risk state (`NORMAL|CAUTION|HALT`) persisted into `state.json` with reason codes and resume conditions.
+  - `packages/shared/src/schemas/bot-state.ts`
+    - added `riskState` schema to bot state contract.
+  - `apps/ui/src/pages/DashboardPage.tsx`
+    - added runtime risk badge in top status pills.
+    - added risk-state block in Status card (state, unwind-only, reasons, resume conditions).
+  - `scripts/generate-last-run-summary.sh`
+    - consumes canonical `riskState.resume_conditions` when present (no longer forced empty on canonical mode).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime validation request:
+  - next `2-4h` bundle should show at least one `CAUTION` or `HALT` transition when drawdown grows,
+  - verify no fast same-symbol re-entry after stop-loss exits on high-risk profile,
+  - verify UI shows runtime risk state and reason text from engine state.

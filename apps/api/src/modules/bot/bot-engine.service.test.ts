@@ -453,6 +453,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         walletTotalHome: number;
         nowMs: number;
       }) => {
+        state: "NORMAL" | "CAUTION" | "HALT";
         active: boolean;
         dailyRealizedPnl: number;
         maxDailyLossAbs: number;
@@ -495,9 +496,66 @@ describe("bot-engine insufficient-balance helpers", () => {
     });
 
     expect(guard.active).toBe(true);
+    expect(guard.state).toBe("HALT");
     expect(guard.dailyRealizedPnl).toBeCloseTo(-20, 6);
-    expect(guard.maxDailyLossPct).toBe(1.5);
-    expect(guard.maxDailyLossAbs).toBeCloseTo(15, 6);
+    expect(guard.maxDailyLossPct).toBe(1.2);
+    expect(guard.maxDailyLossAbs).toBeCloseTo(12, 6);
+  });
+
+  it("returns CAUTION before HALT threshold", () => {
+    const helpers = service as unknown as {
+      evaluateDailyLossGuard: (params: {
+        state: BotState;
+        risk: number;
+        walletTotalHome: number;
+        nowMs: number;
+      }) => {
+        state: "NORMAL" | "CAUTION" | "HALT";
+        active: boolean;
+        dailyRealizedPnl: number;
+        maxDailyLossAbs: number;
+        maxDailyLossPct: number;
+      };
+    };
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      orderHistory: [
+        {
+          id: "buy-1",
+          ts: new Date(now - 20 * 60_000).toISOString(),
+          symbol: "AAAUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          price: 100,
+          qty: 1
+        },
+        {
+          id: "sell-1",
+          ts: new Date(now - 10 * 60_000).toISOString(),
+          symbol: "AAAUSDC",
+          side: "SELL",
+          type: "MARKET",
+          status: "FILLED",
+          price: 70,
+          qty: 1
+        }
+      ]
+    };
+
+    const guard = helpers.evaluateDailyLossGuard({
+      state,
+      risk: 100,
+      walletTotalHome: 1_000,
+      nowMs: now
+    });
+
+    expect(guard.active).toBe(false);
+    expect(guard.state).toBe("CAUTION");
+    expect(guard.maxDailyLossPct).toBe(6);
+    expect(guard.maxDailyLossAbs).toBeCloseTo(60, 6);
   });
 
   it("penalizes grid score in bear trend", () => {

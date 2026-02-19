@@ -103,6 +103,13 @@ const reasonCodes = hasCanonicalRiskState
       ...activeGlobalLocks.map((lock) => String(lock?.type ?? "UNKNOWN"))
     ];
 const unwindOnly = hasCanonicalRiskState ? Boolean(state?.riskState?.unwind_only ?? state?.riskState?.unwindOnly ?? false) : fallbackUnwindOnly;
+const resumeConditions = hasCanonicalRiskState
+  ? Array.isArray(state?.riskState?.resume_conditions)
+    ? state.riskState.resume_conditions.map((condition) => String(condition))
+    : Array.isArray(state?.riskState?.resumeConditions)
+      ? state.riskState.resumeConditions.map((condition) => String(condition))
+      : []
+  : ["Best-effort risk state until T-005 canonical guardrails"];
 
 const realized = safeNum(totals.realizedPnl, 0);
 const unrealized = 0;
@@ -195,7 +202,7 @@ const output = {
     state: riskState,
     reason_codes: reasonCodes,
     unwind_only: unwindOnly,
-    resume_conditions: hasCanonicalRiskState ? [] : ["Best-effort risk state until T-005 canonical guardrails"]
+    resume_conditions: resumeConditions
   },
   pnl: {
     equity_usdt: equity,

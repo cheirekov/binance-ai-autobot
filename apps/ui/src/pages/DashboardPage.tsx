@@ -79,6 +79,18 @@ export function DashboardPage(): JSX.Element {
     return mode === "SPOT_GRID" ? { label: "Mode: Spot + Grid", tone: "neutral" as const } : { label: "Mode: Spot", tone: "neutral" as const };
   }, [publicConfig.config?.basic?.tradeMode]);
 
+  const runtimeRiskPill = useMemo(() => {
+    const riskState = state?.riskState;
+    if (!riskState) return { label: "Risk: —", tone: "neutral" as const };
+    if (riskState.state === "HALT") {
+      return { label: "Risk: HALT (unwind-only)", tone: "bad" as const };
+    }
+    if (riskState.state === "CAUTION") {
+      return { label: "Risk: CAUTION", tone: "warn" as const };
+    }
+    return { label: "Risk: NORMAL", tone: "ok" as const };
+  }, [state?.riskState]);
+
   const openAiPill = useMemo(() => {
     const openai = integrations.status?.openai;
     if (!openai) return { label: "OpenAI: —", tone: "neutral" as const };
@@ -221,6 +233,7 @@ export function DashboardPage(): JSX.Element {
         <span className={pillClass(openAiPill.tone)}>{openAiPill.label}</span>
         <span className={pillClass(livePill.tone)}>{livePill.label}</span>
         <span className={pillClass(modePill.tone)}>{modePill.label}</span>
+        <span className={pillClass(runtimeRiskPill.tone)}>{runtimeRiskPill.label}</span>
         {externalOrdersPill ? <span className={pillClass(externalOrdersPill.tone)}>{externalOrdersPill.label}</span> : null}
       </div>
 
@@ -276,6 +289,28 @@ export function DashboardPage(): JSX.Element {
               {runStats.stats?.kpi ? `${runStats.stats.kpi.totals.buys}/${runStats.stats.kpi.totals.sells}` : "—"}
             </span>
           </div>
+
+          {state?.riskState ? (
+            <div style={{ marginTop: 12 }}>
+              <div className="subtitle">Runtime risk state</div>
+              <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <span className={pillClass(runtimeRiskPill.tone)}>{runtimeRiskPill.label}</span>
+                <span className={pillClass(state.riskState.unwind_only ? "warn" : "neutral")}>
+                  Unwind-only: {String(Boolean(state.riskState.unwind_only))}
+                </span>
+                {(state.riskState.reason_codes ?? []).slice(0, 3).map((reason) => (
+                  <span key={reason} className="pill warn">
+                    {reason}
+                  </span>
+                ))}
+              </div>
+              {(state.riskState.resume_conditions ?? []).length > 0 ? (
+                <div className="subtitle" style={{ marginTop: 6 }}>
+                  Resume: {(state.riskState.resume_conditions ?? []).join(" · ")}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           <div style={{ marginTop: 12 }}>
             <div className="subtitle">Wallet policy (latest telemetry)</div>

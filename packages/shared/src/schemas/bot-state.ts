@@ -65,6 +65,14 @@ export const ProtectionLockEntrySchema = z.object({
 });
 export type ProtectionLockEntry = z.infer<typeof ProtectionLockEntrySchema>;
 
+export const RuntimeRiskStateSchema = z.object({
+  state: z.enum(["NORMAL", "CAUTION", "HALT"]),
+  reason_codes: z.array(z.string().min(1)).default([]),
+  unwind_only: z.boolean().default(false),
+  resume_conditions: z.array(z.string().min(1)).default([])
+});
+export type RuntimeRiskState = z.infer<typeof RuntimeRiskStateSchema>;
+
 export const BotStateSchema = z.object({
   version: z.literal(BOT_STATE_VERSION),
   startedAt: z.string().min(1).optional(),
@@ -76,7 +84,8 @@ export const BotStateSchema = z.object({
   activeOrders: z.array(OrderSchema),
   orderHistory: z.array(OrderSchema),
   symbolBlacklist: z.array(SymbolBlacklistEntrySchema).default([]),
-  protectionLocks: z.array(ProtectionLockEntrySchema).default([])
+  protectionLocks: z.array(ProtectionLockEntrySchema).default([]),
+  riskState: RuntimeRiskStateSchema.optional()
 });
 export type BotState = z.infer<typeof BotStateSchema>;
 
@@ -92,6 +101,12 @@ export function defaultBotState(): BotState {
     activeOrders: [],
     orderHistory: [],
     symbolBlacklist: [],
-    protectionLocks: []
+    protectionLocks: [],
+    riskState: {
+      state: "NORMAL",
+      reason_codes: [],
+      unwind_only: false,
+      resume_conditions: []
+    }
   };
 }
