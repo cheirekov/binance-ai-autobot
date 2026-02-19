@@ -470,6 +470,12 @@ export class BotEngineService implements OnModuleInit {
     return Math.round((45 - t * 33) * 60_000); // 45m -> 12m
   }
 
+  private deriveCautionEntryPauseCooldownMs(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const t = boundedRisk / 100;
+    return Math.round((6 - t * 4) * 60_000); // 6m -> 2m
+  }
+
   private evaluateDailyLossGuard(params: {
     state: BotState;
     risk: number;
@@ -3863,6 +3869,57 @@ export class BotEngineService implements OnModuleInit {
           const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
           tickContext.maxOpenPositions = maxOpenPositions;
           const candidateIsOpen = (managedPositions.get(candidateSymbol)?.netQty ?? 0) > 0;
+          const cautionModeActive = dailyLossGuard.state === "CAUTION";
+
+          if (cautionModeActive && !candidateIsOpen) {
+            const summary = `Skip ${candidateSymbol}: Daily loss caution (new symbols paused)`;
+            const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveCautionEntryPauseCooldownMs(risk));
+            const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
+            const cooldownMs = cooldown.cooldownMs;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        stage: "daily-loss-caution",
+                        candidateSymbol,
+                        riskState: dailyLossGuard.state,
+                        dailyRealizedPnl: dailyLossGuard.dailyRealizedPnl,
+                        maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs,
+                        maxDailyLossPct: dailyLossGuard.maxDailyLossPct,
+                        lookbackMs: dailyLossGuard.lookbackMs,
+                        windowStart: dailyLossGuard.windowStartIso,
+                        cooldownMs
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            const nextWithCooldown = this.upsertProtectionLock(next, {
+              type: "COOLDOWN",
+              scope: "SYMBOL",
+              symbol: candidateSymbol,
+              reason: `Daily loss caution pause (${Math.round(cooldownMs / 1000)}s)`,
+              expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+              details: {
+                category: "DAILY_LOSS_CAUTION_NEW_SYMBOL",
+                cooldownMs,
+                riskState: dailyLossGuard.state
+              }
+            });
+            this.save(nextWithCooldown);
+            return;
+          }
 
           const rebalanceSellCooldownMs = config?.advanced.liveTradeRebalanceSellCooldownMs ?? 900_000;
           const takeProfitPct = 0.35 + (risk / 100) * 0.9; // 0.35% .. 1.25%
@@ -4917,7 +4974,7 @@ export class BotEngineService implements OnModuleInit {
                 }
               });
             }
-            const buyPaused = Boolean(existingBuyPauseLock) || shouldPauseBuys;
+            const buyPaused = cautionModeActive || Boolean(existingBuyPauseLock) || shouldPauseBuys;
 
             const atr = Number.isFinite(selectedCandidate?.atrPct14) ? Math.max(0.1, selectedCandidate?.atrPct14 ?? 0.4) : 0.4;
             const gridSpacingPct = Math.max(0.2, Math.min(2.5, atr * (0.6 - (risk / 100) * 0.25)));
@@ -5078,7 +5135,9 @@ export class BotEngineService implements OnModuleInit {
             let pendingNoActionState: BotState | null = null;
 
             if (!hasBuyLimit && buyPaused) {
-              const summary = `Skip ${candidateSymbol}: Grid guard paused BUY leg`;
+              const summary = cautionModeActive
+                ? `Skip ${candidateSymbol}: Daily loss caution paused GRID BUY leg`
+                : `Skip ${candidateSymbol}: Grid guard paused BUY leg`;
               const nowMs = Date.now();
               const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
               const lastSimilar = current.decisions.find((d) => d.kind === "SKIP" && d.summary === summary);
@@ -5097,6 +5156,7 @@ export class BotEngineService implements OnModuleInit {
                       details: {
                         regime,
                         pauseConfidenceThreshold,
+                        cautionModeActive,
                         buyPaused,
                         hasBuyLimit,
                         hasSellLimit
@@ -5565,6 +5625,56 @@ export class BotEngineService implements OnModuleInit {
               return;
             }
             this.save(next);
+            return;
+          }
+
+          if (cautionModeActive) {
+            const summary = `Skip ${candidateSymbol}: Daily loss caution paused MARKET entry`;
+            const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveCautionEntryPauseCooldownMs(risk));
+            const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
+            const cooldownMs = cooldown.cooldownMs;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        stage: "daily-loss-caution-market-entry",
+                        candidateSymbol,
+                        riskState: dailyLossGuard.state,
+                        dailyRealizedPnl: dailyLossGuard.dailyRealizedPnl,
+                        maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs,
+                        maxDailyLossPct: dailyLossGuard.maxDailyLossPct,
+                        lookbackMs: dailyLossGuard.lookbackMs,
+                        windowStart: dailyLossGuard.windowStartIso,
+                        cooldownMs
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            const nextWithCooldown = this.upsertProtectionLock(next, {
+              type: "COOLDOWN",
+              scope: "SYMBOL",
+              symbol: candidateSymbol,
+              reason: `Daily loss caution paused market entry (${Math.round(cooldownMs / 1000)}s)`,
+              expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+              details: {
+                category: "DAILY_LOSS_CAUTION_MARKET_ENTRY",
+                cooldownMs,
+                riskState: dailyLossGuard.state
+              }
+            });
+            this.save(nextWithCooldown);
             return;
           }
 

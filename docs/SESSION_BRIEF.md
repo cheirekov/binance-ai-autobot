@@ -1,13 +1,13 @@
 # Session Brief
 
-Last updated: 2026-02-19 13:46 UTC
+Last updated: 2026-02-19 16:18 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
 
 ## 1) Batch contract (fill before coding)
 
-- Batch type: `DAY (2-4h)`
+- Batch type: `NIGHT (8-12h)`
 - Active ticket: `T-005` (Daily guardrails + unwind-only behavior)
 - Goal (single sentence): enforce risk-linked daily-loss guardrails with visible runtime state and halt-only-new-exposure behavior.
 - In scope:
@@ -43,7 +43,7 @@ Use this file at the start and end of every batch.
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
 - Runtime validation plan:
-  - run duration: `2-4 hours`
+  - run duration: `8-12 hours`
   - expected bundle name pattern: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
 
 ## 3) Deployment handoff
@@ -55,7 +55,7 @@ Use this file at the start and end of every batch.
   - `liveTrading=true`
   - testnet endpoint and keys configured
 - Operator checklist:
-  - reset state needed? (`optional` — recommended to reset `data/state.json` for clean overnight evidence)
+  - reset state needed? (`no` — keep rolling `data/state.json` so daily-loss guard windows remain valid)
   - keep config.json? (`yes`)
   - start command:
     - Compose v2: `docker compose up -d --build --force-recreate`
@@ -66,30 +66,30 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-  - runtime: `47.31h`; open LIMIT lifecycle observed: `yes` (openLimitOrders=7, historyLimitOrders=58, activeMarketOrders=0)
-  - realized PnL: `-165.82 USDC`; open exposure cost: `7192.70 USDC`
-  - conversion share: `35.87%`; fee-edge skip pressure remains elevated (`38.24%` of skips)
-  - guard visibility in this run: `daily-loss guard skip = 0`, `post-stop-loss cooldown skip = 0`
+  - runtime: `50.01h`; open LIMIT lifecycle observed: `yes` (openLimitOrders=3, historyLimitOrders=67, activeMarketOrders=0)
+  - realized PnL: `-216.68 USDC`; open exposure cost: `5476.12 USDC`
+  - risk state visibility: `CAUTION` is active with daily-loss metrics in summary
+  - skip mix remains heavy: inventory waiting `44.14%`, sizing/min-order `27.03%`
 - Decision: `continue`
 - Next ticket candidate: `T-005` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - losses remain concentrated in a few symbols (ORCA/SUI/XRP/SOL) without guard trip in this bundle.
-  - high-risk mode (`risk=100`) still allows deep drawdown before hard stop; monitor next run for CAUTION/HALT transitions.
+  - CAUTION mode was visible but still allowed fresh exposure in this run; night patch adds explicit CAUTION entry brakes.
+  - HALT path is still not runtime-verified; keep the rolling window intact overnight.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260219-132253.tgz`
-  - auto-updated at: `2026-02-19T13:46:00.000Z`
+  - bundle: `autobot-feedback-20260219-160533.tgz`
+  - auto-updated at: `2026-02-19T16:18:00.000Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-005
-Batch: DAY (2-4h)
-Goal: enforce daily-loss guardrails that stop new exposure while preserving exit paths.
-In scope: rolling daily-loss guard check, guard skip telemetry, post-stop-loss symbol re-entry cooldown.
+Batch: NIGHT (8-12h)
+Goal: verify CAUTION/HALT guardrail behavior with explicit entry brakes while preserving exits/sweeps.
+In scope: rolling daily-loss guard check, guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses.
 Out of scope: strategy rewrite, multi-quote routing, commission ledger refactor.
 DoD:
 - API: daily-loss guard computes and enforces risk-linked max daily loss.
-- Runtime: guard blocks new entries and records clear skip details.
+- Runtime: CAUTION state pauses new exposure (`new symbols paused`, `paused GRID BUY leg`, `paused MARKET entry`) and records clear skip details.
 - Runtime: symbol post-stop-loss re-entry cooldown is observed.
 - Risk slider mapping: max daily loss threshold widens at high risk and tightens at low risk.
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.

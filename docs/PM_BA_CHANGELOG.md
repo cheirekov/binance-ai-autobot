@@ -1844,3 +1844,26 @@ This log is mandatory for every implementation patch batch.
   - next `2-4h` bundle should show at least one `CAUTION` or `HALT` transition when drawdown grows,
   - verify no fast same-symbol re-entry after stop-loss exits on high-risk profile,
   - verify UI shows runtime risk state and reason text from engine state.
+
+## 2026-02-19 16:14 UTC — T-005 night build: CAUTION mode execution brakes
+- Scope: prepare night run from `autobot-feedback-20260219-160533.tgz` without widening to strategy refactor tickets.
+- Bundle findings:
+  - `risk_state=CAUTION` is now visible and persisted (good), but execution still opened fresh risk (`entry` market buys) while in caution.
+  - Realized PnL worsened to `-216.68 USDC`; skip pressure shifted to `inventoryWaiting=44.14%` and `minOrder/sizing=27.03%`.
+  - Dominant loop signature: repeated `Grid waiting for ladder slot or inventory` / minQty sell rejects with ongoing new entries.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - added risk-linked caution pause cooldown (`6m -> 2m` by risk).
+    - when `riskState=CAUTION`, blocks **new symbol** entries and writes explicit skip/lock telemetry.
+    - in grid lane, forces BUY leg pause under CAUTION (SELL leg remains available).
+    - in market-entry lane, blocks BUY market entries under CAUTION (exits/sweeps still allowed via earlier flow).
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - added coverage for caution pause cooldown scaling.
+- Risk slider impact:
+  - higher risk still keeps shorter pauses, but caution now explicitly constrains expansion of exposure.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (night):
+  - deploy without resetting `data/state.json` to preserve rolling loss window,
+  - verify decisions include caution skip reasons (`new symbols paused`, `paused GRID BUY leg`, `paused MARKET entry`),
+  - verify exits/sweeps still execute while caution remains active.
