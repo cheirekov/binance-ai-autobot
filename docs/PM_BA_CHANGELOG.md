@@ -1867,3 +1867,27 @@ This log is mandatory for every implementation patch batch.
   - deploy without resetting `data/state.json` to preserve rolling loss window,
   - verify decisions include caution skip reasons (`new symbols paused`, `paused GRID BUY leg`, `paused MARKET entry`),
   - verify exits/sweeps still execute while caution remains active.
+
+## 2026-02-20 08:07 UTC — T-005 short-run build: reduce grid-guard/no-inventory churn
+- Scope: follow-up after `autobot-feedback-20260220-075341.tgz` with focused churn reduction (no ticket scope expansion).
+- Overnight findings summary:
+  - realized PnL recovered to positive (`+26.41 USDC`) and risk state ended `NORMAL` (guardrails did not over-freeze execution).
+  - dominant skip cluster moved to one symbol pattern:
+    - `Skip ARBUSDC: Grid guard active (no inventory to sell)` (`13`)
+    - `Skip ARBUSDC: Grid guard paused BUY leg` (`13`)
+  - this indicates guard behavior is correct but re-evaluation frequency is too high for paused/no-inventory symbols.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - added dedicated cooldown policy for `grid guard + no inventory` branch:
+      - new helper `deriveGridGuardNoInventoryCooldownMs` (`12m -> 4m` by risk).
+    - reused `deriveInfeasibleSymbolCooldown` in this branch so storm escalation is applied consistently.
+    - enriched lock/decision details with optional storm diagnostics.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - added test for new cooldown scaling helper.
+- Risk slider impact:
+  - low risk waits longer before rechecking paused/no-inventory symbols; high risk remains shorter but no longer ultra-frequent.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (1-3h):
+  - run without state reset and verify reduced frequency of `Grid guard active (no inventory to sell)` loops.
+  - verify no regression in exits/sweeps and no increase in order-reject skips.

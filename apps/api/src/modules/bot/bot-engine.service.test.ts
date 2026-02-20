@@ -568,6 +568,16 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.deriveCautionEntryPauseCooldownMs(100)).toBe(120000);
   });
 
+  it("scales grid-guard no-inventory cooldown with risk", () => {
+    const helpers = service as unknown as {
+      deriveGridGuardNoInventoryCooldownMs: (risk: number) => number;
+    };
+
+    expect(helpers.deriveGridGuardNoInventoryCooldownMs(0)).toBe(720000);
+    expect(helpers.deriveGridGuardNoInventoryCooldownMs(50)).toBe(480000);
+    expect(helpers.deriveGridGuardNoInventoryCooldownMs(100)).toBe(240000);
+  });
+
   it("penalizes grid score in bear trend", () => {
     const helpers = service as unknown as {
       buildAdaptiveStrategyScores: (candidate: UniverseCandidate | null, regime: "BEAR_TREND" | "RANGE") => {

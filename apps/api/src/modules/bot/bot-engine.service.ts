@@ -476,6 +476,12 @@ export class BotEngineService implements OnModuleInit {
     return Math.round((6 - t * 4) * 60_000); // 6m -> 2m
   }
 
+  private deriveGridGuardNoInventoryCooldownMs(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const t = boundedRisk / 100;
+    return Math.round((12 - t * 8) * 60_000); // 12m -> 4m
+  }
+
   private evaluateDailyLossGuard(params: {
     state: BotState;
     risk: number;
@@ -5536,7 +5542,12 @@ export class BotEngineService implements OnModuleInit {
             if (buyPaused && !hasSellLimit && (!Number.isFinite(baseFree) || baseFree <= 0)) {
               const summary = `Skip ${candidateSymbol}: Grid guard active (no inventory to sell)`;
               const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
-              const cooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), 60_000);
+              const baseCooldownMs = Math.max(
+                this.deriveNoActionSymbolCooldownMs(risk),
+                this.deriveGridGuardNoInventoryCooldownMs(risk)
+              );
+              const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
+              const cooldownMs = cooldown.cooldownMs;
               const next = {
                 ...current,
                 decisions: alreadyLogged
@@ -5551,7 +5562,8 @@ export class BotEngineService implements OnModuleInit {
                           baseFree: Number((Number.isFinite(baseFree) ? baseFree : 0).toFixed(8)),
                           cooldownMs,
                           regime,
-                          pauseConfidenceThreshold
+                          pauseConfidenceThreshold,
+                          ...(cooldown.storm ? { storm: cooldown.storm } : {})
                         }
                       },
                       ...current.decisions
@@ -5562,13 +5574,16 @@ export class BotEngineService implements OnModuleInit {
                 type: "COOLDOWN",
                 scope: "SYMBOL",
                 symbol: candidateSymbol,
-                reason: `Grid guard active; rotating away (${Math.round(cooldownMs / 1000)}s)`,
+                reason: cooldown.storm
+                  ? `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`
+                  : `Grid guard active; rotating away (${Math.round(cooldownMs / 1000)}s)`,
                 expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
                 details: {
                   category: "GRID_GUARD_ROTATE",
                   cooldownMs,
                   regime,
-                  pauseConfidenceThreshold
+                  pauseConfidenceThreshold,
+                  ...(cooldown.storm ? { storm: cooldown.storm } : {})
                 }
               });
               this.save(nextWithCooldown);
