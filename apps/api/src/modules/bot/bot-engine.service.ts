@@ -204,7 +204,14 @@ type ProtectionPolicy = {
 type DailyLossGuardSnapshot = {
   state: "NORMAL" | "CAUTION" | "HALT";
   active: boolean;
+  trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK";
   dailyRealizedPnl: number;
+  peakDailyRealizedPnl: number;
+  profitGivebackAbs: number;
+  profitGivebackPct: number;
+  profitGivebackActivationAbs: number;
+  profitGivebackCautionPct: number;
+  profitGivebackHaltPct: number;
   maxDailyLossAbs: number;
   maxDailyLossPct: number;
   lookbackMs: number;
@@ -494,15 +501,31 @@ export class BotEngineService implements OnModuleInit {
     const windowStartMs = params.nowMs - policy.maxDailyLossLookbackMs;
     const windowStartIso = new Date(windowStartMs).toISOString();
 
-    const dailyRealizedPnl = this.getClosedPnlEvents(params.state)
+    const windowEvents = this.getClosedPnlEvents(params.state)
       .filter((event) => {
         const ts = Date.parse(event.ts);
         return Number.isFinite(ts) && ts >= windowStartMs;
       })
-      .reduce((sum, event) => sum + event.pnlAbs, 0);
+      .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
 
+    let dailyRealizedPnl = 0;
+    let peakDailyRealizedPnl = 0;
+    for (const event of windowEvents) {
+      dailyRealizedPnl += event.pnlAbs;
+      if (dailyRealizedPnl > peakDailyRealizedPnl) {
+        peakDailyRealizedPnl = dailyRealizedPnl;
+      }
+    }
+
+    const t = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50)) / 100;
+    const profitGivebackAbs = Math.max(0, peakDailyRealizedPnl - dailyRealizedPnl);
+    const profitGivebackPct = peakDailyRealizedPnl > 0 ? profitGivebackAbs / peakDailyRealizedPnl : 0;
+    const profitGivebackActivationAbs = Math.max(15, maxDailyLossAbs * 0.25);
+    const profitGivebackCautionPct = Number((0.35 + t * 0.2).toFixed(4)); // 35% -> 55%
+    const profitGivebackHaltPct = Number((0.65 + t * 0.2).toFixed(4)); // 65% -> 85%
+    const profitGivebackActive = peakDailyRealizedPnl >= profitGivebackActivationAbs;
     const cautionLossAbs = maxDailyLossAbs * 0.4;
-    const state =
+    let state: "NORMAL" | "CAUTION" | "HALT" =
       walletTotalHome <= 0
         ? "NORMAL"
         : dailyRealizedPnl <= -maxDailyLossAbs
@@ -510,11 +533,29 @@ export class BotEngineService implements OnModuleInit {
           : dailyRealizedPnl <= -cautionLossAbs
             ? "CAUTION"
             : "NORMAL";
+    let trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK" = state === "NORMAL" ? "NONE" : "ABS_DAILY_LOSS";
+
+    if (profitGivebackActive) {
+      if (profitGivebackPct >= profitGivebackHaltPct) {
+        state = "HALT";
+        trigger = "PROFIT_GIVEBACK";
+      } else if (profitGivebackPct >= profitGivebackCautionPct && state === "NORMAL") {
+        state = "CAUTION";
+        trigger = "PROFIT_GIVEBACK";
+      }
+    }
     const active = state === "HALT";
     return {
       state,
       active,
+      trigger,
       dailyRealizedPnl: this.toRounded(dailyRealizedPnl, 8),
+      peakDailyRealizedPnl: this.toRounded(peakDailyRealizedPnl, 8),
+      profitGivebackAbs: this.toRounded(profitGivebackAbs, 8),
+      profitGivebackPct: this.toRounded(profitGivebackPct, 8),
+      profitGivebackActivationAbs: this.toRounded(profitGivebackActivationAbs, 8),
+      profitGivebackCautionPct: this.toRounded(profitGivebackCautionPct, 8),
+      profitGivebackHaltPct: this.toRounded(profitGivebackHaltPct, 8),
       maxDailyLossAbs: this.toRounded(maxDailyLossAbs, 8),
       maxDailyLossPct: policy.maxDailyLossPct,
       lookbackMs: policy.maxDailyLossLookbackMs,
@@ -3526,8 +3567,17 @@ export class BotEngineService implements OnModuleInit {
                 ? []
                 : [
                     "DAILY_LOSS_GUARD",
+                    `trigger=${dailyLossGuard.trigger}`,
                     `dailyRealized=${dailyLossGuard.dailyRealizedPnl.toFixed(2)}${homeStable}`,
-                    `maxLoss=${dailyLossGuard.maxDailyLossAbs.toFixed(2)}${homeStable}`
+                    `maxLoss=${dailyLossGuard.maxDailyLossAbs.toFixed(2)}${homeStable}`,
+                    ...(dailyLossGuard.trigger === "PROFIT_GIVEBACK"
+                      ? [
+                          `peakDaily=${dailyLossGuard.peakDailyRealizedPnl.toFixed(2)}${homeStable}`,
+                          `giveback=${dailyLossGuard.profitGivebackAbs.toFixed(2)}${homeStable} (${(
+                            dailyLossGuard.profitGivebackPct * 100
+                          ).toFixed(1)}%)`
+                        ]
+                      : [])
                   ],
             unwind_only: dailyLossGuard.state === "HALT",
             resume_conditions:
@@ -4289,6 +4339,13 @@ export class BotEngineService implements OnModuleInit {
                         dailyRealizedPnl: dailyLossGuard.dailyRealizedPnl,
                         maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs,
                         maxDailyLossPct: dailyLossGuard.maxDailyLossPct,
+                        trigger: dailyLossGuard.trigger,
+                        peakDailyRealizedPnl: dailyLossGuard.peakDailyRealizedPnl,
+                        profitGivebackAbs: dailyLossGuard.profitGivebackAbs,
+                        profitGivebackPct: dailyLossGuard.profitGivebackPct,
+                        profitGivebackActivationAbs: dailyLossGuard.profitGivebackActivationAbs,
+                        profitGivebackCautionPct: dailyLossGuard.profitGivebackCautionPct,
+                        profitGivebackHaltPct: dailyLossGuard.profitGivebackHaltPct,
                         lookbackMs: dailyLossGuard.lookbackMs,
                         windowStart: dailyLossGuard.windowStartIso,
                         candidateSymbol

@@ -1891,3 +1891,27 @@ This log is mandatory for every implementation patch batch.
 - Runtime request (1-3h):
   - run without state reset and verify reduced frequency of `Grid guard active (no inventory to sell)` loops.
   - verify no regression in exits/sweeps and no increase in order-reject skips.
+
+## 2026-02-20 12:01 UTC — T-005 short-run build: profit-giveback guard trigger
+- Scope: address repeated “profit then giveback” runtime pattern observed in user notes and bundle trend, while staying inside `T-005` guardrail lane.
+- Bundle findings (`autobot-feedback-20260220-114757.tgz`):
+  - run recovered realized PnL to `+26.41 USDC` and ended `risk_state=NORMAL` (good).
+  - no hard blocker in sizing/fee loops; remaining risk is cyclical giveback behavior across long runs.
+  - symbol churn improved but still present as market-dependent idle/wait patterns.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - extended daily guard snapshot with trigger metadata (`NONE|ABS_DAILY_LOSS|PROFIT_GIVEBACK`).
+    - added profit-giveback detection over rolling 24h realized PnL path:
+      - computes rolling peak realized PnL,
+      - computes giveback absolute/percent from that peak,
+      - activates guard when giveback passes risk-linked caution/halt thresholds.
+    - enriches runtime `riskState.reason_codes` and daily-loss skip details with trigger context and giveback metrics.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - added coverage for `PROFIT_GIVEBACK` caution path.
+- Risk slider impact:
+  - lower risk tightens giveback tolerance; higher risk allows larger giveback before caution/halt.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (next 1-3h):
+  - run without state reset and verify guard reasons include `trigger=PROFIT_GIVEBACK` when profit is materially given back.
+  - verify exits/sweeps remain operational and no false HALT during stable positive trend.
