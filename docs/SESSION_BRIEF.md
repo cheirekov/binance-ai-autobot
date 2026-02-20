@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-20 14:15 UTC
+Last updated: 2026-02-20 14:38 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,7 +9,7 @@ Use this file at the start and end of every batch.
 
 - Batch type: `DAY (1-3h)`
 - Active ticket: `T-005` (Daily guardrails + unwind-only behavior)
-- Goal (single sentence): enforce tighter high-risk guardrails so repeated profit-giveback cycles trigger protection earlier.
+- Goal (single sentence): enforce tighter high-risk guardrails and keep runtime risk state consistent with active protection locks.
 - In scope:
   - compute rolling 24h realized PnL guard threshold from risk slider.
   - block new entry/grid placement when guard is active.
@@ -18,6 +18,8 @@ Use this file at the start and end of every batch.
   - persist canonical runtime risk state (`NORMAL/CAUTION/HALT`) into bot state and show it in UI.
   - detect and guard against large realized-profit giveback within the same rolling window.
   - tighten high-risk absolute-loss + giveback thresholds to reduce late guard activation.
+  - ensure active global locks are reflected in runtime `riskState` (no `NORMAL` while lock is active).
+  - execute controlled partial unwinds while `STOPLOSS_GUARD`/`MAX_DRAWDOWN` is active.
 - Out of scope:
   - full ledger/commission reconciliation (`T-007`),
   - regime strategy rewrite (`T-031/T-032`),
@@ -30,6 +32,8 @@ Use this file at the start and end of every batch.
   - reduce repeated `Grid guard active (no inventory to sell)` skips for the same symbol.
   - guard reason includes `trigger=PROFIT_GIVEBACK` when profits are materially given back.
   - high-risk profile reaches `CAUTION/HALT` earlier on renewed drawdown/giveback.
+  - runtime risk state mirrors active global lock state in UI/telemetry.
+  - under active global lock, inventory begins reducing (`global-lock-unwind`) instead of full freeze.
 - Stop/rollback condition:
   - if guard blocks all trading actions including exits/sweeps.
 
@@ -44,6 +48,8 @@ Use this file at the start and end of every batch.
   - fewer same-symbol BUY entries immediately after `stop-loss-exit`.
   - `state.riskState` updates to `CAUTION/HALT` in runtime snapshots when guard thresholds are crossed.
   - guard details include `trigger` (`ABS_DAILY_LOSS` vs `PROFIT_GIVEBACK`) and giveback metrics.
+  - with active `STOPLOSS_GUARD` or `MAX_DRAWDOWN` global lock, `state.riskState.state` is not `NORMAL`.
+  - lock window contains `global-lock-unwind` trade decisions for eligible managed positions.
 - Risk slider impact (`none` or explicit low/mid/high behavior):
   - max daily loss threshold scales from strict (low risk) to loose (high risk).
 - Validation commands:
@@ -74,11 +80,13 @@ Use this file at the start and end of every batch.
 - Observed KPI delta:
   - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=87, activeMarketOrders=0)
   - realized PnL turned negative again: `-95.87 USDC`; open exposure cost: `3654.26 USDC`
-  - runtime still ended `risk_state=NORMAL` in this bundle (guard trigger was late for this profile)
+  - runtime still ended `risk_state=NORMAL` in this bundle while a global lock appeared (state/lock mismatch fixed in latest patch)
 - Decision: `continue`
 - Next ticket candidate: `T-005` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
   - long-run profit-giveback/drawdown can still progress before caution/halt on risk=100 settings.
+  - monitor for lock-state flapping after consistency fix.
+  - monitor unwind cadence to avoid excessive liquidation in short lock windows.
 - Notes for next session:
   - bundle: `autobot-feedback-20260220-134417.tgz`
   - auto-updated at: `2026-02-20T14:15:00.000Z`
@@ -89,7 +97,7 @@ Use this file at the start and end of every batch.
 Ticket: T-005
 Batch: DAY (1-3h)
 Goal: verify tighter high-risk guardrails trigger earlier on renewed drawdown/profit-giveback.
-In scope: rolling daily-loss guard check, guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds.
+In scope: rolling daily-loss guard check, guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds, lock-state consistency, global-lock unwind-only execution.
 Out of scope: strategy rewrite, multi-quote routing, commission ledger refactor.
 DoD:
 - API: daily-loss guard computes and enforces risk-linked max daily loss.
@@ -97,6 +105,8 @@ DoD:
 - Runtime: symbol post-stop-loss re-entry cooldown is observed.
 - Runtime: repeated `Grid guard active (no inventory to sell)` for the same symbol drops versus prior run.
 - Runtime: guard switches to `trigger=PROFIT_GIVEBACK` earlier on profit retrace events.
+- Runtime: active global `STOPLOSS_GUARD`/`MAX_DRAWDOWN` lock maps to non-`NORMAL` risk state.
+- Runtime: active global lock performs controlled `global-lock-unwind` sells when inventory is available.
 - Risk slider mapping: max daily loss threshold widens at high risk and tightens at low risk.
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.

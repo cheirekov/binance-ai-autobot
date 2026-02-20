@@ -726,6 +726,71 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(guard.profitGivebackPct).toBeCloseTo(0.5, 6);
   });
 
+  it("maps active STOPLOSS_GUARD lock to HALT runtime risk state", () => {
+    const helpers = service as unknown as {
+      buildRuntimeRiskState: (params: {
+        dailyLossGuard: {
+          state: "NORMAL" | "CAUTION" | "HALT";
+          active: boolean;
+          trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK";
+          dailyRealizedPnl: number;
+          peakDailyRealizedPnl: number;
+          profitGivebackAbs: number;
+          profitGivebackPct: number;
+          profitGivebackActivationAbs: number;
+          profitGivebackCautionPct: number;
+          profitGivebackHaltPct: number;
+          maxDailyLossAbs: number;
+          maxDailyLossPct: number;
+          lookbackMs: number;
+          windowStartIso: string;
+        };
+        homeStable: string;
+        activeGlobalLock?: {
+          type: "COOLDOWN" | "STOPLOSS_GUARD" | "MAX_DRAWDOWN" | "LOW_PROFIT" | "GRID_GUARD_BUY_PAUSE";
+          scope: "GLOBAL" | "SYMBOL";
+          reason: string;
+          expiresAt: string;
+        } | null;
+      }) => {
+        state: "NORMAL" | "CAUTION" | "HALT";
+        reason_codes: string[];
+        unwind_only: boolean;
+        resume_conditions: string[];
+      };
+    };
+
+    const riskState = helpers.buildRuntimeRiskState({
+      homeStable: "USDC",
+      dailyLossGuard: {
+        state: "NORMAL",
+        active: false,
+        trigger: "NONE",
+        dailyRealizedPnl: 5,
+        peakDailyRealizedPnl: 8,
+        profitGivebackAbs: 3,
+        profitGivebackPct: 0.375,
+        profitGivebackActivationAbs: 10,
+        profitGivebackCautionPct: 0.3,
+        profitGivebackHaltPct: 0.55,
+        maxDailyLossAbs: 40,
+        maxDailyLossPct: 4,
+        lookbackMs: 24 * 60 * 60_000,
+        windowStartIso: "2026-02-20T00:00:00.000Z"
+      },
+      activeGlobalLock: {
+        type: "STOPLOSS_GUARD",
+        scope: "GLOBAL",
+        reason: "5 stop-loss exits in last 45m",
+        expiresAt: "2026-02-20T16:37:46.000Z"
+      }
+    });
+
+    expect(riskState.state).toBe("HALT");
+    expect(riskState.unwind_only).toBe(true);
+    expect(riskState.reason_codes.some((r) => r.includes("PROTECTION_LOCK_STOPLOSS_GUARD"))).toBe(true);
+  });
+
   it("scales daily-loss caution entry pause cooldown with risk", () => {
     const helpers = service as unknown as {
       deriveCautionEntryPauseCooldownMs: (risk: number) => number;
@@ -744,6 +809,16 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.deriveGridGuardNoInventoryCooldownMs(0)).toBe(720000);
     expect(helpers.deriveGridGuardNoInventoryCooldownMs(50)).toBe(480000);
     expect(helpers.deriveGridGuardNoInventoryCooldownMs(100)).toBe(240000);
+  });
+
+  it("scales global-lock unwind cooldown with risk", () => {
+    const helpers = service as unknown as {
+      deriveGlobalLockUnwindCooldownMs: (risk: number) => number;
+    };
+
+    expect(helpers.deriveGlobalLockUnwindCooldownMs(0)).toBe(1200000);
+    expect(helpers.deriveGlobalLockUnwindCooldownMs(50)).toBe(840000);
+    expect(helpers.deriveGlobalLockUnwindCooldownMs(100)).toBe(480000);
   });
 
   it("penalizes grid score in bear trend", () => {

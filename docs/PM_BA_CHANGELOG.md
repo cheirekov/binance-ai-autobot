@@ -1939,3 +1939,51 @@ This log is mandatory for every implementation patch batch.
 - Runtime request (next 1-3h):
   - run without state reset and verify earlier transitions to `CAUTION`/`HALT` on renewed drawdown/giveback,
   - confirm reasons include `trigger=PROFIT_GIVEBACK` when applicable.
+
+## 2026-02-20 14:27 UTC — T-005 short-run build: unify risk-state with active protection locks
+- Scope: fix inconsistency reported by user (`STOPLOSS_GUARD` active while UI risk pill showed `NORMAL`) without expanding beyond guardrail lane.
+- Bundle findings (`autobot-feedback-20260220-134417.tgz`):
+  - active global `STOPLOSS_GUARD` appeared in telemetry while runtime risk state remained `NORMAL`.
+  - this created wrong operator signal (“not adapting”) despite protection lock being active.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - added `buildRuntimeRiskState(...)` helper to derive canonical runtime risk from:
+      - daily-loss guard snapshot,
+      - active global protection lock (if any).
+    - runtime risk state now escalates with active global locks:
+      - `STOPLOSS_GUARD` / `MAX_DRAWDOWN` -> `HALT` + `unwind_only=true`,
+      - other global locks -> at least `CAUTION`.
+    - reason codes now include lock context (`PROTECTION_LOCK_*`) and lock reason/expiry.
+    - applied post-lock recomputation so state written to `state.json` matches effective execution gating.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - added test ensuring `STOPLOSS_GUARD` maps runtime risk state to `HALT`.
+- Risk slider impact:
+  - none on thresholds; this is state-consistency + operator-signal correctness.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (next 1-3h):
+  - verify when `STOPLOSS_GUARD` appears, UI shows non-`NORMAL` risk state with lock reason.
+  - verify state returns to `NORMAL` only after lock expiry + no active daily-loss trigger.
+
+## 2026-02-20 14:35 UTC — T-005 short-run build: global-lock unwind-only execution
+- Scope: answer wallet-policy concern under `STOPLOSS_GUARD` by implementing true unwind-only behavior instead of full freeze.
+- Problem observed:
+  - during active global lock, engine previously returned early and only emitted skip/cancel signals.
+  - this paused new entries (good) but also prevented controlled inventory reduction (not aligned with unwind-only intent).
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - added `deriveGlobalLockUnwindCooldownMs` (`20m -> 8m` by risk).
+    - inside active global lock path (`STOPLOSS_GUARD`/`MAX_DRAWDOWN`):
+      - selects managed home-quote positions by largest cost,
+      - performs throttled partial market SELL (`global-lock-unwind`) with risk-linked fraction,
+      - preserves lock state and skip telemetry if no feasible unwind action exists.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - added cooldown scaling test for global-lock unwind loop.
+- Risk slider impact:
+  - lower risk unwinds faster/more conservatively (longer cooldown, larger reduction per cycle).
+  - higher risk unwinds more gradually but still blocks fresh exposure under lock.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (next 1-3h):
+  - while global lock is active, verify decisions include `global-lock-unwind` trades and risk state remains non-`NORMAL`.
+  - confirm wallet concentration starts reducing without reopening new exposure lanes.

@@ -489,6 +489,12 @@ export class BotEngineService implements OnModuleInit {
     return Math.round((12 - t * 8) * 60_000); // 12m -> 4m
   }
 
+  private deriveGlobalLockUnwindCooldownMs(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const t = boundedRisk / 100;
+    return Math.round((20 - t * 12) * 60_000); // 20m -> 8m
+  }
+
   private evaluateDailyLossGuard(params: {
     state: BotState;
     risk: number;
@@ -560,6 +566,56 @@ export class BotEngineService implements OnModuleInit {
       maxDailyLossPct: policy.maxDailyLossPct,
       lookbackMs: policy.maxDailyLossLookbackMs,
       windowStartIso
+    };
+  }
+
+  private buildRuntimeRiskState(params: {
+    dailyLossGuard: DailyLossGuardSnapshot;
+    homeStable: string;
+    activeGlobalLock?: ProtectionLockEntry | null;
+  }): BotState["riskState"] {
+    const guard = params.dailyLossGuard;
+    const baseReasonCodes =
+      guard.state === "NORMAL"
+        ? []
+        : [
+            "DAILY_LOSS_GUARD",
+            `trigger=${guard.trigger}`,
+            `dailyRealized=${guard.dailyRealizedPnl.toFixed(2)}${params.homeStable}`,
+            `maxLoss=${guard.maxDailyLossAbs.toFixed(2)}${params.homeStable}`,
+            ...(guard.trigger === "PROFIT_GIVEBACK"
+              ? [
+                  `peakDaily=${guard.peakDailyRealizedPnl.toFixed(2)}${params.homeStable}`,
+                  `giveback=${guard.profitGivebackAbs.toFixed(2)}${params.homeStable} (${(guard.profitGivebackPct * 100).toFixed(1)}%)`
+                ]
+              : [])
+          ];
+    const baseResumeConditions =
+      guard.state === "NORMAL"
+        ? []
+        : [`Rolling PnL window (${Math.round(guard.lookbackMs / 3_600_000)}h) must recover above threshold`];
+
+    const lock = params.activeGlobalLock ?? null;
+    if (!lock) {
+      return {
+        state: guard.state,
+        reason_codes: baseReasonCodes,
+        unwind_only: guard.state === "HALT",
+        resume_conditions: baseResumeConditions
+      };
+    }
+
+    const lockType = lock.type.trim().toUpperCase();
+    const lockIsHardStop = lockType === "STOPLOSS_GUARD" || lockType === "MAX_DRAWDOWN";
+    const lockState: "CAUTION" | "HALT" = lockIsHardStop ? "HALT" : "CAUTION";
+    const mergedReasonCodes = [...baseReasonCodes, `PROTECTION_LOCK_${lockType}`, `lockReason=${lock.reason}`];
+    const mergedResumeConditions = [...baseResumeConditions, `Wait protection lock expiry (${lock.expiresAt})`];
+
+    return {
+      state: guard.state === "HALT" ? "HALT" : lockState,
+      reason_codes: mergedReasonCodes,
+      unwind_only: guard.state === "HALT" || lockIsHardStop,
+      resume_conditions: mergedResumeConditions
     };
   }
 
@@ -3560,33 +3616,10 @@ export class BotEngineService implements OnModuleInit {
             walletTotalHome,
             nowMs: Date.now()
           });
-          const nextRiskState = {
-            state: dailyLossGuard.state,
-            reason_codes:
-              dailyLossGuard.state === "NORMAL"
-                ? []
-                : [
-                    "DAILY_LOSS_GUARD",
-                    `trigger=${dailyLossGuard.trigger}`,
-                    `dailyRealized=${dailyLossGuard.dailyRealizedPnl.toFixed(2)}${homeStable}`,
-                    `maxLoss=${dailyLossGuard.maxDailyLossAbs.toFixed(2)}${homeStable}`,
-                    ...(dailyLossGuard.trigger === "PROFIT_GIVEBACK"
-                      ? [
-                          `peakDaily=${dailyLossGuard.peakDailyRealizedPnl.toFixed(2)}${homeStable}`,
-                          `giveback=${dailyLossGuard.profitGivebackAbs.toFixed(2)}${homeStable} (${(
-                            dailyLossGuard.profitGivebackPct * 100
-                          ).toFixed(1)}%)`
-                        ]
-                      : [])
-                  ],
-            unwind_only: dailyLossGuard.state === "HALT",
-            resume_conditions:
-              dailyLossGuard.state === "NORMAL"
-                ? []
-                : [
-                    `Rolling PnL window (${Math.round(dailyLossGuard.lookbackMs / 3_600_000)}h) must recover above threshold`
-                  ]
-          } as const;
+          const nextRiskState = this.buildRuntimeRiskState({
+            dailyLossGuard,
+            homeStable
+          });
           const riskStateChanged =
             JSON.stringify(current.riskState ?? null) !== JSON.stringify(nextRiskState);
           if (riskStateChanged) {
@@ -3611,6 +3644,20 @@ export class BotEngineService implements OnModuleInit {
           }
 
           const globalLockAfterDrawdown = this.getActiveGlobalProtectionLock(current);
+          const effectiveRiskState = this.buildRuntimeRiskState({
+            dailyLossGuard,
+            homeStable,
+            activeGlobalLock: globalLockAfterDrawdown
+          });
+          const effectiveRiskStateChanged =
+            JSON.stringify(current.riskState ?? null) !== JSON.stringify(effectiveRiskState);
+          if (effectiveRiskStateChanged) {
+            current = {
+              ...current,
+              riskState: effectiveRiskState
+            };
+            this.save(current);
+          }
           if (globalLockAfterDrawdown) {
             if (config?.advanced.autoCancelBotOrdersOnGlobalProtectionLock && config) {
               current = await this.cancelBotOwnedOpenOrders({
@@ -3626,6 +3673,90 @@ export class BotEngineService implements OnModuleInit {
                 maxCancels: 10
               });
               this.save(current);
+            }
+
+            const lockType = globalLockAfterDrawdown.type.trim().toUpperCase();
+            const supportsUnwindOnly = lockType === "STOPLOSS_GUARD" || lockType === "MAX_DRAWDOWN";
+            if (supportsUnwindOnly) {
+              const managedForUnwind = [...this.getManagedPositions(current).values()]
+                .filter((position) => position.netQty > 0 && position.symbol.endsWith(homeStable))
+                .sort((left, right) => right.costQuote - left.costQuote);
+              const unwindCooldownMs = this.deriveGlobalLockUnwindCooldownMs(risk);
+              const unwindFraction = Number((0.2 + (1 - Math.max(0, Math.min(100, risk)) / 100) * 0.5).toFixed(4)); // 70% -> 20%
+
+              for (const position of managedForUnwind) {
+                const recentUnwind = current.decisions.find((decision) => {
+                  if (decision.kind !== "TRADE") return false;
+                  const details = decision.details as Record<string, unknown> | undefined;
+                  if (details?.reason !== "global-lock-unwind") return false;
+                  if (typeof details?.symbol !== "string" || details.symbol.trim().toUpperCase() !== position.symbol) return false;
+                  const ts = Date.parse(decision.ts);
+                  return Number.isFinite(ts) && Date.now() - ts < unwindCooldownMs;
+                });
+                if (recentUnwind) {
+                  continue;
+                }
+
+                const baseAsset = position.symbol.slice(0, Math.max(0, position.symbol.length - homeStable.length));
+                if (!baseAsset) continue;
+                const baseFree = balances.find((b) => b.asset.toUpperCase() === baseAsset.toUpperCase())?.free ?? 0;
+                if (!Number.isFinite(baseFree) || baseFree <= 0) continue;
+
+                const desiredQty = Math.min(position.netQty, baseFree) * unwindFraction;
+                if (!Number.isFinite(desiredQty) || desiredQty <= 0) continue;
+
+                const sellCheck = await this.marketData.validateMarketOrderQty(position.symbol, desiredQty);
+                let sellQtyStr = sellCheck.ok ? sellCheck.normalizedQty : undefined;
+                if (!sellQtyStr && sellCheck.requiredQty) {
+                  const requiredQty = Number.parseFloat(sellCheck.requiredQty);
+                  if (Number.isFinite(requiredQty) && requiredQty > 0 && requiredQty <= Math.min(position.netQty, baseFree) + 1e-8) {
+                    sellQtyStr = sellCheck.requiredQty;
+                  }
+                }
+                if (!sellQtyStr) continue;
+
+                const sellQty = Number.parseFloat(sellQtyStr);
+                if (!Number.isFinite(sellQty) || sellQty <= 0) continue;
+
+                setLiveOperation({
+                  stage: "global-lock-unwind-market-sell",
+                  symbol: position.symbol,
+                  side: "SELL",
+                  asset: baseAsset,
+                  required: sellQty
+                });
+                const unwindFunds = await ensureFundsBeforeOrder({
+                  asset: baseAsset,
+                  required: sellQty
+                });
+                if (!unwindFunds.ok) continue;
+
+                const unwindRes = await this.trading.placeSpotMarketOrder({
+                  symbol: position.symbol,
+                  side: "SELL",
+                  quantity: sellQtyStr
+                });
+                persistLiveTrade({
+                  symbol: position.symbol,
+                  side: "SELL",
+                  requestedQty: sellQtyStr,
+                  fallbackQty: sellQty,
+                  response: unwindRes,
+                  reason: "global-lock-unwind",
+                  details: {
+                    reason: "global-lock-unwind",
+                    lockType,
+                    lockReason: globalLockAfterDrawdown.reason,
+                    lockExpiresAt: globalLockAfterDrawdown.expiresAt,
+                    symbol: position.symbol,
+                    unwindFraction,
+                    unwindCooldownMs,
+                    managedPositionQty: Number(position.netQty.toFixed(8)),
+                    managedPositionCost: Number(position.costQuote.toFixed(8))
+                  }
+                });
+                return;
+              }
             }
 
             const summary = `Skip: Protection lock ${globalLockAfterDrawdown.type} (GLOBAL)`;
