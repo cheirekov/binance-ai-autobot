@@ -463,7 +463,7 @@ export class BotEngineService implements OnModuleInit {
       maxDrawdownPct: Math.max(2.5, Number((4 + t * 10).toFixed(2))), // 4% -> 14%
       maxDrawdownLockMs: Math.round((120 - t * 90) * 60_000), // 120m -> 30m
       maxDailyLossLookbackMs: 24 * 60 * 60_000, // 24h rolling window
-      maxDailyLossPct: Number((1.2 + t * 4.8).toFixed(2)), // 1.2% -> 6.0%
+      maxDailyLossPct: Number((1 + t * 3.5).toFixed(2)), // 1.0% -> 4.5%
       lowProfitLookbackMs: Math.round((180 - t * 135) * 60_000), // 180m -> 45m
       lowProfitTradeLimit: Math.max(2, Math.round(2 + t * 3)), // 2 -> 5
       lowProfitThresholdPct: Number((-0.5 - t * 2).toFixed(2)), // -0.5% -> -2.5%
@@ -520,9 +520,9 @@ export class BotEngineService implements OnModuleInit {
     const t = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50)) / 100;
     const profitGivebackAbs = Math.max(0, peakDailyRealizedPnl - dailyRealizedPnl);
     const profitGivebackPct = peakDailyRealizedPnl > 0 ? profitGivebackAbs / peakDailyRealizedPnl : 0;
-    const profitGivebackActivationAbs = Math.max(15, maxDailyLossAbs * 0.25);
-    const profitGivebackCautionPct = Number((0.35 + t * 0.2).toFixed(4)); // 35% -> 55%
-    const profitGivebackHaltPct = Number((0.65 + t * 0.2).toFixed(4)); // 65% -> 85%
+    const profitGivebackActivationAbs = Math.max(10, maxDailyLossAbs * 0.1);
+    const profitGivebackCautionPct = Number((0.3 + t * 0.15).toFixed(4)); // 30% -> 45%
+    const profitGivebackHaltPct = Number((0.55 + t * 0.15).toFixed(4)); // 55% -> 70%
     const profitGivebackActive = peakDailyRealizedPnl >= profitGivebackActivationAbs;
     const cautionLossAbs = maxDailyLossAbs * 0.4;
     let state: "NORMAL" | "CAUTION" | "HALT" =

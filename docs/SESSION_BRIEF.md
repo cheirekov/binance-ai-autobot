@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-20 12:05 UTC
+Last updated: 2026-02-20 14:15 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,7 +9,7 @@ Use this file at the start and end of every batch.
 
 - Batch type: `DAY (1-3h)`
 - Active ticket: `T-005` (Daily guardrails + unwind-only behavior)
-- Goal (single sentence): enforce risk-linked daily-loss guardrails with visible runtime state and halt-only-new-exposure behavior.
+- Goal (single sentence): enforce tighter high-risk guardrails so repeated profit-giveback cycles trigger protection earlier.
 - In scope:
   - compute rolling 24h realized PnL guard threshold from risk slider.
   - block new entry/grid placement when guard is active.
@@ -17,6 +17,7 @@ Use this file at the start and end of every batch.
   - add post-stop-loss symbol re-entry cooldown (risk-linked) to reduce churn.
   - persist canonical runtime risk state (`NORMAL/CAUTION/HALT`) into bot state and show it in UI.
   - detect and guard against large realized-profit giveback within the same rolling window.
+  - tighten high-risk absolute-loss + giveback thresholds to reduce late guard activation.
 - Out of scope:
   - full ledger/commission reconciliation (`T-007`),
   - regime strategy rewrite (`T-031/T-032`),
@@ -28,6 +29,7 @@ Use this file at the start and end of every batch.
   - dashboard status shows runtime risk state + reason codes directly from engine state.
   - reduce repeated `Grid guard active (no inventory to sell)` skips for the same symbol.
   - guard reason includes `trigger=PROFIT_GIVEBACK` when profits are materially given back.
+  - high-risk profile reaches `CAUTION/HALT` earlier on renewed drawdown/giveback.
 - Stop/rollback condition:
   - if guard blocks all trading actions including exits/sweeps.
 
@@ -70,31 +72,31 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=7, historyLimitOrders=67, activeMarketOrders=0)
-  - realized PnL recovered positive: `+26.41 USDC`; risk state ended `NORMAL`
-  - loop pressure is low, but long-run profit-giveback cycles remain possible without dedicated trigger
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=87, activeMarketOrders=0)
+  - realized PnL turned negative again: `-95.87 USDC`; open exposure cost: `3654.26 USDC`
+  - runtime still ended `risk_state=NORMAL` in this bundle (guard trigger was late for this profile)
 - Decision: `continue`
 - Next ticket candidate: `T-005` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - long-run PnL can oscillate (profit then giveback) without hitting absolute-loss threshold in time.
+  - long-run profit-giveback/drawdown can still progress before caution/halt on risk=100 settings.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260220-114757.tgz`
-  - auto-updated at: `2026-02-20T12:05:00.000Z`
+  - bundle: `autobot-feedback-20260220-134417.tgz`
+  - auto-updated at: `2026-02-20T14:15:00.000Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-005
 Batch: DAY (1-3h)
-Goal: verify guardrails stay effective while adding protection against profit-giveback cycles.
-In scope: rolling daily-loss guard check, guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, profit-giveback trigger.
+Goal: verify tighter high-risk guardrails trigger earlier on renewed drawdown/profit-giveback.
+In scope: rolling daily-loss guard check, guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds.
 Out of scope: strategy rewrite, multi-quote routing, commission ledger refactor.
 DoD:
 - API: daily-loss guard computes and enforces risk-linked max daily loss.
 - Runtime: CAUTION state pauses new exposure (`new symbols paused`, `paused GRID BUY leg`, `paused MARKET entry`) and records clear skip details.
 - Runtime: symbol post-stop-loss re-entry cooldown is observed.
 - Runtime: repeated `Grid guard active (no inventory to sell)` for the same symbol drops versus prior run.
-- Runtime: guard can switch to `trigger=PROFIT_GIVEBACK` before full daily-loss breach.
+- Runtime: guard switches to `trigger=PROFIT_GIVEBACK` earlier on profit retrace events.
 - Risk slider mapping: max daily loss threshold widens at high risk and tightens at low risk.
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.

@@ -500,8 +500,8 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(guard.state).toBe("HALT");
     expect(guard.trigger).toBe("ABS_DAILY_LOSS");
     expect(guard.dailyRealizedPnl).toBeCloseTo(-20, 6);
-    expect(guard.maxDailyLossPct).toBe(1.2);
-    expect(guard.maxDailyLossAbs).toBeCloseTo(12, 6);
+    expect(guard.maxDailyLossPct).toBe(1);
+    expect(guard.maxDailyLossAbs).toBeCloseTo(10, 6);
   });
 
   it("returns CAUTION before HALT threshold", () => {
@@ -558,8 +558,8 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(guard.active).toBe(false);
     expect(guard.state).toBe("CAUTION");
     expect(guard.trigger).toBe("ABS_DAILY_LOSS");
-    expect(guard.maxDailyLossPct).toBe(6);
-    expect(guard.maxDailyLossAbs).toBeCloseTo(60, 6);
+    expect(guard.maxDailyLossPct).toBe(4.5);
+    expect(guard.maxDailyLossAbs).toBeCloseTo(45, 6);
   });
 
   it("switches to PROFIT_GIVEBACK caution when gains are mostly given back", () => {
@@ -637,6 +637,89 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(guard.active).toBe(false);
     expect(guard.state).toBe("CAUTION");
     expect(guard.trigger).toBe("PROFIT_GIVEBACK");
+    expect(guard.peakDailyRealizedPnl).toBeCloseTo(60, 6);
+    expect(guard.dailyRealizedPnl).toBeCloseTo(30, 6);
+    expect(guard.profitGivebackAbs).toBeCloseTo(30, 6);
+    expect(guard.profitGivebackPct).toBeCloseTo(0.5, 6);
+  });
+
+  it("activates PROFIT_GIVEBACK caution on high risk with moderate peak", () => {
+    const helpers = service as unknown as {
+      evaluateDailyLossGuard: (params: {
+        state: BotState;
+        risk: number;
+        walletTotalHome: number;
+        nowMs: number;
+      }) => {
+        state: "NORMAL" | "CAUTION" | "HALT";
+        active: boolean;
+        trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK";
+        dailyRealizedPnl: number;
+        peakDailyRealizedPnl: number;
+        profitGivebackAbs: number;
+        profitGivebackPct: number;
+        profitGivebackActivationAbs: number;
+      };
+    };
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      orderHistory: [
+        {
+          id: "buy-1",
+          ts: new Date(now - 60 * 60_000).toISOString(),
+          symbol: "AAAUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          price: 100,
+          qty: 2
+        },
+        {
+          id: "sell-1",
+          ts: new Date(now - 50 * 60_000).toISOString(),
+          symbol: "AAAUSDC",
+          side: "SELL",
+          type: "MARKET",
+          status: "FILLED",
+          price: 130,
+          qty: 2
+        },
+        {
+          id: "buy-2",
+          ts: new Date(now - 40 * 60_000).toISOString(),
+          symbol: "BBBUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          price: 100,
+          qty: 2
+        },
+        {
+          id: "sell-2",
+          ts: new Date(now - 30 * 60_000).toISOString(),
+          symbol: "BBBUSDC",
+          side: "SELL",
+          type: "MARKET",
+          status: "FILLED",
+          price: 85,
+          qty: 2
+        }
+      ]
+    };
+
+    const guard = helpers.evaluateDailyLossGuard({
+      state,
+      risk: 100,
+      walletTotalHome: 10_000,
+      nowMs: now
+    });
+
+    expect(guard.active).toBe(false);
+    expect(guard.state).toBe("CAUTION");
+    expect(guard.trigger).toBe("PROFIT_GIVEBACK");
+    expect(guard.profitGivebackActivationAbs).toBeCloseTo(45, 6);
     expect(guard.peakDailyRealizedPnl).toBeCloseTo(60, 6);
     expect(guard.dailyRealizedPnl).toBeCloseTo(30, 6);
     expect(guard.profitGivebackAbs).toBeCloseTo(30, 6);

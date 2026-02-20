@@ -1915,3 +1915,27 @@ This log is mandatory for every implementation patch batch.
 - Runtime request (next 1-3h):
   - run without state reset and verify guard reasons include `trigger=PROFIT_GIVEBACK` when profit is materially given back.
   - verify exits/sweeps remain operational and no false HALT during stable positive trend.
+
+## 2026-02-20 14:12 UTC — T-005 short-run build: tighten high-risk guard sensitivity
+- Scope: follow-up after `autobot-feedback-20260220-134417.tgz` where realized PnL turned negative again despite prior giveback guard addition.
+- Bundle findings:
+  - realized PnL degraded to `-95.87 USDC`; exposure remained high (`openExposureCost ~3654 USDC`).
+  - runtime ended in `risk_state=NORMAL`; guard sensitivity still too loose for risk=100 profile in this environment.
+  - one global `STOPLOSS_GUARD` lock appeared, but daily guard still did not engage.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - tightened absolute daily-loss curve from `1.2% -> 6.0%` to `1.0% -> 4.5%`.
+    - tightened profit-giveback activation + thresholds:
+      - activation floor from `max(15, 25% of maxDailyLossAbs)` to `max(10, 10% of maxDailyLossAbs)`,
+      - caution threshold from `35%-55%` to `30%-45%` giveback,
+      - halt threshold from `65%-85%` to `55%-70%` giveback.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - updated absolute-threshold expectations for new curve.
+    - added high-risk (`risk=100`) test asserting `PROFIT_GIVEBACK` caution with moderate peak/giveback.
+- Risk slider impact:
+  - high risk remains more permissive than low risk, but no longer waits for very deep realized giveback before entering caution/halt.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (next 1-3h):
+  - run without state reset and verify earlier transitions to `CAUTION`/`HALT` on renewed drawdown/giveback,
+  - confirm reasons include `trigger=PROFIT_GIVEBACK` when applicable.
