@@ -2796,6 +2796,13 @@ export class BotEngineService implements OnModuleInit {
     return "ENGINE";
   }
 
+  private isFeeEdgeSufficient(netEdgePct: number, minNetEdgePct: number): boolean {
+    if (!Number.isFinite(netEdgePct) || !Number.isFinite(minNetEdgePct)) return false;
+    const normalizedNetEdge = Number(netEdgePct.toFixed(3));
+    const normalizedMinEdge = Number(minNetEdgePct.toFixed(3));
+    return normalizedNetEdge >= normalizedMinEdge;
+  }
+
   private readNumericDecisionDetail(details: Record<string, unknown> | undefined, key: string): number | null {
     const raw = details?.[key];
     if (typeof raw === "number" && Number.isFinite(raw)) return raw;
@@ -4734,7 +4741,7 @@ export class BotEngineService implements OnModuleInit {
           const riskAdjustedMinNetEdgePct = Math.max(0.05, capitalProfile.minNetEdgePct * (1 - riskNormalized * 0.65));
           if (Number.isFinite(estimatedEdgePct)) {
             const netEdgePct = (estimatedEdgePct ?? 0) - roundTripCostPct;
-            if (netEdgePct < riskAdjustedMinNetEdgePct) {
+            if (!this.isFeeEdgeSufficient(netEdgePct, riskAdjustedMinNetEdgePct)) {
               const summary = `Skip ${candidateSymbol}: Fee/edge filter (net ${netEdgePct.toFixed(3)}% < ${riskAdjustedMinNetEdgePct.toFixed(3)}%)`;
               const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveFeeEdgeCooldownMs(risk));
               const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });

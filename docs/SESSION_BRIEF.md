@@ -1,15 +1,15 @@
 # Session Brief
 
-Last updated: 2026-02-21 15:09 UTC
+Last updated: 2026-02-21 19:38 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
 
 ## 1) Batch contract (fill before coding)
 
-- Batch type: `DAY (1-3h)`
+- Batch type: `NIGHT (8-12h)`
 - Active ticket: `T-005` (Daily guardrails + unwind-only behavior)
-- Goal (single sentence): validate daily-loss HALT de-risking behavior and trigger-aware guard telemetry without relaxing guardrails.
+- Goal (single sentence): run overnight on stable T-005 guardrails with fee-edge precision normalization to reduce borderline skip churn.
 - In scope:
   - compute rolling 24h realized PnL guard threshold from risk slider.
   - block new entry/grid placement when guard is active.
@@ -23,6 +23,7 @@ Use this file at the start and end of every batch.
   - execute controlled partial unwinds during daily-loss `HALT` (`daily-loss-halt-unwind`) to reduce exposure during prolonged guard windows.
   - emit trigger-aware daily-loss skip summary text (`PROFIT_GIVEBACK` vs `ABS_DAILY_LOSS`).
   - normalize adaptive telemetry labels so UI does not show `UNKNOWN` for regime/decision kind.
+  - normalize fee-edge threshold comparison to avoid `net X < X` float-noise rejects.
 - Out of scope:
   - full ledger/commission reconciliation (`T-007`),
   - regime strategy rewrite (`T-031/T-032`),
@@ -58,7 +59,7 @@ Use this file at the start and end of every batch.
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
 - Runtime validation plan:
-  - run duration: `1-3 hours`
+  - run duration: `8-12 hours`
   - expected bundle name pattern: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
 
 ## 3) Deployment handoff
@@ -81,24 +82,24 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-  - runtime remained active with realized PnL positive in bundle (`+6.42 USDC`) and risk state returned to `NORMAL`.
-  - caution gating was visible (`new symbols paused` / `paused MARKET entry`) instead of uncontrolled re-entry.
-  - adaptive tail still had legacy `UNKNOWN` labels; display/API normalization added in this patch.
+  - runtime stable and profitable in bundle snapshot (`realized +33.01 USDC`, `risk_state=NORMAL`).
+  - guardrails stayed active without freeze (`trades=64`, `open limit orders=3`).
+  - skip pressure shifted to fee-edge borderline and grid-wait patterns; fee-edge comparator normalization added for this night run.
 - Decision: `continue`
 - Next ticket candidate: `T-005` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - exposure concentration remains high on top 2 symbols; de-concentration policy remains the next tuning lane.
+  - exposure concentration remains high on top symbols; de-concentration policy remains next tuning lane after T-005 closure.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260221-145317.tgz`
-  - auto-updated at: `2026-02-21T15:09:00.000Z`
+  - bundle: `autobot-feedback-20260221-192344.tgz`
+  - auto-updated at: `2026-02-21T19:38:00.000Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-005
-Batch: DAY (1-3h)
-Goal: validate daily-loss HALT de-risking and clean telemetry labels (no UNKNOWN in UI).
-In scope: rolling daily-loss guard check, trigger-aware guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds, lock-state consistency, global-lock unwind-only execution, daily-loss-halt unwind execution, adaptive telemetry label normalization.
+Batch: NIGHT (8-12h)
+Goal: validate overnight stability with daily-loss guardrails and fee-edge precision normalization.
+In scope: rolling daily-loss guard check, trigger-aware guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds, lock-state consistency, global-lock unwind-only execution, daily-loss-halt unwind execution, adaptive telemetry label normalization, fee-edge comparator normalization.
 Out of scope: strategy rewrite, multi-quote routing, commission ledger refactor.
 DoD:
 - API: daily-loss guard computes and enforces risk-linked max daily loss.

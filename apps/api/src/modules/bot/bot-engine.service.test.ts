@@ -874,6 +874,15 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(summary).toContain("70.0%");
   });
 
+  it("treats fee-edge compare as pass when values match at 3-decimal precision", () => {
+    const helpers = service as unknown as {
+      isFeeEdgeSufficient: (netEdgePct: number, minNetEdgePct: number) => boolean;
+    };
+
+    expect(helpers.isFeeEdgeSufficient(0.05198, 0.05201)).toBe(true);
+    expect(helpers.isFeeEdgeSufficient(0.0514, 0.05201)).toBe(false);
+  });
+
   it("penalizes grid score in bear trend", () => {
     const helpers = service as unknown as {
       buildAdaptiveStrategyScores: (candidate: UniverseCandidate | null, regime: "BEAR_TREND" | "RANGE") => {

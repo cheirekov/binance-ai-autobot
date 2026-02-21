@@ -2050,3 +2050,23 @@ This log is mandatory for every implementation patch batch.
   - none (telemetry/UX normalization only).
 - Validation evidence:
   - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+
+## 2026-02-21 19:35 UTC — T-005 night build prep after `autobot-feedback-20260221-192344.tgz`: fee-edge threshold normalization
+- Scope: reduce borderline fee-edge churn before night run, keep strategy lane unchanged.
+- Bundle findings:
+  - run ended stable (`risk_state=NORMAL`) with positive realized PnL snapshot (`+33.01 USDC`).
+  - top skip contributors were `Grid waiting` and repeated `Fee/edge filter`, including borderline lines like `net 0.052% < 0.052%`.
+  - no crash/regression pattern in lifecycle (`fills=166`, `canceled=34`, active limit orders present).
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - added `isFeeEdgeSufficient(...)` comparator that normalizes both net/min edge to 3-decimal precision before filtering.
+    - fee-edge gate now uses normalized comparison to avoid false rejects caused by floating-point dust at display precision.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - added coverage for threshold-equality pass at 3-decimal precision and clear fail below threshold.
+- Risk slider impact:
+  - none on policy targets; only comparator precision normalization for execution gating.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (night):
+  - run without state reset and verify reduced frequency of `Fee/edge filter (net X < X)` borderline skips,
+  - monitor whether trade cadence stays stable while guardrails remain intact.
