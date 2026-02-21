@@ -2031,3 +2031,22 @@ This log is mandatory for every implementation patch batch.
 - Runtime request (next 1-3h):
   - verify decisions include `daily-loss-halt-unwind` while HALT is active and exposure starts reducing,
   - verify guard skip summary explicitly references profit giveback thresholds when `trigger=PROFIT_GIVEBACK`.
+
+## 2026-02-21 15:06 UTC — T-005 follow-up after `autobot-feedback-20260221-145317.tgz`: normalize UNKNOWN telemetry labels
+- Scope: resolve operator-facing confusion around `UNKNOWN` labels in dashboard decisions/adaptive telemetry, without changing execution logic.
+- Bundle findings:
+  - runtime ended `risk_state=NORMAL` with positive realized PnL in bundle snapshot.
+  - adaptive telemetry still contained legacy `regime=UNKNOWN` rows; user also reported `Kind: UNKNOWN` in UI.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - changed missing-indicator regime fallback from `UNKNOWN` to `NEUTRAL`,
+    - added adaptive-tail normalization on read:
+      - regime labels normalized to `BULL_TREND|BEAR_TREND|RANGE|NEUTRAL`,
+      - decision kinds normalized to `TRADE|SKIP|ENGINE`,
+      - invalid/missing fields hardened with safe defaults.
+  - `apps/ui/src/pages/DashboardPage.tsx`
+    - added display-side normalization helpers so unexpected telemetry values render as stable labels (`NEUTRAL`, `ENGINE`) instead of `UNKNOWN`.
+- Risk slider impact:
+  - none (telemetry/UX normalization only).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).

@@ -2337,7 +2337,7 @@ export class BotEngineService implements OnModuleInit {
 
     if (!Number.isFinite(change) || !Number.isFinite(rsi) || !Number.isFinite(adx)) {
       return {
-        label: "UNKNOWN",
+        label: "NEUTRAL",
         confidence: 0.2,
         inputs
       };
@@ -2731,7 +2731,45 @@ export class BotEngineService implements OnModuleInit {
       const parsed: AdaptiveShadowEvent[] = [];
       for (const line of tail) {
         try {
-          parsed.push(JSON.parse(line) as AdaptiveShadowEvent);
+          const event = JSON.parse(line) as Partial<AdaptiveShadowEvent>;
+          const normalizedLabel = this.normalizeAdaptiveRegimeLabel(event.regime?.label);
+          const normalizedKind = this.normalizeAdaptiveDecisionKind(event.decision?.kind);
+          const regimeConfidence =
+            typeof event.regime?.confidence === "number" && Number.isFinite(event.regime.confidence) ? event.regime.confidence : 0.2;
+          const summary = typeof event.decision?.summary === "string" && event.decision.summary.trim() ? event.decision.summary : "Telemetry event";
+
+          parsed.push({
+            version: 1,
+            ts: typeof event.ts === "string" && event.ts.trim() ? event.ts : new Date().toISOString(),
+            tickStartedAt: typeof event.tickStartedAt === "string" && event.tickStartedAt.trim() ? event.tickStartedAt : new Date().toISOString(),
+            tickDurationMs: typeof event.tickDurationMs === "number" && Number.isFinite(event.tickDurationMs) ? event.tickDurationMs : 0,
+            environment: event.environment === "LIVE" ? "LIVE" : "PAPER",
+            homeStableCoin:
+              typeof event.homeStableCoin === "string" && event.homeStableCoin.trim() ? event.homeStableCoin : "USDC",
+            candidateSymbol:
+              typeof event.candidateSymbol === "string" && event.candidateSymbol.trim() ? event.candidateSymbol : "UNSET",
+            ...(event.executionLane ? { executionLane: event.executionLane } : {}),
+            ...(event.candidateFeatures ? { candidateFeatures: event.candidateFeatures } : {}),
+            regime: {
+              label: normalizedLabel,
+              confidence: this.toRounded(Math.max(0, Math.min(1, regimeConfidence)), 4),
+              inputs: event.regime?.inputs ?? {}
+            },
+            strategy: event.strategy ?? {
+              trend: 0,
+              meanReversion: 0,
+              grid: 0,
+              recommended: "MEAN_REVERSION"
+            },
+            risk: event.risk ?? {
+              risk: 50
+            },
+            decision: {
+              ...event.decision,
+              kind: normalizedKind,
+              summary
+            }
+          });
         } catch {
           // ignore invalid lines
         }
@@ -2740,6 +2778,22 @@ export class BotEngineService implements OnModuleInit {
     } catch {
       return [];
     }
+  }
+
+  private normalizeAdaptiveRegimeLabel(label: unknown): RegimeLabel {
+    const normalized = typeof label === "string" ? label.trim().toUpperCase() : "";
+    if (normalized === "BULL_TREND") return "BULL_TREND";
+    if (normalized === "BEAR_TREND") return "BEAR_TREND";
+    if (normalized === "RANGE") return "RANGE";
+    if (normalized === "NEUTRAL") return "NEUTRAL";
+    return "NEUTRAL";
+  }
+
+  private normalizeAdaptiveDecisionKind(kind: unknown): "ENGINE" | "TRADE" | "SKIP" {
+    const normalized = typeof kind === "string" ? kind.trim().toUpperCase() : "";
+    if (normalized === "TRADE") return "TRADE";
+    if (normalized === "SKIP") return "SKIP";
+    return "ENGINE";
   }
 
   private readNumericDecisionDetail(details: Record<string, unknown> | undefined, key: string): number | null {

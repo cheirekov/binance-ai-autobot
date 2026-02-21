@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-21 11:52 UTC
+Last updated: 2026-02-21 15:09 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -22,6 +22,7 @@ Use this file at the start and end of every batch.
   - execute controlled partial unwinds while `STOPLOSS_GUARD`/`MAX_DRAWDOWN` is active.
   - execute controlled partial unwinds during daily-loss `HALT` (`daily-loss-halt-unwind`) to reduce exposure during prolonged guard windows.
   - emit trigger-aware daily-loss skip summary text (`PROFIT_GIVEBACK` vs `ABS_DAILY_LOSS`).
+  - normalize adaptive telemetry labels so UI does not show `UNKNOWN` for regime/decision kind.
 - Out of scope:
   - full ledger/commission reconciliation (`T-007`),
   - regime strategy rewrite (`T-031/T-032`),
@@ -80,24 +81,24 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-  - runtime reached `HALT` with `trigger=PROFIT_GIVEBACK` and remained execution-alive.
-  - skip stream was dominated by daily-loss guard rows (expected) with repetitive absolute-loss text for a giveback-triggered halt.
-  - no dedicated daily-loss halt unwind lane existed before this patch (added now).
+  - runtime remained active with realized PnL positive in bundle (`+6.42 USDC`) and risk state returned to `NORMAL`.
+  - caution gating was visible (`new symbols paused` / `paused MARKET entry`) instead of uncontrolled re-entry.
+  - adaptive tail still had legacy `UNKNOWN` labels; display/API normalization added in this patch.
 - Decision: `continue`
 - Next ticket candidate: `T-005` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - need runtime confirmation that daily-loss HALT unwinds reduce exposure without over-churn.
+  - exposure concentration remains high on top 2 symbols; de-concentration policy remains the next tuning lane.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260221-112806.tgz`
-  - auto-updated at: `2026-02-21T11:29:33.800Z`
+  - bundle: `autobot-feedback-20260221-145317.tgz`
+  - auto-updated at: `2026-02-21T15:09:00.000Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-005
 Batch: DAY (1-3h)
-Goal: validate daily-loss HALT de-risking and trigger-aware guard messages.
-In scope: rolling daily-loss guard check, trigger-aware guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds, lock-state consistency, global-lock unwind-only execution, daily-loss-halt unwind execution.
+Goal: validate daily-loss HALT de-risking and clean telemetry labels (no UNKNOWN in UI).
+In scope: rolling daily-loss guard check, trigger-aware guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds, lock-state consistency, global-lock unwind-only execution, daily-loss-halt unwind execution, adaptive telemetry label normalization.
 Out of scope: strategy rewrite, multi-quote routing, commission ledger refactor.
 DoD:
 - API: daily-loss guard computes and enforces risk-linked max daily loss.

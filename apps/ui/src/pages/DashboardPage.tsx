@@ -13,6 +13,21 @@ function pillClass(tone: PillTone): string {
   return "pill";
 }
 
+function normalizeDecisionKindLabel(kind: string | undefined): "ENGINE" | "TRADE" | "SKIP" {
+  const value = (kind ?? "").trim().toUpperCase();
+  if (value === "TRADE") return "TRADE";
+  if (value === "SKIP") return "SKIP";
+  return "ENGINE";
+}
+
+function normalizeRegimeLabel(label: string | undefined): "BULL_TREND" | "BEAR_TREND" | "RANGE" | "NEUTRAL" {
+  const value = (label ?? "").trim().toUpperCase();
+  if (value === "BULL_TREND") return "BULL_TREND";
+  if (value === "BEAR_TREND") return "BEAR_TREND";
+  if (value === "RANGE") return "RANGE";
+  return "NEUTRAL";
+}
+
 export function DashboardPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -684,13 +699,13 @@ export function DashboardPage(): JSX.Element {
             </b>
           </span>
           <span className="pill">
-            Last regime: <b>{latestAdaptiveEvent?.regime.label ?? "—"}</b>
+            Last regime: <b>{latestAdaptiveEvent ? normalizeRegimeLabel(latestAdaptiveEvent.regime.label) : "—"}</b>
           </span>
           <span className="pill">
             Last strategy: <b>{latestAdaptiveEvent?.strategy.recommended ?? "—"}</b>
           </span>
           <span className="pill">
-            Last decision: <b>{latestAdaptiveEvent?.decision.kind ?? "—"}</b>
+            Last decision: <b>{latestAdaptiveEvent ? normalizeDecisionKindLabel(latestAdaptiveEvent.decision.kind) : "—"}</b>
           </span>
           <span className="pill">
             History loaded: <b>{adaptiveTail.length}</b>
@@ -712,7 +727,7 @@ export function DashboardPage(): JSX.Element {
                 <tr key={`${event.ts}:${idx}`}>
                   <td className="col-time">{new Date(event.ts).toLocaleTimeString()}</td>
                   <td>{event.candidateSymbol ?? "—"}</td>
-                  <td>{event.regime.label}</td>
+                  <td>{normalizeRegimeLabel(event.regime.label)}</td>
                   <td>{event.strategy.recommended}</td>
                   <td>{event.decision.summary}</td>
                 </tr>
@@ -753,7 +768,7 @@ export function DashboardPage(): JSX.Element {
                     <Fragment key={d.id}>
                       <tr>
                         <td className="col-time">{new Date(d.ts).toLocaleTimeString()}</td>
-                        <td className="col-kind">{d.kind}</td>
+                        <td className="col-kind">{normalizeDecisionKindLabel(d.kind)}</td>
                         <td>{d.summary}</td>
                         <td className="col-kind">
                           {hasDetails ? (
