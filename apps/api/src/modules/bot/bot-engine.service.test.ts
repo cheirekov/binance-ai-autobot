@@ -821,6 +821,59 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.deriveGlobalLockUnwindCooldownMs(100)).toBe(480000);
   });
 
+  it("scales daily-loss HALT unwind cooldown with risk", () => {
+    const helpers = service as unknown as {
+      deriveDailyLossHaltUnwindCooldownMs: (risk: number) => number;
+    };
+
+    expect(helpers.deriveDailyLossHaltUnwindCooldownMs(0)).toBe(1080000);
+    expect(helpers.deriveDailyLossHaltUnwindCooldownMs(50)).toBe(780000);
+    expect(helpers.deriveDailyLossHaltUnwindCooldownMs(100)).toBe(480000);
+  });
+
+  it("derives stronger daily-loss HALT unwind fraction for absolute-loss trigger", () => {
+    const helpers = service as unknown as {
+      deriveDailyLossHaltUnwindFraction: (params: { risk: number; trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK" }) => number;
+    };
+
+    expect(helpers.deriveDailyLossHaltUnwindFraction({ risk: 0, trigger: "ABS_DAILY_LOSS" })).toBe(0.55);
+    expect(helpers.deriveDailyLossHaltUnwindFraction({ risk: 100, trigger: "ABS_DAILY_LOSS" })).toBe(0.22);
+    expect(helpers.deriveDailyLossHaltUnwindFraction({ risk: 0, trigger: "PROFIT_GIVEBACK" })).toBe(0.35);
+    expect(helpers.deriveDailyLossHaltUnwindFraction({ risk: 100, trigger: "PROFIT_GIVEBACK" })).toBe(0.15);
+  });
+
+  it("formats daily-loss guard summary for profit-giveback trigger", () => {
+    const helpers = service as unknown as {
+      buildDailyLossGuardSkipSummary: (guard: {
+        state: "NORMAL" | "CAUTION" | "HALT";
+        trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK";
+        peakDailyRealizedPnl: number;
+        profitGivebackPct: number;
+        profitGivebackCautionPct: number;
+        profitGivebackHaltPct: number;
+        dailyRealizedPnl: number;
+        maxDailyLossAbs: number;
+      }, homeStable: string) => string;
+    };
+
+    const summary = helpers.buildDailyLossGuardSkipSummary(
+      {
+        state: "HALT",
+        trigger: "PROFIT_GIVEBACK",
+        peakDailyRealizedPnl: 40,
+        profitGivebackPct: 0.72,
+        profitGivebackCautionPct: 0.45,
+        profitGivebackHaltPct: 0.7,
+        dailyRealizedPnl: 11,
+        maxDailyLossAbs: 380
+      },
+      "USDC"
+    );
+    expect(summary).toContain("profit giveback");
+    expect(summary).toContain("72.0%");
+    expect(summary).toContain("70.0%");
+  });
+
   it("penalizes grid score in bear trend", () => {
     const helpers = service as unknown as {
       buildAdaptiveStrategyScores: (candidate: UniverseCandidate | null, regime: "BEAR_TREND" | "RANGE") => {

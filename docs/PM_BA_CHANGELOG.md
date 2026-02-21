@@ -1987,3 +1987,47 @@ This log is mandatory for every implementation patch batch.
 - Runtime request (next 1-3h):
   - while global lock is active, verify decisions include `global-lock-unwind` trades and risk state remains non-`NORMAL`.
   - confirm wallet concentration starts reducing without reopening new exposure lanes.
+
+## 2026-02-20 19:25 UTC — T-005 night build decision after `autobot-feedback-20260220-165828.tgz`
+- Scope: PM/BA review of latest 3-day runtime bundle to decide whether to patch again or freeze for overnight evidence.
+- Bundle findings:
+  - realized PnL snapshot positive (`+39.04 USDC`) with active trading lifecycle (125 trades, 176 fills, 24 cancels).
+  - runtime ended `risk_state=NORMAL` with no active hard-stop lock in snapshot; previous state/lock mismatch did not reappear here.
+  - dominant skips are operational (`grid waiting`, `max open positions`, `minQty/notional rejects`) rather than crash/loop signatures.
+  - exposure remains concentrated (largest symbol ~31%), so overnight validation should focus on drawdown reaction quality, not entry aggressiveness.
+- PM/BA decision:
+  - no new strategy-scope patch before night run (avoid introducing fresh variance mid-lane).
+  - run overnight on the current T-005 build and collect long-horizon evidence for:
+    - `CAUTION/HALT` transitions under renewed drawdown,
+    - `global-lock-unwind` behavior during hard lock windows,
+    - absence of state/risk inconsistency.
+- Operator handoff:
+  - deploy current commit as-is,
+  - keep `data/state.json` (no reset) so rolling guard windows remain valid,
+  - collect morning bundle via `./scripts/collect-feedback.sh`.
+
+## 2026-02-21 11:45 UTC — T-005 follow-up after `autobot-feedback-20260221-112806.tgz`: HALT de-risking and clearer trigger semantics
+- Scope: resolve operator concern about “absolute 24h HALT” by making HALT adaptive (unwind-only de-risk), while keeping strict no-new-risk behavior.
+- Bundle findings:
+  - runtime ended in `risk_state=HALT` with `trigger=PROFIT_GIVEBACK` and repeated guard skips.
+  - guard skip message still used absolute-loss wording even for giveback-triggered HALT, which was misleading.
+  - under daily-loss HALT there was no dedicated forced de-risk lane (only entry blocking + normal exits/sweeps).
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - added `deriveDailyLossHaltUnwindCooldownMs` (`18m -> 8m` by risk) and `deriveDailyLossHaltUnwindFraction` (trigger-aware fraction).
+    - in `dailyLossGuard.active` (`HALT`) branch:
+      - optionally cancels bot-owned open orders (reuses existing advanced flag),
+      - performs throttled partial market SELL of managed home-quote positions (`daily-loss-halt-unwind`),
+      - preserves HALT behavior (no new exposure) if unwind is not currently feasible.
+    - added `buildDailyLossGuardSkipSummary` so `PROFIT_GIVEBACK` HALT/CAUTION messages show giveback threshold semantics instead of absolute-loss text.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - added coverage for daily-loss HALT unwind cooldown scaling,
+    - added coverage for trigger-aware unwind fraction,
+    - added coverage for profit-giveback summary formatting.
+- Risk slider impact:
+  - HALT unwind cadence remains tighter at high risk but still active; low risk de-risks faster per cycle.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (next 1-3h):
+  - verify decisions include `daily-loss-halt-unwind` while HALT is active and exposure starts reducing,
+  - verify guard skip summary explicitly references profit giveback thresholds when `trigger=PROFIT_GIVEBACK`.

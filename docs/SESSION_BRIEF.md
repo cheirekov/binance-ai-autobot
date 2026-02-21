@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-20 14:38 UTC
+Last updated: 2026-02-21 11:52 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,7 +9,7 @@ Use this file at the start and end of every batch.
 
 - Batch type: `DAY (1-3h)`
 - Active ticket: `T-005` (Daily guardrails + unwind-only behavior)
-- Goal (single sentence): enforce tighter high-risk guardrails and keep runtime risk state consistent with active protection locks.
+- Goal (single sentence): validate daily-loss HALT de-risking behavior and trigger-aware guard telemetry without relaxing guardrails.
 - In scope:
   - compute rolling 24h realized PnL guard threshold from risk slider.
   - block new entry/grid placement when guard is active.
@@ -20,6 +20,8 @@ Use this file at the start and end of every batch.
   - tighten high-risk absolute-loss + giveback thresholds to reduce late guard activation.
   - ensure active global locks are reflected in runtime `riskState` (no `NORMAL` while lock is active).
   - execute controlled partial unwinds while `STOPLOSS_GUARD`/`MAX_DRAWDOWN` is active.
+  - execute controlled partial unwinds during daily-loss `HALT` (`daily-loss-halt-unwind`) to reduce exposure during prolonged guard windows.
+  - emit trigger-aware daily-loss skip summary text (`PROFIT_GIVEBACK` vs `ABS_DAILY_LOSS`).
 - Out of scope:
   - full ledger/commission reconciliation (`T-007`),
   - regime strategy rewrite (`T-031/T-032`),
@@ -78,26 +80,24 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=87, activeMarketOrders=0)
-  - realized PnL turned negative again: `-95.87 USDC`; open exposure cost: `3654.26 USDC`
-  - runtime still ended `risk_state=NORMAL` in this bundle while a global lock appeared (state/lock mismatch fixed in latest patch)
+  - runtime reached `HALT` with `trigger=PROFIT_GIVEBACK` and remained execution-alive.
+  - skip stream was dominated by daily-loss guard rows (expected) with repetitive absolute-loss text for a giveback-triggered halt.
+  - no dedicated daily-loss halt unwind lane existed before this patch (added now).
 - Decision: `continue`
 - Next ticket candidate: `T-005` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - long-run profit-giveback/drawdown can still progress before caution/halt on risk=100 settings.
-  - monitor for lock-state flapping after consistency fix.
-  - monitor unwind cadence to avoid excessive liquidation in short lock windows.
+  - need runtime confirmation that daily-loss HALT unwinds reduce exposure without over-churn.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260220-134417.tgz`
-  - auto-updated at: `2026-02-20T14:15:00.000Z`
+  - bundle: `autobot-feedback-20260221-112806.tgz`
+  - auto-updated at: `2026-02-21T11:29:33.800Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-005
 Batch: DAY (1-3h)
-Goal: verify tighter high-risk guardrails trigger earlier on renewed drawdown/profit-giveback.
-In scope: rolling daily-loss guard check, guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds, lock-state consistency, global-lock unwind-only execution.
+Goal: validate daily-loss HALT de-risking and trigger-aware guard messages.
+In scope: rolling daily-loss guard check, trigger-aware guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds, lock-state consistency, global-lock unwind-only execution, daily-loss-halt unwind execution.
 Out of scope: strategy rewrite, multi-quote routing, commission ledger refactor.
 DoD:
 - API: daily-loss guard computes and enforces risk-linked max daily loss.
@@ -107,6 +107,7 @@ DoD:
 - Runtime: guard switches to `trigger=PROFIT_GIVEBACK` earlier on profit retrace events.
 - Runtime: active global `STOPLOSS_GUARD`/`MAX_DRAWDOWN` lock maps to non-`NORMAL` risk state.
 - Runtime: active global lock performs controlled `global-lock-unwind` sells when inventory is available.
+- Runtime: daily-loss HALT performs controlled `daily-loss-halt-unwind` sells when inventory is available.
 - Risk slider mapping: max daily loss threshold widens at high risk and tightens at low risk.
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.

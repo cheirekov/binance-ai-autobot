@@ -495,6 +495,34 @@ export class BotEngineService implements OnModuleInit {
     return Math.round((20 - t * 12) * 60_000); // 20m -> 8m
   }
 
+  private deriveDailyLossHaltUnwindCooldownMs(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const t = boundedRisk / 100;
+    return Math.round((18 - t * 10) * 60_000); // 18m -> 8m
+  }
+
+  private deriveDailyLossHaltUnwindFraction(params: {
+    risk: number;
+    trigger: DailyLossGuardSnapshot["trigger"];
+  }): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const t = boundedRisk / 100;
+    const isAbsLoss = params.trigger === "ABS_DAILY_LOSS";
+    const floor = isAbsLoss ? 0.22 : 0.15;
+    const span = isAbsLoss ? 0.33 : 0.2;
+    return Number((floor + (1 - t) * span).toFixed(4));
+  }
+
+  private buildDailyLossGuardSkipSummary(guard: DailyLossGuardSnapshot, homeStable: string): string {
+    if (guard.trigger === "PROFIT_GIVEBACK" && guard.peakDailyRealizedPnl > 0) {
+      const givebackPct = guard.profitGivebackPct * 100;
+      const thresholdPct = (guard.state === "HALT" ? guard.profitGivebackHaltPct : guard.profitGivebackCautionPct) * 100;
+      const mode = guard.state === "HALT" ? "HALT" : "CAUTION";
+      return `Skip: Daily loss ${mode} (profit giveback ${givebackPct.toFixed(1)}% >= ${thresholdPct.toFixed(1)}%)`;
+    }
+    return `Skip: Daily loss guard active (${guard.dailyRealizedPnl.toFixed(2)} ${homeStable} <= -${guard.maxDailyLossAbs.toFixed(2)} ${homeStable})`;
+  }
+
   private evaluateDailyLossGuard(params: {
     state: BotState;
     risk: number;
@@ -4451,7 +4479,104 @@ export class BotEngineService implements OnModuleInit {
           }
 
           if (dailyLossGuard.active) {
-            const summary = `Skip: Daily loss guard active (${dailyLossGuard.dailyRealizedPnl.toFixed(2)} ${homeStable} <= -${dailyLossGuard.maxDailyLossAbs.toFixed(2)} ${homeStable})`;
+            if (config?.advanced.autoCancelBotOrdersOnGlobalProtectionLock && config) {
+              current = await this.cancelBotOwnedOpenOrders({
+                config,
+                state: current,
+                orders: current.activeOrders,
+                reason: "daily-loss-halt",
+                details: {
+                  trigger: dailyLossGuard.trigger,
+                  dailyRealizedPnl: dailyLossGuard.dailyRealizedPnl,
+                  maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs
+                },
+                maxCancels: 10
+              });
+              this.save(current);
+            }
+
+            const managedForUnwind = [...this.getManagedPositions(current).values()]
+              .filter((position) => position.netQty > 0 && position.symbol.endsWith(homeStable))
+              .sort((left, right) => right.costQuote - left.costQuote);
+            const unwindCooldownMs = this.deriveDailyLossHaltUnwindCooldownMs(risk);
+            const unwindFraction = this.deriveDailyLossHaltUnwindFraction({
+              risk,
+              trigger: dailyLossGuard.trigger
+            });
+
+            for (const position of managedForUnwind) {
+              const recentUnwind = current.decisions.find((decision) => {
+                if (decision.kind !== "TRADE") return false;
+                const details = decision.details as Record<string, unknown> | undefined;
+                if (details?.reason !== "daily-loss-halt-unwind") return false;
+                if (typeof details?.symbol !== "string" || details.symbol.trim().toUpperCase() !== position.symbol) return false;
+                const ts = Date.parse(decision.ts);
+                return Number.isFinite(ts) && Date.now() - ts < unwindCooldownMs;
+              });
+              if (recentUnwind) {
+                continue;
+              }
+
+              const baseAsset = position.symbol.slice(0, Math.max(0, position.symbol.length - homeStable.length));
+              if (!baseAsset) continue;
+              const baseFree = balances.find((b) => b.asset.toUpperCase() === baseAsset.toUpperCase())?.free ?? 0;
+              if (!Number.isFinite(baseFree) || baseFree <= 0) continue;
+
+              const desiredQty = Math.min(position.netQty, baseFree) * unwindFraction;
+              if (!Number.isFinite(desiredQty) || desiredQty <= 0) continue;
+
+              const sellCheck = await this.marketData.validateMarketOrderQty(position.symbol, desiredQty);
+              let sellQtyStr = sellCheck.ok ? sellCheck.normalizedQty : undefined;
+              if (!sellQtyStr && sellCheck.requiredQty) {
+                const requiredQty = Number.parseFloat(sellCheck.requiredQty);
+                if (Number.isFinite(requiredQty) && requiredQty > 0 && requiredQty <= Math.min(position.netQty, baseFree) + 1e-8) {
+                  sellQtyStr = sellCheck.requiredQty;
+                }
+              }
+              if (!sellQtyStr) continue;
+
+              const sellQty = Number.parseFloat(sellQtyStr);
+              if (!Number.isFinite(sellQty) || sellQty <= 0) continue;
+
+              setLiveOperation({
+                stage: "daily-loss-halt-unwind-market-sell",
+                symbol: position.symbol,
+                side: "SELL",
+                asset: baseAsset,
+                required: sellQty
+              });
+              const unwindFunds = await ensureFundsBeforeOrder({
+                asset: baseAsset,
+                required: sellQty
+              });
+              if (!unwindFunds.ok) continue;
+
+              const unwindRes = await this.trading.placeSpotMarketOrder({
+                symbol: position.symbol,
+                side: "SELL",
+                quantity: sellQtyStr
+              });
+              persistLiveTrade({
+                symbol: position.symbol,
+                side: "SELL",
+                requestedQty: sellQtyStr,
+                fallbackQty: sellQty,
+                response: unwindRes,
+                reason: "daily-loss-halt-unwind",
+                details: {
+                  reason: "daily-loss-halt-unwind",
+                  trigger: dailyLossGuard.trigger,
+                  symbol: position.symbol,
+                  unwindFraction,
+                  unwindCooldownMs,
+                  managedPositionQty: Number(position.netQty.toFixed(8)),
+                  managedPositionCost: Number(position.costQuote.toFixed(8))
+                }
+              });
+              return;
+            }
+
+            const summary = this.buildDailyLossGuardSkipSummary(dailyLossGuard, homeStable);
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
             const next = {
               ...current,
@@ -4479,7 +4604,9 @@ export class BotEngineService implements OnModuleInit {
                         profitGivebackHaltPct: dailyLossGuard.profitGivebackHaltPct,
                         lookbackMs: dailyLossGuard.lookbackMs,
                         windowStart: dailyLossGuard.windowStartIso,
-                        candidateSymbol
+                        candidateSymbol,
+                        unwindFraction,
+                        unwindCooldownMs
                       }
                     },
                     ...current.decisions
