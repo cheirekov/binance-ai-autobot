@@ -2121,3 +2121,32 @@ This log is mandatory for every implementation patch batch.
 - Runtime request (1-3h):
   - run without state reset and verify transition from `HALT(trigger=PROFIT_GIVEBACK)` to `CAUTION` after exposure drops below floor,
   - confirm no fresh `daily-loss-halt-unwind` storm once exposure is already low.
+
+## 2026-02-22 20:21 UTC — T-005 night build prep after `autobot-feedback-20260222-201531.tgz`: dust-aware open-position cap counting
+- Scope: remove false `max open positions` stalls caused by micro residual positions while preserving position-cap safety.
+- Bundle findings:
+  - previous HALT stickiness is improved (`risk_state=NORMAL` in latest bundle), so release gate behavior is moving in the right direction.
+  - runtime still shows heavy skip pressure from `Max open positions reached (10)` + `No feasible candidates`, despite only a few materially sized positions.
+  - root cause: position-cap counting included tiny managed residuals (dust-like entries), which blocked new candidate rotation and made adaptation look frozen.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - added risk-linked exposure floor for counting managed positions toward cap:
+      - `deriveManagedPositionMinCountableExposureHome(risk)` => `10 -> 5` (home quote),
+      - `isManagedPositionCountable(...)` helper.
+    - candidate selection now computes `openHomePositionCount` using only countable positions.
+    - execution loop `maxOpenPositions` guard now uses `countableOpenHomePositions` instead of raw symbol count.
+    - skip/lock telemetry now records both:
+      - `openPositions` (countable),
+      - `rawOpenPositions` (all),
+      - `minCountableExposureHome`.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - added tests for countable exposure floor scaling and countability checks.
+    - retained prior trigger-aware HALT policy coverage.
+- Risk slider impact:
+  - high risk is more permissive (`5` home-quote min countable exposure), low risk stricter (`10`).
+  - no symbol hardcoding; behavior remains environment-adaptive.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (night):
+  - run without state reset and check that `Max open positions reached` skip count drops when only micro residual positions remain.
+  - verify new entries can rotate when meaningful position count is below cap.

@@ -491,6 +491,18 @@ export class BotEngineService implements OnModuleInit {
     return Math.round((12 - t * 8) * 60_000); // 12m -> 4m
   }
 
+  private deriveManagedPositionMinCountableExposureHome(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const t = boundedRisk / 100;
+    return Number((10 - t * 5).toFixed(2)); // 10 -> 5 (home-quote value)
+  }
+
+  private isManagedPositionCountable(position: ManagedPosition, minExposureHome: number): boolean {
+    if (!Number.isFinite(position.netQty) || position.netQty <= 0) return false;
+    if (!Number.isFinite(position.costQuote) || position.costQuote <= 0) return false;
+    return position.costQuote + 1e-8 >= minExposureHome;
+  }
+
   private deriveGlobalLockUnwindCooldownMs(risk: number): number {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
     const t = boundedRisk / 100;
@@ -3151,11 +3163,16 @@ export class BotEngineService implements OnModuleInit {
 
           const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(boundedRisk / 25)));
           const positions = tradeMode === "SPOT_GRID" ? this.getManagedPositions(current) : null;
+          const minCountableExposureHome = this.deriveManagedPositionMinCountableExposureHome(boundedRisk);
           const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
           const activeReasonQuarantineFamilies = this.getActiveReasonQuarantineFamilies(current);
           const openHomePositionCount =
             positions?.size && tradeMode === "SPOT_GRID"
-              ? [...positions.values()].filter((position) => position.netQty > 0 && position.symbol.endsWith(homeStable)).length
+              ? [...positions.values()].filter(
+                (position) =>
+                  position.symbol.endsWith(homeStable) &&
+                  this.isManagedPositionCountable(position, minCountableExposureHome)
+              ).length
               : 0;
           let bestGridCandidate: { symbol: string; candidate: UniverseCandidate; score: number } | null = null;
           let firstEligibleGridCandidate: { symbol: string; candidate: UniverseCandidate } | null = null;
@@ -4157,6 +4174,10 @@ export class BotEngineService implements OnModuleInit {
 
           const managedPositions = this.getManagedPositions(current);
           const managedOpenHomeSymbols = [...managedPositions.values()].filter((p) => p.netQty > 0 && p.symbol.endsWith(homeStable));
+          const minCountableExposureHome = this.deriveManagedPositionMinCountableExposureHome(risk);
+          const countableOpenHomePositions = managedOpenHomeSymbols.filter((position) =>
+            this.isManagedPositionCountable(position, minCountableExposureHome)
+          );
           const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
           tickContext.maxOpenPositions = maxOpenPositions;
           const candidateIsOpen = (managedPositions.get(candidateSymbol)?.netQty ?? 0) > 0;
@@ -4698,7 +4719,7 @@ export class BotEngineService implements OnModuleInit {
             return;
           }
 
-          if (managedOpenHomeSymbols.length >= maxOpenPositions && !candidateIsOpen) {
+          if (countableOpenHomePositions.length >= maxOpenPositions && !candidateIsOpen) {
             const summary = `Skip ${candidateSymbol}: Max open positions reached (${maxOpenPositions})`;
             const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), 60_000);
             const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
@@ -4717,8 +4738,10 @@ export class BotEngineService implements OnModuleInit {
                       kind: "SKIP",
                       summary,
                       details: {
-                        openPositions: managedOpenHomeSymbols.length,
+                        openPositions: countableOpenHomePositions.length,
+                        rawOpenPositions: managedOpenHomeSymbols.length,
                         maxOpenPositions,
+                        minCountableExposureHome,
                         cooldownMs,
                         ...(cooldown.storm ? { storm: cooldown.storm } : {})
                       }
@@ -4737,8 +4760,10 @@ export class BotEngineService implements OnModuleInit {
               expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
               details: {
                 category: "MAX_OPEN_POSITIONS",
-                openPositions: managedOpenHomeSymbols.length,
+                openPositions: countableOpenHomePositions.length,
+                rawOpenPositions: managedOpenHomeSymbols.length,
                 maxOpenPositions,
+                minCountableExposureHome,
                 cooldownMs,
                 ...(cooldown.storm ? { storm: cooldown.storm } : {})
               }

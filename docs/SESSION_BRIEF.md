@@ -1,15 +1,15 @@
 # Session Brief
 
-Last updated: 2026-02-22 15:09 UTC
+Last updated: 2026-02-22 20:21 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
 
 ## 1) Batch contract (fill before coding)
 
-- Batch type: `SHORT (1-3h)`
+- Batch type: `NIGHT (8-12h)`
 - Active ticket: `T-005` (Daily guardrails + unwind-only behavior)
-- Goal (single sentence): keep T-005 guardrails active while preventing sticky `PROFIT_GIVEBACK` HALT once managed exposure is already reduced.
+- Goal (single sentence): keep T-005 guardrails stable overnight while removing dust-driven max-open-position stalls.
 - In scope:
   - compute rolling 24h realized PnL guard threshold from risk slider.
   - block new entry/grid placement when guard is active.
@@ -26,6 +26,7 @@ Use this file at the start and end of every batch.
   - normalize fee-edge threshold comparison to avoid `net X < X` float-noise rejects.
   - tune daily-loss HALT unwind cadence/fraction by trigger type to reduce unwind-overtrading during `PROFIT_GIVEBACK` HALT.
   - add managed-exposure gate for giveback HALT release (`HALT` only when exposure remains above risk-linked floor).
+  - count open positions toward cap only when managed exposure is above risk-linked home-quote floor.
 - Out of scope:
   - full ledger/commission reconciliation (`T-007`),
   - regime strategy rewrite (`T-031/T-032`),
@@ -61,7 +62,7 @@ Use this file at the start and end of every batch.
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
 - Runtime validation plan:
-  - run duration: `1-3 hours`
+  - run duration: `8-12 hours`
   - expected bundle name pattern: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
 
 ## 3) Deployment handoff
@@ -84,25 +85,25 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-  - guardrails still active: `risk_state=HALT`, `trigger=PROFIT_GIVEBACK`, `unwind_only=true`.
-  - issue confirmed: HALT can remain sticky after de-risking, reducing adaptation window.
-  - patch adds managed-exposure release gate (`PROFIT_GIVEBACK` HALT -> `CAUTION` when exposure is below risk-linked floor).
+  - risk-state improved: latest bundle ended `risk_state=NORMAL` (no sticky HALT).
+  - main blocker now is repeated `Max open positions reached` despite only a few materially sized positions.
+  - patch adds countable-vs-raw position telemetry and risk-linked countable floor for cap logic.
 - Decision: `continue`
 - Next ticket candidate: `T-005` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - ensure release gate does not weaken hard-stop protection during real drawdown.
+  - need to confirm floor does not undercount meaningful micro positions in small-wallet scenarios.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260222-145936.tgz`
-  - patch focus: managed-exposure-aware giveback HALT release + telemetry fields (`managedExposurePct`, `haltExposureFloor`).
-  - validation target: observe `HALT -> CAUTION` transition when exposure floor is crossed.
+  - bundle: `autobot-feedback-20260222-201531.tgz`
+  - patch focus: dust-aware max-open-position counting (`openPositions` vs `rawOpenPositions`, `minCountableExposureHome`).
+  - validation target: lower `Max open positions reached` + `No feasible candidates` skip pressure.
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-005
-Batch: SHORT (1-3h)
-Goal: validate managed-exposure release behavior for giveback guard while keeping hard safety limits.
-In scope: rolling daily-loss guard check, trigger-aware guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds, lock-state consistency, global-lock unwind-only execution, daily-loss-halt unwind execution with trigger-aware cadence/fraction, managed-exposure HALT release gate, adaptive telemetry label normalization, fee-edge comparator normalization.
+Batch: NIGHT (8-12h)
+Goal: validate dust-aware max-open-position counting while keeping daily-loss guardrails stable.
+In scope: rolling daily-loss guard check, trigger-aware guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds, lock-state consistency, global-lock unwind-only execution, daily-loss-halt unwind execution with trigger-aware cadence/fraction, managed-exposure HALT release gate, risk-linked countable-position cap logic, adaptive telemetry label normalization, fee-edge comparator normalization.
 Out of scope: strategy rewrite, multi-quote routing, commission ledger refactor.
 DoD:
 - API: daily-loss guard computes and enforces risk-linked max daily loss.
@@ -114,6 +115,7 @@ DoD:
 - Runtime: active global lock performs controlled `global-lock-unwind` sells when inventory is available.
 - Runtime: daily-loss HALT performs controlled `daily-loss-halt-unwind` sells when inventory is available.
 - Runtime: giveback-triggered guard can release from `HALT` to `CAUTION` when managed exposure is below risk-linked floor.
+- Runtime: `Max open positions reached` guard uses countable positions and reports raw/countable counts in telemetry.
 - Risk slider mapping: max daily loss threshold widens at high risk and tightens at low risk.
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.

@@ -992,6 +992,29 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.deriveGridGuardNoInventoryCooldownMs(100)).toBe(240000);
   });
 
+  it("scales countable managed-position exposure floor with risk", () => {
+    const helpers = service as unknown as {
+      deriveManagedPositionMinCountableExposureHome: (risk: number) => number;
+    };
+
+    expect(helpers.deriveManagedPositionMinCountableExposureHome(0)).toBe(10);
+    expect(helpers.deriveManagedPositionMinCountableExposureHome(50)).toBe(7.5);
+    expect(helpers.deriveManagedPositionMinCountableExposureHome(100)).toBe(5);
+  });
+
+  it("counts managed positions only when exposure floor is met", () => {
+    const helpers = service as unknown as {
+      isManagedPositionCountable: (
+        position: { netQty: number; costQuote: number },
+        minExposureHome: number
+      ) => boolean;
+    };
+
+    expect(helpers.isManagedPositionCountable({ netQty: 1, costQuote: 5.01 }, 5)).toBe(true);
+    expect(helpers.isManagedPositionCountable({ netQty: 1, costQuote: 4.99 }, 5)).toBe(false);
+    expect(helpers.isManagedPositionCountable({ netQty: 0, costQuote: 100 }, 5)).toBe(false);
+  });
+
   it("scales global-lock unwind cooldown with risk", () => {
     const helpers = service as unknown as {
       deriveGlobalLockUnwindCooldownMs: (risk: number) => number;
