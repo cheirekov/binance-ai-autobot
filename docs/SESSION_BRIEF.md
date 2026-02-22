@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-21 19:38 UTC
+Last updated: 2026-02-22 09:50 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,7 +9,7 @@ Use this file at the start and end of every batch.
 
 - Batch type: `NIGHT (8-12h)`
 - Active ticket: `T-005` (Daily guardrails + unwind-only behavior)
-- Goal (single sentence): run overnight on stable T-005 guardrails with fee-edge precision normalization to reduce borderline skip churn.
+- Goal (single sentence): run overnight on stable T-005 guardrails and reduce HALT unwind fee churn using trigger-aware unwind cadence/fraction.
 - In scope:
   - compute rolling 24h realized PnL guard threshold from risk slider.
   - block new entry/grid placement when guard is active.
@@ -24,6 +24,7 @@ Use this file at the start and end of every batch.
   - emit trigger-aware daily-loss skip summary text (`PROFIT_GIVEBACK` vs `ABS_DAILY_LOSS`).
   - normalize adaptive telemetry labels so UI does not show `UNKNOWN` for regime/decision kind.
   - normalize fee-edge threshold comparison to avoid `net X < X` float-noise rejects.
+  - tune daily-loss HALT unwind cadence/fraction by trigger type to reduce unwind-overtrading during `PROFIT_GIVEBACK` HALT.
 - Out of scope:
   - full ledger/commission reconciliation (`T-007`),
   - regime strategy rewrite (`T-031/T-032`),
@@ -82,24 +83,25 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-  - runtime stable and profitable in bundle snapshot (`realized +33.01 USDC`, `risk_state=NORMAL`).
-  - guardrails stayed active without freeze (`trades=64`, `open limit orders=3`).
-  - skip pressure shifted to fee-edge borderline and grid-wait patterns; fee-edge comparator normalization added for this night run.
+  - guardrails activated correctly: `risk_state=HALT`, `trigger=PROFIT_GIVEBACK`, `unwind_only=true`.
+  - loss profile in this bundle: `realized=-55.07 USDC`, `peakDaily=72.45 USDC`, `giveback=127.52 USDC (176.0%)`.
+  - churn signal: `daily-loss-halt-unwind` dominated trade flow (`90/91` recent trades), so unwind cadence was too aggressive for fee-sensitive environments.
 - Decision: `continue`
 - Next ticket candidate: `T-005` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - exposure concentration remains high on top symbols; de-concentration policy remains next tuning lane after T-005 closure.
+  - HALT unwind cadence can still overtrade if market remains choppy; verify trade/hour reduction after trigger-aware unwind tuning.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260221-192344.tgz`
-  - auto-updated at: `2026-02-21T19:38:00.000Z`
+  - bundle: `autobot-feedback-20260222-094317.tgz`
+  - patch focus: trigger-aware daily-loss HALT unwind policy (`ABS_DAILY_LOSS` aggressive, `PROFIT_GIVEBACK` slower).
+  - validation target: lower `daily-loss-halt-unwind` count/hour while exposure still trends down under HALT.
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-005
 Batch: NIGHT (8-12h)
-Goal: validate overnight stability with daily-loss guardrails and fee-edge precision normalization.
-In scope: rolling daily-loss guard check, trigger-aware guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds, lock-state consistency, global-lock unwind-only execution, daily-loss-halt unwind execution, adaptive telemetry label normalization, fee-edge comparator normalization.
+Goal: validate overnight stability with daily-loss guardrails and trigger-aware HALT unwind cadence to reduce fee churn.
+In scope: rolling daily-loss guard check, trigger-aware guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds, lock-state consistency, global-lock unwind-only execution, daily-loss-halt unwind execution with trigger-aware cadence/fraction, adaptive telemetry label normalization, fee-edge comparator normalization.
 Out of scope: strategy rewrite, multi-quote routing, commission ledger refactor.
 DoD:
 - API: daily-loss guard computes and enforces risk-linked max daily loss.

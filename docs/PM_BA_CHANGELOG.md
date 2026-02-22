@@ -2070,3 +2070,26 @@ This log is mandatory for every implementation patch batch.
 - Runtime request (night):
   - run without state reset and verify reduced frequency of `Fee/edge filter (net X < X)` borderline skips,
   - monitor whether trade cadence stays stable while guardrails remain intact.
+
+## 2026-02-22 09:55 UTC — T-005 night build prep after `autobot-feedback-20260222-094317.tgz`: HALT unwind churn reduction
+- Scope: reduce over-trading during daily-loss HALT while preserving de-risking behavior.
+- Bundle findings:
+  - run ended in `risk_state=HALT` (`trigger=PROFIT_GIVEBACK`) with unwind-only active.
+  - `daily-loss-halt-unwind` dominated trade flow (`90/91` recent trades), which is too aggressive for real-fee environments.
+  - guard semantics worked (clear HALT giveback messages), but cadence needs tuning to avoid fee churn.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - replaced separate HALT cooldown/fraction helpers with trigger-aware unified policy:
+      - `ABS_DAILY_LOSS`: faster/more aggressive unwind (`18m -> 8m`, fraction `0.50 -> 0.32`),
+      - `PROFIT_GIVEBACK`: slower/less aggressive unwind (`30m -> 12m`, fraction `0.32 -> 0.18`).
+    - daily-loss HALT branch now consumes this policy for cadence/fraction selection.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - updated HALT unwind tests to assert trigger-aware policy outputs.
+- Risk slider impact:
+  - unchanged guard thresholds; only unwind cadence under HALT is tuned.
+  - for risk=100 + giveback HALT, unwind remains active but is materially less frequent.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (night):
+  - run without state reset and verify lower count of `daily-loss-halt-unwind` trades per hour,
+  - verify HALT still reduces exposure and does not re-open fresh risk.

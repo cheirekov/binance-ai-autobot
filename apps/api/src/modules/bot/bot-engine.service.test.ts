@@ -821,25 +821,30 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.deriveGlobalLockUnwindCooldownMs(100)).toBe(480000);
   });
 
-  it("scales daily-loss HALT unwind cooldown with risk", () => {
+  it("derives trigger-aware daily-loss HALT unwind policy", () => {
     const helpers = service as unknown as {
-      deriveDailyLossHaltUnwindCooldownMs: (risk: number) => number;
+      deriveDailyLossHaltUnwindPolicy: (params: { risk: number; trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK" }) => {
+        cooldownMs: number;
+        fraction: number;
+      };
     };
 
-    expect(helpers.deriveDailyLossHaltUnwindCooldownMs(0)).toBe(1080000);
-    expect(helpers.deriveDailyLossHaltUnwindCooldownMs(50)).toBe(780000);
-    expect(helpers.deriveDailyLossHaltUnwindCooldownMs(100)).toBe(480000);
-  });
-
-  it("derives stronger daily-loss HALT unwind fraction for absolute-loss trigger", () => {
-    const helpers = service as unknown as {
-      deriveDailyLossHaltUnwindFraction: (params: { risk: number; trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK" }) => number;
-    };
-
-    expect(helpers.deriveDailyLossHaltUnwindFraction({ risk: 0, trigger: "ABS_DAILY_LOSS" })).toBe(0.55);
-    expect(helpers.deriveDailyLossHaltUnwindFraction({ risk: 100, trigger: "ABS_DAILY_LOSS" })).toBe(0.22);
-    expect(helpers.deriveDailyLossHaltUnwindFraction({ risk: 0, trigger: "PROFIT_GIVEBACK" })).toBe(0.35);
-    expect(helpers.deriveDailyLossHaltUnwindFraction({ risk: 100, trigger: "PROFIT_GIVEBACK" })).toBe(0.15);
+    expect(helpers.deriveDailyLossHaltUnwindPolicy({ risk: 0, trigger: "ABS_DAILY_LOSS" })).toEqual({
+      cooldownMs: 1080000,
+      fraction: 0.5
+    });
+    expect(helpers.deriveDailyLossHaltUnwindPolicy({ risk: 100, trigger: "ABS_DAILY_LOSS" })).toEqual({
+      cooldownMs: 480000,
+      fraction: 0.32
+    });
+    expect(helpers.deriveDailyLossHaltUnwindPolicy({ risk: 0, trigger: "PROFIT_GIVEBACK" })).toEqual({
+      cooldownMs: 1800000,
+      fraction: 0.32
+    });
+    expect(helpers.deriveDailyLossHaltUnwindPolicy({ risk: 100, trigger: "PROFIT_GIVEBACK" })).toEqual({
+      cooldownMs: 720000,
+      fraction: 0.18
+    });
   });
 
   it("formats daily-loss guard summary for profit-giveback trigger", () => {

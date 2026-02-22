@@ -495,22 +495,20 @@ export class BotEngineService implements OnModuleInit {
     return Math.round((20 - t * 12) * 60_000); // 20m -> 8m
   }
 
-  private deriveDailyLossHaltUnwindCooldownMs(risk: number): number {
-    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
-    const t = boundedRisk / 100;
-    return Math.round((18 - t * 10) * 60_000); // 18m -> 8m
-  }
-
-  private deriveDailyLossHaltUnwindFraction(params: {
+  private deriveDailyLossHaltUnwindPolicy(params: {
     risk: number;
     trigger: DailyLossGuardSnapshot["trigger"];
-  }): number {
+  }): { cooldownMs: number; fraction: number } {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
     const t = boundedRisk / 100;
     const isAbsLoss = params.trigger === "ABS_DAILY_LOSS";
-    const floor = isAbsLoss ? 0.22 : 0.15;
-    const span = isAbsLoss ? 0.33 : 0.2;
-    return Number((floor + (1 - t) * span).toFixed(4));
+    const cooldownMs = isAbsLoss
+      ? Math.round((18 - t * 10) * 60_000) // 18m -> 8m
+      : Math.round((30 - t * 18) * 60_000); // 30m -> 12m
+    const floor = isAbsLoss ? 0.32 : 0.18;
+    const span = isAbsLoss ? 0.18 : 0.14;
+    const fraction = Number((floor + (1 - t) * span).toFixed(4));
+    return { cooldownMs, fraction };
   }
 
   private buildDailyLossGuardSkipSummary(guard: DailyLossGuardSnapshot, homeStable: string): string {
@@ -4559,11 +4557,12 @@ export class BotEngineService implements OnModuleInit {
             const managedForUnwind = [...this.getManagedPositions(current).values()]
               .filter((position) => position.netQty > 0 && position.symbol.endsWith(homeStable))
               .sort((left, right) => right.costQuote - left.costQuote);
-            const unwindCooldownMs = this.deriveDailyLossHaltUnwindCooldownMs(risk);
-            const unwindFraction = this.deriveDailyLossHaltUnwindFraction({
+            const unwindPolicy = this.deriveDailyLossHaltUnwindPolicy({
               risk,
               trigger: dailyLossGuard.trigger
             });
+            const unwindCooldownMs = unwindPolicy.cooldownMs;
+            const unwindFraction = unwindPolicy.fraction;
 
             for (const position of managedForUnwind) {
               const recentUnwind = current.decisions.find((decision) => {
