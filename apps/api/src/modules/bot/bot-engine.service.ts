@@ -212,6 +212,8 @@ type DailyLossGuardSnapshot = {
   profitGivebackActivationAbs: number;
   profitGivebackCautionPct: number;
   profitGivebackHaltPct: number;
+  profitGivebackHaltMinExposurePct: number;
+  managedExposurePct: number;
   maxDailyLossAbs: number;
   maxDailyLossPct: number;
   lookbackMs: number;
@@ -524,6 +526,7 @@ export class BotEngineService implements OnModuleInit {
   private evaluateDailyLossGuard(params: {
     state: BotState;
     risk: number;
+    homeStable: string;
     walletTotalHome: number;
     nowMs: number;
   }): DailyLossGuardSnapshot {
@@ -555,7 +558,13 @@ export class BotEngineService implements OnModuleInit {
     const profitGivebackActivationAbs = Math.max(10, maxDailyLossAbs * 0.1);
     const profitGivebackCautionPct = Number((0.3 + t * 0.15).toFixed(4)); // 30% -> 45%
     const profitGivebackHaltPct = Number((0.55 + t * 0.15).toFixed(4)); // 55% -> 70%
+    const profitGivebackHaltMinExposurePct = Number((0.2 - t * 0.12).toFixed(4)); // 20% -> 8%
     const profitGivebackActive = peakDailyRealizedPnl >= profitGivebackActivationAbs;
+    const homeStable = params.homeStable.trim().toUpperCase();
+    const managedExposureHome = [...this.getManagedPositions(params.state).values()]
+      .filter((position) => position.netQty > 0 && position.symbol.endsWith(homeStable))
+      .reduce((sum, position) => sum + Math.max(0, position.costQuote), 0);
+    const managedExposurePct = walletTotalHome > 0 ? managedExposureHome / walletTotalHome : 0;
     const cautionLossAbs = maxDailyLossAbs * 0.4;
     let state: "NORMAL" | "CAUTION" | "HALT" =
       walletTotalHome <= 0
@@ -565,11 +574,14 @@ export class BotEngineService implements OnModuleInit {
           : dailyRealizedPnl <= -cautionLossAbs
             ? "CAUTION"
             : "NORMAL";
+    const absLossHalt = state === "HALT";
     let trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK" = state === "NORMAL" ? "NONE" : "ABS_DAILY_LOSS";
 
     if (profitGivebackActive) {
       if (profitGivebackPct >= profitGivebackHaltPct) {
-        state = "HALT";
+        const shouldKeepHardHalt =
+          absLossHalt || managedExposurePct >= profitGivebackHaltMinExposurePct || dailyRealizedPnl <= -cautionLossAbs;
+        state = shouldKeepHardHalt ? "HALT" : "CAUTION";
         trigger = "PROFIT_GIVEBACK";
       } else if (profitGivebackPct >= profitGivebackCautionPct && state === "NORMAL") {
         state = "CAUTION";
@@ -588,6 +600,8 @@ export class BotEngineService implements OnModuleInit {
       profitGivebackActivationAbs: this.toRounded(profitGivebackActivationAbs, 8),
       profitGivebackCautionPct: this.toRounded(profitGivebackCautionPct, 8),
       profitGivebackHaltPct: this.toRounded(profitGivebackHaltPct, 8),
+      profitGivebackHaltMinExposurePct: this.toRounded(profitGivebackHaltMinExposurePct, 8),
+      managedExposurePct: this.toRounded(managedExposurePct, 8),
       maxDailyLossAbs: this.toRounded(maxDailyLossAbs, 8),
       maxDailyLossPct: policy.maxDailyLossPct,
       lookbackMs: policy.maxDailyLossLookbackMs,
@@ -612,7 +626,9 @@ export class BotEngineService implements OnModuleInit {
             ...(guard.trigger === "PROFIT_GIVEBACK"
               ? [
                   `peakDaily=${guard.peakDailyRealizedPnl.toFixed(2)}${params.homeStable}`,
-                  `giveback=${guard.profitGivebackAbs.toFixed(2)}${params.homeStable} (${(guard.profitGivebackPct * 100).toFixed(1)}%)`
+                  `giveback=${guard.profitGivebackAbs.toFixed(2)}${params.homeStable} (${(guard.profitGivebackPct * 100).toFixed(1)}%)`,
+                  `managedExposure=${(guard.managedExposurePct * 100).toFixed(1)}%`,
+                  `haltExposureFloor=${(guard.profitGivebackHaltMinExposurePct * 100).toFixed(1)}%`
                 ]
               : [])
           ];
@@ -3700,6 +3716,7 @@ export class BotEngineService implements OnModuleInit {
           const dailyLossGuard = this.evaluateDailyLossGuard({
             state: current,
             risk,
+            homeStable,
             walletTotalHome,
             nowMs: Date.now()
           });
@@ -4629,6 +4646,8 @@ export class BotEngineService implements OnModuleInit {
                   symbol: position.symbol,
                   unwindFraction,
                   unwindCooldownMs,
+                  managedExposurePct: dailyLossGuard.managedExposurePct,
+                  profitGivebackHaltMinExposurePct: dailyLossGuard.profitGivebackHaltMinExposurePct,
                   managedPositionQty: Number(position.netQty.toFixed(8)),
                   managedPositionCost: Number(position.costQuote.toFixed(8))
                 }
@@ -4662,6 +4681,8 @@ export class BotEngineService implements OnModuleInit {
                         profitGivebackActivationAbs: dailyLossGuard.profitGivebackActivationAbs,
                         profitGivebackCautionPct: dailyLossGuard.profitGivebackCautionPct,
                         profitGivebackHaltPct: dailyLossGuard.profitGivebackHaltPct,
+                        profitGivebackHaltMinExposurePct: dailyLossGuard.profitGivebackHaltMinExposurePct,
+                        managedExposurePct: dailyLossGuard.managedExposurePct,
                         lookbackMs: dailyLossGuard.lookbackMs,
                         windowStart: dailyLossGuard.windowStartIso,
                         candidateSymbol,

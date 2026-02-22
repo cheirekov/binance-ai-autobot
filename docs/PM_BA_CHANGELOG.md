@@ -2093,3 +2093,31 @@ This log is mandatory for every implementation patch batch.
 - Runtime request (night):
   - run without state reset and verify lower count of `daily-loss-halt-unwind` trades per hour,
   - verify HALT still reduces exposure and does not re-open fresh risk.
+
+## 2026-02-22 15:09 UTC — T-005 1-3h build prep after `autobot-feedback-20260222-145936.tgz`: profit-giveback HALT release gate
+- Scope: prevent prolonged `PROFIT_GIVEBACK` HALT deadlock after de-risking, while keeping hard-stop behavior when exposure remains high.
+- Bundle findings:
+  - runtime still ended in `risk_state=HALT` with `trigger=PROFIT_GIVEBACK`.
+  - `daily-loss-halt-unwind` trades in state window happened before restart window and then stopped; bot remained HALT-skipping.
+  - this indicates guard logic was safe but too sticky for recovery once exposure is already reduced.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - daily-loss guard now computes managed exposure ratio for home-quoted positions (`managedExposurePct`).
+    - added risk-linked exposure floor for keeping giveback in hard HALT:
+      - `profitGivebackHaltMinExposurePct`: `20% -> 8%` (risk `0 -> 100`).
+    - when `trigger=PROFIT_GIVEBACK` and giveback exceeds HALT threshold:
+      - keep `HALT` only if abs-loss HALT is active, or managed exposure is above floor, or daily realized loss is already beyond CAUTION loss band;
+      - otherwise downgrade to `CAUTION` (still guarded, but allows controlled re-entry path).
+    - runtime reason codes and skip/unwind details now include `managedExposurePct` and `haltExposureFloor`.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - added coverage for both branches:
+      - low managed exposure => giveback becomes `CAUTION`,
+      - high managed exposure => giveback remains `HALT`.
+- Risk slider impact:
+  - unchanged max-loss thresholds.
+  - risk now also scales giveback-HALT exposure floor (`20%` low-risk, `8%` high-risk), keeping behavior adaptive and non-hardcoded.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (1-3h):
+  - run without state reset and verify transition from `HALT(trigger=PROFIT_GIVEBACK)` to `CAUTION` after exposure drops below floor,
+  - confirm no fresh `daily-loss-halt-unwind` storm once exposure is already low.
