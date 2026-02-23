@@ -503,6 +503,14 @@ export class BotEngineService implements OnModuleInit {
     return position.costQuote + 1e-8 >= minExposureHome;
   }
 
+  private shouldRestrictCautionToManagedSymbols(params: {
+    tradeMode: AppConfig["basic"]["tradeMode"];
+    riskState: DailyLossGuardSnapshot["state"];
+    openHomePositionCount: number;
+  }): boolean {
+    return params.tradeMode === "SPOT_GRID" && params.riskState === "CAUTION" && params.openHomePositionCount > 0;
+  }
+
   private deriveGlobalLockUnwindCooldownMs(risk: number): number {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
     const t = boundedRisk / 100;
@@ -3174,6 +3182,12 @@ export class BotEngineService implements OnModuleInit {
                   this.isManagedPositionCountable(position, minCountableExposureHome)
               ).length
               : 0;
+          const selectionRiskState = current.riskState?.state ?? "NORMAL";
+          const restrictToManagedSymbolsInCaution = this.shouldRestrictCautionToManagedSymbols({
+            tradeMode,
+            riskState: selectionRiskState,
+            openHomePositionCount
+          });
           let bestGridCandidate: { symbol: string; candidate: UniverseCandidate; score: number } | null = null;
           let firstEligibleGridCandidate: { symbol: string; candidate: UniverseCandidate } | null = null;
 
@@ -3238,6 +3252,9 @@ export class BotEngineService implements OnModuleInit {
 
               const netQty = positions?.get(symbol)?.netQty ?? 0;
               const hasInventory = Number.isFinite(netQty) && netQty > 0;
+              if (restrictToManagedSymbolsInCaution && !hasInventory) {
+                continue;
+              }
               const openPositionCapReached = openHomePositionCount >= maxOpenPositions;
               if (openPositionCapReached && !hasInventory) {
                 continue;
@@ -3363,6 +3380,9 @@ export class BotEngineService implements OnModuleInit {
             }
             if (firstEligibleGridCandidate) {
               return firstEligibleGridCandidate;
+            }
+            if (restrictToManagedSymbolsInCaution) {
+              return { symbol: null, candidate: null, reason: "Daily loss caution: no eligible managed symbols" };
             }
           }
 

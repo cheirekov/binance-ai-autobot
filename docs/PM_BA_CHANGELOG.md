@@ -2150,3 +2150,31 @@ This log is mandatory for every implementation patch batch.
 - Runtime request (night):
   - run without state reset and check that `Max open positions reached` skip count drops when only micro residual positions remain.
   - verify new entries can rotate when meaningful position count is below cap.
+
+## 2026-02-23 09:32 UTC — T-005 post-night patch after `autobot-feedback-20260223-092739.tgz`: CAUTION managed-symbol routing
+- Scope: reduce CAUTION skip loops and restore controlled activity by routing candidate selection to managed symbols while guard is active.
+- Bundle findings:
+  - guard behaved as intended: `risk_state=CAUTION`, `trigger=PROFIT_GIVEBACK`, `unwind_only=false`.
+  - however trade activity dropped to zero (`trades.count=0`) with skip dominance:
+    - `No eligible universe candidates after policy and lock filters` (55),
+    - repeated `Daily loss caution (new symbols paused)` on non-managed symbols.
+  - this indicates CAUTION protection was safe but over-conservative in symbol routing, starving managed-position maintenance.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - added `shouldRestrictCautionToManagedSymbols(...)` helper.
+    - during candidate selection, when runtime risk state is `CAUTION` and managed open positions exist:
+      - non-managed symbols are skipped early,
+      - selector prefers only managed symbols for execution.
+    - if none are eligible under that rule, selector emits explicit reason:
+      - `Daily loss caution: no eligible managed symbols`.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - added coverage for CAUTION managed-symbol restriction helper behavior.
+    - retained all prior T-005 coverage.
+- Risk slider impact:
+  - no threshold changes; behavior is routing-only.
+  - preserves existing risk-linked guardrails while reducing no-op candidate churn.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (next 1-3h):
+  - run without state reset and verify drop in `Daily loss caution (new symbols paused)` skip flood.
+  - verify at least some managed-symbol activity (orders/trades or explicit managed-symbol infeasibility reasons) instead of generic no-eligible loops.

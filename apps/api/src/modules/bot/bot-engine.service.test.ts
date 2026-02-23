@@ -1015,6 +1015,45 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.isManagedPositionCountable({ netQty: 0, costQuote: 100 }, 5)).toBe(false);
   });
 
+  it("restricts caution candidate selection to managed symbols only when needed", () => {
+    const helpers = service as unknown as {
+      shouldRestrictCautionToManagedSymbols: (params: {
+        tradeMode: "SPOT" | "SPOT_GRID" | "FUTURES";
+        riskState: "NORMAL" | "CAUTION" | "HALT";
+        openHomePositionCount: number;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldRestrictCautionToManagedSymbols({
+        tradeMode: "SPOT_GRID",
+        riskState: "CAUTION",
+        openHomePositionCount: 3
+      })
+    ).toBe(true);
+    expect(
+      helpers.shouldRestrictCautionToManagedSymbols({
+        tradeMode: "SPOT_GRID",
+        riskState: "CAUTION",
+        openHomePositionCount: 0
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldRestrictCautionToManagedSymbols({
+        tradeMode: "SPOT",
+        riskState: "CAUTION",
+        openHomePositionCount: 3
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldRestrictCautionToManagedSymbols({
+        tradeMode: "SPOT_GRID",
+        riskState: "HALT",
+        openHomePositionCount: 3
+      })
+    ).toBe(false);
+  });
+
   it("scales global-lock unwind cooldown with risk", () => {
     const helpers = service as unknown as {
       deriveGlobalLockUnwindCooldownMs: (risk: number) => number;
