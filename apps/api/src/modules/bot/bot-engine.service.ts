@@ -503,12 +503,34 @@ export class BotEngineService implements OnModuleInit {
     return position.costQuote + 1e-8 >= minExposureHome;
   }
 
+  private deriveCautionManagedSymbolOnlyMinExposurePct(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const t = boundedRisk / 100;
+    return Number((0.1 - t * 0.07).toFixed(4)); // 10% -> 3%
+  }
+
+  private extractRiskStateManagedExposurePct(riskState: BotState["riskState"] | undefined): number | null {
+    const raw = riskState?.reason_codes?.find((reason) => reason.startsWith("managedExposure="));
+    if (!raw) return null;
+    const match = /^managedExposure=([0-9]+(?:\.[0-9]+)?)%$/i.exec(raw.trim());
+    if (!match) return null;
+    const pct = Number.parseFloat(match[1]);
+    if (!Number.isFinite(pct) || pct < 0) return null;
+    return pct / 100;
+  }
+
   private shouldRestrictCautionToManagedSymbols(params: {
     tradeMode: AppConfig["basic"]["tradeMode"];
     riskState: DailyLossGuardSnapshot["state"];
     openHomePositionCount: number;
+    managedExposurePct: number | null;
+    minManagedExposurePct: number;
   }): boolean {
-    return params.tradeMode === "SPOT_GRID" && params.riskState === "CAUTION" && params.openHomePositionCount > 0;
+    if (params.tradeMode !== "SPOT_GRID") return false;
+    if (params.riskState !== "CAUTION") return false;
+    if (params.openHomePositionCount <= 0) return false;
+    if (params.managedExposurePct === null) return true;
+    return params.managedExposurePct >= params.minManagedExposurePct;
   }
 
   private deriveGlobalLockUnwindCooldownMs(risk: number): number {
@@ -3172,6 +3194,7 @@ export class BotEngineService implements OnModuleInit {
           const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(boundedRisk / 25)));
           const positions = tradeMode === "SPOT_GRID" ? this.getManagedPositions(current) : null;
           const minCountableExposureHome = this.deriveManagedPositionMinCountableExposureHome(boundedRisk);
+          const cautionManagedSymbolOnlyMinExposurePct = this.deriveCautionManagedSymbolOnlyMinExposurePct(boundedRisk);
           const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
           const activeReasonQuarantineFamilies = this.getActiveReasonQuarantineFamilies(current);
           const openHomePositionCount =
@@ -3183,10 +3206,13 @@ export class BotEngineService implements OnModuleInit {
               ).length
               : 0;
           const selectionRiskState = current.riskState?.state ?? "NORMAL";
+          const selectionManagedExposurePct = this.extractRiskStateManagedExposurePct(current.riskState);
           const restrictToManagedSymbolsInCaution = this.shouldRestrictCautionToManagedSymbols({
             tradeMode,
             riskState: selectionRiskState,
-            openHomePositionCount
+            openHomePositionCount,
+            managedExposurePct: selectionManagedExposurePct,
+            minManagedExposurePct: cautionManagedSymbolOnlyMinExposurePct
           });
           let bestGridCandidate: { symbol: string; candidate: UniverseCandidate; score: number } | null = null;
           let firstEligibleGridCandidate: { symbol: string; candidate: UniverseCandidate } | null = null;
@@ -4204,8 +4230,13 @@ export class BotEngineService implements OnModuleInit {
           tickContext.maxOpenPositions = maxOpenPositions;
           const candidateIsOpen = (managedPositions.get(candidateSymbol)?.netQty ?? 0) > 0;
           const cautionModeActive = dailyLossGuard.state === "CAUTION";
+          const cautionManagedSymbolOnlyMinExposurePct = this.deriveCautionManagedSymbolOnlyMinExposurePct(risk);
+          const cautionPauseNewSymbols =
+            cautionModeActive &&
+            (dailyLossGuard.trigger !== "PROFIT_GIVEBACK" ||
+              dailyLossGuard.managedExposurePct >= cautionManagedSymbolOnlyMinExposurePct);
 
-          if (cautionModeActive && !candidateIsOpen) {
+          if (cautionPauseNewSymbols && !candidateIsOpen) {
             const summary = `Skip ${candidateSymbol}: Daily loss caution (new symbols paused)`;
             const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveCautionEntryPauseCooldownMs(risk));
             const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
@@ -4227,9 +4258,12 @@ export class BotEngineService implements OnModuleInit {
                         stage: "daily-loss-caution",
                         candidateSymbol,
                         riskState: dailyLossGuard.state,
+                        trigger: dailyLossGuard.trigger,
                         dailyRealizedPnl: dailyLossGuard.dailyRealizedPnl,
                         maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs,
                         maxDailyLossPct: dailyLossGuard.maxDailyLossPct,
+                        managedExposurePct: dailyLossGuard.managedExposurePct,
+                        cautionManagedSymbolOnlyMinExposurePct,
                         lookbackMs: dailyLossGuard.lookbackMs,
                         windowStart: dailyLossGuard.windowStartIso,
                         cooldownMs

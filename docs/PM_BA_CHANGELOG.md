@@ -2198,3 +2198,30 @@ This log is mandatory for every implementation patch batch.
 - Runtime request (next 1-3h):
   - run without state reset and verify `Daily loss caution: no eligible managed symbols` drops materially.
   - verify managed symbols can produce sell/grid-maintenance attempts under CAUTION instead of full no-op loops.
+
+## 2026-02-23 15:14 UTC — T-005 short-run patch after `autobot-feedback-20260223-151026.tgz`: exposure-aware CAUTION pause relaxation
+- Scope: avoid CAUTION deadlock when managed exposure is already tiny by relaxing new-symbol pause in low-exposure profit-giveback mode.
+- Bundle findings:
+  - CAUTION routing + sell-leg unblocking reduced some generic skips, but runtime remained no-trade (`trades.count=0`).
+  - dominant skip remained `Daily loss caution: no eligible managed symbols` (83), with managed symbols still failing mostly on sell sizing constraints.
+  - current risk-state already shows very low managed exposure (`managedExposure=0.2%`), so strict new-symbol pause is no longer proportionate.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - added `deriveCautionManagedSymbolOnlyMinExposurePct(risk)` (`10% -> 3%`) and risk-state parser `extractRiskStateManagedExposurePct(...)`.
+    - `shouldRestrictCautionToManagedSymbols(...)` is now exposure-aware:
+      - restrict only when managed exposure is at/above the risk-linked floor (or unknown).
+    - CAUTION new-symbol pause gate now uses same exposure logic:
+      - for `trigger=PROFIT_GIVEBACK` + low managed exposure, bot can rotate out of deadlocked managed-only set.
+      - for `ABS_DAILY_LOSS`, behavior remains strict.
+    - caution skip details now include trigger + managed exposure thresholds for auditability.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+    - expanded helper tests for exposure-aware restriction,
+    - added tests for caution managed-exposure threshold scaling and risk-state exposure parsing.
+- Risk slider impact:
+  - no change to daily-loss thresholds.
+  - risk controls the CAUTION managed-exposure floor (`10%` low-risk, `3%` high-risk), making behavior adaptive and non-hardcoded.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (next 1-3h):
+  - run without state reset and verify drop in `Daily loss caution: no eligible managed symbols`.
+  - check that CAUTION can re-engage with controlled candidates when managed exposure is below floor.

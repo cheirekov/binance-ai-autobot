@@ -1021,6 +1021,8 @@ describe("bot-engine insufficient-balance helpers", () => {
         tradeMode: "SPOT" | "SPOT_GRID" | "FUTURES";
         riskState: "NORMAL" | "CAUTION" | "HALT";
         openHomePositionCount: number;
+        managedExposurePct: number | null;
+        minManagedExposurePct: number;
       }) => boolean;
     };
 
@@ -1028,30 +1030,96 @@ describe("bot-engine insufficient-balance helpers", () => {
       helpers.shouldRestrictCautionToManagedSymbols({
         tradeMode: "SPOT_GRID",
         riskState: "CAUTION",
-        openHomePositionCount: 3
+        openHomePositionCount: 3,
+        managedExposurePct: 0.12,
+        minManagedExposurePct: 0.03
       })
     ).toBe(true);
     expect(
       helpers.shouldRestrictCautionToManagedSymbols({
         tradeMode: "SPOT_GRID",
         riskState: "CAUTION",
-        openHomePositionCount: 0
+        openHomePositionCount: 0,
+        managedExposurePct: 0.12,
+        minManagedExposurePct: 0.03
       })
     ).toBe(false);
     expect(
       helpers.shouldRestrictCautionToManagedSymbols({
         tradeMode: "SPOT",
         riskState: "CAUTION",
-        openHomePositionCount: 3
+        openHomePositionCount: 3,
+        managedExposurePct: 0.12,
+        minManagedExposurePct: 0.03
       })
     ).toBe(false);
     expect(
       helpers.shouldRestrictCautionToManagedSymbols({
         tradeMode: "SPOT_GRID",
         riskState: "HALT",
-        openHomePositionCount: 3
+        openHomePositionCount: 3,
+        managedExposurePct: 0.12,
+        minManagedExposurePct: 0.03
       })
     ).toBe(false);
+    expect(
+      helpers.shouldRestrictCautionToManagedSymbols({
+        tradeMode: "SPOT_GRID",
+        riskState: "CAUTION",
+        openHomePositionCount: 3,
+        managedExposurePct: 0.02,
+        minManagedExposurePct: 0.03
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldRestrictCautionToManagedSymbols({
+        tradeMode: "SPOT_GRID",
+        riskState: "CAUTION",
+        openHomePositionCount: 3,
+        managedExposurePct: null,
+        minManagedExposurePct: 0.03
+      })
+    ).toBe(true);
+  });
+
+  it("scales caution managed-symbol-only exposure floor with risk", () => {
+    const helpers = service as unknown as {
+      deriveCautionManagedSymbolOnlyMinExposurePct: (risk: number) => number;
+    };
+
+    expect(helpers.deriveCautionManagedSymbolOnlyMinExposurePct(0)).toBe(0.1);
+    expect(helpers.deriveCautionManagedSymbolOnlyMinExposurePct(50)).toBe(0.065);
+    expect(helpers.deriveCautionManagedSymbolOnlyMinExposurePct(100)).toBe(0.03);
+  });
+
+  it("extracts managed exposure pct from runtime risk-state reasons", () => {
+    const helpers = service as unknown as {
+      extractRiskStateManagedExposurePct: (riskState:
+        | {
+            state: "NORMAL" | "CAUTION" | "HALT";
+            reason_codes: string[];
+            unwind_only: boolean;
+            resume_conditions: string[];
+          }
+        | undefined) => number | null;
+    };
+
+    expect(
+      helpers.extractRiskStateManagedExposurePct({
+        state: "CAUTION",
+        reason_codes: ["DAILY_LOSS_GUARD", "managedExposure=0.2%"],
+        unwind_only: false,
+        resume_conditions: []
+      })
+    ).toBeCloseTo(0.002, 8);
+    expect(
+      helpers.extractRiskStateManagedExposurePct({
+        state: "CAUTION",
+        reason_codes: ["DAILY_LOSS_GUARD"],
+        unwind_only: false,
+        resume_conditions: []
+      })
+    ).toBeNull();
   });
 
   it("scales global-lock unwind cooldown with risk", () => {
