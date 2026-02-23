@@ -3217,7 +3217,8 @@ export class BotEngineService implements OnModuleInit {
               enforceRegionPolicy: config?.advanced.enforceRegionPolicy
             });
             if (policyReason) continue;
-            if (this.getEntryGuard({ symbol, state: current })) continue;
+            const entryGuard = this.getEntryGuard({ symbol, state: current });
+            if (tradeMode !== "SPOT_GRID" && entryGuard) continue;
 
             if (tradeMode === "SPOT_GRID") {
               const symbolOpenLimitOrdersAll = current.activeOrders.filter((order) => {
@@ -3252,6 +3253,7 @@ export class BotEngineService implements OnModuleInit {
 
               const netQty = positions?.get(symbol)?.netQty ?? 0;
               const hasInventory = Number.isFinite(netQty) && netQty > 0;
+              const hasEntryGuard = Boolean(entryGuard);
               if (restrictToManagedSymbolsInCaution && !hasInventory) {
                 continue;
               }
@@ -3328,7 +3330,7 @@ export class BotEngineService implements OnModuleInit {
               }
 
               const missingBuyLeg =
-                !hasBuyLimit && !buyPaused && !suppressBuyLegFromRejectStorm && (!openPositionCapReached || hasInventory);
+                !hasBuyLimit && !buyPaused && !suppressBuyLegFromRejectStorm && !hasEntryGuard && (!openPositionCapReached || hasInventory);
               const missingSellLeg = !hasSellLimit && hasInventory && sellLegLikelyFeasible && !suppressSellLegFromRejectStorm;
               const canTakeAction = missingBuyLeg || missingSellLeg;
               const hasGuardNoInventoryNoLadder = buyPaused && !hasInventory && !hasBuyLimit && !hasSellLimit;

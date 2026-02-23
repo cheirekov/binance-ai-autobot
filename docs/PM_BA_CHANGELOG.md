@@ -2178,3 +2178,23 @@ This log is mandatory for every implementation patch batch.
 - Runtime request (next 1-3h):
   - run without state reset and verify drop in `Daily loss caution (new symbols paused)` skip flood.
   - verify at least some managed-symbol activity (orders/trades or explicit managed-symbol infeasibility reasons) instead of generic no-eligible loops.
+
+## 2026-02-23 12:36 UTC — T-005 short-run patch after `autobot-feedback-20260223-123245.tgz`: CAUTION sell-leg unblocking
+- Scope: unblock managed-symbol maintenance actions under `CAUTION` by allowing sell-leg routing even when entry guard is active.
+- Bundle findings:
+  - CAUTION routing patch worked partially (new explicit reason seen), but runtime still had zero trades.
+  - dominant skip reason became `Daily loss caution: no eligible managed symbols` (100), indicating selector over-blocked managed symbols.
+  - root cause: `entryGuard` was still applied before grid-branch logic, which prevented selecting managed symbols for sell-leg handling.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - candidate selection now computes `entryGuard` once and applies hard skip only for non-grid modes.
+    - in `SPOT_GRID`, `entryGuard` suppresses only missing BUY legs, not symbol eligibility for managed SELL-side actions.
+    - keeps CAUTION managed-symbol routing and countable-position cap logic intact.
+- Risk slider impact:
+  - none (routing/eligibility logic only).
+  - no threshold changes to daily loss, giveback, or unwind policy.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (next 1-3h):
+  - run without state reset and verify `Daily loss caution: no eligible managed symbols` drops materially.
+  - verify managed symbols can produce sell/grid-maintenance attempts under CAUTION instead of full no-op loops.
