@@ -2225,3 +2225,24 @@ This log is mandatory for every implementation patch batch.
 - Runtime request (next 1-3h):
   - run without state reset and verify drop in `Daily loss caution: no eligible managed symbols`.
   - check that CAUTION can re-engage with controlled candidates when managed exposure is below floor.
+
+## 2026-02-24 13:40 UTC — T-005 short-run patch after `autobot-feedback-20260224-132920.tgz`: align CAUTION gate across MARKET + GRID BUY legs
+- Scope: eliminate remaining CAUTION over-blocking mismatch where candidate routing was relaxed but MARKET/GRID BUY-leg guards still used broad `cautionModeActive`.
+- Bundle findings (`autobot-feedback-20260224-132920.tgz`):
+  - protection recovered correctly to `risk_state=NORMAL`.
+  - runtime activity resumed (`trades.count=76`) and prior deadlock reason `Daily loss caution: no eligible managed symbols` is no longer dominant.
+  - residual CAUTION skips still appeared in history (`paused MARKET entry` / `paused GRID BUY leg`) because those branches were gated by raw CAUTION state, not the strict trigger+exposure condition.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - in SPOT_GRID branch, `buyPaused` now uses `buyPausedByCaution = cautionPauseNewSymbols` (strict CAUTION condition), not raw `cautionModeActive`.
+    - MARKET entry pause branch now checks `cautionPauseNewSymbols` instead of raw `cautionModeActive`.
+    - added richer skip details for market-entry caution skips (`trigger`, `managedExposurePct`, `cautionManagedSymbolOnlyMinExposurePct`) for auditability.
+- Risk slider impact:
+  - no threshold changes.
+  - existing risk-linked exposure floor (`10% -> 3%`) now consistently controls all CAUTION new-risk pause points.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+- Runtime request (night run):
+  - run without state reset.
+  - verify CAUTION history no longer shows disproportionate `paused MARKET entry` / `paused GRID BUY leg` when `trigger=PROFIT_GIVEBACK` and managed exposure is below floor.
+  - verify ABS-loss CAUTION behavior remains strict.

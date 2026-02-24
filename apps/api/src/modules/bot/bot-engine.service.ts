@@ -5457,7 +5457,8 @@ export class BotEngineService implements OnModuleInit {
                 }
               });
             }
-            const buyPaused = cautionModeActive || Boolean(existingBuyPauseLock) || shouldPauseBuys;
+            const buyPausedByCaution = cautionPauseNewSymbols;
+            const buyPaused = buyPausedByCaution || Boolean(existingBuyPauseLock) || shouldPauseBuys;
 
             const atr = Number.isFinite(selectedCandidate?.atrPct14) ? Math.max(0.1, selectedCandidate?.atrPct14 ?? 0.4) : 0.4;
             const gridSpacingPct = Math.max(0.2, Math.min(2.5, atr * (0.6 - (risk / 100) * 0.25)));
@@ -5618,7 +5619,7 @@ export class BotEngineService implements OnModuleInit {
             let pendingNoActionState: BotState | null = null;
 
             if (!hasBuyLimit && buyPaused) {
-              const summary = cautionModeActive
+              const summary = buyPausedByCaution
                 ? `Skip ${candidateSymbol}: Daily loss caution paused GRID BUY leg`
                 : `Skip ${candidateSymbol}: Grid guard paused BUY leg`;
               const nowMs = Date.now();
@@ -5640,6 +5641,7 @@ export class BotEngineService implements OnModuleInit {
                         regime,
                         pauseConfidenceThreshold,
                         cautionModeActive,
+                        buyPausedByCaution,
                         buyPaused,
                         hasBuyLimit,
                         hasSellLimit
@@ -6120,7 +6122,7 @@ export class BotEngineService implements OnModuleInit {
             return;
           }
 
-          if (cautionModeActive) {
+          if (cautionPauseNewSymbols) {
             const summary = `Skip ${candidateSymbol}: Daily loss caution paused MARKET entry`;
             const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveCautionEntryPauseCooldownMs(risk));
             const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
@@ -6142,9 +6144,12 @@ export class BotEngineService implements OnModuleInit {
                         stage: "daily-loss-caution-market-entry",
                         candidateSymbol,
                         riskState: dailyLossGuard.state,
+                        trigger: dailyLossGuard.trigger,
                         dailyRealizedPnl: dailyLossGuard.dailyRealizedPnl,
                         maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs,
                         maxDailyLossPct: dailyLossGuard.maxDailyLossPct,
+                        managedExposurePct: dailyLossGuard.managedExposurePct,
+                        cautionManagedSymbolOnlyMinExposurePct,
                         lookbackMs: dailyLossGuard.lookbackMs,
                         windowStart: dailyLossGuard.windowStartIso,
                         cooldownMs

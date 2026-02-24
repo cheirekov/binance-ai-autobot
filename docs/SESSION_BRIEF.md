@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-23 15:14 UTC
+Last updated: 2026-02-24 13:40 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,7 +9,7 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-005` (Daily guardrails + unwind-only behavior)
-- Goal (single sentence): keep T-005 guardrails active while relaxing CAUTION deadlock when managed exposure is already tiny.
+- Goal (single sentence): keep T-005 guardrails active and apply the strict CAUTION trigger/exposure gate consistently across MARKET and GRID BUY-leg pauses.
 - In scope:
   - compute rolling 24h realized PnL guard threshold from risk slider.
   - block new entry/grid placement when guard is active.
@@ -88,25 +88,25 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Observed KPI delta:
-  - protection state remains correct (`risk_state=CAUTION`, `trigger=PROFIT_GIVEBACK`) but trade activity is still zero.
-  - dominant skip remains `Daily loss caution: no eligible managed symbols`; managed symbols are frequently sizing-infeasible.
-  - patch now makes CAUTION managed-only behavior exposure-aware to avoid low-exposure deadlock.
+  - `risk_state` recovered to `NORMAL`; CAUTION deadlock is cleared.
+  - trade activity resumed (`trades.count=76`), including LIMIT ladder lifecycle and market exits/entries.
+  - residual CAUTION skip history still includes `paused MARKET entry` / `paused GRID BUY leg`, indicating branch-level gate mismatch.
 - Decision: `continue`
 - Next ticket candidate: `T-005` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - if market remains illiquid for eligible symbols, sizing-related skips may still dominate.
+  - PnL remains negative and out of ticket scope until `T-007` and strategy tickets.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260223-151026.tgz`
-  - patch focus: exposure-aware CAUTION pause relaxation (`managedExposure` vs risk-linked floor).
-  - validation target: drop in `Daily loss caution: no eligible managed symbols` and restored controlled activity.
+  - bundle: `autobot-feedback-20260224-132920.tgz`
+  - patch focus: use strict `cautionPauseNewSymbols` gate for MARKET + GRID BUY-leg pause points.
+  - validation target: when low-exposure `PROFIT_GIVEBACK` CAUTION appears, skip flood from paused market/grid-buy should reduce.
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-005
 Batch: SHORT (1-3h)
-Goal: validate exposure-aware CAUTION pause relaxation while preserving daily-loss guard safety behavior.
-In scope: rolling daily-loss guard check, trigger-aware guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds, lock-state consistency, global-lock unwind-only execution, daily-loss-halt unwind execution with trigger-aware cadence/fraction, managed-exposure HALT release gate, risk-linked countable-position cap logic, CAUTION managed-symbol routing, SPOT_GRID entry-guard buy-only enforcement, exposure-aware CAUTION pause relaxation, adaptive telemetry label normalization, fee-edge comparator normalization.
+Goal: validate strict CAUTION gate alignment across candidate routing, MARKET entry pause, and GRID BUY-leg pause while preserving guard safety behavior.
+In scope: rolling daily-loss guard check, trigger-aware guard skip telemetry, post-stop-loss symbol re-entry cooldown, CAUTION entry pauses, no-inventory grid cooldown tuning, tightened giveback thresholds, lock-state consistency, global-lock unwind-only execution, daily-loss-halt unwind execution with trigger-aware cadence/fraction, managed-exposure HALT release gate, risk-linked countable-position cap logic, CAUTION managed-symbol routing, SPOT_GRID entry-guard buy-only enforcement, exposure-aware CAUTION pause relaxation, consistent MARKET/GRID BUY-leg CAUTION gating, adaptive telemetry label normalization, fee-edge comparator normalization.
 Out of scope: strategy rewrite, multi-quote routing, commission ledger refactor.
 DoD:
 - API: daily-loss guard computes and enforces risk-linked max daily loss.
@@ -122,6 +122,7 @@ DoD:
 - Runtime: in `CAUTION` with managed exposure, candidate routing targets managed symbols (fewer `new symbols paused` loops).
 - Runtime: in `SPOT_GRID`, entry guard blocks new BUY legs but does not block managed SELL-leg symbol routing.
 - Runtime: in `CAUTION + PROFIT_GIVEBACK`, managed-only/new-symbol pause is relaxed when managed exposure is below the risk-linked floor.
+- Runtime: under low-exposure `PROFIT_GIVEBACK` CAUTION, `paused MARKET entry` and `paused GRID BUY leg` skip frequency is reduced (gate consistency check).
 - Risk slider mapping: max daily loss threshold widens at high risk and tightens at low risk.
 - CI/test command: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
