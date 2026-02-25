@@ -2246,3 +2246,38 @@ This log is mandatory for every implementation patch batch.
   - run without state reset.
   - verify CAUTION history no longer shows disproportionate `paused MARKET entry` / `paused GRID BUY leg` when `trigger=PROFIT_GIVEBACK` and managed exposure is below floor.
   - verify ABS-loss CAUTION behavior remains strict.
+
+## 2026-02-25 10:15 UTC — T-005 night validation review after `autobot-feedback-20260225-100508.tgz`: closure recommendation
+- Scope: verify whether T-005 guardrail lane is stable enough to close and move to `T-007`.
+- Bundle findings:
+  - runtime recovered to `risk_state=NORMAL` at end of run; no persistent CAUTION/HALT deadlock.
+  - bot remained active (`trades.count=146`, `filled=189`) with no dominant `Daily loss caution: no eligible managed symbols` pattern.
+  - CAUTION/HALT guard events occurred but resolved naturally (observed brief giveback HALT entries and unwind events, then recovery).
+  - top skips are now mostly strategy/routing constraints (`Max consecutive entries`, `Grid waiting for ladder slot`), not T-005 guardrail lockups.
+- PM/BA decision:
+  - `T-005` is considered functionally complete for Gate-A guard behavior.
+  - next active lane should move to `T-007` (commission/fill-aware PnL and exposure correctness).
+- Runtime request (next short run):
+  - keep current runtime behavior (no state reset required for continuity),
+  - start validating `T-007` metrics design against existing bundles before first implementation patch.
+
+## 2026-02-25 10:35 UTC — T-007 patch batch 1: commission-aware fee plumbing into baseline + summary
+- Scope: first implementation slice for commission-aware PnL reporting without changing strategy execution logic.
+- Technical changes:
+  - `packages/shared/src/schemas/bot-state.ts`
+    - extended `Order` schema with optional `feeHome` (normalized fee amount in home quote).
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+    - added `deriveOrderFeeHome(...)` helper to extract/normalize fill commissions into home quote where derivable.
+    - `persistLiveTrade(...)` now computes and persists `order.feeHome` from exchange `fills`, and adds fee diagnostics in trade decision details.
+    - upgraded `dedupeOrderHistory(...)` to merge duplicate records and preserve richer fee/price metadata.
+    - baseline KPI builder now tracks `feesHome` per symbol and totals, and includes buy-side fees in open-cost basis.
+  - `scripts/generate-last-run-summary.sh`
+    - `pnl.fees_usdt` now sourced from `baseline-kpis.totals.feesHome` (fallback-safe).
+    - `pnl.net_usdt` now computed using fee-aware formula.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed (lint + tests + build).
+  - added/updated API tests (`bot-engine.service.test.ts`) for fee conversion helper behavior.
+- Runtime request (next 1-3h):
+  - run without state reset.
+  - verify `data/telemetry/last_run_summary.json` shows non-zero `pnl.fees_usdt` when commissions are available in fills.
+  - verify no regression in T-005 guardrail behavior (`risk_state` transitions and no managed-symbol deadlock loop).

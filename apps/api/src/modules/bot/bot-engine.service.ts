@@ -113,6 +113,7 @@ type BaselineSymbolStats = {
   avgEntry: number;
   openCost: number;
   realizedPnl: number;
+  feesHome: number;
   lastTradeTs?: string;
 };
 
@@ -149,6 +150,7 @@ type BaselineRunStats = {
     buyNotional: number;
     sellNotional: number;
     realizedPnl: number;
+    feesHome: number;
     openExposureCost: number;
     openPositions: number;
   };
@@ -2029,6 +2031,97 @@ export class BotEngineService implements OnModuleInit {
     return "REJECTED";
   }
 
+  private deriveOrderFeeHome(params: {
+    symbol: string;
+    homeStable: string;
+    fills: Array<{ price?: string; qty?: string; commission?: string; commissionAsset?: string }>;
+    fallbackPrice?: number;
+  }): { feeHome: number; feeAsset?: string; feeQty?: number; hasUnconvertedFee: boolean } {
+    const symbol = params.symbol.trim().toUpperCase();
+    const homeStable = params.homeStable.trim().toUpperCase();
+    if (!symbol || !homeStable || !Array.isArray(params.fills) || params.fills.length === 0) {
+      return { feeHome: 0, hasUnconvertedFee: false };
+    }
+
+    let baseAsset = "";
+    let quoteAsset = "";
+    if (symbol.endsWith(homeStable) && symbol.length > homeStable.length) {
+      baseAsset = symbol.slice(0, symbol.length - homeStable.length);
+      quoteAsset = homeStable;
+    } else if (symbol.startsWith(homeStable) && symbol.length > homeStable.length) {
+      baseAsset = homeStable;
+      quoteAsset = symbol.slice(homeStable.length);
+    }
+
+    let feeHome = 0;
+    let hasUnconvertedFee = false;
+    let feeAsset: string | undefined;
+    let feeQty = 0;
+    let mixedAssets = false;
+
+    for (const fill of params.fills) {
+      const commission = Number.parseFloat(fill.commission ?? "");
+      const commissionAsset = (fill.commissionAsset ?? "").trim().toUpperCase();
+      const fillPrice = Number.parseFloat(fill.price ?? "");
+      const price =
+        Number.isFinite(fillPrice) && fillPrice > 0
+          ? fillPrice
+          : Number.isFinite(params.fallbackPrice) && (params.fallbackPrice ?? 0) > 0
+            ? (params.fallbackPrice as number)
+            : Number.NaN;
+
+      if (!Number.isFinite(commission) || commission <= 0 || !commissionAsset) continue;
+
+      if (!feeAsset) {
+        feeAsset = commissionAsset;
+      } else if (feeAsset !== commissionAsset) {
+        mixedAssets = true;
+      }
+      feeQty += commission;
+
+      if (commissionAsset === homeStable) {
+        feeHome += commission;
+        continue;
+      }
+
+      if (!baseAsset || !quoteAsset) {
+        hasUnconvertedFee = true;
+        continue;
+      }
+
+      if (quoteAsset === homeStable) {
+        if (commissionAsset === quoteAsset) {
+          feeHome += commission;
+          continue;
+        }
+        if (commissionAsset === baseAsset && Number.isFinite(price) && price > 0) {
+          feeHome += commission * price;
+          continue;
+        }
+      }
+
+      if (baseAsset === homeStable) {
+        if (commissionAsset === baseAsset) {
+          feeHome += commission;
+          continue;
+        }
+        if (commissionAsset === quoteAsset && Number.isFinite(price) && price > 0) {
+          feeHome += commission / price;
+          continue;
+        }
+      }
+
+      hasUnconvertedFee = true;
+    }
+
+    return {
+      feeHome: this.toRounded(Math.max(0, feeHome), 8),
+      ...(feeAsset && !mixedAssets ? { feeAsset } : {}),
+      ...(feeQty > 0 && !mixedAssets ? { feeQty: this.toRounded(feeQty, 8) } : {}),
+      hasUnconvertedFee
+    };
+  }
+
   private resolveBotOrderClientIdPrefix(config: AppConfig | null): string {
     const raw = config?.advanced.botOrderClientIdPrefix ?? "ABOT";
     const trimmed = raw.trim().toUpperCase();
@@ -2227,14 +2320,38 @@ export class BotEngineService implements OnModuleInit {
     };
   }
 
+  private mergeOrderRecords(primary: Order, secondary: Order): Order {
+    const mergedFeeHome =
+      Number.isFinite(primary.feeHome) && (primary.feeHome ?? 0) > 0
+        ? primary.feeHome
+        : Number.isFinite(secondary.feeHome) && (secondary.feeHome ?? 0) > 0
+          ? secondary.feeHome
+          : primary.feeHome ?? secondary.feeHome;
+
+    return {
+      ...primary,
+      ...(primary.clientOrderId ? {} : secondary.clientOrderId ? { clientOrderId: secondary.clientOrderId } : {}),
+      ...(Number.isFinite(primary.price) && (primary.price ?? 0) > 0
+        ? {}
+        : Number.isFinite(secondary.price) && (secondary.price ?? 0) > 0
+          ? { price: secondary.price }
+          : {}),
+      ...(Number.isFinite(mergedFeeHome) && (mergedFeeHome ?? 0) >= 0 ? { feeHome: mergedFeeHome } : {})
+    };
+  }
+
   private dedupeOrderHistory(orders: Order[]): Order[] {
-    const seen = new Set<string>();
+    const indexByKey = new Map<string, number>();
     const out: Order[] = [];
     for (const order of orders) {
       const key = `${order.id}:${order.status}:${order.side}:${order.symbol}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(order);
+      const existingIndex = indexByKey.get(key);
+      if (existingIndex === undefined) {
+        indexByKey.set(key, out.length);
+        out.push(order);
+        continue;
+      }
+      out[existingIndex] = this.mergeOrderRecords(out[existingIndex], order);
     }
     return out;
   }
@@ -2565,12 +2682,14 @@ export class BotEngineService implements OnModuleInit {
     let sells = 0;
     let buyNotional = 0;
     let sellNotional = 0;
+    let feesHome = 0;
 
     for (const order of filledOrders) {
       const symbol = order.symbol.trim().toUpperCase();
       const qty = Number.isFinite(order.qty) ? Math.max(0, order.qty) : 0;
       const price = Number.isFinite(order.price) ? Math.max(0, order.price ?? 0) : 0;
       const notional = qty > 0 && price > 0 ? qty * price : 0;
+      const orderFeeHome = Number.isFinite(order.feeHome) ? Math.max(0, order.feeHome ?? 0) : 0;
       if (qty <= 0) continue;
 
       const next = symbolMap.get(symbol) ?? {
@@ -2583,6 +2702,7 @@ export class BotEngineService implements OnModuleInit {
         avgEntry: 0,
         openCost: 0,
         realizedPnl: 0,
+        feesHome: 0,
         lastTradeTs: undefined
       };
 
@@ -2593,6 +2713,9 @@ export class BotEngineService implements OnModuleInit {
           buyNotional += notional;
           next.buyNotional += notional;
           next.openCost += notional;
+        }
+        if (orderFeeHome > 0) {
+          next.openCost += orderFeeHome;
         }
         next.netQty += qty;
       } else {
@@ -2610,6 +2733,10 @@ export class BotEngineService implements OnModuleInit {
           next.netQty = Math.max(0, next.netQty - closeQty);
         }
       }
+      if (orderFeeHome > 0) {
+        feesHome += orderFeeHome;
+        next.feesHome += orderFeeHome;
+      }
 
       next.avgEntry = next.netQty > 0 ? next.openCost / next.netQty : 0;
       next.lastTradeTs = order.ts;
@@ -2624,12 +2751,14 @@ export class BotEngineService implements OnModuleInit {
         netQty: this.toRounded(s.netQty, 8),
         avgEntry: this.toRounded(s.avgEntry, 8),
         openCost: this.toRounded(s.openCost, 8),
-        realizedPnl: this.toRounded(s.realizedPnl, 8)
+        realizedPnl: this.toRounded(s.realizedPnl, 8),
+        feesHome: this.toRounded(s.feesHome, 8)
       }))
       .sort((a, b) => b.buyNotional + b.sellNotional - (a.buyNotional + a.sellNotional))
       .slice(0, 40);
 
     const realizedPnl = this.toRounded(symbols.reduce((sum, s) => sum + s.realizedPnl, 0), 8);
+    const totalFeesHome = this.toRounded(feesHome, 8);
     const openExposureCost = this.toRounded(symbols.reduce((sum, s) => sum + (s.netQty > 0 ? s.openCost : 0), 0), 8);
     const openPositions = symbols.filter((s) => s.netQty > 0).length;
 
@@ -2666,6 +2795,7 @@ export class BotEngineService implements OnModuleInit {
         buyNotional: this.toRounded(buyNotional, 8),
         sellNotional: this.toRounded(sellNotional, 8),
         realizedPnl,
+        feesHome: totalFeesHome,
         openExposureCost,
         openPositions
       },
@@ -3581,8 +3711,8 @@ export class BotEngineService implements OnModuleInit {
             details?: Record<string, unknown>;
           }): void => {
             const { symbol, side, requestedQty, fallbackQty, response, reason, details } = params;
+            const fills = "fills" in response && Array.isArray(response.fills) ? response.fills : [];
             const avgPrice = (() => {
-              const fills = "fills" in response && Array.isArray(response.fills) ? response.fills : [];
               let qtySum = 0;
               let costSum = 0;
               for (const f of fills) {
@@ -3596,6 +3726,12 @@ export class BotEngineService implements OnModuleInit {
               const ap = costSum / qtySum;
               return Number.isFinite(ap) && ap > 0 ? ap : undefined;
             })();
+            const feeSummary = this.deriveOrderFeeHome({
+              symbol,
+              homeStable,
+              fills,
+              fallbackPrice: avgPrice
+            });
 
             const executedQty = Number.parseFloat(response.executedQty ?? "");
             const origQty = Number.parseFloat(response.origQty ?? "");
@@ -3617,7 +3753,8 @@ export class BotEngineService implements OnModuleInit {
               type: (response.type?.toUpperCase() ?? "MARKET"),
               status: this.mapBinanceStatus(response.status),
               qty: finalQty,
-              ...(avgPrice ? { price: avgPrice } : {})
+              ...(avgPrice ? { price: avgPrice } : {}),
+              ...(feeSummary.feeHome > 0 ? { feeHome: feeSummary.feeHome } : {})
             };
 
             const decisionSummary = `Binance ${envLabel} ${side} ${order.type} ${symbol} qty ${requestedQty} → ${order.status} (orderId ${order.id} · ${reason})`;
@@ -3637,6 +3774,10 @@ export class BotEngineService implements OnModuleInit {
                     status: response.status,
                     executedQty: response.executedQty,
                     cummulativeQuoteQty: response.cummulativeQuoteQty,
+                    ...(feeSummary.feeHome > 0 ? { feeHome: feeSummary.feeHome } : {}),
+                    ...(feeSummary.feeAsset ? { feeAsset: feeSummary.feeAsset } : {}),
+                    ...(typeof feeSummary.feeQty === "number" ? { feeQty: feeSummary.feeQty } : {}),
+                    ...(feeSummary.hasUnconvertedFee ? { hasUnconvertedFee: true } : {}),
                     reason,
                     ...details
                   }

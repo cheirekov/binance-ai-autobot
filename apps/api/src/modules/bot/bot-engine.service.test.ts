@@ -734,6 +734,53 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(guard.profitGivebackPct).toBeCloseTo(0.5, 6);
   });
 
+  it("derives home fees from fills for quote-home and home-base symbols", () => {
+    const helpers = service as unknown as {
+      deriveOrderFeeHome: (params: {
+        symbol: string;
+        homeStable: string;
+        fills: Array<{ price?: string; qty?: string; commission?: string; commissionAsset?: string }>;
+        fallbackPrice?: number;
+      }) => { feeHome: number; feeAsset?: string; feeQty?: number; hasUnconvertedFee: boolean };
+    };
+
+    const quoteHome = helpers.deriveOrderFeeHome({
+      symbol: "BTCUSDC",
+      homeStable: "USDC",
+      fills: [{ price: "100000", qty: "0.001", commission: "0.000001", commissionAsset: "BTC" }]
+    });
+    expect(quoteHome.feeHome).toBeCloseTo(0.1, 8);
+    expect(quoteHome.hasUnconvertedFee).toBe(false);
+
+    const homeBase = helpers.deriveOrderFeeHome({
+      symbol: "USDCUSDT",
+      homeStable: "USDC",
+      fills: [{ price: "1.0000", qty: "5", commission: "0.01", commissionAsset: "USDT" }]
+    });
+    expect(homeBase.feeHome).toBeCloseTo(0.01, 8);
+    expect(homeBase.hasUnconvertedFee).toBe(false);
+  });
+
+  it("flags unconverted fee assets when fill asset cannot be mapped to home", () => {
+    const helpers = service as unknown as {
+      deriveOrderFeeHome: (params: {
+        symbol: string;
+        homeStable: string;
+        fills: Array<{ price?: string; qty?: string; commission?: string; commissionAsset?: string }>;
+        fallbackPrice?: number;
+      }) => { feeHome: number; feeAsset?: string; feeQty?: number; hasUnconvertedFee: boolean };
+    };
+
+    const fee = helpers.deriveOrderFeeHome({
+      symbol: "BTCUSDT",
+      homeStable: "USDC",
+      fills: [{ price: "100000", qty: "0.001", commission: "0.01", commissionAsset: "BNB" }]
+    });
+
+    expect(fee.feeHome).toBe(0);
+    expect(fee.hasUnconvertedFee).toBe(true);
+  });
+
   it("downgrades PROFIT_GIVEBACK HALT to CAUTION when managed exposure is low", () => {
     const helpers = service as unknown as {
       evaluateDailyLossGuard: (params: {

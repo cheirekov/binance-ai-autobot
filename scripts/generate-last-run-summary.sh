@@ -113,10 +113,10 @@ const resumeConditions = hasCanonicalRiskState
 
 const realized = safeNum(totals.realizedPnl, 0);
 const unrealized = 0;
-const fees = 0;
+const fees = Math.max(0, safeNum(totals.feesHome, safeNum(totals.fees, 0)));
 const net = realized + unrealized - fees;
 const openExposureCost = safeNum(totals.openExposureCost, 0);
-const equity = Math.max(0, openExposureCost + Math.max(0, realized));
+const equity = Math.max(0, openExposureCost + Math.max(0, net));
 const totalAllocPct = equity > 0 ? Math.max(0, Math.min(100, (openExposureCost / equity) * 100)) : 0;
 
 const symbols = Array.isArray(kpis.symbols) ? kpis.symbols : [];

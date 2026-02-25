@@ -29,7 +29,8 @@ export const OrderSchema = z.object({
   type: z.string().min(1),
   status: OrderStatusSchema,
   price: z.number().nonnegative().optional(),
-  qty: z.number().positive()
+  qty: z.number().positive(),
+  feeHome: z.number().nonnegative().optional()
 });
 export type Order = z.infer<typeof OrderSchema>;
 

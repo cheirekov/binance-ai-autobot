@@ -1,6 +1,6 @@
 # DELIVERY BOARD (PM v2) — Binance AI Autobot
 
-Last updated: 2026-02-18  
+Last updated: 2026-02-25  
 Owner: PM/BA + Codex + User
 
 This board is structured to reduce scope drift and context-window churn.
@@ -88,17 +88,18 @@ Must pass all:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-005 | IN_PROGRESS | Daily guardrails + unwind-only behavior | No PnL ledger refactor, no AI promotion, no multi-quote expansion |
+| T-007 | IN_PROGRESS | PnL correctness + exposure reporting | No strategy rewrite, no AI promotion, no multi-quote expansion |
 
+`T-005` status: moved to DONE after overnight evidence (`autobot-feedback-20260225-100508.tgz`) showed guard transitions/recovery without deadlock.
 `T-029` status: moved to DONE after overnight evidence (`autobot-feedback-20260219-103043.tgz`) showed unmanaged exposure controlled and no dominant no-feasible conversion loop.
 
 ### NEXT (Gate A blockers)
 
 | Priority | ID | Status | Title | Acceptance focus |
 |---|---|---|---|---|
-| 1 | T-007 | TODO | PnL correctness + exposure reporting | commission/fill-aware and restart-stable |
-| 2 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source |
-| 3 | T-030 | TODO | Universe filter-chain v2 | staged rejection reasons and anti-churn visibility |
+| 1 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source |
+| 2 | T-030 | TODO | Universe filter-chain v2 | staged rejection reasons and anti-churn visibility |
+| 3 | T-034 | TODO | Multi-quote execution policy v1 | adaptive quote routing without hardcoded quote lock |
 
 ### LATER (after Gate A)
 
