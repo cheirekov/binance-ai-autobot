@@ -82,6 +82,20 @@ Must pass all:
 
 ---
 
+## Strategy delivery map (adaptive + ML)
+
+| Phase | Tickets | What changes in bot behavior |
+|---|---|---|
+| Foundation (now) | `T-007` | PnL/fees become audit-grade so strategy quality is measurable, not guessed. |
+| Adaptive execution v1 | `T-030`, `T-031`, `T-032`, `T-034` | Universe quality filters + regime routing + exit logic + quote routing adapt entries/exits to market structure. |
+| Learning (shadow) | `T-026`, `T-025` | Offline calibration + shadow model score market situations and recommend parameter shifts without live risk. |
+| AI action (gated) | `T-035`, `T-036`, `T-037`, `T-038` | News/event signals can influence trades only after promotion gates and budget/risk checks pass. |
+
+Profit milestone rule:
+- We will call adaptation/profit behavior “ready” only after we can show improvement in **expectancy** and **drawdown control** across multiple day/night bundles, not a single bullish run.
+
+---
+
 ## NOW / NEXT / LATER
 
 ### NOW (active lane)
@@ -129,11 +143,11 @@ Must pass all:
 
 ### Completed baseline (already delivered)
 
-`T-000`, `T-001`, `T-002`, `T-004`, `T-006`, `T-008`, `T-009`, `T-010`, `T-011`, `T-012`, `T-013`, `T-014`, `T-015`, `T-016`, `T-017`, `T-019`, `T-021`, `T-022`, `T-024`, `T-027`, `T-029`, `T-033`
+`T-000`, `T-001`, `T-002`, `T-004`, `T-005`, `T-006`, `T-008`, `T-009`, `T-010`, `T-011`, `T-012`, `T-013`, `T-014`, `T-015`, `T-016`, `T-017`, `T-019`, `T-021`, `T-022`, `T-024`, `T-027`, `T-029`, `T-033`
 
 ### Open backlog
 
-`T-003`, `T-005`, `T-007`, `T-020`, `T-023`, `T-025`, `T-026`, `T-028`, `T-030`, `T-031`, `T-032`, `T-034`, `T-035`, `T-036`, `T-037`, `T-038`
+`T-003`, `T-007`, `T-020`, `T-023`, `T-025`, `T-026`, `T-028`, `T-030`, `T-031`, `T-032`, `T-034`, `T-035`, `T-036`, `T-037`, `T-038`
 
 ---
 

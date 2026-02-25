@@ -160,6 +160,7 @@ export function DashboardPage(): JSX.Element {
   const pnlSummary = useMemo(() => {
     const kpi = runStats.stats?.kpi;
     const realized = kpi?.totals?.realizedPnl;
+    const fees = kpi?.totals?.feesHome;
     const openCost = kpi?.totals?.openExposureCost;
     const symbols = kpi?.symbols ?? [];
 
@@ -196,6 +197,7 @@ export function DashboardPage(): JSX.Element {
 
     return {
       realized,
+      fees,
       openCost,
       openValue: pricedOpenPositions > 0 ? openValue : undefined,
       unrealized,
@@ -559,13 +561,22 @@ export function DashboardPage(): JSX.Element {
 
         <div className="card">
           <div className="title">PnL</div>
-          <div className="subtitle">Baseline from persisted fills (commissions/funding still not included).</div>
+          <div className="subtitle">Baseline from persisted fills (fees included when exchange fill data is available; funding not included).</div>
+          <div className="subtitle">Wallet total is mark-to-market across all held assets, so it can differ from this trade PnL view.</div>
           <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <span className="pill">
               Realized:{" "}
               <b>
                 {typeof pnlSummary.realized === "number" && Number.isFinite(pnlSummary.realized)
                   ? `${pnlSummary.realized.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${homeStableCoin}`
+                  : "—"}
+              </b>
+            </span>
+            <span className={pillClass("bad")}>
+              Fees:{" "}
+              <b>
+                {typeof pnlSummary.fees === "number" && Number.isFinite(pnlSummary.fees)
+                  ? `${pnlSummary.fees.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${homeStableCoin}`
                   : "—"}
               </b>
             </span>

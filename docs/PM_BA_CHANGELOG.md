@@ -2281,3 +2281,31 @@ This log is mandatory for every implementation patch batch.
   - run without state reset.
   - verify `data/telemetry/last_run_summary.json` shows non-zero `pnl.fees_usdt` when commissions are available in fills.
   - verify no regression in T-005 guardrail behavior (`risk_state` transitions and no managed-symbol deadlock loop).
+
+## 2026-02-25 13:10 UTC — T-007 validation after `autobot-feedback-20260225-130706.tgz`
+- Scope: validate batch-1 fee plumbing in real runtime bundle.
+- Validation outcome:
+  - `last_run_summary.json` now reports non-zero fees:
+    - `pnl.fees_usdt = 2.48637116`
+    - `pnl.net_usdt = -82.09507722` (fee-adjusted)
+  - `baseline-kpis.json` now includes `totals.feesHome = 2.48637116` and per-symbol `feesHome` values.
+  - no T-005 regression observed:
+    - `risk_state=NORMAL` at bundle end,
+    - no `Daily loss caution: no eligible managed symbols` deadlock pattern.
+- PM/BA decision:
+  - `T-007` batch-1 objective is met.
+  - continue with one more short + night validation run before moving to next T-007 refinement slice.
+
+## 2026-02-25 14:50 UTC — T-007 UI transparency patch: PnL scope + fees visibility
+- Scope: reduce confusion between wallet mark-to-market and trade PnL panel while keeping T-007 active.
+- Technical changes:
+  - `apps/ui/src/pages/DashboardPage.tsx`
+    - PnL subtitle updated to reflect current truth: fees included when fill data exists; funding still excluded.
+    - added explicit note that wallet total (all assets mark-to-market) can differ from trade-PnL baseline.
+    - added `Fees` pill in PnL card (`kpi.totals.feesHome`).
+  - `apps/ui/src/hooks/useRunStats.ts`
+    - extended UI types with optional `feesHome` fields (totals + symbol rows).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed.
+- Runtime request:
+  - verify UI PnL card now shows fees and updated explanatory text on the next deploy.

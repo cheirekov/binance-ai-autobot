@@ -25,6 +25,7 @@ export type BaselineRunStats = {
     minOrderSkipPct?: number;
     inventoryWaitingSkipPct?: number;
     realizedPnl: number;
+    feesHome?: number;
     openExposureCost: number;
   };
   topSkipSummaries: Array<{ summary: string; count: number }>;
@@ -38,6 +39,7 @@ export type BaselineRunStats = {
     avgEntry: number;
     openCost: number;
     realizedPnl: number;
+    feesHome?: number;
     lastTradeTs?: string;
   }>;
 };
