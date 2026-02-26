@@ -16,6 +16,29 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-26 18:05 UTC — T-007 batch: summary math upgrade (equity/unrealized/drawdown)
+- Scope: improve `last_run_summary` PnL/exposure fidelity for night-run validation without changing trading behavior.
+- BA requirement mapping:
+  - Keep active scope in `T-007` (PnL correctness + exposure reporting).
+  - Provide clearer, less placeholder telemetry for operator review.
+- PM milestone mapping:
+  - Follow-up after `autobot-feedback-20260226-174034.tgz` review showed T-007 fee plumbing stable but summary fields still placeholder-like (`unrealized=0`, `daily_net_pct=0`, `max_drawdown_pct=0`).
+- Technical changes:
+  - `scripts/generate-last-run-summary.sh`:
+    - derive equity from latest `walletTotalHome` in adaptive telemetry when available (fallback to prior formula),
+    - estimate unrealized PnL from open position cost vs latest filled price per symbol (avg-entry fallback),
+    - compute `daily_net_pct` from `net_usdt / equity_usdt`,
+    - compute `max_drawdown_pct` from wallet telemetry series (plus daily-guard fallback from decision details).
+- Risk slider impact:
+  - none (reporting-only change; execution logic untouched).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+  - smoke check: `./scripts/generate-last-run-summary.sh /tmp/last_run_summary.test.json` ✅
+- Runtime test request:
+  - night run on same config/state; verify `last_run_summary.pnl.daily_net_pct` and `max_drawdown_pct` remain non-zero/non-placeholder when runtime data is present.
+- Follow-up:
+  - if night bundle remains stable, close `T-007` after one restart-stability confirmation run.
+
 ## 2026-02-26 09:05 UTC — T-007 runtime stability hotfix: max-consecutive-entry loop mitigation
 - Scope: unblock morning/day runtime evidence by reducing repeated no-action loops on `Max consecutive entries reached` skips.
 - BA requirement mapping:

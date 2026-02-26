@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-26 13:43 UTC
+Last updated: 2026-02-26 17:41 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -14,6 +14,7 @@ Use this file at the start and end of every batch.
   - normalize commission extraction from exchange fill payloads.
   - convert commission into home quote (`USDC`) when possible.
   - include fees in realized/net PnL telemetry and summaries.
+  - replace placeholder summary math with runtime-derived equity/unrealized/drawdown where data exists.
   - keep PnL totals stable across restart/state reload.
 - Out of scope:
   - strategy/risk behavior rewrites (`T-030`, `T-031`, `T-032`),
@@ -32,6 +33,7 @@ Use this file at the start and end of every batch.
 - API behavior:
   - commissions are captured per fill/trade event when available.
   - PnL export path computes `fees_usdt`, `realized_usdt`, `net_usdt` consistently.
+  - `last_run_summary` computes non-placeholder `daily_net_pct` and `max_drawdown_pct` when telemetry inputs exist.
 - Runtime evidence in decisions/logs:
   - no guardrail regression from `T-005` (no managed-symbol CAUTION deadlock loops).
   - PnL summary fields no longer hardcode `fees_usdt=0` when fee data exists.
@@ -45,7 +47,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `14fa42f`
+- Commit hash: `1a4e1e4`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -66,23 +68,23 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `DAY (collection) / DAY (run end)`
+  - window (local): `EVENING (collection) / EVENING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `215.646`
-  - run end: `Thu Feb 26 2026 15:43:04 GMT+0200 (Eastern European Standard Time)`
+  - run duration (hours): `219.604`
+  - run end: `Thu Feb 26 2026 19:40:33 GMT+0200 (Eastern European Standard Time)`
   - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=2, historyLimitOrders=5, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=97.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=1, decisions=200, ratio=0.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=68, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=66.0%)
+  - sizing reject pressure: `low` (sizingRejectSkips=13, decisions=200, ratio=6.5%)
 - Decision: `continue`
 - Next ticket candidate: `T-007` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - none critical from automated checks.
+  - verify new summary math across a full night run and after restart (no drift/regression in reported totals).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260226-134319.tgz`
-  - auto-updated at: `2026-02-26T13:43:37.744Z`
+  - bundle: `autobot-feedback-20260226-174034.tgz`
+  - auto-updated at: `2026-02-26T17:41:05.840Z`
 
 ## 5) Copy/paste prompt for next session
 

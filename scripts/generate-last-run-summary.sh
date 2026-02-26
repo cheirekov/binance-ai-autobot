@@ -35,6 +35,7 @@ const decisions = Array.isArray(state.decisions) ? state.decisions : [];
 const activeOrders = Array.isArray(state.activeOrders) ? state.activeOrders : [];
 const orderHistory = Array.isArray(state.orderHistory) ? state.orderHistory : [];
 const locks = Array.isArray(state.protectionLocks) ? state.protectionLocks : [];
+const symbols = Array.isArray(kpis.symbols) ? kpis.symbols : [];
 
 const exec = (cmd) => {
   try {
@@ -51,6 +52,28 @@ const configRaw = (() => {
     return "{}";
   }
 })();
+
+const readJsonLinesTail = (path, limit = 2000) => {
+  try {
+    const raw = fs.readFileSync(path, "utf8");
+    const lines = raw
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const tail = lines.slice(Math.max(0, lines.length - limit));
+    const parsed = [];
+    for (const line of tail) {
+      try {
+        parsed.push(JSON.parse(line));
+      } catch {
+        // ignore malformed lines
+      }
+    }
+    return parsed;
+  } catch {
+    return [];
+  }
+};
 
 const configHash = crypto.createHash("sha256").update(configRaw).digest("hex").slice(0, 16);
 const commit = exec("git rev-parse --short HEAD");
@@ -112,14 +135,69 @@ const resumeConditions = hasCanonicalRiskState
   : ["Best-effort risk state until T-005 canonical guardrails"];
 
 const realized = safeNum(totals.realizedPnl, 0);
-const unrealized = 0;
 const fees = Math.max(0, safeNum(totals.feesHome, safeNum(totals.fees, 0)));
-const net = realized + unrealized - fees;
 const openExposureCost = safeNum(totals.openExposureCost, 0);
-const equity = Math.max(0, openExposureCost + Math.max(0, net));
-const totalAllocPct = equity > 0 ? Math.max(0, Math.min(100, (openExposureCost / equity) * 100)) : 0;
+const latestFillPriceBySymbol = new Map();
+for (const order of orderHistory) {
+  if (String(order?.status ?? "").toUpperCase() !== "FILLED") continue;
+  const symbol = String(order?.symbol ?? "").trim().toUpperCase();
+  const ts = Date.parse(String(order?.ts ?? ""));
+  const price = safeNum(order?.price, NaN);
+  if (!symbol || !Number.isFinite(ts) || !Number.isFinite(price) || price <= 0) continue;
+  const prev = latestFillPriceBySymbol.get(symbol);
+  if (!prev || ts > prev.ts) {
+    latestFillPriceBySymbol.set(symbol, { ts, price });
+  }
+}
 
-const symbols = Array.isArray(kpis.symbols) ? kpis.symbols : [];
+let openValueEstimate = 0;
+for (const symbolStats of symbols) {
+  const netQty = safeNum(symbolStats?.netQty, 0);
+  if (netQty <= 0) continue;
+  const symbol = String(symbolStats?.symbol ?? "").trim().toUpperCase();
+  const latest = latestFillPriceBySymbol.get(symbol);
+  const price = latest?.price ?? safeNum(symbolStats?.avgEntry, 0);
+  if (!Number.isFinite(price) || price <= 0) continue;
+  openValueEstimate += netQty * price;
+}
+const unrealized = openValueEstimate > 0 ? openValueEstimate - openExposureCost : 0;
+const net = realized + unrealized - fees;
+
+const adaptiveEvents = readJsonLinesTail("data/telemetry/adaptive-shadow.jsonl");
+const walletTotals = adaptiveEvents
+  .map((event) => safeNum(event?.risk?.walletTotalHome, NaN))
+  .filter((value) => Number.isFinite(value) && value > 0);
+const latestWalletTotalHome = walletTotals.length > 0 ? walletTotals[walletTotals.length - 1] : null;
+let walletMaxDrawdownPct = 0;
+if (walletTotals.length > 1) {
+  let peak = walletTotals[0];
+  for (const value of walletTotals) {
+    if (value > peak) peak = value;
+    if (peak <= 0) continue;
+    const drawdown = ((peak - value) / peak) * 100;
+    if (drawdown > walletMaxDrawdownPct) walletMaxDrawdownPct = drawdown;
+  }
+}
+
+let guardMaxDrawdownPct = 0;
+for (const decision of decisions) {
+  const details = decision?.details && typeof decision.details === "object" ? decision.details : null;
+  if (!details) continue;
+  const dailyRealized = safeNum(details.dailyRealizedPnl, NaN);
+  const peakDaily = safeNum(details.peakDailyRealizedPnl, NaN);
+  if (!Number.isFinite(dailyRealized) || !Number.isFinite(peakDaily) || peakDaily <= 0) continue;
+  const drawdown = ((peakDaily - dailyRealized) / peakDaily) * 100;
+  if (drawdown > guardMaxDrawdownPct) guardMaxDrawdownPct = drawdown;
+}
+
+const equity =
+  latestWalletTotalHome && latestWalletTotalHome > 0
+    ? latestWalletTotalHome
+    : Math.max(0, openExposureCost + Math.max(0, net));
+const totalAllocPct = equity > 0 ? Math.max(0, Math.min(100, (openExposureCost / equity) * 100)) : 0;
+const dailyNetPct = equity > 0 ? (net / equity) * 100 : 0;
+const maxDrawdownPct = Math.max(walletMaxDrawdownPct, guardMaxDrawdownPct);
+
 const bySymbolPct = symbols
   .filter((symbol) => safeNum(symbol?.openCost, 0) > 0)
   .map((symbol) => ({
@@ -211,8 +289,8 @@ const output = {
     fees_usdt: fees,
     net_usdt: net,
     daily_net_usdt: net,
-    daily_net_pct: 0,
-    max_drawdown_pct: 0
+    daily_net_pct: dailyNetPct,
+    max_drawdown_pct: maxDrawdownPct
   },
   exposure: {
     total_alloc_pct: totalAllocPct,
