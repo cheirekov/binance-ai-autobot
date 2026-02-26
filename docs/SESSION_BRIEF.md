@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-26 08:33 UTC
+Last updated: 2026-02-26 13:43 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -45,7 +45,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `2c6c675`
+- Commit hash: `14fa42f`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -66,23 +66,23 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `210.476`
-  - run end: `Thu Feb 26 2026 10:32:51 GMT+0200 (Eastern European Standard Time)`
+  - run duration (hours): `215.646`
+  - run end: `Thu Feb 26 2026 15:43:04 GMT+0200 (Eastern European Standard Time)`
   - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=5, historyLimitOrders=13, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=93.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=15, decisions=200, ratio=7.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=2, historyLimitOrders=5, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=97.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=1, decisions=200, ratio=0.5%)
 - Decision: `continue`
 - Next ticket candidate: `T-007` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260226-083253.tgz`
-  - auto-updated at: `2026-02-26T08:33:13.764Z`
+  - bundle: `autobot-feedback-20260226-134319.tgz`
+  - auto-updated at: `2026-02-26T13:43:37.744Z`
 
 ## 5) Copy/paste prompt for next session
 

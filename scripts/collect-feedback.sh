@@ -211,9 +211,10 @@ const durationHours =
     : null;
 const declaredFromEnv = typeof process.env.AUTOBOT_RUN_PHASE === "string" ? process.env.AUTOBOT_RUN_PHASE.trim() : "";
 const inferredCycle = (() => {
-  if (durationHours !== null && durationHours >= 6) return "NIGHT_RUN";
-  if (durationHours !== null && durationHours >= 2) return "DAY_RUN";
-  return "SHORT_REVIEW";
+  const window = classifyWindow(now.getHours());
+  if (window === "MORNING") return "MORNING_REVIEW";
+  if (window === "DAY") return "DAY_RUN";
+  return "NIGHT_RUN"; // EVENING/NIGHT
 })();
 const declaredCycle = declaredFromEnv.length > 0 ? declaredFromEnv : inferredCycle;
 
