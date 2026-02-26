@@ -5503,6 +5503,44 @@ export class BotEngineService implements OnModuleInit {
             })();
             const quoteSpendable = Math.max(0, quoteFree - reserveHardTarget);
 
+            if (botOrderAutoCancelEnabled && config) {
+              const ttlMs = Math.max(60_000, Math.round(config.advanced.botOrderStaleTtlMinutes * 60_000));
+              const staleAcrossSymbols = current.activeOrders
+                .filter((order) => order.status === "NEW")
+                .filter((order) => {
+                  const orderType = order.type.trim().toUpperCase();
+                  return orderType === "LIMIT" || orderType === "LIMIT_MAKER";
+                })
+                .filter((order) => this.isBotOwnedOrder(order, botPrefix))
+                .map((order) => {
+                  const ageMs = this.getOrderAgeMs(order);
+                  return { order, ageMs };
+                })
+                .filter((item) => typeof item.ageMs === "number" && item.ageMs > ttlMs)
+                .sort((a, b) => (b.ageMs ?? 0) - (a.ageMs ?? 0))
+                .map((item) => item.order);
+
+              if (staleAcrossSymbols.length > 0) {
+                const staleBySymbol = staleAcrossSymbols.reduce<Record<string, number>>((acc, order) => {
+                  acc[order.symbol] = (acc[order.symbol] ?? 0) + 1;
+                  return acc;
+                }, {});
+                current = await this.cancelBotOwnedOpenOrders({
+                  config,
+                  state: current,
+                  orders: staleAcrossSymbols,
+                  reason: "stale-grid-order ttl-sweep",
+                  details: {
+                    staleTtlMinutes: config.advanced.botOrderStaleTtlMinutes,
+                    staleCount: staleAcrossSymbols.length,
+                    staleBySymbol
+                  },
+                  maxCancels: Math.min(4, staleAcrossSymbols.length)
+                });
+                this.save(current);
+              }
+            }
+
             let symbolOpenLimitOrdersAll = current.activeOrders.filter((order) => {
               if (order.symbol !== candidateSymbol) return false;
               if (order.status !== "NEW") return false;

@@ -55,7 +55,9 @@ Use this file at the start and end of every batch.
     - Compose v2: `docker compose up -d --build --force-recreate`
     - Compose v1: `docker-compose up -d --build --force-recreate`
   - collect bundle:
-    - `./scripts/collect-feedback.sh` (override compose command via `AUTOBOT_COMPOSE_CMD=docker-compose` when needed)
+    - `AUTOBOT_RUN_PHASE=DAY_RUN ./scripts/collect-feedback.sh`
+    - or `AUTOBOT_RUN_PHASE=NIGHT_RUN ./scripts/collect-feedback.sh`
+    - (override compose command via `AUTOBOT_COMPOSE_CMD=docker-compose` when needed)
 
 ## 4) End-of-batch result (latest reference run)
 

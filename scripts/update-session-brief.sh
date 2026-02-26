@@ -30,11 +30,12 @@ tar -xzf "$BUNDLE" -C "$TMP_DIR"
 STATE_SUMMARY_PATH="$TMP_DIR/meta/state-summary.txt"
 STATE_PATH="$TMP_DIR/data/state.json"
 KPI_PATH="$TMP_DIR/data/telemetry/baseline-kpis.json"
+RUN_CONTEXT_PATH="$TMP_DIR/meta/run-context.json"
 
-node - "$SESSION_FILE" "$BUNDLE" "$STATE_SUMMARY_PATH" "$STATE_PATH" "$KPI_PATH" <<'NODE'
+node - "$SESSION_FILE" "$BUNDLE" "$STATE_SUMMARY_PATH" "$STATE_PATH" "$KPI_PATH" "$RUN_CONTEXT_PATH" <<'NODE'
 const fs = require("node:fs");
 
-const [sessionFile, bundlePath, stateSummaryPath, statePath, kpiPath] = process.argv.slice(2);
+const [sessionFile, bundlePath, stateSummaryPath, statePath, kpiPath, runContextPath] = process.argv.slice(2);
 
 const readJson = (filePath) => {
   try {
@@ -50,6 +51,7 @@ const readJson = (filePath) => {
 const stateSummary = readJson(stateSummaryPath) ?? {};
 const state = readJson(statePath) ?? {};
 const kpis = readJson(kpiPath) ?? {};
+const runContext = readJson(runContextPath) ?? {};
 const sessionRaw = fs.readFileSync(sessionFile, "utf8");
 
 const activeOrders = Array.isArray(state.activeOrders) ? state.activeOrders : [];
@@ -137,9 +139,19 @@ if (risks.length === 0) {
 const now = new Date();
 const nowIso = now.toISOString();
 const nowPretty = `${nowIso.slice(0, 16).replace("T", " ")} UTC`;
+const contextSummary =
+  runContext.collection_window_local || runContext.run_end_window_local
+    ? `${String(runContext.collection_window_local ?? "unknown")} (collection) / ${String(runContext.run_end_window_local ?? "unknown")} (run end)`
+    : "unknown";
 const block = [
   "## 4) End-of-batch result (fill after run)",
   "",
+  "- Run context:",
+  `  - window (local): \`${contextSummary}\``,
+  `  - timezone: \`${String(runContext.timezone_local ?? "unknown")}\``,
+  `  - run duration (hours): \`${runContext.run_duration_hours ?? "unknown"}\``,
+  `  - run end: \`${String(runContext.run_end_local ?? runContext.run_ended_at_utc ?? "unknown")}\``,
+  `  - declared cycle: \`${String(runContext.declared_cycle ?? "auto")}\``,
   "- Observed KPI delta:",
   `  - open LIMIT lifecycle observed: \`${limitLifecycleObserved ? "yes" : "no"}\` (openLimitOrders=${activeLimitOrders}, historyLimitOrders=${historyLimitOrders}, activeMarketOrders=${activeMarketOrders})`,
   `  - market-only share reduced: \`${marketOnlyReduced ? "yes" : "no"}\`${marketOrderShare === null ? "" : ` (historyMarketShare=${marketOrderShare.toFixed(1)}%)`}`,

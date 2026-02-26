@@ -76,6 +76,10 @@ Companion docs:
    - max one active runtime hypothesis per batch.
 29. Each patch must close with a short “what changed / why / expected KPI effect” note.
 30. If context resets, restore from `docs/SESSION_BRIEF.md` + latest `docs/PM_BA_CHANGELOG.md` before new coding.
+31. Every feedback bundle must include run-time context (`morning/day/evening/night`) so PM/BA can place results correctly in the daily cycle.
+    - Use `AUTOBOT_RUN_PHASE` when collecting logs (e.g. `MORNING_REVIEW`, `DAY_RUN`, `NIGHT_RUN`).
+32. Anti-overfit rule: no patch is considered “adaptive” if validated only against one recent market state.
+    - acceptance must reference at least one `RANGE`-leaning and one `TREND`-leaning bundle window before promotion.
 
 ## Delivery workflow (mandatory)
 
@@ -90,6 +94,9 @@ Companion docs:
 7. Add a structured entry in `docs/PM_BA_CHANGELOG.md`.
 8. Run `./scripts/pmba-gate.sh end`.
 9. Mark ticket `DONE` (or `BLOCKED` with reason and next action).
+10. For runtime bundles, set cycle label explicitly when known:
+   - `AUTOBOT_RUN_PHASE=DAY_RUN ./scripts/collect-feedback.sh`
+   - `AUTOBOT_RUN_PHASE=NIGHT_RUN ./scripts/collect-feedback.sh`
 
 ## Batch cadence (mandatory)
 

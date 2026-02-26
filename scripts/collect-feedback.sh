@@ -45,6 +45,19 @@ copy_if_exists() {
   fi
 }
 
+classify_window() {
+  local hour="$1"
+  if (( hour >= 5 && hour < 12 )); then
+    echo "MORNING"
+  elif (( hour >= 12 && hour < 18 )); then
+    echo "DAY"
+  elif (( hour >= 18 && hour < 22 )); then
+    echo "EVENING"
+  else
+    echo "NIGHT"
+  fi
+}
+
 # Generate compact last-run summary if generator exists.
 if [[ -x "scripts/generate-last-run-summary.sh" ]]; then
   ./scripts/generate-last-run-summary.sh >/dev/null 2>&1 || true
@@ -148,7 +161,16 @@ fi
 
 # Minimal environment/meta (safe to share)
 {
+  local_hour="$(date +%H)"
+  utc_hour="$(date -u +%H)"
+  local_window="$(classify_window $((10#$local_hour)))"
+  utc_window="$(classify_window $((10#$utc_hour)))"
   echo "date_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  echo "date_local=$(date +"%Y-%m-%dT%H:%M:%S%z")"
+  echo "timezone_local=$(date +%Z)"
+  echo "window_local=$local_window"
+  echo "window_utc=$utc_window"
+  echo "declared_cycle=${AUTOBOT_RUN_PHASE:-auto}"
   echo "git_sha=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
   echo "docker_compose_cmd=${COMPOSE[*]:-none}"
   if [[ "$COMPOSE_AVAILABLE" -eq 1 ]]; then
@@ -157,6 +179,64 @@ fi
     echo "docker_compose_version=unavailable"
   fi
 } >"$TMP_DIR/meta/info.txt"
+
+if command -v node >/dev/null 2>&1; then
+  node - "$TMP_DIR/data/telemetry/last_run_summary.json" "$TMP_DIR/meta/run-context.json" <<'NODE' || true
+const fs = require("node:fs");
+
+const [summaryPath, outPath] = process.argv.slice(2);
+
+const readJson = (path) => {
+  try {
+    return JSON.parse(fs.readFileSync(path, "utf8"));
+  } catch {
+    return null;
+  }
+};
+
+const classifyWindow = (hour) => {
+  if (hour >= 5 && hour < 12) return "MORNING";
+  if (hour >= 12 && hour < 18) return "DAY";
+  if (hour >= 18 && hour < 22) return "EVENING";
+  return "NIGHT";
+};
+
+const now = new Date();
+const summary = readJson(summaryPath);
+const startedAt = summary?.started_at_utc ? new Date(summary.started_at_utc) : null;
+const endedAt = summary?.ended_at_utc ? new Date(summary.ended_at_utc) : null;
+const durationHours =
+  startedAt && endedAt && Number.isFinite(startedAt.getTime()) && Number.isFinite(endedAt.getTime())
+    ? Math.max(0, (endedAt.getTime() - startedAt.getTime()) / 36e5)
+    : null;
+
+const output = {
+  collected_at_utc: now.toISOString(),
+  collected_at_local: now.toString(),
+  timezone_local: Intl.DateTimeFormat().resolvedOptions().timeZone ?? "unknown",
+  collection_window_local: classifyWindow(now.getHours()),
+  collection_window_utc: classifyWindow(now.getUTCHours()),
+  declared_cycle: process.env.AUTOBOT_RUN_PHASE ?? "auto",
+  run_started_at_utc: startedAt && Number.isFinite(startedAt.getTime()) ? startedAt.toISOString() : null,
+  run_ended_at_utc: endedAt && Number.isFinite(endedAt.getTime()) ? endedAt.toISOString() : null,
+  run_end_local: endedAt && Number.isFinite(endedAt.getTime()) ? endedAt.toString() : null,
+  run_duration_hours: durationHours === null ? null : Number(durationHours.toFixed(3)),
+  run_end_window_local:
+    endedAt && Number.isFinite(endedAt.getTime()) ? classifyWindow(endedAt.getHours()) : null,
+  run_end_window_utc:
+    endedAt && Number.isFinite(endedAt.getTime()) ? classifyWindow(endedAt.getUTCHours()) : null
+};
+
+fs.writeFileSync(outPath, JSON.stringify(output, null, 2));
+NODE
+else
+  {
+    echo "{"
+    echo "  \"declared_cycle\": \"${AUTOBOT_RUN_PHASE:-auto}\","
+    echo "  \"note\": \"run-context.json partial fallback (node unavailable)\""
+    echo "}"
+  } >"$TMP_DIR/meta/run-context.json"
+fi
 
 if [[ "$COMPOSE_AVAILABLE" -eq 1 ]]; then
   "${COMPOSE[@]}" ps >"$TMP_DIR/meta/docker-compose-ps.txt" 2>&1 || true
@@ -229,4 +309,4 @@ fi
 tar -czf "$OUT_FILE" -C "$TMP_DIR" .
 
 echo "Wrote $OUT_FILE"
-echo "Contains: state/universe/news/api.log + telemetry + redacted config + team docs snapshot (no raw config.json)."
+echo "Contains: state/universe/news/api.log + telemetry + redacted config + team docs snapshot + run-context metadata (no raw config.json)."
