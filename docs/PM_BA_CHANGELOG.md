@@ -16,6 +16,31 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-02-26 09:05 UTC — T-007 runtime stability hotfix: max-consecutive-entry loop mitigation
+- Scope: unblock morning/day runtime evidence by reducing repeated no-action loops on `Max consecutive entries reached` skips.
+- BA requirement mapping:
+  - Keep process professional and avoid repeating old/closed behaviors without triage.
+  - Preserve single active ticket (`T-007`) while handling `P1` runtime stall.
+- PM milestone mapping:
+  - Triggered by `pmba-gate.sh end` failure on repeated dominant loop reason between:
+    - `autobot-feedback-20260226-065205.tgz`
+    - `autobot-feedback-20260226-083253.tgz`
+- Technical changes:
+  - Added triage note: `docs/TRIAGE_NOTE_2026-02-26_T007_MAX_CONSECUTIVE_LOOP.md`.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - include `max consecutive entries reached` in skip-storm key classification.
+    - when entry guard reports max-consecutive reached, apply SYMBOL `COOLDOWN` lock with risk-linked cooldown (45m -> 15m by risk) and storm escalation support.
+    - include cooldown diagnostics in skip decision details.
+- Risk slider impact:
+  - explicit: low risk imposes longer cooldown after max-consecutive guard; high risk still shorter but non-zero cooldown.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` (pending in this patch batch).
+- Runtime test request:
+  - morning/day run: verify repeated `Max consecutive entries reached` no longer dominates top skip reason.
+  - confirm candidate rotation resumes and decisions/trades recover.
+- Follow-up:
+  - if loop persists, PM/BA to decide pivot to dedicated execution-lane ticket (`T-030/T-031`) with stricter candidate diversification.
+
 ## 2026-02-18 10:45 UTC — T-029 regime-aware stop-loss tightening for managed positions
 - Scope: reduce “profit turns into loss” drift by tightening stop-loss for managed positions when symbol regime is confidently bearish.
 - BA requirement mapping:

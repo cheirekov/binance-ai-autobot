@@ -875,6 +875,7 @@ export class BotEngineService implements OnModuleInit {
       key.includes("conversion cooldown") ||
       key.includes("binance sizing filter") ||
       key.includes("temporarily blacklisted") ||
+      key.includes("max consecutive entries reached") ||
       key.includes("waiting for ladder slot or inventory") ||
       key.includes("fee/edge filter") ||
       key.includes("max open positions reached") ||
@@ -3587,6 +3588,18 @@ export class BotEngineService implements OnModuleInit {
       const entryGuard = this.getEntryGuard({ symbol: candidateSymbol, state: current });
       if (entryGuard) {
         const summary = `Skip ${candidateSymbol}: ${entryGuard.summary}`;
+        const isMaxConsecutiveEntryGuard = entryGuard.summary.trim().toLowerCase().includes("max consecutive entries reached");
+        const baseCooldownMs = isMaxConsecutiveEntryGuard
+          ? Math.max(this.deriveNoActionSymbolCooldownMs(risk), Math.round((45 - (risk / 100) * 30) * 60_000)) // 45m -> 15m
+          : this.deriveNoActionSymbolCooldownMs(risk);
+        const cooldown = this.deriveInfeasibleSymbolCooldown({
+          state: current,
+          symbol: candidateSymbol,
+          risk,
+          baseCooldownMs,
+          summary
+        });
+        const cooldownMs = cooldown.cooldownMs;
         const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
         const next = {
           ...current,
@@ -3600,12 +3613,33 @@ export class BotEngineService implements OnModuleInit {
                   ts: new Date().toISOString(),
                   kind: "SKIP",
                   summary,
-                  details: entryGuard.details
+                  details: {
+                    ...(entryGuard.details ?? {}),
+                    ...(isMaxConsecutiveEntryGuard ? { cooldownMs } : {}),
+                    ...(cooldown.storm ? { storm: cooldown.storm } : {})
+                  }
                 },
                 ...current.decisions
               ].slice(0, 200)
         } satisfies BotState;
-        this.save(next);
+        const withCooldown = isMaxConsecutiveEntryGuard
+          ? this.upsertProtectionLock(next, {
+              type: "COOLDOWN",
+              scope: "SYMBOL",
+              symbol: candidateSymbol,
+              reason: cooldown.storm
+                ? `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`
+                : `Cooldown after max-consecutive-entry guard (${Math.round(cooldownMs / 1000)}s)`,
+              expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+              details: {
+                category: "ENTRY_GUARD_MAX_CONSECUTIVE",
+                cooldownMs,
+                ...(entryGuard.details ?? {}),
+                ...(cooldown.storm ? { storm: cooldown.storm } : {})
+              }
+            })
+          : next;
+        this.save(withCooldown);
         return;
       }
 

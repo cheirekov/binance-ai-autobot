@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-26 06:49 UTC
+Last updated: 2026-02-26 08:33 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -45,7 +45,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `320a7bf`
+- Commit hash: `2c6c675`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -68,21 +68,21 @@ Use this file at the start and end of every batch.
 - Run context:
   - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `15.858`
-  - run end: `Tue Feb 17 2026 05:31:59 GMT+0200 (Eastern European Standard Time)`
+  - run duration (hours): `210.476`
+  - run end: `Thu Feb 26 2026 10:32:51 GMT+0200 (Eastern European Standard Time)`
   - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=17, historyLimitOrders=191, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=4.5%)
-  - sizing reject pressure: `medium` (sizingRejectSkips=48, decisions=200, ratio=24.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=5, historyLimitOrders=13, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=93.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=15, decisions=200, ratio=7.5%)
 - Decision: `continue`
 - Next ticket candidate: `T-007` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - sizing reject pressure is medium (24.0%).
+  - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260226-064927.tgz`
-  - auto-updated at: `2026-02-26T06:49:35.172Z`
+  - bundle: `autobot-feedback-20260226-083253.tgz`
+  - auto-updated at: `2026-02-26T08:33:13.764Z`
 
 ## 5) Copy/paste prompt for next session
 
