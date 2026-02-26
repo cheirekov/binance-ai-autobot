@@ -170,7 +170,7 @@ fi
   echo "timezone_local=$(date +%Z)"
   echo "window_local=$local_window"
   echo "window_utc=$utc_window"
-  echo "declared_cycle=${AUTOBOT_RUN_PHASE:-auto}"
+  echo "declared_cycle=${AUTOBOT_RUN_PHASE:-auto-inferred-see-run-context}"
   echo "git_sha=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
   echo "docker_compose_cmd=${COMPOSE[*]:-none}"
   if [[ "$COMPOSE_AVAILABLE" -eq 1 ]]; then
@@ -209,6 +209,13 @@ const durationHours =
   startedAt && endedAt && Number.isFinite(startedAt.getTime()) && Number.isFinite(endedAt.getTime())
     ? Math.max(0, (endedAt.getTime() - startedAt.getTime()) / 36e5)
     : null;
+const declaredFromEnv = typeof process.env.AUTOBOT_RUN_PHASE === "string" ? process.env.AUTOBOT_RUN_PHASE.trim() : "";
+const inferredCycle = (() => {
+  if (durationHours !== null && durationHours >= 6) return "NIGHT_RUN";
+  if (durationHours !== null && durationHours >= 2) return "DAY_RUN";
+  return "SHORT_REVIEW";
+})();
+const declaredCycle = declaredFromEnv.length > 0 ? declaredFromEnv : inferredCycle;
 
 const output = {
   collected_at_utc: now.toISOString(),
@@ -216,7 +223,8 @@ const output = {
   timezone_local: Intl.DateTimeFormat().resolvedOptions().timeZone ?? "unknown",
   collection_window_local: classifyWindow(now.getHours()),
   collection_window_utc: classifyWindow(now.getUTCHours()),
-  declared_cycle: process.env.AUTOBOT_RUN_PHASE ?? "auto",
+  declared_cycle: declaredCycle,
+  declared_cycle_source: declaredFromEnv.length > 0 ? "manual" : "auto-inferred",
   run_started_at_utc: startedAt && Number.isFinite(startedAt.getTime()) ? startedAt.toISOString() : null,
   run_ended_at_utc: endedAt && Number.isFinite(endedAt.getTime()) ? endedAt.toISOString() : null,
   run_end_local: endedAt && Number.isFinite(endedAt.getTime()) ? endedAt.toString() : null,

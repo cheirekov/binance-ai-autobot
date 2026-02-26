@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-26 06:33 UTC
+Last updated: 2026-02-26 06:49 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -45,7 +45,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `<set-after-commit>`
+- Commit hash: `320a7bf`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -55,33 +55,34 @@ Use this file at the start and end of every batch.
     - Compose v2: `docker compose up -d --build --force-recreate`
     - Compose v1: `docker-compose up -d --build --force-recreate`
   - collect bundle:
-    - `AUTOBOT_RUN_PHASE=DAY_RUN ./scripts/collect-feedback.sh`
-    - or `AUTOBOT_RUN_PHASE=NIGHT_RUN ./scripts/collect-feedback.sh`
-    - (override compose command via `AUTOBOT_COMPOSE_CMD=docker-compose` when needed)
+    - `AUTOBOT_COMPOSE_CMD=docker-compose ./scripts/collect-feedback.sh`
+    - cycle label is auto-inferred (manual override optional via `AUTOBOT_RUN_PHASE=...`)
   - local ingest:
-    - `./scripts/ingest-feedback.sh autobot-feedback-YYYYMMDD-HHMMSS.tgz`
+    - preferred: `./scripts/pull-and-ingest-feedback.sh <remote-host> [remote-repo-dir]`
+    - fallback: `./scripts/ingest-feedback.sh autobot-feedback-YYYYMMDD-HHMMSS.tgz`
   - canonical procedure reference:
     - `docs/RUN_LOGGING_P0.md`
 
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `unknown`
-  - timezone: `unknown`
-  - run duration (hours): `unknown`
-  - run end: `unknown`
-  - declared cycle: `auto`
+  - window (local): `MORNING (collection) / MORNING (run end)`
+  - timezone: `Europe/Sofia`
+  - run duration (hours): `15.858`
+  - run end: `Tue Feb 17 2026 05:31:59 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `NIGHT_RUN`
+  - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=5, historyLimitOrders=13, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=93.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=16, decisions=200, ratio=8.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=17, historyLimitOrders=191, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=4.5%)
+  - sizing reject pressure: `medium` (sizingRejectSkips=48, decisions=200, ratio=24.0%)
 - Decision: `continue`
 - Next ticket candidate: `T-007` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - none critical from automated checks.
+  - sizing reject pressure is medium (24.0%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260226-060219.tgz`
-  - auto-updated at: `2026-02-26T06:33:33.102Z`
+  - bundle: `autobot-feedback-20260226-064927.tgz`
+  - auto-updated at: `2026-02-26T06:49:35.172Z`
 
 ## 5) Copy/paste prompt for next session
 

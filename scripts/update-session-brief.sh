@@ -34,6 +34,7 @@ RUN_CONTEXT_PATH="$TMP_DIR/meta/run-context.json"
 
 node - "$SESSION_FILE" "$BUNDLE" "$STATE_SUMMARY_PATH" "$STATE_PATH" "$KPI_PATH" "$RUN_CONTEXT_PATH" <<'NODE'
 const fs = require("node:fs");
+const { execSync } = require("node:child_process");
 
 const [sessionFile, bundlePath, stateSummaryPath, statePath, kpiPath, runContextPath] = process.argv.slice(2);
 
@@ -53,6 +54,13 @@ const state = readJson(statePath) ?? {};
 const kpis = readJson(kpiPath) ?? {};
 const runContext = readJson(runContextPath) ?? {};
 const sessionRaw = fs.readFileSync(sessionFile, "utf8");
+const safeExec = (cmd) => {
+  try {
+    return execSync(cmd, { stdio: ["ignore", "pipe", "ignore"] }).toString("utf8").trim();
+  } catch {
+    return "";
+  }
+};
 
 const activeOrders = Array.isArray(state.activeOrders) ? state.activeOrders : [];
 const historyOrders = Array.isArray(state.orderHistory) ? state.orderHistory : [];
@@ -152,6 +160,7 @@ const block = [
   `  - run duration (hours): \`${runContext.run_duration_hours ?? "unknown"}\``,
   `  - run end: \`${String(runContext.run_end_local ?? runContext.run_ended_at_utc ?? "unknown")}\``,
   `  - declared cycle: \`${String(runContext.declared_cycle ?? "auto")}\``,
+  `  - cycle source: \`${String(runContext.declared_cycle_source ?? "unknown")}\``,
   "- Observed KPI delta:",
   `  - open LIMIT lifecycle observed: \`${limitLifecycleObserved ? "yes" : "no"}\` (openLimitOrders=${activeLimitOrders}, historyLimitOrders=${historyLimitOrders}, activeMarketOrders=${activeMarketOrders})`,
   `  - market-only share reduced: \`${marketOnlyReduced ? "yes" : "no"}\`${marketOrderShare === null ? "" : ` (historyMarketShare=${marketOrderShare.toFixed(1)}%)`}`,
@@ -176,7 +185,12 @@ const withUpdatedAt = withSection.replace(
   /^Last updated:.*$/m,
   `Last updated: ${nowPretty}`
 );
-fs.writeFileSync(sessionFile, withUpdatedAt);
+const commitHash = safeExec("git rev-parse --short HEAD") || "unknown";
+const withCommit = withUpdatedAt.replace(
+  /^- Commit hash:.*$/m,
+  `- Commit hash: \`${commitHash}\``
+);
+fs.writeFileSync(sessionFile, withCommit);
 
 console.log(`Updated ${sessionFile} from ${bundlePath}`);
 console.log(`Decision=${decision}, nextTicket=${nextTicket}, sizingRejectPressure=${sizingRejectPressure}`);

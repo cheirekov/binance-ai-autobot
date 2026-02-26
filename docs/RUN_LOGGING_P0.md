@@ -3,30 +3,36 @@
 Use this exact process for every day/night cycle.  
 Do not improvise per session.
 
-## 1) On remote bot server (collect bundle)
+## 1) On remote bot server (collect bundle — fully automatic)
 
-Use `docker-compose` v1 and set cycle label explicitly:
+Just run:
 
-- Morning review:
-  - `AUTOBOT_COMPOSE_CMD=docker-compose AUTOBOT_RUN_PHASE=MORNING_REVIEW ./scripts/collect-feedback.sh`
-- Day run:
-  - `AUTOBOT_COMPOSE_CMD=docker-compose AUTOBOT_RUN_PHASE=DAY_RUN ./scripts/collect-feedback.sh`
-- Night run:
-  - `AUTOBOT_COMPOSE_CMD=docker-compose AUTOBOT_RUN_PHASE=NIGHT_RUN ./scripts/collect-feedback.sh`
+- `AUTOBOT_COMPOSE_CMD=docker-compose ./scripts/collect-feedback.sh`
+
+Notes:
+- No manual phase is required.
+- Script auto-infers run cycle (`SHORT_REVIEW` / `DAY_RUN` / `NIGHT_RUN`) from runtime duration.
+- If needed, you can still override with `AUTOBOT_RUN_PHASE=...`, but it is optional.
 
 Result: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
 
-## 2) Copy bundle to local machine
+## 2) On local machine (single command)
 
-- `scp user@remote:/path/to/autobot-feedback-YYYYMMDD-HHMMSS.tgz .`
+Preferred fully automatic pull + ingest:
 
-## 3) On local repo (ingest bundle)
+- `./scripts/pull-and-ingest-feedback.sh <remote-host> [remote-repo-dir]`
 
-Run one command:
+Example:
+- `./scripts/pull-and-ingest-feedback.sh i2 /root/work/binance-ai-autobot`
 
-- `./scripts/ingest-feedback.sh autobot-feedback-YYYYMMDD-HHMMSS.tgz`
+This command does:
+- finds latest bundle on remote,
+- copies it via `scp`,
+- runs local ingestion.
 
-This performs:
+## 3) Local ingestion details (automatic)
+
+`ingest-feedback` performs:
 - bundle sanity check (`run-context`, `last_run_summary`, `info.txt`),
 - `update-session-brief.sh`,
 - `pmba-gate.sh end`.
@@ -35,7 +41,7 @@ This performs:
 
 Post only:
 - bundle filename,
-- output of `./scripts/ingest-feedback.sh ...`.
+- output of `./scripts/pull-and-ingest-feedback.sh ...` (or `ingest-feedback` if you copied manually).
 
 No extra manual edits before Codex review.
 

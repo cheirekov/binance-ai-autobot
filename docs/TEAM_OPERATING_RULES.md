@@ -95,18 +95,18 @@ Companion docs:
 7. Add a structured entry in `docs/PM_BA_CHANGELOG.md`.
 8. Run `./scripts/pmba-gate.sh end`.
 9. Mark ticket `DONE` (or `BLOCKED` with reason and next action).
-10. For runtime bundles, set cycle label explicitly when known:
-   - `AUTOBOT_RUN_PHASE=DAY_RUN ./scripts/collect-feedback.sh`
-   - `AUTOBOT_RUN_PHASE=NIGHT_RUN ./scripts/collect-feedback.sh`
+10. Runtime bundles use auto cycle inference by default (`SHORT_REVIEW` / `DAY_RUN` / `NIGHT_RUN`).
+   - manual override is optional: `AUTOBOT_RUN_PHASE=<label> ./scripts/collect-feedback.sh`
 11. Bundle ingestion on local machine must use one command:
-   - `./scripts/ingest-feedback.sh <bundle.tgz>`
+   - preferred: `./scripts/pull-and-ingest-feedback.sh <remote-host> [remote-repo-dir]`
+   - fallback (already copied bundle): `./scripts/ingest-feedback.sh <bundle.tgz>`
 
 ## Batch cadence (mandatory)
 
 1. Start-of-batch brief (max 10 lines) in `docs/PM_BA_CHANGELOG.md`:
    - scope, hypothesis, target KPI delta, stop condition.
 2. End-of-batch result:
-   - run `./scripts/collect-feedback.sh` then `./scripts/update-session-brief.sh`,
+   - run `./scripts/pull-and-ingest-feedback.sh ...` (or `collect` + `ingest` fallback),
    - observed KPI delta,
    - decision (`continue`, `rollback`, `pivot`),
    - next batch owner.
