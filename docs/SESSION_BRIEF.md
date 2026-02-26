@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-25 14:50 UTC  
+Last updated: 2026-02-26 06:33 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -58,19 +58,30 @@ Use this file at the start and end of every batch.
     - `AUTOBOT_RUN_PHASE=DAY_RUN ./scripts/collect-feedback.sh`
     - or `AUTOBOT_RUN_PHASE=NIGHT_RUN ./scripts/collect-feedback.sh`
     - (override compose command via `AUTOBOT_COMPOSE_CMD=docker-compose` when needed)
+  - local ingest:
+    - `./scripts/ingest-feedback.sh autobot-feedback-YYYYMMDD-HHMMSS.tgz`
+  - canonical procedure reference:
+    - `docs/RUN_LOGGING_P0.md`
 
-## 4) End-of-batch result (latest reference run)
+## 4) End-of-batch result (fill after run)
 
-- Observed KPI delta (`autobot-feedback-20260225-130706.tgz`):
-  - fee telemetry is now populated in runtime summary:
-    - `pnl.fees_usdt=2.48637116`,
-    - `pnl.net_usdt=-82.09507722` (fee-adjusted).
-  - baseline KPIs include fee totals and per-symbol fee allocation (`totals.feesHome`, `symbols[].feesHome`).
-  - guardrail behavior remains stable (`risk_state=NORMAL` at end, no managed-symbol deadlock pattern).
-  - UI patch added PnL scope clarification + visible fees pill to align operator understanding with telemetry semantics.
+- Run context:
+  - window (local): `unknown`
+  - timezone: `unknown`
+  - run duration (hours): `unknown`
+  - run end: `unknown`
+  - declared cycle: `auto`
+- Observed KPI delta:
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=5, historyLimitOrders=13, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=93.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=16, decisions=200, ratio=8.0%)
 - Decision: `continue`
+- Next ticket candidate: `T-007` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - fee visibility still depends on exchange `fills` availability (legacy/externally imported orders may have partial fee coverage).
+  - none critical from automated checks.
+- Notes for next session:
+  - bundle: `autobot-feedback-20260226-060219.tgz`
+  - auto-updated at: `2026-02-26T06:33:33.102Z`
 
 ## 5) Copy/paste prompt for next session
 

@@ -8,6 +8,7 @@ Companion docs:
 - `docs/SESSION_BRIEF.md` (single-session handoff and execution contract)
 - `docs/TRIAGE_NOTE_TEMPLATE.md` (mandatory format for non-P0/P1 issue capture)
 - `docs/AI_DECISION_CONTRACT.md` (AI signal interface and hard safety constraints)
+- `docs/RUN_LOGGING_P0.md` (single allowed procedure for remote log collection and local ingestion)
 
 ## Team roles (mandatory)
 
@@ -97,6 +98,8 @@ Companion docs:
 10. For runtime bundles, set cycle label explicitly when known:
    - `AUTOBOT_RUN_PHASE=DAY_RUN ./scripts/collect-feedback.sh`
    - `AUTOBOT_RUN_PHASE=NIGHT_RUN ./scripts/collect-feedback.sh`
+11. Bundle ingestion on local machine must use one command:
+   - `./scripts/ingest-feedback.sh <bundle.tgz>`
 
 ## Batch cadence (mandatory)
 

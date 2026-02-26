@@ -165,7 +165,7 @@ const block = [
   `  - auto-updated at: \`${nowIso}\``
 ].join("\n");
 
-const sectionPattern = /## 4\) End-of-batch result \(fill after run\)[\s\S]*?(?=## 5\) Copy\/paste prompt for next session)/m;
+const sectionPattern = /## 4\) End-of-batch result \((?:fill after run|latest reference run)\)[\s\S]*?(?=## 5\) Copy\/paste prompt for next session)/m;
 if (!sectionPattern.test(sessionRaw)) {
   console.error("Could not find Section 4 in docs/SESSION_BRIEF.md");
   process.exit(1);

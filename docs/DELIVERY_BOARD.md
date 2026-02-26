@@ -43,6 +43,7 @@ Hard rule: until Gate A passes, AI remains shadow-only for execution changes.
   - feedback bundle (`scripts/collect-feedback.sh`)
   - runtime summary artifact in telemetry bundle (`data/telemetry/last_run_summary.json`)
 - End-of-batch gate now includes loop persistence check across the latest 2 bundles (`./scripts/pmba-gate.sh end`) to prevent repeating closed-ticket failure patterns without triage.
+- Runtime collection/ingestion procedure is fixed and centralized in `docs/RUN_LOGGING_P0.md` (remote collect + local ingest).
 
 AI message contract reference:
 - `docs/AI_DECISION_CONTRACT.md`
