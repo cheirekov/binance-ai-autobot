@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-26 17:41 UTC
+Last updated: 2026-02-27 09:03 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -47,7 +47,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `1a4e1e4`
+- Commit hash: `a7cefc1`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -68,23 +68,23 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `EVENING (collection) / EVENING (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `219.604`
-  - run end: `Thu Feb 26 2026 19:40:33 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `NIGHT_RUN`
+  - run duration (hours): `234.983`
+  - run end: `Fri Feb 27 2026 11:03:18 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=68, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=66.0%)
-  - sizing reject pressure: `low` (sizingRejectSkips=13, decisions=200, ratio=6.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=8, historyLimitOrders=124, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=38.0%)
+  - sizing reject pressure: `low` (sizingRejectSkips=16, decisions=200, ratio=8.0%)
 - Decision: `continue`
 - Next ticket candidate: `T-007` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - verify new summary math across a full night run and after restart (no drift/regression in reported totals).
+  - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260226-174034.tgz`
-  - auto-updated at: `2026-02-26T17:41:05.840Z`
+  - bundle: `autobot-feedback-20260227-090325.tgz`
+  - auto-updated at: `2026-02-27T09:03:40.651Z`
 
 ## 5) Copy/paste prompt for next session
 
