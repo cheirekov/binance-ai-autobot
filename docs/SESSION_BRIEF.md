@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-02-27 09:03 UTC
+Last updated: 2026-03-01 14:41 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -47,7 +47,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `a7cefc1`
+- Commit hash: `613616b`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -68,23 +68,25 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `234.983`
-  - run end: `Fri Feb 27 2026 11:03:18 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - run duration (hours): `288.391`
+  - run end: `Sun Mar 01 2026 16:27:47 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=8, historyLimitOrders=124, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=38.0%)
-  - sizing reject pressure: `low` (sizingRejectSkips=16, decisions=200, ratio=8.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=15, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=92.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
 - Decision: `continue`
 - Next ticket candidate: `T-007` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260227-090325.tgz`
-  - auto-updated at: `2026-02-27T09:03:40.651Z`
+  - bundle: `autobot-feedback-20260301-142801.tgz`
+  - patch pending deploy: normalize summary drawdown + align executed trade count in `last_run_summary`.
+  - verify next bundle keeps `max_drawdown_pct` realistic and `activity.trades.count` consistent with fills.
+  - auto-updated at: `2026-03-01T14:28:45.189Z`
 
 ## 5) Copy/paste prompt for next session
 

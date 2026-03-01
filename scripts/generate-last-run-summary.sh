@@ -180,14 +180,17 @@ if (walletTotals.length > 1) {
 }
 
 let guardMaxDrawdownPct = 0;
+const guardMinPeakPnlAbs = 5;
 for (const decision of decisions) {
   const details = decision?.details && typeof decision.details === "object" ? decision.details : null;
   if (!details) continue;
   const dailyRealized = safeNum(details.dailyRealizedPnl, NaN);
   const peakDaily = safeNum(details.peakDailyRealizedPnl, NaN);
-  if (!Number.isFinite(dailyRealized) || !Number.isFinite(peakDaily) || peakDaily <= 0) continue;
+  if (!Number.isFinite(dailyRealized) || !Number.isFinite(peakDaily) || peakDaily < guardMinPeakPnlAbs) continue;
   const drawdown = ((peakDaily - dailyRealized) / peakDaily) * 100;
-  if (drawdown > guardMaxDrawdownPct) guardMaxDrawdownPct = drawdown;
+  if (Number.isFinite(drawdown) && drawdown >= 0 && drawdown > guardMaxDrawdownPct) {
+    guardMaxDrawdownPct = drawdown;
+  }
 }
 
 const equity =
@@ -196,7 +199,8 @@ const equity =
     : Math.max(0, openExposureCost + Math.max(0, net));
 const totalAllocPct = equity > 0 ? Math.max(0, Math.min(100, (openExposureCost / equity) * 100)) : 0;
 const dailyNetPct = equity > 0 ? (net / equity) * 100 : 0;
-const maxDrawdownPct = Math.max(walletMaxDrawdownPct, guardMaxDrawdownPct);
+const maxDrawdownPctRaw = walletTotals.length > 1 ? walletMaxDrawdownPct : guardMaxDrawdownPct;
+const maxDrawdownPct = Math.max(0, Math.min(100, maxDrawdownPctRaw));
 
 const bySymbolPct = symbols
   .filter((symbol) => safeNum(symbol?.openCost, 0) > 0)
@@ -222,6 +226,9 @@ const walletPolicySnapshot = decisions.find((decision) => {
 const unmanagedExposurePct = safeNum(walletPolicySnapshot?.details?.unmanagedExposurePct, 0);
 
 const submittedOrders = activeOrders.length + orderHistory.length;
+const executedBuys = safeNum(totals.buys, 0);
+const executedSells = safeNum(totals.sells, 0);
+const executedTradeCount = Math.max(safeNum(totals.filledOrders, 0), executedBuys + executedSells);
 const filledOrders = safeNum(totals.filledOrders, 0);
 const rejectedOrders = orderHistory.filter((order) => String(order?.status ?? "").toUpperCase() === "REJECTED").length;
 const canceledOrders = orderHistory.filter((order) => String(order?.status ?? "").toUpperCase() === "CANCELED").length;
@@ -301,9 +308,9 @@ const output = {
   },
   activity: {
     trades: {
-      count: safeNum(totals.trades, 0),
-      buys: safeNum(totals.buys, 0),
-      sells: safeNum(totals.sells, 0)
+      count: executedTradeCount,
+      buys: executedBuys,
+      sells: executedSells
     },
     orders: {
       submitted: submittedOrders,

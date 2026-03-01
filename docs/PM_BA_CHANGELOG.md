@@ -16,6 +16,32 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-01 14:40 UTC — T-007 patch: drawdown normalization + executed trade count consistency
+- Scope: keep T-007 in reporting lane and remove misleading summary artifacts seen in long-running bundles.
+- BA requirement mapping:
+  - PnL/exposure summary must be interpretable by non-trader operators.
+  - Runtime summary fields should use consistent semantics across panels.
+- PM milestone mapping:
+  - follow-up after `autobot-feedback-20260301-142801.tgz` where:
+    - `activity.trades.count` represented decision trades (`20`) while buys+sells reflected executed fills (`192`),
+    - `pnl.max_drawdown_pct` was inflated (`148%`) by profit-giveback fallback math even with valid wallet telemetry.
+- Technical changes:
+  - `scripts/generate-last-run-summary.sh`:
+    - `activity.trades.count` now reflects executed trades (`max(filledOrders, buys+sells)`), not decision count.
+    - drawdown fallback from guard decisions now ignores tiny peak baselines (`< 5` home quote).
+    - `max_drawdown_pct` now prefers wallet-telemetry drawdown when available and is bounded to `[0, 100]`.
+- Risk slider impact:
+  - none (telemetry/reporting only; execution logic unchanged).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+  - local smoke: `./scripts/generate-last-run-summary.sh /tmp/last_run_summary.test.json` ✅
+- Runtime test request:
+  - run 1–3h and verify:
+    - `activity.trades.count === activity.trades.buys + activity.trades.sells` (or equals filled orders),
+    - `pnl.max_drawdown_pct` stays realistic and no longer spikes from tiny guard peak denominators.
+- Follow-up:
+  - if next two bundles remain stable, propose T-007 closeout with one restart-stability confirmation run.
+
 ## 2026-02-26 18:05 UTC — T-007 batch: summary math upgrade (equity/unrealized/drawdown)
 - Scope: improve `last_run_summary` PnL/exposure fidelity for night-run validation without changing trading behavior.
 - BA requirement mapping:
