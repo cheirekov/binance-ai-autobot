@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-01 14:41 UTC
+Last updated: 2026-03-02 06:59 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -47,7 +47,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `613616b`
+- Commit hash: `c6e1800`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -68,25 +68,23 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `DAY (collection) / DAY (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `288.391`
-  - run end: `Sun Mar 01 2026 16:27:47 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `DAY_RUN`
+  - run duration (hours): `304.896`
+  - run end: `Mon Mar 02 2026 08:58:03 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=15, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=92.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
-- Decision: `continue`
-- Next ticket candidate: `T-007` (continue active lane unless PM/BA reprioritizes)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=5, historyLimitOrders=153, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=24.6%)
+  - sizing reject pressure: `high` (sizingRejectSkips=57, decisions=200, ratio=28.5%)
+- Decision: `pivot`
+- Next ticket candidate: `PM/BA-TRIAGE` (triage required before lane change)
 - Open risks:
-  - none critical from automated checks.
+  - sizing reject pressure is high (28.5%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260301-142801.tgz`
-  - patch pending deploy: normalize summary drawdown + align executed trade count in `last_run_summary`.
-  - verify next bundle keeps `max_drawdown_pct` realistic and `activity.trades.count` consistent with fills.
-  - auto-updated at: `2026-03-01T14:28:45.189Z`
+  - bundle: `autobot-feedback-20260302-065830.tgz`
+  - auto-updated at: `2026-03-02T06:59:06.993Z`
 
 ## 5) Copy/paste prompt for next session
 

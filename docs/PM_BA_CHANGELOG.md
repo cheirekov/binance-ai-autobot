@@ -16,6 +16,27 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-02 07:20 UTC — PM/BA triage: high sizing-reject pressure during T-007 run
+- Scope: triage decision only (no strategy patch in T-007 lane).
+- BA requirement mapping:
+  - keep single active ticket discipline and avoid hidden scope creep.
+  - record non-T-007 runtime degradations with explicit ticket mapping.
+- PM milestone mapping:
+  - based on `autobot-feedback-20260302-065830.tgz`:
+    - `Decision=pivot`, `nextTicket=PM/BA-TRIAGE`,
+    - `sizingRejectSkips=57`, `sizingRejectSkipPct=47.8992%`.
+- Technical changes:
+  - added triage note:
+    - `docs/TRIAGE_NOTE_2026-03-02_T007_SIZING_REJECT_PRESSURE.md`.
+- Risk slider impact:
+  - none (triage/logging only).
+- Validation evidence:
+  - bundle telemetry review completed; no code/runtime command changes in this entry.
+- Runtime test request:
+  - perform one controlled restart short run to confirm T-007 restart stability before closeout.
+- Follow-up:
+  - queue `T-030` as the next active lane immediately after T-007 closeout.
+
 ## 2026-03-01 14:40 UTC — T-007 patch: drawdown normalization + executed trade count consistency
 - Scope: keep T-007 in reporting lane and remove misleading summary artifacts seen in long-running bundles.
 - BA requirement mapping:
