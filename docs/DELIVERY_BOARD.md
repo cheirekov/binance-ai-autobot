@@ -48,6 +48,7 @@ Hard rule: until Gate A passes, AI remains shadow-only for execution changes.
 AI message contract reference:
 - `docs/AI_DECISION_CONTRACT.md`
 - Schema reference: `docs/schemas/last_run_summary.schema.json`
+- Strategy source-of-truth: `docs/STRATEGY_COVERAGE.md`
 
 ---
 
@@ -104,29 +105,27 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-007 | IN_PROGRESS | PnL correctness + exposure reporting | No strategy rewrite, no AI promotion, no multi-quote expansion |
+| T-030 | IN_PROGRESS | Universe filter-chain v2 | No AI promotion, no PnL schema redesign, no multi-quote routing expansion |
 
 `T-005` status: moved to DONE after overnight evidence (`autobot-feedback-20260225-100508.tgz`) showed guard transitions/recovery without deadlock.
 `T-029` status: moved to DONE after overnight evidence (`autobot-feedback-20260219-103043.tgz`) showed unmanaged exposure controlled and no dominant no-feasible conversion loop.
+`T-007` status: moved to DONE after restart-stability evidence (`autobot-feedback-20260302-112527.tgz`) confirmed fee-aware summary fields, executed-trade count consistency, and bounded drawdown reporting.
 
 ### NEXT (Gate A blockers)
 
 | Priority | ID | Status | Title | Acceptance focus |
 |---|---|---|---|---|
-| 1 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source |
-| 2 | T-030 | TODO | Universe filter-chain v2 | staged rejection reasons and anti-churn visibility |
-| 3 | T-034 | TODO | Multi-quote execution policy v1 | adaptive quote routing without hardcoded quote lock |
+| 1 | T-034 | TODO | Multi-quote execution policy v1 | adaptive quote routing across stable and cross-quote pairs |
+| 2 | T-031 | TODO | Regime engine v2 | reduce repeated non-actionable candidate loops |
+| 3 | T-032 | TODO | Exit manager v2 | reduce profit giveback and improve downside exits |
+| 4 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source |
 
 ### LATER (after Gate A)
 
 | Priority | ID | Status | Title |
 |---|---|---|---|
-| 1 | T-034 | TODO | Multi-quote execution policy v1 (adaptive quotes) |
-| 2 | T-030 | TODO | Universe filter-chain v2 |
-| 3 | T-031 | TODO | Regime engine v2 |
-| 4 | T-032 | TODO | Exit manager v2 |
-| 5 | T-003 | BLOCKED | Adaptive exit policy follow-up |
-| 6 | T-028 | TODO | Compact advanced UX |
+| 1 | T-003 | BLOCKED | Adaptive exit policy follow-up |
+| 2 | T-028 | TODO | Compact advanced UX |
 
 ### Learning/AI lane (parallel prep, shadow-first)
 
@@ -145,11 +144,11 @@ Profit milestone rule:
 
 ### Completed baseline (already delivered)
 
-`T-000`, `T-001`, `T-002`, `T-004`, `T-005`, `T-006`, `T-008`, `T-009`, `T-010`, `T-011`, `T-012`, `T-013`, `T-014`, `T-015`, `T-016`, `T-017`, `T-019`, `T-021`, `T-022`, `T-024`, `T-027`, `T-029`, `T-033`
+`T-000`, `T-001`, `T-002`, `T-004`, `T-005`, `T-006`, `T-007`, `T-008`, `T-009`, `T-010`, `T-011`, `T-012`, `T-013`, `T-014`, `T-015`, `T-016`, `T-017`, `T-019`, `T-021`, `T-022`, `T-024`, `T-027`, `T-029`, `T-033`
 
 ### Open backlog
 
-`T-003`, `T-007`, `T-020`, `T-023`, `T-025`, `T-026`, `T-028`, `T-030`, `T-031`, `T-032`, `T-034`, `T-035`, `T-036`, `T-037`, `T-038`
+`T-003`, `T-020`, `T-023`, `T-025`, `T-026`, `T-028`, `T-030`, `T-031`, `T-032`, `T-034`, `T-035`, `T-036`, `T-037`, `T-038`
 
 ---
 

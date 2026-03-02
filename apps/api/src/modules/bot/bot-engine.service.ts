@@ -861,6 +861,23 @@ export class BotEngineService implements OnModuleInit {
     return count;
   }
 
+  private countRecentSkipCluster(params: {
+    state: BotState;
+    cluster: "FEE_EDGE" | "MIN_ORDER" | "INVENTORY_WAITING" | "OTHER";
+    windowMs: number;
+  }): number {
+    const nowMs = Date.now();
+    let count = 0;
+    for (const decision of params.state.decisions) {
+      if (decision.kind !== "SKIP") continue;
+      const ts = Date.parse(decision.ts);
+      if (Number.isFinite(ts) && nowMs - ts > params.windowMs) break;
+      if (this.classifySkipReasonCluster(decision.summary) !== params.cluster) continue;
+      count += 1;
+    }
+    return count;
+  }
+
   private getSkipStormKey(summary: string): string | null {
     const raw = summary.trim();
     if (!raw) return null;
@@ -3345,6 +3362,13 @@ export class BotEngineService implements OnModuleInit {
             managedExposurePct: selectionManagedExposurePct,
             minManagedExposurePct: cautionManagedSymbolOnlyMinExposurePct
           });
+          const recentMinOrderSkipsGlobal = this.countRecentSkipCluster({
+            state: current,
+            cluster: "MIN_ORDER",
+            windowMs: 20 * 60_000
+          });
+          const minOrderPressureThreshold = Math.max(8, Math.round(16 - boundedRisk * 0.08)); // risk 0 -> 16, risk 100 -> 8
+          const minOrderPressureActive = recentMinOrderSkipsGlobal >= minOrderPressureThreshold;
           let bestGridCandidate: { symbol: string; candidate: UniverseCandidate; score: number } | null = null;
           let firstEligibleGridCandidate: { symbol: string; candidate: UniverseCandidate } | null = null;
 
@@ -3486,6 +3510,10 @@ export class BotEngineService implements OnModuleInit {
                 continue;
               }
 
+              if (minOrderPressureActive && recentGridBuySizingRejects > 0 && !hasInventory && !hasBuyLimit && !hasSellLimit) {
+                continue;
+              }
+
               const missingBuyLeg =
                 !hasBuyLimit && !buyPaused && !suppressBuyLegFromRejectStorm && !hasEntryGuard && (!openPositionCapReached || hasInventory);
               const missingSellLeg = !hasSellLimit && hasInventory && sellLegLikelyFeasible && !suppressSellLegFromRejectStorm;
@@ -3509,6 +3537,8 @@ export class BotEngineService implements OnModuleInit {
                 0.55,
                 recentGridBuySizingRejects * 0.06 + recentGridSellSizingRejects * 0.08 + recentFeeEdgeRejects * 0.04
               );
+              const minOrderPressurePenalty =
+                minOrderPressureActive && recentGridBuySizingRejects > 0 && !hasInventory ? 0.18 : 0;
               const infeasibleSellPenalty = !sellLegLikelyFeasible && hasInventory ? 0.35 : 0;
 
               const actionability = canTakeAction ? 1 : waiting ? 0.05 : 0.3;
@@ -3522,6 +3552,7 @@ export class BotEngineService implements OnModuleInit {
                 bearTrendGridPenalty -
                 openLimitPenalty -
                 rejectPenalty -
+                minOrderPressurePenalty -
                 infeasibleSellPenalty;
 
               if (!bestGridCandidate || score > bestGridCandidate.score) {

@@ -289,6 +289,62 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.classifySkipReasonCluster("Skip SUIUSDC: Grid waiting for ladder slot or inventory")).toBe("INVENTORY_WAITING");
   });
 
+  it("counts recent skip clusters inside the requested window", () => {
+    const helpers = service as unknown as {
+      countRecentSkipCluster: (params: {
+        state: BotState;
+        cluster: "FEE_EDGE" | "MIN_ORDER" | "INVENTORY_WAITING" | "OTHER";
+        windowMs: number;
+      }) => number;
+    };
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "skip-1",
+          ts: new Date(now - 5_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip ETHUSDC: Grid buy sizing rejected (Below minNotional 5.00000000)"
+        },
+        {
+          id: "skip-2",
+          ts: new Date(now - 20_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip SOLUSDC: Grid sell sizing rejected (Below minQty 0.00100000)"
+        },
+        {
+          id: "skip-3",
+          ts: new Date(now - 40_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip DOGEUSDC: Grid waiting for ladder slot or inventory"
+        },
+        {
+          id: "skip-4",
+          ts: new Date(now - 80_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip BNBUSDC: Fee/edge filter (net 0.01% < 0.05%)"
+        }
+      ]
+    };
+
+    expect(
+      helpers.countRecentSkipCluster({
+        state,
+        cluster: "MIN_ORDER",
+        windowMs: 60_000
+      })
+    ).toBe(2);
+    expect(
+      helpers.countRecentSkipCluster({
+        state,
+        cluster: "FEE_EDGE",
+        windowMs: 60_000
+      })
+    ).toBe(0);
+  });
+
   it("activates reason-level quarantine after repeated fee-edge skips", () => {
     const helpers = service as unknown as {
       maybeApplyReasonQuarantineLock: (params: { state: BotState; summary: string; risk: number }) => BotState;

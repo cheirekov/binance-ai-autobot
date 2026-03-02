@@ -16,6 +16,68 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-02 12:05 UTC — PM/BA priority decision: cross-quote strategy moved up after T-030
+- Scope:
+  - lock sequencing decision so strategy priorities survive context compression.
+- BA requirement mapping:
+  - user requirement: adaptive/autonomous strategy behavior not limited to one quote asset.
+  - explicit need to support cross-quote opportunities (e.g. `BTCXRP`) under controlled risk.
+- PM milestone mapping:
+  - after T-007 closeout and T-030 kickoff, next strategy priority is moved to `T-034`.
+- Technical changes:
+  - `docs/DELIVERY_BOARD.md`:
+    - `NEXT` priorities reordered to: `T-034` -> `T-031` -> `T-032` -> `T-020`.
+    - removed duplicate/obsolete entries from `LATER`.
+  - `docs/STRATEGY_COVERAGE.md`:
+    - strategy ownership map reordered with `T-034` first in next core lane,
+    - added explicit market-condition handling rule (implement market-agnostic adaptive logic; validate across multiple run windows).
+- Risk slider impact:
+  - none (planning/process update only).
+- Validation evidence:
+  - documentation consistency review completed; implementation validation will happen in the next strategy patch batches.
+- Runtime test request:
+  - continue active `T-030` run without state reset; evaluate reject-pressure delta first.
+- Follow-up:
+  - after current `T-030` evidence, begin `T-034` implementation slice 1 (controlled cross-quote candidate routing).
+
+## 2026-03-02 11:50 UTC — T-007 closeout + T-030 kickoff (min-order pressure filter slice)
+- Scope:
+  - close `T-007` after restart-stability evidence,
+  - start `T-030` with a minimal actionability filter to reduce repeated min-order sizing reject loops.
+- BA requirement mapping:
+  - Keep single active ticket rule and formally close prior lane before strategy filtering lane.
+  - Address persistent non-actionable candidate churn reported in latest bundles.
+- PM milestone mapping:
+  - `T-007` closeout evidence from `autobot-feedback-20260302-112527.tgz`:
+    - fee-aware summary present (`fees_usdt=4.35724998`),
+    - trade count semantics fixed (`activity.trades.count=89` with `buys=40`, `sells=49`),
+    - bounded drawdown reporting (`max_drawdown_pct=3.5559`).
+  - `T-030` trigger evidence from same bundle:
+    - `sizingRejectSkips=76`,
+    - `sizingRejectSkipPct=54.6763%`.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added `countRecentSkipCluster(...)` helper for windowed skip-cluster pressure detection,
+    - introduced global min-order pressure mode in SPOT_GRID candidate selection,
+    - under min-order pressure, suppresses fresh buy-only symbols that already have recent buy sizing rejects,
+    - added extra scoring penalty for such candidates to improve rotation toward actionable symbols.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added unit test for recent skip-cluster counting window behavior.
+  - docs/process:
+    - `docs/TRIAGE_NOTE_2026-03-02_T007_SIZING_REJECT_PRESSURE.md`,
+    - moved board active lane to `T-030`,
+    - added strategy catalog and ownership map: `docs/STRATEGY_COVERAGE.md`.
+- Risk slider impact:
+  - yes (risk still controls aggressiveness; filter only throttles repeated non-actionable picks, not core risk caps).
+- Validation evidence:
+  - pending CI run in this patch batch.
+- Runtime test request:
+  - short 1–3h run on current state:
+    - verify reduction in repeated `Grid buy/sell sizing rejected` top reasons,
+    - verify no regression in LIMIT lifecycle and guard behavior.
+- Follow-up:
+  - if pressure drops and trade cadence stays healthy, continue `T-030` with staged rejection explainability slice next.
+
 ## 2026-03-02 07:20 UTC — PM/BA triage: high sizing-reject pressure during T-007 run
 - Scope: triage decision only (no strategy patch in T-007 lane).
 - BA requirement mapping:
