@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-02 11:47 UTC
+Last updated: 2026-03-02 20:07 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -44,7 +44,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `bec65e1`
+- Commit hash: `e040825`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -65,23 +65,25 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `DAY (collection) / DAY (run end)`
+  - window (local): `EVENING (collection) / EVENING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `309.352`
-  - run end: `Mon Mar 02 2026 13:25:24 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `DAY_RUN`
+  - run duration (hours): `317.478`
+  - run end: `Mon Mar 02 2026 21:32:58 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=9, historyLimitOrders=162, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=19.4%)
-  - sizing reject pressure: `high` (sizingRejectSkips=76, decisions=200, ratio=38.0%)
-- Decision: `pivot`
-- Next ticket candidate: `T-030` (start filter-chain lane)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=100, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=50.0%)
+  - sizing reject pressure: `medium` (sizingRejectSkips=43, decisions=200, ratio=21.5%)
+- Decision: `continue`
+- Next ticket candidate: `T-030` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - sizing reject pressure is high (38.0%).
+  - sizing reject pressure is medium (21.5%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260302-112527.tgz`
-  - auto-updated at: `2026-03-02T11:34:35.343Z`
+  - bundle: `autobot-feedback-20260302-193305.tgz`
+  - triage note added: `docs/TRIAGE_NOTE_2026-03-02_T030_INVENTORY_WAIT_LOOP.md`
+  - patch pending deploy: actionable-candidate priority + inventory-wait pressure penalty in T-030 lane.
+  - auto-updated at: `2026-03-02T19:33:32.333Z`
 
 ## 5) Copy/paste prompt for next session
 

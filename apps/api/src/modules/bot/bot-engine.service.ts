@@ -3369,8 +3369,15 @@ export class BotEngineService implements OnModuleInit {
           });
           const minOrderPressureThreshold = Math.max(8, Math.round(16 - boundedRisk * 0.08)); // risk 0 -> 16, risk 100 -> 8
           const minOrderPressureActive = recentMinOrderSkipsGlobal >= minOrderPressureThreshold;
+          const recentInventoryWaitingSkipsGlobal = this.countRecentSkipCluster({
+            state: current,
+            cluster: "INVENTORY_WAITING",
+            windowMs: 20 * 60_000
+          });
+          const inventoryWaitingPressureThreshold = Math.max(6, Math.round(14 - boundedRisk * 0.08)); // risk 0 -> 14, risk 100 -> 6
+          const inventoryWaitingPressureActive = recentInventoryWaitingSkipsGlobal >= inventoryWaitingPressureThreshold;
           let bestGridCandidate: { symbol: string; candidate: UniverseCandidate; score: number } | null = null;
-          let firstEligibleGridCandidate: { symbol: string; candidate: UniverseCandidate } | null = null;
+          let bestActionableGridCandidate: { symbol: string; candidate: UniverseCandidate; score: number } | null = null;
 
           const seenSymbols = new Set<string>();
           for (const rawCandidate of snap.candidates ?? []) {
@@ -3455,6 +3462,12 @@ export class BotEngineService implements OnModuleInit {
                 contains: "grid sell sizing rejected",
                 windowMs: 15 * 60_000
               });
+              const recentInventoryWaitingSkips = this.countRecentSymbolSkipMatches({
+                state: current,
+                symbol,
+                contains: "grid waiting for ladder slot or inventory",
+                windowMs: 20 * 60_000
+              });
               const recentFeeEdgeRejects = this.countRecentSymbolSkipMatches({
                 state: current,
                 symbol,
@@ -3523,10 +3536,6 @@ export class BotEngineService implements OnModuleInit {
                 continue;
               }
 
-              if (canTakeAction && !firstEligibleGridCandidate) {
-                firstEligibleGridCandidate = { symbol, candidate };
-              }
-
               const waiting = hasBuyLimit && hasSellLimit;
               const waitingPenalty = waiting ? 0.3 : 0;
               const guardNoInventoryPenalty = buyPaused && !hasInventory ? 0.45 : 0;
@@ -3539,9 +3548,13 @@ export class BotEngineService implements OnModuleInit {
               );
               const minOrderPressurePenalty =
                 minOrderPressureActive && recentGridBuySizingRejects > 0 && !hasInventory ? 0.18 : 0;
+              const inventoryWaitingPenalty = Math.min(
+                0.45,
+                recentInventoryWaitingSkips * 0.07 + (inventoryWaitingPressureActive && waiting ? 0.18 : 0)
+              );
               const infeasibleSellPenalty = !sellLegLikelyFeasible && hasInventory ? 0.35 : 0;
 
-              const actionability = canTakeAction ? 1 : waiting ? 0.05 : 0.3;
+              const actionability = canTakeAction ? 1 : waiting ? (inventoryWaitingPressureActive ? 0.01 : 0.05) : 0.3;
               const recommendedBonus = scores.recommended === "GRID" ? 0.15 : scores.recommended === "MEAN_REVERSION" ? 0.05 : 0;
               const score =
                 scores.grid * 1.2 +
@@ -3553,8 +3566,12 @@ export class BotEngineService implements OnModuleInit {
                 openLimitPenalty -
                 rejectPenalty -
                 minOrderPressurePenalty -
+                inventoryWaitingPenalty -
                 infeasibleSellPenalty;
 
+              if (canTakeAction && (!bestActionableGridCandidate || score > bestActionableGridCandidate.score)) {
+                bestActionableGridCandidate = { symbol, candidate, score };
+              }
               if (!bestGridCandidate || score > bestGridCandidate.score) {
                 bestGridCandidate = { symbol, candidate, score };
               }
@@ -3565,11 +3582,11 @@ export class BotEngineService implements OnModuleInit {
           }
 
           if (tradeMode === "SPOT_GRID") {
+            if (bestActionableGridCandidate) {
+              return { symbol: bestActionableGridCandidate.symbol, candidate: bestActionableGridCandidate.candidate };
+            }
             if (bestGridCandidate) {
               return { symbol: bestGridCandidate.symbol, candidate: bestGridCandidate.candidate };
-            }
-            if (firstEligibleGridCandidate) {
-              return firstEligibleGridCandidate;
             }
             if (restrictToManagedSymbolsInCaution) {
               return { symbol: null, candidate: null, reason: "Daily loss caution: no eligible managed symbols" };

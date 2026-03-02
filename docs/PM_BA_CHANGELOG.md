@@ -16,6 +16,36 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-02 20:05 UTC — T-030 mitigation: inventory-wait loop suppression
+- Scope:
+  - address dominant repeated loop reason flagged by PM/BA gate:
+    - `Skip DOGEUSDC: Grid waiting for ladder slot or inventory`.
+- BA requirement mapping:
+  - keep strategy behavior adaptive and reduce non-actionable re-selection loops without hardcoding symbols.
+- PM milestone mapping:
+  - immediate mitigation for gate failure after `autobot-feedback-20260302-193305.tgz`.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added global `INVENTORY_WAITING` pressure detection in candidate selection window.
+    - added per-symbol inventory-wait repeat counting (`countRecentSymbolSkipMatches(... "grid waiting for ladder slot or inventory" ...)`).
+    - added inventory-wait pressure penalty in grid candidate score.
+    - changed SPOT_GRID pick order to prefer actionable candidates (`canTakeAction`) before passive waiting candidates.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added unit test for per-symbol inventory-wait skip matching window.
+  - triage:
+    - `docs/TRIAGE_NOTE_2026-03-02_T030_INVENTORY_WAIT_LOOP.md`.
+- Risk slider impact:
+  - yes (high risk remains aggressive, but repeated waiting symbols are deprioritized sooner under pressure).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+  - `./scripts/pmba-gate.sh end` remains blocked by the same pre-patch bundle pair (`autobot-feedback-20260302-112527.tgz` -> `autobot-feedback-20260302-193305.tgz`) and is expected to clear on next post-patch bundle.
+- Runtime test request:
+  - pre-night short run:
+    - verify reduced dominance of `Grid waiting for ladder slot or inventory`,
+    - verify trading continues (no new global no-action deadlock).
+- Follow-up:
+  - if inventory-wait remains dominant in next 2 bundles, escalate to `T-031` regime-side actionability gating.
+
 ## 2026-03-02 12:05 UTC — PM/BA priority decision: cross-quote strategy moved up after T-030
 - Scope:
   - lock sequencing decision so strategy priorities survive context compression.

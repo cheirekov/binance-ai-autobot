@@ -345,6 +345,57 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(0);
   });
 
+  it("counts recent per-symbol skip matches for inventory waiting loops", () => {
+    const helpers = service as unknown as {
+      countRecentSymbolSkipMatches: (params: {
+        state: BotState;
+        symbol: string;
+        contains: string;
+        windowMs: number;
+      }) => number;
+    };
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "s1",
+          ts: new Date(now - 5_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip DOGEUSDC: Grid waiting for ladder slot or inventory"
+        },
+        {
+          id: "s2",
+          ts: new Date(now - 20_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip DOGEUSDC: Grid waiting for ladder slot or inventory"
+        },
+        {
+          id: "s3",
+          ts: new Date(now - 70_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip DOGEUSDC: Grid waiting for ladder slot or inventory"
+        },
+        {
+          id: "s4",
+          ts: new Date(now - 15_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip ETHUSDC: Grid waiting for ladder slot or inventory"
+        }
+      ]
+    };
+
+    expect(
+      helpers.countRecentSymbolSkipMatches({
+        state,
+        symbol: "DOGEUSDC",
+        contains: "grid waiting for ladder slot or inventory",
+        windowMs: 60_000
+      })
+    ).toBe(2);
+  });
+
   it("activates reason-level quarantine after repeated fee-edge skips", () => {
     const helpers = service as unknown as {
       maybeApplyReasonQuarantineLock: (params: { state: BotState; summary: string; risk: number }) => BotState;
