@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-04 10:15 UTC
+Last updated: 2026-03-04 17:13 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -45,7 +45,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `e39860f`
+- Commit hash: `6c54cb5`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -66,24 +66,24 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `EVENING (collection) / EVENING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `355.292`
-  - run end: `Wed Mar 04 2026 11:21:50 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - run duration (hours): `363.15`
+  - run end: `Wed Mar 04 2026 19:13:18 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=5, historyLimitOrders=90, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=55.0%)
-  - sizing reject pressure: `medium` (sizingRejectSkips=22, decisions=200, ratio=11.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=23, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=88.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=2, decisions=200, ratio=1.0%)
 - Decision: `continue`
 - Next ticket candidate: `T-034` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - sizing reject pressure is medium (11.0%).
+  - conversion-heavy flow remains high (80.6% of trades).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260304-092221.tgz`
-  - auto-updated at: `2026-03-04T09:22:36.627Z`
-  - code patch applied for `T-034` slice (risk-bound execution quote widening + quote-aware unwind/recovery paths); awaiting next runtime bundle evidence.
+  - bundle: `autobot-feedback-20260304-171336.tgz`
+  - auto-updated at: `2026-03-04T17:13:48.461Z`
+  - pending deploy patch: `T-034` quote-liquidity feasibility gate for non-home execution quotes (target: reduce `Insufficient spendable BTC/ETH for grid BUY` loops).
 
 ## 5) Copy/paste prompt for next session
 

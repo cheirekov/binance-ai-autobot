@@ -1815,6 +1815,7 @@ export class BotEngineService implements OnModuleInit {
     preferredCandidate: UniverseCandidate | null;
     snapshotCandidates: UniverseCandidate[];
     state: BotState;
+    homeStable: string;
     allowedExecutionQuotes: Set<string>;
     traderRegion: string;
     neverTradeSymbols: string[];
@@ -1823,6 +1824,7 @@ export class BotEngineService implements OnModuleInit {
     balances: BinanceBalanceSnapshot[];
     walletTotalHome: number;
     maxPositionPct: number;
+    minQuoteLiquidityHome: number;
     notionalCap: number;
     capitalNotionalCapMultiplier: number;
     bufferFactor: number;
@@ -1848,6 +1850,7 @@ export class BotEngineService implements OnModuleInit {
       preferredCandidate,
       snapshotCandidates,
       state,
+      homeStable,
       allowedExecutionQuotes,
       traderRegion,
       neverTradeSymbols,
@@ -1856,6 +1859,7 @@ export class BotEngineService implements OnModuleInit {
       balances,
       walletTotalHome,
       maxPositionPct,
+      minQuoteLiquidityHome,
       notionalCap,
       capitalNotionalCapMultiplier,
       bufferFactor
@@ -1872,6 +1876,8 @@ export class BotEngineService implements OnModuleInit {
       Number.isFinite(notionalCap) && notionalCap > 0 ? Math.max(1, notionalCap * capitalNotionalCapMultiplier) : null;
     const capForSizing = effectiveNotionalCap ? effectiveNotionalCap / bufferFactor : null;
     const rawTargetNotional = walletTotalHome * (maxPositionPct / 100);
+    const normalizedHomeStable = homeStable.trim().toUpperCase();
+    const quoteBridgeAssets = resolveRouteBridgeAssets(this.configService.load(), normalizedHomeStable);
     let sizingRejected = 0;
     const rejectionSamples: Array<{
       symbol: string;
@@ -1931,6 +1937,28 @@ export class BotEngineService implements OnModuleInit {
 
         const baseAsset = rules.baseAsset.trim().toUpperCase();
         const baseTotal = balances.find((b) => b.asset.trim().toUpperCase() === baseAsset)?.total ?? 0;
+        const hasInventory =
+          Number.isFinite(baseTotal) &&
+          baseTotal > Number.EPSILON;
+        if (!hasInventory && quoteAsset !== normalizedHomeStable) {
+          const quoteHomeValue = await this.estimateAssetValueInHome(
+            quoteAsset,
+            quoteFree,
+            normalizedHomeStable,
+            quoteBridgeAssets
+          );
+          const quoteLiquidityHome = Number.isFinite(quoteHomeValue ?? Number.NaN) ? quoteHomeValue ?? 0 : 0;
+          if (!Number.isFinite(quoteLiquidityHome) || quoteLiquidityHome < minQuoteLiquidityHome) {
+            sizingRejected += 1;
+            recordRejection({
+              symbol,
+              stage: "quote-liquidity",
+              reason: `Quote liquidity ${quoteLiquidityHome.toFixed(4)} ${normalizedHomeStable} < ${minQuoteLiquidityHome.toFixed(4)} ${normalizedHomeStable}`,
+              price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined
+            });
+            continue;
+          }
+        }
         const currentNotional = Number.isFinite(baseTotal) && baseTotal > 0 ? baseTotal * price : 0;
         const remainingSymbolNotional = Math.max(0, maxSymbolNotional - currentNotional);
         if (remainingSymbolNotional <= 0) continue;
@@ -4299,10 +4327,16 @@ export class BotEngineService implements OnModuleInit {
           const notionalCap = config?.advanced.liveTradeNotionalCap ?? 25;
           const slippageBuffer = config?.advanced.liveTradeSlippageBuffer ?? 1.005;
           const bufferFactor = Number.isFinite(slippageBuffer) && slippageBuffer > 0 ? slippageBuffer : 1;
+          const minQuoteLiquidityHome = Math.max(
+            1,
+            (config?.advanced.conversionTopUpMinTarget ?? 5) *
+              (risk >= 80 ? 0.6 : risk >= 50 ? 0.8 : 1)
+          );
           const feasibleCandidateSelection = await this.pickFeasibleLiveCandidate({
             preferredCandidate: selectedCandidate,
             snapshotCandidates: universeSnapshot?.candidates ?? [],
             state: current,
+            homeStable,
             allowedExecutionQuotes,
             traderRegion,
             neverTradeSymbols: config?.advanced.neverTradeSymbols ?? [],
@@ -4311,6 +4345,7 @@ export class BotEngineService implements OnModuleInit {
             balances,
             walletTotalHome,
             maxPositionPct,
+            minQuoteLiquidityHome,
             notionalCap,
             capitalNotionalCapMultiplier: capitalProfile.notionalCapMultiplier,
             bufferFactor

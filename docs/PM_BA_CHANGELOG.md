@@ -16,6 +16,32 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-04 17:35 UTC — T-034 slice: quote-liquidity feasibility gate for cross-quote routing
+- Scope:
+  - use the latest long day bundle (`autobot-feedback-20260304-171336.tgz`) to tighten multi-quote feasibility and reduce non-actionable quote-starved loops.
+- BA requirement mapping:
+  - keep adaptation beyond home quote, but reject candidates that cannot realistically place buy legs due to underfunded quote inventory.
+- PM milestone mapping:
+  - active ticket remains `T-034` with PM/BA gate PASS; patch is for the next night run validation.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - `pickFeasibleLiveCandidate(...)` now accepts `homeStable` + `minQuoteLiquidityHome` and rejects underfunded non-home quote candidates via a new rejection stage `quote-liquidity`.
+    - quote-liquidity uses home-normalized valuation (`estimateAssetValueInHome`) and bridge assets to avoid hardcoded pair assumptions.
+    - tick now computes risk-linked `minQuoteLiquidityHome` and passes it into feasibility selection.
+    - daily-loss managed exposure remains quote-family aware by passing `allowedExecutionQuotes` into `evaluateDailyLossGuard(...)`.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - updated feasible-candidate test fixture to include required quote balance and new method params.
+- Risk slider impact:
+  - threshold is risk-linked: high risk allows lower quote-liquidity floor, low risk keeps stricter floor.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - deploy and run overnight without state reset; confirm reduced repeats of
+    - `Insufficient spendable BTC/ETH for grid BUY`
+    while keeping sizingRejectPressure in low/medium.
+- Follow-up:
+  - if quote-liquidity loops persist, add explicit per-quote exposure budget and quote-family skip histogram as `T-034` slice 3.
+
 ## 2026-03-04 10:15 UTC — T-034 slice: risk-bound multi-quote execution wiring
 - Scope:
   - implement controlled quote-family widening for live execution and propagate quote-aware handling through unwind/recovery paths.

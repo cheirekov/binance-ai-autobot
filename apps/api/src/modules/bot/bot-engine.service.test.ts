@@ -72,6 +72,7 @@ describe("bot-engine pickFeasibleLiveCandidate", () => {
       preferredCandidate: candidate,
       snapshotCandidates: [],
       state: defaultBotState(),
+      homeStable: "USDC",
       allowedExecutionQuotes: new Set(["USDC"]),
       traderRegion: "EEA",
       neverTradeSymbols: [],
@@ -80,6 +81,7 @@ describe("bot-engine pickFeasibleLiveCandidate", () => {
       balances,
       walletTotalHome: 10_000,
       maxPositionPct: 20,
+      minQuoteLiquidityHome: 3,
       notionalCap: 0,
       capitalNotionalCapMultiplier: 1,
       bufferFactor: 1.002
