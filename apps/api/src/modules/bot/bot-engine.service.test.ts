@@ -58,14 +58,21 @@ describe("bot-engine pickFeasibleLiveCandidate", () => {
       reasons: []
     };
 
-    const balances: BinanceBalanceSnapshot[] = [];
+    const balances: BinanceBalanceSnapshot[] = [
+      {
+        asset: "USDC",
+        free: 10_000,
+        locked: 0,
+        total: 10_000
+      }
+    ];
 
     type PickResult = { candidate: UniverseCandidate | null; reason?: string };
     const result = await (service as unknown as { pickFeasibleLiveCandidate: (params: unknown) => Promise<PickResult> }).pickFeasibleLiveCandidate({
       preferredCandidate: candidate,
       snapshotCandidates: [],
       state: defaultBotState(),
-      homeStable: "USDC",
+      allowedExecutionQuotes: new Set(["USDC"]),
       traderRegion: "EEA",
       neverTradeSymbols: [],
       excludeStableStablePairs: true,
@@ -73,7 +80,6 @@ describe("bot-engine pickFeasibleLiveCandidate", () => {
       balances,
       walletTotalHome: 10_000,
       maxPositionPct: 20,
-      quoteFree: 10_000,
       notionalCap: 0,
       capitalNotionalCapMultiplier: 1,
       bufferFactor: 1.002
@@ -1419,6 +1425,50 @@ describe("bot-engine insufficient-balance helpers", () => {
         strategy: { trend: 0.3, meanReversion: 0.4, grid: 0.6, recommended: "GRID" }
       })
     ).toBe("GRID");
+  });
+});
+
+describe("bot-engine multi-quote execution policy", () => {
+  const service = new BotEngineService(
+    { load: () => null } as unknown as ConfigService,
+    {} as unknown as BinanceMarketDataService,
+    {} as unknown as BinanceTradingService,
+    {} as unknown as ConversionRouterService,
+    {} as unknown as UniverseService
+  );
+
+  it("widens execution quote allowlist as risk increases", () => {
+    const helpers = service as unknown as {
+      resolveExecutionQuoteAssets: (params: {
+        config: AppConfig | null;
+        homeStable: string;
+        traderRegion: "EEA" | "NON_EEA";
+        risk: number;
+      }) => Set<string>;
+    };
+
+    const lowRiskQuotes = helpers.resolveExecutionQuoteAssets({
+      config: null,
+      homeStable: "USDC",
+      traderRegion: "NON_EEA",
+      risk: 20
+    });
+    const highRiskQuotes = helpers.resolveExecutionQuoteAssets({
+      config: null,
+      homeStable: "USDC",
+      traderRegion: "NON_EEA",
+      risk: 90
+    });
+
+    expect(lowRiskQuotes.has("USDC")).toBe(true);
+    expect(lowRiskQuotes.has("USDT")).toBe(true);
+    expect(lowRiskQuotes.has("JPY")).toBe(false);
+    expect(lowRiskQuotes.has("BTC")).toBe(false);
+
+    expect(highRiskQuotes.has("USDC")).toBe(true);
+    expect(highRiskQuotes.has("USDT")).toBe(true);
+    expect(highRiskQuotes.has("JPY")).toBe(true);
+    expect(highRiskQuotes.has("BTC")).toBe(true);
   });
 });
 

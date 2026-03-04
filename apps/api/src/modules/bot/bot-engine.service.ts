@@ -7,7 +7,7 @@ import type { AppConfig, BotState, Decision, Order, ProtectionLockEntry, SymbolB
 import { BotStateSchema, defaultBotState } from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
-import { resolveRouteBridgeAssets } from "../config/asset-routing";
+import { resolveRouteBridgeAssets, resolveUniverseDefaultQuoteAssets } from "../config/asset-routing";
 import { BinanceMarketDataService, type MarketQtyValidation } from "../integrations/binance-market-data.service";
 import {
   BinanceTradingService,
@@ -19,6 +19,8 @@ import {
 import { ConversionRouterService } from "../integrations/conversion-router.service";
 import { getPairPolicyBlockReason, isStableAsset } from "../policy/trading-policy";
 import { UniverseService } from "../universe/universe.service";
+
+const EXECUTION_FIAT_QUOTES = new Set(["EUR", "JPY", "GBP", "TRY", "BRL", "AUD"]);
 
 function atomicWriteFile(filePath: string, data: string): void {
   const tmpPath = `${filePath}.tmp`;
@@ -571,6 +573,7 @@ export class BotEngineService implements OnModuleInit {
     state: BotState;
     risk: number;
     homeStable: string;
+    allowedExecutionQuotes?: Iterable<string>;
     walletTotalHome: number;
     nowMs: number;
   }): DailyLossGuardSnapshot {
@@ -605,8 +608,20 @@ export class BotEngineService implements OnModuleInit {
     const profitGivebackHaltMinExposurePct = Number((0.2 - t * 0.12).toFixed(4)); // 20% -> 8%
     const profitGivebackActive = peakDailyRealizedPnl >= profitGivebackActivationAbs;
     const homeStable = params.homeStable.trim().toUpperCase();
+    const exposureQuotes = new Set<string>(
+      [...(params.allowedExecutionQuotes ?? [])]
+        .map((asset) => asset.trim().toUpperCase())
+        .filter((asset) => asset.length > 0)
+    );
+    if (!exposureQuotes.has(homeStable)) {
+      exposureQuotes.add(homeStable);
+    }
     const managedExposureHome = [...this.getManagedPositions(params.state).values()]
-      .filter((position) => position.netQty > 0 && position.symbol.endsWith(homeStable))
+      .filter(
+        (position) =>
+          position.netQty > 0 &&
+          this.getSymbolQuoteAssetByPriority(position.symbol, exposureQuotes) !== null
+      )
       .reduce((sum, position) => sum + Math.max(0, position.costQuote), 0);
     const managedExposurePct = walletTotalHome > 0 ? managedExposureHome / walletTotalHome : 0;
     const cautionLossAbs = maxDailyLossAbs * 0.4;
@@ -1613,6 +1628,28 @@ export class BotEngineService implements OnModuleInit {
     return total;
   }
 
+  private getSymbolQuoteAssetByPriority(symbol: string, quoteAssets: Iterable<string>): string | null {
+    const normalizedSymbol = symbol.trim().toUpperCase();
+    if (!normalizedSymbol) return null;
+    const quotes = [...quoteAssets]
+      .map((asset) => asset.trim().toUpperCase())
+      .filter((asset) => asset.length > 0)
+      .sort((left, right) => right.length - left.length);
+    for (const quote of quotes) {
+      if (normalizedSymbol.length <= quote.length) continue;
+      if (normalizedSymbol.endsWith(quote)) return quote;
+    }
+    return null;
+  }
+
+  private getSymbolBaseAssetByPriority(symbol: string, quoteAssets: Iterable<string>): string | null {
+    const normalizedSymbol = symbol.trim().toUpperCase();
+    const quote = this.getSymbolQuoteAssetByPriority(normalizedSymbol, quoteAssets);
+    if (!quote) return null;
+    const base = normalizedSymbol.slice(0, normalizedSymbol.length - quote.length).trim().toUpperCase();
+    return base || null;
+  }
+
   private getCapitalProfile(walletTotalHome: number): CapitalProfile {
     if (!Number.isFinite(walletTotalHome) || walletTotalHome <= 1_200) {
       return {
@@ -1658,11 +1695,60 @@ export class BotEngineService implements OnModuleInit {
     return atrComponent + trendComponent + rsiComponent + scoreComponent;
   }
 
+  private resolveExecutionQuoteAssets(params: {
+    config: AppConfig | null;
+    homeStable: string;
+    traderRegion: "EEA" | "NON_EEA";
+    risk: number;
+  }): Set<string> {
+    const homeStable = params.homeStable.trim().toUpperCase();
+    const defaults = resolveUniverseDefaultQuoteAssets({
+      config: params.config,
+      homeStableCoin: homeStable,
+      traderRegion: params.traderRegion
+    });
+    const normalizedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const allowFiatQuotes = normalizedRisk >= 35;
+    const maxNonStableQuotes = normalizedRisk >= 80 ? 3 : normalizedRisk >= 60 ? 2 : normalizedRisk >= 45 ? 1 : 0;
+
+    const stableOrHome: string[] = [];
+    const fiatQuotes: string[] = [];
+    const nonStableQuotes: string[] = [];
+    for (const asset of defaults) {
+      const normalized = asset.trim().toUpperCase();
+      if (!normalized) continue;
+      if (normalized === homeStable || isStableAsset(normalized)) {
+        stableOrHome.push(normalized);
+        continue;
+      }
+      if (EXECUTION_FIAT_QUOTES.has(normalized)) {
+        fiatQuotes.push(normalized);
+        continue;
+      }
+      nonStableQuotes.push(normalized);
+    }
+
+    const finalQuotes = new Set<string>(stableOrHome.length > 0 ? stableOrHome : [homeStable]);
+    if (allowFiatQuotes) {
+      for (const quote of fiatQuotes) {
+        finalQuotes.add(quote);
+      }
+    }
+    for (const quote of nonStableQuotes.slice(0, maxNonStableQuotes)) {
+      finalQuotes.add(quote);
+    }
+    if (finalQuotes.size === 0) {
+      finalQuotes.add(homeStable);
+    }
+
+    return finalQuotes;
+  }
+
   private pickExposureEligibleCandidate(params: {
     preferredCandidate: UniverseCandidate | null;
     snapshotCandidates: UniverseCandidate[];
     state: BotState;
-    homeStable: string;
+    allowedExecutionQuotes: Set<string>;
     traderRegion: string;
     neverTradeSymbols: string[];
     excludeStableStablePairs: boolean;
@@ -1675,7 +1761,7 @@ export class BotEngineService implements OnModuleInit {
       preferredCandidate,
       snapshotCandidates,
       state,
-      homeStable,
+      allowedExecutionQuotes,
       traderRegion,
       neverTradeSymbols,
       excludeStableStablePairs,
@@ -1695,7 +1781,8 @@ export class BotEngineService implements OnModuleInit {
       if (!symbol || seen.has(symbol)) continue;
       seen.add(symbol);
 
-      if (candidate.quoteAsset.trim().toUpperCase() !== homeStable) continue;
+      const quoteAsset = candidate.quoteAsset.trim().toUpperCase();
+      if (!allowedExecutionQuotes.has(quoteAsset)) continue;
       if (this.isSymbolBlocked(symbol, state)) continue;
       if (this.getEntryGuard({ symbol, state })) continue;
 
@@ -1728,7 +1815,7 @@ export class BotEngineService implements OnModuleInit {
     preferredCandidate: UniverseCandidate | null;
     snapshotCandidates: UniverseCandidate[];
     state: BotState;
-    homeStable: string;
+    allowedExecutionQuotes: Set<string>;
     traderRegion: string;
     neverTradeSymbols: string[];
     excludeStableStablePairs: boolean;
@@ -1736,7 +1823,6 @@ export class BotEngineService implements OnModuleInit {
     balances: BinanceBalanceSnapshot[];
     walletTotalHome: number;
     maxPositionPct: number;
-    quoteFree: number;
     notionalCap: number;
     capitalNotionalCapMultiplier: number;
     bufferFactor: number;
@@ -1762,7 +1848,7 @@ export class BotEngineService implements OnModuleInit {
       preferredCandidate,
       snapshotCandidates,
       state,
-      homeStable,
+      allowedExecutionQuotes,
       traderRegion,
       neverTradeSymbols,
       excludeStableStablePairs,
@@ -1770,7 +1856,6 @@ export class BotEngineService implements OnModuleInit {
       balances,
       walletTotalHome,
       maxPositionPct,
-      quoteFree,
       notionalCap,
       capitalNotionalCapMultiplier,
       bufferFactor
@@ -1812,9 +1897,12 @@ export class BotEngineService implements OnModuleInit {
       if (!symbol || seen.has(symbol)) continue;
       seen.add(symbol);
 
-      if (candidate.quoteAsset.trim().toUpperCase() !== homeStable) continue;
+      const quoteAsset = candidate.quoteAsset.trim().toUpperCase();
+      if (!allowedExecutionQuotes.has(quoteAsset)) continue;
       if (this.isSymbolBlocked(symbol, state)) continue;
       if (this.getEntryGuard({ symbol, state })) continue;
+      const quoteFree = balances.find((b) => b.asset.trim().toUpperCase() === quoteAsset)?.free ?? 0;
+      if (!Number.isFinite(quoteFree) || quoteFree <= 0) continue;
 
       const policyReason = getPairPolicyBlockReason({
         symbol,
@@ -1830,7 +1918,8 @@ export class BotEngineService implements OnModuleInit {
       let check: MarketQtyValidation | null = null;
       try {
         const rules = await this.marketData.getSymbolRules(symbol);
-        if (rules.quoteAsset.trim().toUpperCase() !== homeStable) continue;
+        const rulesQuoteAsset = rules.quoteAsset.trim().toUpperCase();
+        if (!allowedExecutionQuotes.has(rulesQuoteAsset)) continue;
 
         let price = Number.isFinite(candidate.lastPrice) ? candidate.lastPrice : Number.NaN;
         if (!Number.isFinite(price) || price <= 0) {
@@ -3129,11 +3218,26 @@ export class BotEngineService implements OnModuleInit {
       if (current.phase !== "TRADING") return;
 
       const homeStable = config?.basic.homeStableCoin ?? "USDT";
+      const traderRegion = config?.basic.traderRegion ?? "NON_EEA";
+      const risk = Math.max(0, Math.min(100, config?.basic.risk ?? 50));
+      const allowedExecutionQuotes = this.resolveExecutionQuoteAssets({
+        config,
+        homeStable,
+        traderRegion,
+        risk
+      });
+      const executionQuoteList = [...allowedExecutionQuotes].sort((left, right) => right.length - left.length);
+      const getExecutionQuoteFromSymbol = (symbol: string): string | null => {
+        return this.getSymbolQuoteAssetByPriority(symbol, executionQuoteList);
+      };
+      const getExecutionBaseFromSymbol = (symbol: string): string | null => {
+        return this.getSymbolBaseAssetByPriority(symbol, executionQuoteList);
+      };
+      const isExecutionQuoteSymbol = (symbol: string): boolean => getExecutionQuoteFromSymbol(symbol) !== null;
       const liveRequested = Boolean(config?.basic.liveTrading);
       const binanceEnvironment = config?.advanced.binanceEnvironment ?? "MAINNET";
       const allowMainnetLiveTrading = String(process.env.ALLOW_MAINNET_LIVE_TRADING ?? "false").toLowerCase() === "true";
       const liveTrading = liveRequested && (binanceEnvironment === "SPOT_TESTNET" || allowMainnetLiveTrading);
-      const risk = Math.max(0, Math.min(100, config?.basic.risk ?? 50));
       tickContext = {
         tickStartedAtIso: new Date(tickStartedAtMs).toISOString(),
         homeStableCoin: homeStable,
@@ -3331,14 +3435,6 @@ export class BotEngineService implements OnModuleInit {
           const botPrefix = config ? this.resolveBotOrderClientIdPrefix(config) : "ABOT";
           const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
 
-          const byHomeQuoteBase = new Map<string, UniverseCandidate>();
-          for (const candidate of snap.candidates ?? []) {
-            const quote = candidate.quoteAsset.trim().toUpperCase();
-            const base = candidate.baseAsset.trim().toUpperCase();
-            if (!base || quote !== homeStable) continue;
-            byHomeQuoteBase.set(base, candidate);
-          }
-
           const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(boundedRisk / 25)));
           const positions = tradeMode === "SPOT_GRID" ? this.getManagedPositions(current) : null;
           const minCountableExposureHome = this.deriveManagedPositionMinCountableExposureHome(boundedRisk);
@@ -3349,7 +3445,7 @@ export class BotEngineService implements OnModuleInit {
             positions?.size && tradeMode === "SPOT_GRID"
               ? [...positions.values()].filter(
                 (position) =>
-                  position.symbol.endsWith(homeStable) &&
+                  isExecutionQuoteSymbol(position.symbol) &&
                   this.isManagedPositionCountable(position, minCountableExposureHome)
               ).length
               : 0;
@@ -3382,13 +3478,9 @@ export class BotEngineService implements OnModuleInit {
           const seenSymbols = new Set<string>();
           for (const rawCandidate of snap.candidates ?? []) {
             if (!rawCandidate?.symbol) continue;
-
-            let candidate = rawCandidate;
-            if (liveTrading && rawCandidate.quoteAsset.trim().toUpperCase() !== homeStable) {
-              const mapped = byHomeQuoteBase.get(rawCandidate.baseAsset.trim().toUpperCase());
-              if (!mapped) continue;
-              candidate = mapped;
-            }
+            const candidate = rawCandidate;
+            const candidateQuote = candidate.quoteAsset.trim().toUpperCase();
+            if (liveTrading && !allowedExecutionQuotes.has(candidateQuote)) continue;
 
             const symbol = candidate.symbol.trim().toUpperCase();
             if (!symbol || seenSymbols.has(symbol)) continue;
@@ -3982,22 +4074,12 @@ export class BotEngineService implements OnModuleInit {
             });
           };
 
-          const quoteFree = balances.find((b) => b.asset === homeStable)?.free ?? 0;
-          if (!Number.isFinite(quoteFree) || quoteFree < 0) {
-            const summary = `Skip ${candidateSymbol}: Invalid ${homeStable} balance`;
-            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
-            const next = {
-              ...current,
-              activeOrders: filled.activeOrders,
-              orderHistory: filled.orderHistory,
-              decisions: alreadyLogged
-                ? current.decisions
-                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200),
-              lastError: undefined
-            } satisfies BotState;
-            this.save(next);
-            return;
-          }
+          const maxExecutionQuoteFree = [...allowedExecutionQuotes].reduce((maxValue, quoteAsset) => {
+            const free = balances.find((b) => b.asset.trim().toUpperCase() === quoteAsset)?.free ?? 0;
+            if (!Number.isFinite(free) || free < 0) return maxValue;
+            return Math.max(maxValue, free);
+          }, 0);
+          let quoteFree = Number.isFinite(maxExecutionQuoteFree) && maxExecutionQuoteFree > 0 ? maxExecutionQuoteFree : 0;
 
           const walletTotalHome = await this.estimateWalletTotalInHome(balances, homeStable);
           const capitalProfile = this.getCapitalProfile(walletTotalHome);
@@ -4005,6 +4087,7 @@ export class BotEngineService implements OnModuleInit {
             state: current,
             risk,
             homeStable,
+            allowedExecutionQuotes,
             walletTotalHome,
             nowMs: Date.now()
           });
@@ -4071,7 +4154,7 @@ export class BotEngineService implements OnModuleInit {
             const supportsUnwindOnly = lockType === "STOPLOSS_GUARD" || lockType === "MAX_DRAWDOWN";
             if (supportsUnwindOnly) {
               const managedForUnwind = [...this.getManagedPositions(current).values()]
-                .filter((position) => position.netQty > 0 && position.symbol.endsWith(homeStable))
+                .filter((position) => position.netQty > 0 && isExecutionQuoteSymbol(position.symbol))
                 .sort((left, right) => right.costQuote - left.costQuote);
               const unwindCooldownMs = this.deriveGlobalLockUnwindCooldownMs(risk);
               const unwindFraction = Number((0.2 + (1 - Math.max(0, Math.min(100, risk)) / 100) * 0.5).toFixed(4)); // 70% -> 20%
@@ -4089,7 +4172,7 @@ export class BotEngineService implements OnModuleInit {
                   continue;
                 }
 
-                const baseAsset = position.symbol.slice(0, Math.max(0, position.symbol.length - homeStable.length));
+                const baseAsset = getExecutionBaseFromSymbol(position.symbol);
                 if (!baseAsset) continue;
                 const baseFree = balances.find((b) => b.asset.toUpperCase() === baseAsset.toUpperCase())?.free ?? 0;
                 if (!Number.isFinite(baseFree) || baseFree <= 0) continue;
@@ -4197,8 +4280,8 @@ export class BotEngineService implements OnModuleInit {
             preferredCandidate: selectedCandidate,
             snapshotCandidates: universeSnapshot?.candidates ?? [],
             state: current,
-            homeStable,
-            traderRegion: config?.basic.traderRegion ?? "NON_EEA",
+            allowedExecutionQuotes,
+            traderRegion,
             neverTradeSymbols: config?.advanced.neverTradeSymbols ?? [],
             excludeStableStablePairs: config?.advanced.excludeStableStablePairs ?? true,
             enforceRegionPolicy: config?.advanced.enforceRegionPolicy ?? true,
@@ -4220,15 +4303,14 @@ export class BotEngineService implements OnModuleInit {
             preferredCandidate: selectedCandidate,
             snapshotCandidates: universeSnapshot?.candidates ?? [],
             state: current,
-            homeStable,
-            traderRegion: config?.basic.traderRegion ?? "NON_EEA",
+            allowedExecutionQuotes,
+            traderRegion,
             neverTradeSymbols: config?.advanced.neverTradeSymbols ?? [],
             excludeStableStablePairs: config?.advanced.excludeStableStablePairs ?? true,
             enforceRegionPolicy: config?.advanced.enforceRegionPolicy ?? true,
             balances,
             walletTotalHome,
             maxPositionPct,
-            quoteFree,
             notionalCap,
             capitalNotionalCapMultiplier: capitalProfile.notionalCapMultiplier,
             bufferFactor
@@ -4252,13 +4334,13 @@ export class BotEngineService implements OnModuleInit {
               const managedPositions = [...this.getManagedPositions(current).values()]
                 .filter((position) => {
                   if (position.netQty <= 0) return false;
-                  if (!position.symbol.endsWith(homeStable)) return false;
+                  if (!isExecutionQuoteSymbol(position.symbol)) return false;
                   return this.isSymbolBlocked(position.symbol, current) === null;
                 })
                 .sort((left, right) => right.costQuote - left.costQuote);
               const recoverySellFraction = this.deriveNoFeasibleRecoverySellFraction(risk);
               for (const position of managedPositions) {
-                const baseAsset = position.symbol.slice(0, Math.max(0, position.symbol.length - homeStable.length));
+                const baseAsset = getExecutionBaseFromSymbol(position.symbol);
                 if (!baseAsset) continue;
                 const baseFree = getAssetFree(baseAsset);
                 if (!Number.isFinite(baseFree) || baseFree <= 0) {
@@ -4414,8 +4496,9 @@ export class BotEngineService implements OnModuleInit {
             this.save(next);
             return;
           }
-          if (rules.quoteAsset !== homeStable) {
-            const summary = `Skip ${candidateSymbol}: Quote asset ${rules.quoteAsset} ≠ home stable ${homeStable}`;
+          const candidateQuoteAsset = rules.quoteAsset.trim().toUpperCase();
+          if (!allowedExecutionQuotes.has(candidateQuoteAsset)) {
+            const summary = `Skip ${candidateSymbol}: Quote asset ${candidateQuoteAsset} is not enabled for execution`;
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
             const next = {
               ...current,
@@ -4424,6 +4507,22 @@ export class BotEngineService implements OnModuleInit {
               decisions: alreadyLogged
                 ? current.decisions
                 : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200)
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
+          quoteFree = balances.find((b) => b.asset.trim().toUpperCase() === candidateQuoteAsset)?.free ?? 0;
+          if (!Number.isFinite(quoteFree) || quoteFree < 0) {
+            const summary = `Skip ${candidateSymbol}: Invalid ${candidateQuoteAsset} balance`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [{ id: crypto.randomUUID(), ts: new Date().toISOString(), kind: "SKIP", summary }, ...current.decisions].slice(0, 200),
+              lastError: undefined
             } satisfies BotState;
             this.save(next);
             return;
@@ -4444,7 +4543,9 @@ export class BotEngineService implements OnModuleInit {
           const gridEnabled = configuredGridEnabled && executionLane !== "MARKET";
 
           const managedPositions = this.getManagedPositions(current);
-          const managedOpenHomeSymbols = [...managedPositions.values()].filter((p) => p.netQty > 0 && p.symbol.endsWith(homeStable));
+          const managedOpenHomeSymbols = [...managedPositions.values()].filter(
+            (position) => position.netQty > 0 && isExecutionQuoteSymbol(position.symbol)
+          );
           const minCountableExposureHome = this.deriveManagedPositionMinCountableExposureHome(risk);
           const countableOpenHomePositions = managedOpenHomeSymbols.filter((position) =>
             this.isManagedPositionCountable(position, minCountableExposureHome)
@@ -4517,7 +4618,7 @@ export class BotEngineService implements OnModuleInit {
           const stopLossPct = -(0.8 + (risk / 100) * 1.2); // -0.8% .. -2.0%
 
           for (const position of managedOpenHomeSymbols) {
-            const baseAsset = position.symbol.slice(0, Math.max(0, position.symbol.length - homeStable.length));
+            const baseAsset = getExecutionBaseFromSymbol(position.symbol);
             if (!baseAsset) continue;
             if (this.isSymbolBlocked(position.symbol, current)) continue;
             const baseFree = balances.find((b) => b.asset.toUpperCase() === baseAsset.toUpperCase())?.free ?? 0;
@@ -4680,12 +4781,11 @@ export class BotEngineService implements OnModuleInit {
             const protectedHomeBaseAssets = new Set<string>();
             for (const order of current.activeOrders) {
               const symbol = order.symbol.trim().toUpperCase();
-              if (!symbol || !symbol.endsWith(homeStable)) continue;
-              const baseAsset = symbol.slice(0, Math.max(0, symbol.length - homeStable.length)).trim().toUpperCase();
+              const baseAsset = getExecutionBaseFromSymbol(symbol);
               if (baseAsset) protectedHomeBaseAssets.add(baseAsset);
             }
             for (const position of managedOpenHomeSymbols) {
-              const baseAsset = position.symbol.slice(0, Math.max(0, position.symbol.length - homeStable.length)).trim().toUpperCase();
+              const baseAsset = getExecutionBaseFromSymbol(position.symbol);
               if (baseAsset) protectedHomeBaseAssets.add(baseAsset);
             }
 
@@ -4872,7 +4972,7 @@ export class BotEngineService implements OnModuleInit {
             }
 
             const managedForUnwind = [...this.getManagedPositions(current).values()]
-              .filter((position) => position.netQty > 0 && position.symbol.endsWith(homeStable))
+              .filter((position) => position.netQty > 0 && isExecutionQuoteSymbol(position.symbol))
               .sort((left, right) => right.costQuote - left.costQuote);
             const unwindPolicy = this.deriveDailyLossHaltUnwindPolicy({
               risk,
@@ -4894,7 +4994,7 @@ export class BotEngineService implements OnModuleInit {
                 continue;
               }
 
-              const baseAsset = position.symbol.slice(0, Math.max(0, position.symbol.length - homeStable.length));
+              const baseAsset = getExecutionBaseFromSymbol(position.symbol);
               if (!baseAsset) continue;
               const baseFree = balances.find((b) => b.asset.toUpperCase() === baseAsset.toUpperCase())?.free ?? 0;
               if (!Number.isFinite(baseFree) || baseFree <= 0) continue;
@@ -5239,7 +5339,7 @@ export class BotEngineService implements OnModuleInit {
           if (enforcedCap && Number.isFinite(bufferedCost)) {
             const capTolerance = Math.max(0.01, enforcedCap * 0.001);
             if (bufferedCost > enforcedCap + capTolerance) {
-              const summary = `Skip ${candidateSymbol}: Would exceed live notional cap (cap ${enforcedCap.toFixed(2)} ${homeStable})`;
+              const summary = `Skip ${candidateSymbol}: Would exceed live notional cap (cap ${enforcedCap.toFixed(2)} ${candidateQuoteAsset})`;
               const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
               const next = {
                 ...current,
@@ -5294,7 +5394,7 @@ export class BotEngineService implements OnModuleInit {
             const shortfallTriggerRatio = Math.max(0.3, 0.8 - (risk / 100) * 0.5); // risk 0 -> 80%, risk 100 -> 30%
             const minShortfallToConvert = floorTopUpTarget * shortfallTriggerRatio;
             if (!requiresReserveRecovery && shortfall < minShortfallToConvert) {
-              const summary = `Skip ${candidateSymbol}: Insufficient ${homeStable} for estimated cost`;
+              const summary = `Skip ${candidateSymbol}: Insufficient ${candidateQuoteAsset} for estimated cost`;
               const baseCooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
               const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
               const cooldownMs = cooldown.cooldownMs;
@@ -5405,13 +5505,13 @@ export class BotEngineService implements OnModuleInit {
                 : false;
 
             const sourceBalances = balances
-              .filter((b) => b.asset.toUpperCase() !== homeStable && b.free > 0)
+              .filter((b) => b.asset.toUpperCase() !== candidateQuoteAsset && b.free > 0)
               .sort((a, b) => {
                 const aIsCandidateBase = a.asset.toUpperCase() === candidateBaseAsset ? 1 : 0;
                 const bIsCandidateBase = b.asset.toUpperCase() === candidateBaseAsset ? 1 : 0;
                 if (aIsCandidateBase !== bIsCandidateBase) return aIsCandidateBase - bIsCandidateBase;
-                const aManagedOpen = (managedPositions.get(`${a.asset.toUpperCase()}${homeStable}`)?.netQty ?? 0) > 0 ? 1 : 0;
-                const bManagedOpen = (managedPositions.get(`${b.asset.toUpperCase()}${homeStable}`)?.netQty ?? 0) > 0 ? 1 : 0;
+                const aManagedOpen = (managedPositions.get(`${a.asset.toUpperCase()}${candidateQuoteAsset}`)?.netQty ?? 0) > 0 ? 1 : 0;
+                const bManagedOpen = (managedPositions.get(`${b.asset.toUpperCase()}${candidateQuoteAsset}`)?.netQty ?? 0) > 0 ? 1 : 0;
                 if (aManagedOpen !== bManagedOpen) return aManagedOpen - bManagedOpen;
                 const aIsStable = isStableAsset(a.asset) ? 1 : 0;
                 const bIsStable = isStableAsset(b.asset) ? 1 : 0;
@@ -5425,13 +5525,13 @@ export class BotEngineService implements OnModuleInit {
               const sourceFree = source.free;
               if (sourceFree <= 0) continue;
               if (sourceAsset === candidateBaseAsset && hasRecentCandidateBuy) continue;
-              const sourceHomeSymbol = `${sourceAsset}${homeStable}`;
-              const sourceOpenManagedPosition = (managedPositions.get(sourceHomeSymbol)?.netQty ?? 0) > 0;
+              const sourceQuoteSymbol = `${sourceAsset}${candidateQuoteAsset}`;
+              const sourceOpenManagedPosition = (managedPositions.get(sourceQuoteSymbol)?.netQty ?? 0) > 0;
               if (sourceOpenManagedPosition && !requiresReserveRecovery) continue;
               const hasRecentSourceBuy =
                 Number.isFinite(rebalanceSellCooldownMs) && rebalanceSellCooldownMs > 0
                   ? current.orderHistory.some((o) => {
-                      if (o.symbol !== sourceHomeSymbol) return false;
+                      if (o.symbol !== sourceQuoteSymbol) return false;
                       if (o.side !== "BUY") return false;
                       if (o.status !== "FILLED" && o.status !== "NEW") return false;
                       const ts = Date.parse(o.ts);
@@ -5457,7 +5557,7 @@ export class BotEngineService implements OnModuleInit {
               const conversion = await this.conversionRouter.convertFromSourceToTarget({
                 sourceAsset,
                 sourceFree,
-                targetAsset: homeStable,
+                targetAsset: candidateQuoteAsset,
                 requiredTarget: conversionTarget,
                 allowTwoHop: true
               });
@@ -5495,7 +5595,7 @@ export class BotEngineService implements OnModuleInit {
               return;
             }
 
-            const summary = `Skip ${candidateSymbol}: Insufficient ${homeStable} for estimated cost`;
+            const summary = `Skip ${candidateSymbol}: Insufficient ${candidateQuoteAsset} for estimated cost`;
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
             const baseCooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
             const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
@@ -5784,8 +5884,8 @@ export class BotEngineService implements OnModuleInit {
             const hasSellLimit = symbolOpenLimits.some((order) => order.side === "SELL");
             const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(risk / 25)));
 
-            // If we have no BUY ladder and quote is below reserve, try a reserve recovery conversion (stable-like -> home stable).
-            // This supports wallets holding e.g. USDT while home stable is USDC, and reduces repeated minQty affordability rejects.
+            // If we have no BUY ladder and quote is below reserve, try a reserve recovery conversion
+            // (stable-like -> candidate quote asset) to reduce repeated minQty affordability rejects.
             if (!hasBuyLimit && quoteFree < reserveLowTarget && symbolOpenLimits.length < maxGridOrdersPerSymbol && config) {
               const conversionTarget = Math.max(floorTopUpTarget, reserveHighTarget - quoteFree);
               const conversionTopUpCooldownMs = Math.max(0, config.advanced.conversionTopUpCooldownMs ?? 90_000);
@@ -5803,13 +5903,13 @@ export class BotEngineService implements OnModuleInit {
 
               if (!conversionCooldownActive) {
                 const stableSources = balances
-                  .filter((b) => b.free > 0 && isStableAsset(b.asset) && b.asset.trim().toUpperCase() !== homeStable)
+                  .filter((b) => b.free > 0 && isStableAsset(b.asset) && b.asset.trim().toUpperCase() !== candidateQuoteAsset)
                   .sort((a, b) => b.free - a.free);
 
                 for (const source of stableSources) {
                   setLiveOperation({
                     stage: "grid-reserve-recovery-conversion",
-                    symbol: `${source.asset.trim().toUpperCase()}${homeStable}`,
+                    symbol: `${source.asset.trim().toUpperCase()}${candidateQuoteAsset}`,
                     side: "SELL",
                     asset: source.asset.trim().toUpperCase(),
                     required: source.free
@@ -5817,7 +5917,7 @@ export class BotEngineService implements OnModuleInit {
                   const conversion = await this.conversionRouter.convertFromSourceToTarget({
                     sourceAsset: source.asset,
                     sourceFree: source.free,
-                    targetAsset: homeStable,
+                    targetAsset: candidateQuoteAsset,
                     requiredTarget: conversionTarget,
                     allowTwoHop: true
                   });
@@ -5944,7 +6044,7 @@ export class BotEngineService implements OnModuleInit {
               const maxAffordableQty = buyPrice > 0 ? quoteSpendable / (buyPrice * bufferFactor) : 0;
               const buyQtyTarget = Math.min(qty, maxAffordableQty);
               if (!Number.isFinite(buyQtyTarget) || buyQtyTarget <= 0) {
-                const summary = `Skip ${candidateSymbol}: Insufficient spendable ${homeStable} for grid BUY`;
+                const summary = `Skip ${candidateSymbol}: Insufficient spendable ${candidateQuoteAsset} for grid BUY`;
                 const baseCooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
                 const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
                 const cooldownMs = cooldown.cooldownMs;
@@ -6010,16 +6110,16 @@ export class BotEngineService implements OnModuleInit {
                     stage: "grid-buy-limit",
                     symbol: candidateSymbol,
                     side: "BUY",
-                    asset: homeStable,
+                    asset: candidateQuoteAsset,
                     required: buyNotionalEstimate
                   });
-                  const buyFunds = await ensureFundsBeforeOrder({ asset: homeStable, required: buyNotionalEstimate });
+                  const buyFunds = await ensureFundsBeforeOrder({ asset: candidateQuoteAsset, required: buyNotionalEstimate });
                   if (!buyFunds.ok) {
                     pendingNoActionState = buildInsufficientFundsSkipState({
                       symbol: candidateSymbol,
                       stage: "grid-buy-limit",
                       side: "BUY",
-                      asset: homeStable,
+                      asset: candidateQuoteAsset,
                       required: buyNotionalEstimate,
                       available: buyFunds.available,
                       details: {
@@ -6445,16 +6545,16 @@ export class BotEngineService implements OnModuleInit {
               stage: "entry-market-buy",
               symbol: candidateSymbol,
               side: "BUY",
-              asset: homeStable,
+              asset: candidateQuoteAsset,
               required: entryRequiredQuote
             });
-            const entryFunds = await ensureFundsBeforeOrder({ asset: homeStable, required: entryRequiredQuote });
+            const entryFunds = await ensureFundsBeforeOrder({ asset: candidateQuoteAsset, required: entryRequiredQuote });
             if (!entryFunds.ok) {
               const nextWithInsufficient = buildInsufficientFundsSkipState({
                 symbol: candidateSymbol,
                 stage: "entry-market-buy",
                 side: "BUY",
-                asset: homeStable,
+                asset: candidateQuoteAsset,
                 required: entryRequiredQuote,
                 available: entryFunds.available,
                 details: {

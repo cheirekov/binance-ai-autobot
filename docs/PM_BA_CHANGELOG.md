@@ -16,6 +16,103 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-04 10:15 UTC — T-034 slice: risk-bound multi-quote execution wiring
+- Scope:
+  - implement controlled quote-family widening for live execution and propagate quote-aware handling through unwind/recovery paths.
+- BA requirement mapping:
+  - satisfy “autobot can route beyond home quote under policy control” while preserving existing guardrails and region/min-order controls.
+- PM milestone mapping:
+  - keep active lane on `T-034` and produce a deployable build for the next long day run window.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added execution quote policy resolver (`resolveExecutionQuoteAssets`) with risk-linked widening:
+      - low risk: stable/home only,
+      - medium risk: +fiat quotes (e.g. `EUR`, `JPY`),
+      - high risk: +bounded non-stable quotes from configured/default allowlist.
+    - candidate selection/feasibility now filters by `allowedExecutionQuotes` instead of hard `homeStable` routing.
+    - updated global-lock unwind, no-feasible recovery, take-profit/stop-loss exits, and daily-loss unwind to parse base/quote against execution quote set (not only `*homeStable` symbols).
+    - daily-loss guard managed-exposure ratio now counts managed positions across the active execution quote set.
+    - quote liquidity prechecks now use best available allowed execution quote balance (prevents false “no quote liquidity” when non-home quote is funded).
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - updated feasible-candidate unit test for quote-balance sourcing from balances.
+    - added risk-widening unit test for execution quote allowlist behavior.
+- Risk slider impact:
+  - explicit and deterministic:
+    - low risk stays strict (stable/home),
+    - higher risk progressively allows broader quote families.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - deploy this patch for the long day run (no state reset), then collect next bundle and confirm:
+    - quote-family diversity increased,
+    - no new dominant infeasible loop reason,
+    - `T-005` guard behavior unchanged.
+- Follow-up:
+  - if quote routing is stable in next 2 bundles, continue with `T-034` slice 2 (cross-quote exposure caps + quote-family telemetry counters).
+
+## 2026-03-03 16:20 UTC — PM/BA triage: equity drift vs fills-window PnL visibility
+- Scope:
+  - record operator-visible mismatch risk: shrinking wallet trend while current panel PnL is green.
+- BA requirement mapping:
+  - improve operator trust and interpretation of runtime performance.
+- PM milestone mapping:
+  - bundle `autobot-feedback-20260303-155005.tgz` remains stable for active `T-034`, but highlights visibility debt.
+- Technical changes:
+  - added triage note:
+    - `docs/TRIAGE_NOTE_2026-03-03_EQUITY_DRIFT_VS_WINDOWED_PNL.md`
+- Risk slider impact:
+  - none (analysis/triage only).
+- Validation evidence:
+  - bundle review completed; PM/BA gate remained PASS.
+- Runtime test request:
+  - continue `T-034` implementation lane without interruption.
+- Follow-up:
+  - schedule post-`T-034` observability follow-up (proposed `T-039`) to show fills-window PnL and equity-delta together.
+
+## 2026-03-03 16:35 UTC — PM/BA triage: concentration + macro-shock adaptation
+- Scope:
+  - capture strategy risk raised by operator: high-risk holdings concentration and slow reaction to macro shock conditions.
+- BA requirement mapping:
+  - adaptive autotrader must reduce downside concentration and react to major regime shifts, not only technical micro-signals.
+- PM milestone mapping:
+  - no interruption of active `T-034`; convert concern into explicit acceptance targets for upcoming strategy lanes.
+- Technical changes:
+  - added triage note:
+    - `docs/TRIAGE_NOTE_2026-03-03_WALLET_CONCENTRATION_AND_MACRO_SHOCK.md`
+- Risk slider impact:
+  - clarifies that `risk=100` permits aggression but does not disable concentration/drawdown controls.
+- Validation evidence:
+  - based on latest day/morning bundle review and operator observations.
+- Runtime test request:
+  - continue current run cadence; monitor concentration (`top symbols`) and open exposure while `T-034` is implemented.
+- Follow-up:
+  - include concentration metric in telemetry and bind stronger adaptive exit behavior under `T-032`.
+
+## 2026-03-03 07:35 UTC — T-030 closeout + T-034 activation (PM/BA decision)
+- Scope:
+  - close `T-030` based on latest runtime evidence and move active lane to `T-034`.
+- BA requirement mapping:
+  - preserve single active ticket discipline and avoid mixed execution/strategy scope.
+  - move from min-order reject churn mitigation to cross-quote adaptability lane.
+- PM milestone mapping:
+  - closeout evidence from `autobot-feedback-20260303-071331.tgz`:
+    - `sizingRejectSkipPct=18.8889%` (down from prior high >50%),
+    - PM/BA gate pass on active lane (`./scripts/pmba-gate.sh end`),
+    - no dominant min-order reject storm in top loop reasons.
+- Technical changes:
+  - documentation/process only:
+    - `docs/DELIVERY_BOARD.md`: set `T-034` as `IN_PROGRESS`, move `T-030` to DONE.
+    - `docs/SESSION_BRIEF.md`: set next batch contract to `T-034`.
+- Risk slider impact:
+  - none (decision and planning update; no runtime execution change in this entry).
+- Validation evidence:
+  - bundle review: `autobot-feedback-20260303-071331.tgz` ✅
+  - gate check: `./scripts/pmba-gate.sh end` ✅
+- Runtime test request:
+  - start `T-034` slice 1 and run short (1-3h) validation bundle before night run.
+- Follow-up:
+  - define `T-034` DoD around controlled non-home quote candidate routing without breaking existing guardrails.
+
 ## 2026-03-02 20:05 UTC — T-030 mitigation: inventory-wait loop suppression
 - Scope:
   - address dominant repeated loop reason flagged by PM/BA gate:
