@@ -16,6 +16,28 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-05 15:55 UTC — T-034 stability fix: global protection lock now forces runtime risk state
+- Scope:
+  - fix risk-state inconsistency where UI could show `Risk: NORMAL` while active global `STOPLOSS_GUARD` lock was present.
+- BA requirement mapping:
+  - operator safety visibility must be consistent with active protection locks.
+- PM milestone mapping:
+  - same active lane (`T-034`); P1 stability fix + required triage note for loop-gate failure.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - in early global-lock handling path, runtime `riskState` is now updated before skip return.
+    - `STOPLOSS_GUARD`/`MAX_DRAWDOWN` global locks now force `HALT` + `unwind_only=true` in runtime state.
+  - added triage note:
+    - `docs/TRIAGE_NOTE_2026-03-05_T034_DOGEBTC_INSUFFICIENT_BTC_LOOP.md`
+- Risk slider impact:
+  - none on strategy decisions; this is state-consistency/safety visibility.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - confirm on next lock event that UI risk pill/state transitions to `HALT` (not `NORMAL`) while global stoploss lock exists.
+- Follow-up:
+  - if DOGEBTC quote-shortfall remains dominant, apply queued quote-family insufficiency cooldown escalation slice under `T-034`.
+
 ## 2026-03-05 14:40 UTC — T-034 UI clarity slice: inventory positions vs active orders
 - Scope:
   - remove operator confusion between PnL “open positions” and active LIMIT orders.

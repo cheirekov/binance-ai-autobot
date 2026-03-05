@@ -3630,6 +3630,35 @@ export class BotEngineService implements OnModuleInit {
 
       const globalLock = this.getActiveGlobalProtectionLock(current);
       if (globalLock) {
+        const lockType = globalLock.type.trim().toUpperCase();
+        const lockIsHardStop = lockType === "STOPLOSS_GUARD" || lockType === "MAX_DRAWDOWN";
+        const effectiveRiskState: BotState["riskState"] = {
+          state: current.riskState?.state === "HALT" ? "HALT" : lockIsHardStop ? "HALT" : "CAUTION",
+          reason_codes: [
+            ...new Set([
+              ...(current.riskState?.reason_codes ?? []),
+              `PROTECTION_LOCK_${lockType}`,
+              `lockReason=${globalLock.reason}`
+            ])
+          ].slice(0, 12),
+          unwind_only: Boolean(current.riskState?.unwind_only) || lockIsHardStop,
+          resume_conditions: [
+            ...new Set([
+              ...(current.riskState?.resume_conditions ?? []),
+              `Wait protection lock expiry (${globalLock.expiresAt})`
+            ])
+          ].slice(0, 8)
+        };
+        const riskStateChanged =
+          JSON.stringify(current.riskState ?? null) !== JSON.stringify(effectiveRiskState);
+        if (riskStateChanged) {
+          current = {
+            ...current,
+            riskState: effectiveRiskState
+          };
+          this.save(current);
+        }
+
         if (liveTrading && config && config.advanced.autoCancelBotOrdersOnGlobalProtectionLock) {
           current = await this.cancelBotOwnedOpenOrders({
             config,

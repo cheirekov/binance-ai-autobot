@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-05 14:40 UTC
+Last updated: 2026-03-05 15:55 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -45,7 +45,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `b247d52`
+- Commit hash: `ac3d1db`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -68,23 +68,23 @@ Use this file at the start and end of every batch.
 - Run context:
   - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `384.378`
-  - run end: `Thu Mar 05 2026 16:27:01 GMT+0200 (Eastern European Standard Time)`
+  - run duration (hours): `385.641`
+  - run end: `Thu Mar 05 2026 17:42:45 GMT+0200 (Eastern European Standard Time)`
   - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=3, historyLimitOrders=20, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=90.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=34, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=83.3%)
   - sizing reject pressure: `low` (sizingRejectSkips=5, decisions=200, ratio=2.5%)
 - Decision: `continue`
 - Next ticket candidate: `T-034` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - quote-family concentration behavior must be verified in runtime bundle after adding per-quote exposure cap filter (`quote-exposure-cap` stage).
-  - operator confusion observed between inventory positions and active limit orders; UI clarity patch prepared.
+  - quote-shortfall loop (`DOGEBTC insufficient spendable BTC`) triaged; queued mitigation if still dominant after current patch.
+  - verify lock-state consistency patch: UI must not show `Risk: NORMAL` while global `STOPLOSS_GUARD` is active.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260305-142707.tgz`
-  - deploy note: PnL card now shows `Inventory positions` and separate `Active limit orders` count.
-  - auto-updated at: `2026-03-05T14:40:00.000Z`
+  - bundle: `autobot-feedback-20260305-154249.tgz`
+  - deploy note: global lock path now writes runtime `riskState` (`HALT` for stoploss/max-drawdown global locks) before skip return.
+  - auto-updated at: `2026-03-05T15:55:00.000Z`
 
 ## 5) Copy/paste prompt for next session
 
