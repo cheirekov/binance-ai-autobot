@@ -16,6 +16,26 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-05 14:40 UTC — T-034 UI clarity slice: inventory positions vs active orders
+- Scope:
+  - remove operator confusion between PnL “open positions” and active LIMIT orders.
+- BA requirement mapping:
+  - dashboard must be understandable for non-trader users; position semantics should be explicit.
+- PM milestone mapping:
+  - stays in `T-034` support lane; no strategy execution change.
+- Technical changes:
+  - `apps/ui/src/pages/DashboardPage.tsx`:
+    - renamed PnL label from `Open positions` to `Inventory positions`.
+    - added `Active limit orders` pill sourced from `state.activeOrders` (`NEW` + `LIMIT/LIMIT_MAKER`).
+- Risk slider impact:
+  - none (UI-only clarity patch).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - verify PnL card now clearly explains why inventory count and active grid orders can differ.
+- Follow-up:
+  - keep focus on `T-034` execution evidence; no PM/BA board pivot.
+
 ## 2026-03-05 12:50 UTC — T-034 slice: per-quote exposure cap + quote-family telemetry
 - Scope:
   - add quote-family concentration guardrails for multi-quote execution and expose quote-family runtime counters in baseline KPI telemetry.

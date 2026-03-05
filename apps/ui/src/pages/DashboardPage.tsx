@@ -68,6 +68,15 @@ export function DashboardPage(): JSX.Element {
     return state.running ? `Running · ${state.phase}` : "Stopped";
   }, [state]);
 
+  const activeLimitOrdersCount = useMemo(() => {
+    const activeOrders = state?.activeOrders ?? [];
+    return activeOrders.filter((order) => {
+      if ((order.status ?? "").trim().toUpperCase() !== "NEW") return false;
+      const orderType = (order.type ?? "").trim().toUpperCase();
+      return orderType === "LIMIT" || orderType === "LIMIT_MAKER";
+    }).length;
+  }, [state?.activeOrders]);
+
   const externalOrdersPill = useMemo(() => {
     const prefix = (publicConfig.config?.advanced?.botOrderClientIdPrefix ?? "ABOT").trim().toUpperCase();
     const openLimits = (state?.activeOrders ?? []).filter((o) => {
@@ -801,7 +810,7 @@ export function DashboardPage(): JSX.Element {
               </b>
             </span>
             <span className="pill">
-              Open positions:{" "}
+              Inventory positions:{" "}
               <b>
                 {pnlSummary.openPositions}
                 {pnlSummary.pricedOpenPositions > 0 && pnlSummary.pricedOpenPositions !== pnlSummary.openPositions
@@ -809,6 +818,9 @@ export function DashboardPage(): JSX.Element {
                   : ""}
                 {pnlSummary.unknownCostPositions > 0 ? ` (cost partial ${pnlSummary.unknownCostPositions})` : ""}
               </b>
+            </span>
+            <span className="pill">
+              Active limit orders: <b>{activeLimitOrdersCount}</b>
             </span>
             <span className="pill">
               Currency: <b>{homeStableCoin}</b>
