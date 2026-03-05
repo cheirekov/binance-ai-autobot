@@ -158,6 +158,14 @@ type BaselineRunStats = {
   };
   byDecisionKind: Record<string, number>;
   topSkipSummaries: Array<{ summary: string; count: number }>;
+  quoteFamilies?: Array<{
+    quoteAsset: string;
+    filledOrders: number;
+    buys: number;
+    sells: number;
+    skips: number;
+    trades: number;
+  }>;
   symbols: BaselineSymbolStats[];
 };
 
@@ -1744,6 +1752,58 @@ export class BotEngineService implements OnModuleInit {
     return finalQuotes;
   }
 
+  private derivePerQuoteExposureCapPct(params: { quoteAsset: string; homeStable: string; risk: number }): number | null {
+    const quote = params.quoteAsset.trim().toUpperCase();
+    const home = params.homeStable.trim().toUpperCase();
+    if (!quote || !home) return null;
+    if (quote === home) return null;
+
+    const t = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50)) / 100;
+    if (isStableAsset(quote)) {
+      // Stable quote families can carry larger share, but still bounded to avoid single-quote lock-in.
+      return Number((25 + t * 40).toFixed(4)); // 25% -> 65%
+    }
+    if (EXECUTION_FIAT_QUOTES.has(quote)) {
+      return Number((15 + t * 25).toFixed(4)); // 15% -> 40%
+    }
+    // Non-stable crypto quote families are capped tighter by default.
+    return Number((8 + t * 17).toFixed(4)); // 8% -> 25%
+  }
+
+  private async buildQuoteExposureHomeMap(params: {
+    state: BotState;
+    homeStable: string;
+    allowedExecutionQuotes: Iterable<string>;
+  }): Promise<Map<string, number>> {
+    const normalizedHomeStable = params.homeStable.trim().toUpperCase();
+    const exposureByQuote = new Map<string, number>();
+    const quoteCandidates = [...params.allowedExecutionQuotes].map((asset) => asset.trim().toUpperCase());
+    const bridgeAssets = resolveRouteBridgeAssets(this.configService.load(), normalizedHomeStable);
+    const managedPositions = [...this.getManagedPositions(params.state).values()].filter(
+      (position) => position.netQty > 0 && Number.isFinite(position.costQuote) && position.costQuote > 0
+    );
+
+    for (const position of managedPositions) {
+      const quoteAsset = this.getSymbolQuoteAssetByPriority(position.symbol, quoteCandidates);
+      if (!quoteAsset) continue;
+
+      let exposureHome = position.costQuote;
+      if (quoteAsset !== normalizedHomeStable) {
+        const converted = await this.estimateAssetValueInHome(
+          quoteAsset,
+          position.costQuote,
+          normalizedHomeStable,
+          bridgeAssets
+        );
+        if (!Number.isFinite(converted ?? Number.NaN)) continue;
+        exposureHome = Math.max(0, converted ?? 0);
+      }
+      exposureByQuote.set(quoteAsset, (exposureByQuote.get(quoteAsset) ?? 0) + exposureHome);
+    }
+
+    return exposureByQuote;
+  }
+
   private pickExposureEligibleCandidate(params: {
     preferredCandidate: UniverseCandidate | null;
     snapshotCandidates: UniverseCandidate[];
@@ -1823,6 +1883,7 @@ export class BotEngineService implements OnModuleInit {
     enforceRegionPolicy: boolean;
     balances: BinanceBalanceSnapshot[];
     walletTotalHome: number;
+    risk: number;
     maxPositionPct: number;
     minQuoteLiquidityHome: number;
     notionalCap: number;
@@ -1836,14 +1897,19 @@ export class BotEngineService implements OnModuleInit {
       symbol: string;
       stage: string;
       reason: string;
+      quoteAsset?: string;
       price?: number;
       targetNotional?: number;
+      targetNotionalHome?: number;
       desiredQty?: number;
       normalizedQty?: string;
       requiredQty?: string;
       bufferedCost?: number;
       remainingSymbolNotional?: number;
       effectiveNotionalCap?: number;
+      quoteExposureHome?: number;
+      quoteExposureCapHome?: number;
+      projectedQuoteExposureHome?: number;
     }>;
   }> {
     const {
@@ -1858,6 +1924,7 @@ export class BotEngineService implements OnModuleInit {
       enforceRegionPolicy,
       balances,
       walletTotalHome,
+      risk,
       maxPositionPct,
       minQuoteLiquidityHome,
       notionalCap,
@@ -1878,19 +1945,29 @@ export class BotEngineService implements OnModuleInit {
     const rawTargetNotional = walletTotalHome * (maxPositionPct / 100);
     const normalizedHomeStable = homeStable.trim().toUpperCase();
     const quoteBridgeAssets = resolveRouteBridgeAssets(this.configService.load(), normalizedHomeStable);
+    const quoteExposureHomeMap = await this.buildQuoteExposureHomeMap({
+      state,
+      homeStable: normalizedHomeStable,
+      allowedExecutionQuotes
+    });
     let sizingRejected = 0;
     const rejectionSamples: Array<{
       symbol: string;
       stage: string;
       reason: string;
+      quoteAsset?: string;
       price?: number;
       targetNotional?: number;
+      targetNotionalHome?: number;
       desiredQty?: number;
       normalizedQty?: string;
       requiredQty?: string;
       bufferedCost?: number;
       remainingSymbolNotional?: number;
       effectiveNotionalCap?: number;
+      quoteExposureHome?: number;
+      quoteExposureCapHome?: number;
+      projectedQuoteExposureHome?: number;
     }> = [];
 
     const recordRejection = (sample: (typeof rejectionSamples)[number]): void => {
@@ -1954,6 +2031,7 @@ export class BotEngineService implements OnModuleInit {
               symbol,
               stage: "quote-liquidity",
               reason: `Quote liquidity ${quoteLiquidityHome.toFixed(4)} ${normalizedHomeStable} < ${minQuoteLiquidityHome.toFixed(4)} ${normalizedHomeStable}`,
+              quoteAsset,
               price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined
             });
             continue;
@@ -1965,6 +2043,47 @@ export class BotEngineService implements OnModuleInit {
 
         const targetNotional = Math.min(rawTargetNotional, capForSizing ?? rawTargetNotional, quoteFree, remainingSymbolNotional);
         if (!Number.isFinite(targetNotional) || targetNotional <= 0) continue;
+        const quoteExposureCapPct = this.derivePerQuoteExposureCapPct({
+          quoteAsset,
+          homeStable: normalizedHomeStable,
+          risk
+        });
+        if (quoteExposureCapPct !== null && walletTotalHome > 0) {
+          let targetNotionalHome = targetNotional;
+          if (quoteAsset !== normalizedHomeStable) {
+            const convertedTarget = await this.estimateAssetValueInHome(
+              quoteAsset,
+              targetNotional,
+              normalizedHomeStable,
+              quoteBridgeAssets
+            );
+            if (Number.isFinite(convertedTarget ?? Number.NaN)) {
+              targetNotionalHome = Math.max(0, convertedTarget ?? 0);
+            }
+          }
+
+          const quoteExposureHome = quoteExposureHomeMap.get(quoteAsset) ?? 0;
+          const quoteExposureCapHome = walletTotalHome * (quoteExposureCapPct / 100);
+          const projectedQuoteExposureHome = quoteExposureHome + targetNotionalHome;
+          if (projectedQuoteExposureHome > quoteExposureCapHome + Math.max(0.1, quoteExposureCapHome * 0.001)) {
+            sizingRejected += 1;
+            recordRejection({
+              symbol,
+              stage: "quote-exposure-cap",
+              reason: `Quote exposure cap ${quoteAsset} ${(quoteExposureHome / walletTotalHome * 100).toFixed(2)}% + ${(targetNotionalHome / walletTotalHome * 100).toFixed(2)}% > ${quoteExposureCapPct.toFixed(2)}%`,
+              quoteAsset,
+              price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined,
+              targetNotional: Number.isFinite(targetNotional) ? Number(targetNotional.toFixed(6)) : undefined,
+              targetNotionalHome: Number.isFinite(targetNotionalHome) ? Number(targetNotionalHome.toFixed(6)) : undefined,
+              quoteExposureHome: Number.isFinite(quoteExposureHome) ? Number(quoteExposureHome.toFixed(6)) : undefined,
+              quoteExposureCapHome: Number.isFinite(quoteExposureCapHome) ? Number(quoteExposureCapHome.toFixed(6)) : undefined,
+              projectedQuoteExposureHome: Number.isFinite(projectedQuoteExposureHome)
+                ? Number(projectedQuoteExposureHome.toFixed(6))
+                : undefined
+            });
+            continue;
+          }
+        }
 
         const desiredQty = targetNotional / price;
         check = await this.marketData.validateMarketOrderQty(symbol, desiredQty);
@@ -1975,6 +2094,7 @@ export class BotEngineService implements OnModuleInit {
             symbol,
             stage: "validate-qty",
             reason: check.reason ?? "No qty returned",
+            quoteAsset,
             price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined,
             targetNotional: Number.isFinite(targetNotional) ? Number(targetNotional.toFixed(6)) : undefined,
             desiredQty: Number.isFinite(desiredQty) ? Number(desiredQty.toFixed(8)) : undefined,
@@ -1991,6 +2111,7 @@ export class BotEngineService implements OnModuleInit {
             symbol,
             stage: "parse-qty",
             reason: `Non-positive qty (${qtyStr})`,
+            quoteAsset,
             price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined,
             targetNotional: Number.isFinite(targetNotional) ? Number(targetNotional.toFixed(6)) : undefined,
             desiredQty: Number.isFinite(desiredQty) ? Number(desiredQty.toFixed(8)) : undefined,
@@ -2007,6 +2128,7 @@ export class BotEngineService implements OnModuleInit {
             symbol,
             stage: "buffered-cost",
             reason: "Invalid buffered cost",
+            quoteAsset,
             price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined,
             targetNotional: Number.isFinite(targetNotional) ? Number(targetNotional.toFixed(6)) : undefined,
             desiredQty: Number.isFinite(desiredQty) ? Number(desiredQty.toFixed(8)) : undefined,
@@ -2025,6 +2147,7 @@ export class BotEngineService implements OnModuleInit {
             symbol,
             stage: "max-symbol-exposure",
             reason: "Would exceed max symbol exposure",
+            quoteAsset,
             price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined,
             targetNotional: Number.isFinite(targetNotional) ? Number(targetNotional.toFixed(6)) : undefined,
             desiredQty: Number.isFinite(desiredQty) ? Number(desiredQty.toFixed(8)) : undefined,
@@ -2044,6 +2167,7 @@ export class BotEngineService implements OnModuleInit {
               symbol,
               stage: "notional-cap",
               reason: "Would exceed live notional cap",
+              quoteAsset,
               price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined,
               targetNotional: Number.isFinite(targetNotional) ? Number(targetNotional.toFixed(6)) : undefined,
               desiredQty: Number.isFinite(desiredQty) ? Number(desiredQty.toFixed(8)) : undefined,
@@ -2770,6 +2894,84 @@ export class BotEngineService implements OnModuleInit {
 
     const byDecisionKind: Record<string, number> = {};
     const skipSummaryCounts = new Map<string, number>();
+    const runtimeConfig = this.configService.load();
+    const runtimeHomeStable = (runtimeConfig?.basic.homeStableCoin ?? "USDC").trim().toUpperCase();
+    const runtimeTraderRegion = runtimeConfig?.basic.traderRegion === "EEA" ? "EEA" : "NON_EEA";
+    const quoteCandidates = [
+      ...new Set([
+        ...resolveUniverseDefaultQuoteAssets({
+          config: runtimeConfig,
+          homeStableCoin: runtimeHomeStable,
+          traderRegion: runtimeTraderRegion
+        }),
+        runtimeHomeStable,
+        "USDC",
+        "USDT",
+        "FDUSD",
+        "BUSD",
+        "DAI",
+        "TUSD",
+        "USDP",
+        "USD",
+        "U",
+        "BTC",
+        "ETH",
+        "BNB",
+        "EUR",
+        "JPY",
+        "GBP",
+        "TRY",
+        "BRL",
+        "AUD"
+      ])
+    ]
+      .map((asset) => asset.trim().toUpperCase())
+      .filter((asset) => asset.length > 0)
+      .sort((left, right) => right.length - left.length);
+    const quoteFamilyStats = new Map<
+      string,
+      {
+        quoteAsset: string;
+        filledOrders: number;
+        buys: number;
+        sells: number;
+        skips: number;
+        trades: number;
+      }
+    >();
+    const ensureQuoteStats = (quoteAsset: string): {
+      quoteAsset: string;
+      filledOrders: number;
+      buys: number;
+      sells: number;
+      skips: number;
+      trades: number;
+    } => {
+      const normalized = quoteAsset.trim().toUpperCase();
+      const existing = quoteFamilyStats.get(normalized);
+      if (existing) return existing;
+      const next = { quoteAsset: normalized, filledOrders: 0, buys: 0, sells: 0, skips: 0, trades: 0 };
+      quoteFamilyStats.set(normalized, next);
+      return next;
+    };
+    const extractSymbolFromSummary = (summary: string): string | null => {
+      const raw = summary.trim();
+      if (raw.length === 0) return null;
+      if (raw.startsWith("Skip ")) {
+        const rest = raw.slice(5);
+        const colonIndex = rest.indexOf(":");
+        const candidate = (colonIndex >= 0 ? rest.slice(0, colonIndex) : rest).trim().toUpperCase();
+        return candidate.length >= 6 ? candidate : null;
+      }
+      const tradeMatch = raw.match(/\b([A-Z0-9]{6,20})\b/);
+      return tradeMatch ? tradeMatch[1].trim().toUpperCase() : null;
+    };
+    const collectDecisionSymbol = (decision: Decision): string | null => {
+      const details = this.getDecisionDetails(decision);
+      const symbolFromDetails = typeof details?.symbol === "string" ? details.symbol.trim().toUpperCase() : "";
+      if (symbolFromDetails.length >= 6) return symbolFromDetails;
+      return extractSymbolFromSummary(decision.summary);
+    };
     let trades = 0;
     let skips = 0;
     let conversions = 0;
@@ -2783,6 +2985,13 @@ export class BotEngineService implements OnModuleInit {
       byDecisionKind[decision.kind] = (byDecisionKind[decision.kind] ?? 0) + 1;
       if (decision.kind === "TRADE") {
         trades += 1;
+        const symbol = collectDecisionSymbol(decision);
+        if (symbol) {
+          const quoteAsset = this.getSymbolQuoteAssetByPriority(symbol, quoteCandidates);
+          if (quoteAsset) {
+            ensureQuoteStats(quoteAsset).trades += 1;
+          }
+        }
         if (this.isConversionTradeDecision(decision)) {
           conversions += 1;
         }
@@ -2799,6 +3008,13 @@ export class BotEngineService implements OnModuleInit {
         if (cluster === "FEE_EDGE") feeEdgeSkips += 1;
         if (cluster === "MIN_ORDER") minOrderSkips += 1;
         if (cluster === "INVENTORY_WAITING") inventoryWaitingSkips += 1;
+        const symbol = collectDecisionSymbol(decision);
+        if (symbol) {
+          const quoteAsset = this.getSymbolQuoteAssetByPriority(symbol, quoteCandidates);
+          if (quoteAsset) {
+            ensureQuoteStats(quoteAsset).skips += 1;
+          }
+        }
         skipSummaryCounts.set(decision.summary, (skipSummaryCounts.get(decision.summary) ?? 0) + 1);
       }
     }
@@ -2826,6 +3042,16 @@ export class BotEngineService implements OnModuleInit {
       const notional = qty > 0 && price > 0 ? qty * price : 0;
       const orderFeeHome = Number.isFinite(order.feeHome) ? Math.max(0, order.feeHome ?? 0) : 0;
       if (qty <= 0) continue;
+      const quoteAsset = this.getSymbolQuoteAssetByPriority(symbol, quoteCandidates);
+      if (quoteAsset) {
+        const bucket = ensureQuoteStats(quoteAsset);
+        bucket.filledOrders += 1;
+        if (order.side === "BUY") {
+          bucket.buys += 1;
+        } else {
+          bucket.sells += 1;
+        }
+      }
 
       const next = symbolMap.get(symbol) ?? {
         symbol,
@@ -2896,6 +3122,13 @@ export class BotEngineService implements OnModuleInit {
     const totalFeesHome = this.toRounded(feesHome, 8);
     const openExposureCost = this.toRounded(symbols.reduce((sum, s) => sum + (s.netQty > 0 ? s.openCost : 0), 0), 8);
     const openPositions = symbols.filter((s) => s.netQty > 0).length;
+    const quoteFamilies = [...quoteFamilyStats.values()]
+      .sort((left, right) => {
+        const rightScore = right.filledOrders + right.skips + right.trades;
+        const leftScore = left.filledOrders + left.skips + left.trades;
+        return rightScore - leftScore;
+      })
+      .slice(0, 20);
 
     return {
       version: 1,
@@ -2936,6 +3169,7 @@ export class BotEngineService implements OnModuleInit {
       },
       byDecisionKind,
       topSkipSummaries,
+      quoteFamilies,
       symbols
     };
   }
@@ -4344,6 +4578,7 @@ export class BotEngineService implements OnModuleInit {
             enforceRegionPolicy: config?.advanced.enforceRegionPolicy ?? true,
             balances,
             walletTotalHome,
+            risk,
             maxPositionPct,
             minQuoteLiquidityHome,
             notionalCap,

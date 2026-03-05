@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-05 09:25 UTC
+Last updated: 2026-03-05 12:50 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -45,7 +45,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `f053e9b`
+- Commit hash: `f04291f`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -66,24 +66,24 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `379.142`
-  - run end: `Thu Mar 05 2026 11:12:49 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - run duration (hours): `382.044`
+  - run end: `Thu Mar 05 2026 14:06:57 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=9, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=95.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=13, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=93.5%)
   - sizing reject pressure: `low` (sizingRejectSkips=6, decisions=200, ratio=3.0%)
 - Decision: `continue`
 - Next ticket candidate: `T-034` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - UI mixed-quote PnL view can look severely negative without normalization; patch prepared, needs runtime verification.
+  - quote-family concentration behavior must be verified in runtime bundle after adding per-quote exposure cap filter (`quote-exposure-cap` stage).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260305-091258.tgz`
-  - auto-updated at: `2026-03-05T09:13:13.963Z`
-  - deploy pending patch: dashboard open cost/value normalization across non-home quote symbols (`*BTC`, `*ETH`, `*USDT`).
+  - bundle: `autobot-feedback-20260305-120723.tgz`
+  - deploy note: `T-034` now includes risk-linked per-quote exposure caps and quote-family KPI counters in baseline telemetry.
+  - auto-updated at: `2026-03-05T12:50:00.000Z`
 
 ## 5) Copy/paste prompt for next session
 

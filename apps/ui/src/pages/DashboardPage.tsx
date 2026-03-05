@@ -163,6 +163,9 @@ export function DashboardPage(): JSX.Element {
     const fees = kpi?.totals?.feesHome;
     const rawOpenCost = kpi?.totals?.openExposureCost;
     const symbols = kpi?.symbols ?? [];
+    const filledOrders = [...(state?.orderHistory ?? [])]
+      .filter((order) => (order.status ?? "").trim().toUpperCase() === "FILLED")
+      .sort((left, right) => Date.parse(left.ts) - Date.parse(right.ts));
 
     const priceByAsset = new Map<string, number>();
     for (const a of wallet.wallet?.assets ?? []) {
@@ -175,7 +178,36 @@ export function DashboardPage(): JSX.Element {
     }
 
     const normalizedHomeStable = homeStableCoin.trim().toUpperCase();
-    const quoteCandidates = [...new Set([normalizedHomeStable, ...priceByAsset.keys(), "USDC", "USDT", "BTC", "ETH", "BNB", "EUR", "JPY"])]
+    const stableLikeAssets = new Set(["USDC", "USDT", "FDUSD", "BUSD", "DAI", "TUSD", "USDP", "USD", "U"]);
+    for (const asset of stableLikeAssets) {
+      if (!priceByAsset.has(asset)) {
+        priceByAsset.set(asset, 1);
+      }
+    }
+    if (!priceByAsset.has(normalizedHomeStable)) {
+      priceByAsset.set(normalizedHomeStable, 1);
+    }
+
+    const quoteCandidates = [
+      ...new Set([
+        normalizedHomeStable,
+        ...priceByAsset.keys(),
+        "USDC",
+        "USDT",
+        "FDUSD",
+        "BUSD",
+        "BTC",
+        "ETH",
+        "BNB",
+        "EUR",
+        "JPY",
+        "GBP",
+        "TRY",
+        "BRL",
+        "AUD",
+        "U"
+      ])
+    ]
       .filter((asset) => asset.length > 0)
       .sort((left, right) => right.length - left.length);
     const splitSymbol = (symbol: string): { base: string; quote: string } | null => {
@@ -191,23 +223,127 @@ export function DashboardPage(): JSX.Element {
       return null;
     };
 
-    const openPositions = symbols.filter((s) => typeof s.netQty === "number" && Number.isFinite(s.netQty) && s.netQty > 0);
+    for (const row of symbols) {
+      const pair = splitSymbol((row.symbol ?? "").trim().toUpperCase());
+      if (!pair) continue;
+      const avgEntry = typeof row.avgEntry === "number" && Number.isFinite(row.avgEntry) ? row.avgEntry : undefined;
+      if (!avgEntry || avgEntry <= 0) continue;
+      if (pair.quote === normalizedHomeStable && !priceByAsset.has(pair.base)) {
+        priceByAsset.set(pair.base, avgEntry);
+      } else if (pair.base === normalizedHomeStable && !priceByAsset.has(pair.quote)) {
+        priceByAsset.set(pair.quote, 1 / avgEntry);
+      }
+    }
+
+    type AssetFlowPosition = {
+      qty: number;
+      costHome: number;
+      unknownCostQty: number;
+    };
+    const flowByAsset = new Map<string, AssetFlowPosition>();
+    const readFlow = (asset: string): AssetFlowPosition => flowByAsset.get(asset) ?? { qty: 0, costHome: 0, unknownCostQty: 0 };
+    const writeFlow = (asset: string, next: AssetFlowPosition): void => {
+      flowByAsset.set(asset, next);
+    };
+    const addFlow = (asset: string, qty: number, costHome: number, unknownCostQty: number): void => {
+      if (!Number.isFinite(qty) || qty <= 0) return;
+      const current = readFlow(asset);
+      writeFlow(asset, {
+        qty: current.qty + qty,
+        costHome: current.costHome + Math.max(0, Number.isFinite(costHome) ? costHome : 0),
+        unknownCostQty: current.unknownCostQty + Math.max(0, Number.isFinite(unknownCostQty) ? unknownCostQty : 0)
+      });
+    };
+    const consumeFlow = (asset: string, qty: number): void => {
+      if (!Number.isFinite(qty) || qty <= 0) return;
+      const current = readFlow(asset);
+      if (current.qty <= 0) return;
+      const closeQty = Math.min(qty, current.qty);
+      const avgCost = current.qty > 0 ? current.costHome / current.qty : 0;
+      const unknownRatio = current.qty > 0 ? current.unknownCostQty / current.qty : 0;
+      const nextQty = Math.max(0, current.qty - closeQty);
+      const nextCost = Math.max(0, current.costHome - avgCost * closeQty);
+      const nextUnknownQty = Math.max(0, current.unknownCostQty - unknownRatio * closeQty);
+      writeFlow(asset, {
+        qty: nextQty,
+        costHome: nextCost,
+        unknownCostQty: Math.min(nextQty, nextUnknownQty)
+      });
+    };
+
+    for (const order of filledOrders) {
+      const pair = splitSymbol((order.symbol ?? "").trim().toUpperCase());
+      if (!pair) continue;
+      const qty = typeof order.qty === "number" && Number.isFinite(order.qty) ? order.qty : 0;
+      const price = typeof order.price === "number" && Number.isFinite(order.price) ? order.price : 0;
+      if (qty <= 0 || price <= 0) continue;
+
+      const side = (order.side ?? "").trim().toUpperCase();
+      const notionalQuote = qty * price;
+      const quotePriceHome =
+        pair.quote === normalizedHomeStable ? 1 : (priceByAsset.get(pair.quote) ?? (stableLikeAssets.has(pair.quote) ? 1 : undefined));
+      const notionalHome =
+        typeof quotePriceHome === "number" && Number.isFinite(quotePriceHome) && quotePriceHome > 0
+          ? notionalQuote * quotePriceHome
+          : undefined;
+      const feeHome =
+        typeof order.feeHome === "number" && Number.isFinite(order.feeHome) && order.feeHome > 0 ? order.feeHome : 0;
+
+      if (side === "BUY") {
+        if (pair.quote !== normalizedHomeStable) {
+          consumeFlow(pair.quote, notionalQuote);
+        }
+        if (pair.base !== normalizedHomeStable) {
+          addFlow(pair.base, qty, (notionalHome ?? 0) + feeHome, notionalHome === undefined ? qty : 0);
+        }
+      } else if (side === "SELL") {
+        if (pair.base !== normalizedHomeStable) {
+          consumeFlow(pair.base, qty);
+        }
+        if (pair.quote !== normalizedHomeStable) {
+          addFlow(pair.quote, notionalQuote, notionalHome ?? 0, notionalHome === undefined ? notionalQuote : 0);
+        }
+      }
+    }
+
     let comparableOpenValue = 0;
     let comparableOpenCost = 0;
+    let openPositions = 0;
     let pricedOpenPositions = 0;
-    for (const pos of openPositions) {
-      const symbol = (pos.symbol ?? "").trim().toUpperCase();
-      const pair = splitSymbol(symbol);
-      if (!pair) continue;
-
-      const basePriceHome = priceByAsset.get(pair.base);
-      const quotePriceHome = pair.quote === normalizedHomeStable ? 1 : priceByAsset.get(pair.quote);
-      const openCostRaw = typeof pos.openCost === "number" && Number.isFinite(pos.openCost) ? pos.openCost : undefined;
-      if (!basePriceHome || !quotePriceHome || openCostRaw === undefined) continue;
-
-      comparableOpenValue += pos.netQty * basePriceHome;
-      comparableOpenCost += openCostRaw * quotePriceHome;
+    let unknownCostPositions = 0;
+    for (const [asset, flow] of flowByAsset.entries()) {
+      if (asset === normalizedHomeStable) continue;
+      if (!Number.isFinite(flow.qty) || flow.qty <= 1e-12) continue;
+      openPositions += 1;
+      const assetPriceHome = priceByAsset.get(asset);
+      if (!assetPriceHome || !Number.isFinite(assetPriceHome) || assetPriceHome <= 0) continue;
+      comparableOpenValue += flow.qty * assetPriceHome;
+      comparableOpenCost += flow.costHome;
       pricedOpenPositions += 1;
+      if (flow.unknownCostQty > 1e-9) {
+        unknownCostPositions += 1;
+      }
+    }
+
+    const symbolOpenPositions = symbols.filter((s) => typeof s.netQty === "number" && Number.isFinite(s.netQty) && s.netQty > 0);
+    if (openPositions === 0) {
+      openPositions = symbolOpenPositions.length;
+    }
+    if (pricedOpenPositions === 0 && symbolOpenPositions.length > 0) {
+      for (const pos of symbolOpenPositions) {
+        const symbol = (pos.symbol ?? "").trim().toUpperCase();
+        const pair = splitSymbol(symbol);
+        if (!pair) continue;
+
+        const basePriceHome = priceByAsset.get(pair.base);
+        const quotePriceHome = pair.quote === normalizedHomeStable ? 1 : priceByAsset.get(pair.quote);
+        const openCostRaw = typeof pos.openCost === "number" && Number.isFinite(pos.openCost) ? pos.openCost : undefined;
+        if (!basePriceHome || !quotePriceHome || openCostRaw === undefined) continue;
+
+        comparableOpenValue += pos.netQty * basePriceHome;
+        comparableOpenCost += openCostRaw * quotePriceHome;
+        pricedOpenPositions += 1;
+      }
     }
 
     const openCost = pricedOpenPositions > 0
@@ -216,8 +352,9 @@ export function DashboardPage(): JSX.Element {
         ? rawOpenCost
         : undefined;
     const openValue = pricedOpenPositions > 0 ? comparableOpenValue : undefined;
+    const costBasisReliable = unknownCostPositions === 0;
     const unrealized =
-      typeof openCost === "number" && Number.isFinite(openCost) && typeof openValue === "number" && Number.isFinite(openValue)
+      costBasisReliable && typeof openCost === "number" && Number.isFinite(openCost) && typeof openValue === "number" && Number.isFinite(openValue)
         ? openValue - openCost
         : undefined;
     const total =
@@ -232,10 +369,12 @@ export function DashboardPage(): JSX.Element {
       openValue,
       unrealized,
       total,
-      openPositions: openPositions.length,
-      pricedOpenPositions
+      openPositions,
+      pricedOpenPositions,
+      unknownCostPositions,
+      costBasisReliable
     };
-  }, [homeStableCoin, runStats.stats?.kpi, wallet.wallet?.assets]);
+  }, [homeStableCoin, runStats.stats?.kpi, state?.orderHistory, wallet.wallet?.assets]);
 
   function formatDecisionDetails(details: Record<string, unknown> | undefined): string | null {
     if (!details) return null;
@@ -593,6 +732,9 @@ export function DashboardPage(): JSX.Element {
           <div className="title">PnL</div>
           <div className="subtitle">Baseline from persisted fills (fees included when exchange fill data is available; funding not included).</div>
           <div className="subtitle">Wallet total is mark-to-market across all held assets, so it can differ from this trade PnL view.</div>
+          {!pnlSummary.costBasisReliable && pnlSummary.unknownCostPositions > 0 ? (
+            <div className="subtitle">Cost basis is partial for {pnlSummary.unknownCostPositions} mixed-quote asset position(s); unrealized/total are hidden.</div>
+          ) : null}
           <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <span className="pill">
               Realized:{" "}
@@ -614,7 +756,7 @@ export function DashboardPage(): JSX.Element {
               Open cost:{" "}
               <b>
                 {typeof pnlSummary.openCost === "number" && Number.isFinite(pnlSummary.openCost)
-                  ? `${pnlSummary.openCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${homeStableCoin}`
+                  ? `${pnlSummary.costBasisReliable ? "" : "~"}${pnlSummary.openCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${homeStableCoin}`
                   : "—"}
               </b>
             </span>
@@ -665,6 +807,7 @@ export function DashboardPage(): JSX.Element {
                 {pnlSummary.pricedOpenPositions > 0 && pnlSummary.pricedOpenPositions !== pnlSummary.openPositions
                   ? ` (priced ${pnlSummary.pricedOpenPositions})`
                   : ""}
+                {pnlSummary.unknownCostPositions > 0 ? ` (cost partial ${pnlSummary.unknownCostPositions})` : ""}
               </b>
             </span>
             <span className="pill">

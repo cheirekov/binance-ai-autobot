@@ -16,6 +16,57 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-05 12:50 UTC — T-034 slice: per-quote exposure cap + quote-family telemetry
+- Scope:
+  - add quote-family concentration guardrails for multi-quote execution and expose quote-family runtime counters in baseline KPI telemetry.
+- BA requirement mapping:
+  - keep adaptive multi-quote behavior while preventing one quote family from consuming disproportionate exposure.
+- PM milestone mapping:
+  - remains in `T-034`; this is the “quote-family risk control” slice before next 1–3h runtime evidence bundle.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added risk-linked per-quote exposure caps (`derivePerQuoteExposureCapPct`) for non-home quote families.
+    - added quote-family exposure accounting in home currency (`buildQuoteExposureHomeMap`) from managed positions.
+    - `pickFeasibleLiveCandidate(...)` now rejects candidates with `stage=quote-exposure-cap` when projected quote-family exposure breaches cap.
+    - extended rejection samples with quote-family diagnostics (`quoteAsset`, projected/cap exposure in home).
+    - extended baseline KPI output with optional `quoteFamilies[]` counters (`filledOrders`, `buys`, `sells`, `skips`, `trades`).
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - updated private-helper test call signature (`risk` parameter).
+    - added regression test: rejects non-home quote candidate when projected quote exposure exceeds cap.
+- Risk slider impact:
+  - direct:
+    - higher risk allows wider non-home quote-family caps,
+    - lower risk enforces tighter quote-family concentration bounds.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - deploy and run 1–3h bundle; verify skip reasons may include `quote-exposure-cap` (bounded, non-dominant) and check quote-family counters in `baseline-kpis.json`.
+- Follow-up:
+  - if `quote-exposure-cap` dominates loops, tune cap bands and add quote-family-aware candidate rotation bias in next `T-034` slice.
+
+## 2026-03-05 12:40 UTC — T-034 support patch: PnL cost-basis de-dup via asset-flow reconstruction
+- Scope:
+  - fix inflated `Open cost` / `Unrealized` in dashboard when multi-quote routing is active and symbol-level exposure double-counts quote-leg inventory.
+- BA requirement mapping:
+  - operator visibility must remain trustworthy while `T-034` expands execution beyond home quote.
+- PM milestone mapping:
+  - keep `T-034` active; treat this as P0 observability blocker removal before next day/night evidence cycle.
+- Technical changes:
+  - `apps/ui/src/pages/DashboardPage.tsx`:
+    - replaced symbol-only open exposure math with filled-order asset-flow reconstruction (base/quote ledger in UI).
+    - de-duplicates quote-asset re-use chains (e.g. `USDC→BTC→BNB`) so PnL panel does not stack synthetic exposure.
+    - enriches quote/home price map from wallet assets + home-quoted KPI rows.
+    - adds reliability guard: when cost basis is partial for mixed-quote assets, hide `Unrealized/Total` and label as partial.
+- Risk slider impact:
+  - none (display/accounting only).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - deploy and confirm PnL card no longer reports unrealistic open cost (e.g. `30k`) while wallet is `~8k`.
+  - verify open positions line may show `cost partial N` only when quote-price coverage is incomplete.
+- Follow-up:
+  - if mismatch remains after deploy, escalate to API-side canonical asset-ledger in `T-007 follow-up` (server truth, UI render only).
+
 ## 2026-03-05 09:25 UTC — T-034 support patch: PnL panel mixed-quote normalization
 - Scope:
   - fix misleading dashboard PnL totals when open positions include non-home quote symbols (`*BTC`, `*ETH`, `*USDT`, etc.).

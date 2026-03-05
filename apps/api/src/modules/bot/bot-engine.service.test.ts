@@ -80,6 +80,7 @@ describe("bot-engine pickFeasibleLiveCandidate", () => {
       enforceRegionPolicy: true,
       balances,
       walletTotalHome: 10_000,
+      risk: 50,
       maxPositionPct: 20,
       minQuoteLiquidityHome: 3,
       notionalCap: 0,
@@ -89,6 +90,93 @@ describe("bot-engine pickFeasibleLiveCandidate", () => {
 
     expect(result.candidate?.symbol).toBe("AAAUSDC");
     expect(result.reason).toBeUndefined();
+  });
+
+  it("rejects non-home quote candidate when projected quote exposure exceeds cap", async () => {
+    const config = {
+      basic: {
+        homeStableCoin: "USDC",
+        traderRegion: "NON_EEA"
+      },
+      advanced: {
+        neverTradeSymbols: [],
+        symbolEntryCooldownMs: 0,
+        maxConsecutiveEntriesPerSymbol: 0,
+        universeQuoteAssets: ["USDC", "BTC"]
+      }
+    } as unknown as AppConfig;
+
+    const configService = { load: () => config };
+    const rules: BinanceSymbolRules = {
+      symbol: "ADABTC",
+      status: "TRADING",
+      baseAsset: "ADA",
+      quoteAsset: "BTC"
+    };
+    const marketData = {
+      getSymbolRules: async () => rules,
+      getTickerPrice: async (symbol: string) => {
+        if (symbol === "BTCUSDC") return "100";
+        if (symbol === "ADABTC") return "0.001";
+        return "1";
+      },
+      validateMarketOrderQty: async () =>
+        ({
+          ok: true,
+          normalizedQty: "1"
+        }) satisfies MarketQtyValidation
+    };
+
+    const service = new BotEngineService(
+      configService as unknown as ConfigService,
+      marketData as unknown as BinanceMarketDataService,
+      {} as unknown as BinanceTradingService,
+      {} as unknown as ConversionRouterService,
+      {} as unknown as UniverseService
+    );
+
+    const candidate: UniverseCandidate = {
+      symbol: "ADABTC",
+      baseAsset: "ADA",
+      quoteAsset: "BTC",
+      lastPrice: 0.001,
+      quoteVolume24h: 1_000_000,
+      priceChangePct24h: 0,
+      score: 1,
+      reasons: []
+    };
+
+    const balances: BinanceBalanceSnapshot[] = [
+      { asset: "BTC", free: 1, locked: 0, total: 1 },
+      { asset: "USDC", free: 0, locked: 0, total: 0 }
+    ];
+
+    const result = await (
+      service as unknown as {
+        pickFeasibleLiveCandidate: (params: unknown) => Promise<{ candidate: UniverseCandidate | null; sizingRejected: number }>;
+      }
+    ).pickFeasibleLiveCandidate({
+      preferredCandidate: candidate,
+      snapshotCandidates: [],
+      state: defaultBotState(),
+      homeStable: "USDC",
+      allowedExecutionQuotes: new Set(["USDC", "BTC"]),
+      traderRegion: "NON_EEA",
+      neverTradeSymbols: [],
+      excludeStableStablePairs: true,
+      enforceRegionPolicy: true,
+      balances,
+      walletTotalHome: 100,
+      risk: 20,
+      maxPositionPct: 20,
+      minQuoteLiquidityHome: 3,
+      notionalCap: 0,
+      capitalNotionalCapMultiplier: 1,
+      bufferFactor: 1.002
+    });
+
+    expect(result.candidate).toBeNull();
+    expect(result.sizingRejected).toBeGreaterThan(0);
   });
 });
 
