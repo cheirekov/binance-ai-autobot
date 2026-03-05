@@ -161,7 +161,7 @@ export function DashboardPage(): JSX.Element {
     const kpi = runStats.stats?.kpi;
     const realized = kpi?.totals?.realizedPnl;
     const fees = kpi?.totals?.feesHome;
-    const openCost = kpi?.totals?.openExposureCost;
+    const rawOpenCost = kpi?.totals?.openExposureCost;
     const symbols = kpi?.symbols ?? [];
 
     const priceByAsset = new Map<string, number>();
@@ -174,22 +174,52 @@ export function DashboardPage(): JSX.Element {
       }
     }
 
+    const normalizedHomeStable = homeStableCoin.trim().toUpperCase();
+    const quoteCandidates = [...new Set([normalizedHomeStable, ...priceByAsset.keys(), "USDC", "USDT", "BTC", "ETH", "BNB", "EUR", "JPY"])]
+      .filter((asset) => asset.length > 0)
+      .sort((left, right) => right.length - left.length);
+    const splitSymbol = (symbol: string): { base: string; quote: string } | null => {
+      const normalized = symbol.trim().toUpperCase();
+      if (!normalized) return null;
+      for (const quote of quoteCandidates) {
+        if (normalized.length <= quote.length) continue;
+        if (!normalized.endsWith(quote)) continue;
+        const base = normalized.slice(0, normalized.length - quote.length).trim().toUpperCase();
+        if (!base) continue;
+        return { base, quote };
+      }
+      return null;
+    };
+
     const openPositions = symbols.filter((s) => typeof s.netQty === "number" && Number.isFinite(s.netQty) && s.netQty > 0);
-    let openValue = 0;
+    let comparableOpenValue = 0;
+    let comparableOpenCost = 0;
     let pricedOpenPositions = 0;
     for (const pos of openPositions) {
       const symbol = (pos.symbol ?? "").trim().toUpperCase();
-      if (!symbol || !symbol.endsWith(homeStableCoin)) continue;
-      const base = symbol.slice(0, Math.max(0, symbol.length - homeStableCoin.length)).trim().toUpperCase();
-      if (!base) continue;
-      const p = priceByAsset.get(base);
-      if (!p) continue;
-      openValue += pos.netQty * p;
+      const pair = splitSymbol(symbol);
+      if (!pair) continue;
+
+      const basePriceHome = priceByAsset.get(pair.base);
+      const quotePriceHome = pair.quote === normalizedHomeStable ? 1 : priceByAsset.get(pair.quote);
+      const openCostRaw = typeof pos.openCost === "number" && Number.isFinite(pos.openCost) ? pos.openCost : undefined;
+      if (!basePriceHome || !quotePriceHome || openCostRaw === undefined) continue;
+
+      comparableOpenValue += pos.netQty * basePriceHome;
+      comparableOpenCost += openCostRaw * quotePriceHome;
       pricedOpenPositions += 1;
     }
 
+    const openCost = pricedOpenPositions > 0
+      ? comparableOpenCost
+      : typeof rawOpenCost === "number" && Number.isFinite(rawOpenCost)
+        ? rawOpenCost
+        : undefined;
+    const openValue = pricedOpenPositions > 0 ? comparableOpenValue : undefined;
     const unrealized =
-      typeof openCost === "number" && Number.isFinite(openCost) && pricedOpenPositions > 0 ? openValue - openCost : undefined;
+      typeof openCost === "number" && Number.isFinite(openCost) && typeof openValue === "number" && Number.isFinite(openValue)
+        ? openValue - openCost
+        : undefined;
     const total =
       typeof realized === "number" && Number.isFinite(realized) && typeof unrealized === "number" && Number.isFinite(unrealized)
         ? realized + unrealized
@@ -199,7 +229,7 @@ export function DashboardPage(): JSX.Element {
       realized,
       fees,
       openCost,
-      openValue: pricedOpenPositions > 0 ? openValue : undefined,
+      openValue,
       unrealized,
       total,
       openPositions: openPositions.length,

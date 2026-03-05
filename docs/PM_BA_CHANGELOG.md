@@ -16,6 +16,27 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-05 09:25 UTC — T-034 support patch: PnL panel mixed-quote normalization
+- Scope:
+  - fix misleading dashboard PnL totals when open positions include non-home quote symbols (`*BTC`, `*ETH`, `*USDT`, etc.).
+- BA requirement mapping:
+  - strategy validation requires trustworthy operator-visible PnL; incorrect UI math blocks acceptance decisions.
+- PM milestone mapping:
+  - keep active ticket on `T-034`; treat this as observability correctness hotfix required for next strategy evidence reads.
+- Technical changes:
+  - `apps/ui/src/pages/DashboardPage.tsx`:
+    - PnL summary now parses symbol base/quote against known quote candidates.
+    - normalizes `openCost` to home currency via quote asset home price (instead of mixing raw quote units).
+    - computes `openValue`/`unrealized` from comparable priced positions only.
+- Risk slider impact:
+  - none (display/accounting normalization only; no execution logic changes).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - deploy and verify dashboard no longer shows extreme artificial negative total (e.g., `-7000`) while wallet remains near `~8000`.
+- Follow-up:
+  - keep `T-034` execution lane active; if mismatch persists after this patch, escalate to API-side home-normalized ledger fields (`T-007 follow-up`).
+
 ## 2026-03-04 17:35 UTC — T-034 slice: quote-liquidity feasibility gate for cross-quote routing
 - Scope:
   - use the latest long day bundle (`autobot-feedback-20260304-171336.tgz`) to tighten multi-quote feasibility and reduce non-actionable quote-starved loops.

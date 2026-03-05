@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-04 17:13 UTC
+Last updated: 2026-03-05 09:25 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -45,7 +45,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `6c54cb5`
+- Commit hash: `f053e9b`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -66,24 +66,24 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `EVENING (collection) / EVENING (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `363.15`
-  - run end: `Wed Mar 04 2026 19:13:18 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `NIGHT_RUN`
+  - run duration (hours): `379.142`
+  - run end: `Thu Mar 05 2026 11:12:49 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=23, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=88.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=2, decisions=200, ratio=1.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=9, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=95.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=6, decisions=200, ratio=3.0%)
 - Decision: `continue`
 - Next ticket candidate: `T-034` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - conversion-heavy flow remains high (80.6% of trades).
+  - UI mixed-quote PnL view can look severely negative without normalization; patch prepared, needs runtime verification.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260304-171336.tgz`
-  - auto-updated at: `2026-03-04T17:13:48.461Z`
-  - pending deploy patch: `T-034` quote-liquidity feasibility gate for non-home execution quotes (target: reduce `Insufficient spendable BTC/ETH for grid BUY` loops).
+  - bundle: `autobot-feedback-20260305-091258.tgz`
+  - auto-updated at: `2026-03-05T09:13:13.963Z`
+  - deploy pending patch: dashboard open cost/value normalization across non-home quote symbols (`*BTC`, `*ETH`, `*USDT`).
 
 ## 5) Copy/paste prompt for next session
 
