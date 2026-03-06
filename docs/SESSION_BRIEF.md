@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-05 15:55 UTC
+Last updated: 2026-03-06 20:12 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,7 +9,7 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-034` (Multi-quote execution policy v1)
-- Goal (single sentence): add controlled non-home quote routing so the bot can take actionable cross-quote opportunities without violating guardrails.
+- Goal (single sentence): reduce CAUTION-mode non-actionable candidate churn while preserving controlled non-home quote routing guardrails.
 - In scope:
   - define a strict allowlist policy for quote assets eligible for execution beyond home stable quote.
   - add candidate/feasibility routing logic from home-quote fallback to approved cross-quote symbols.
@@ -22,6 +22,7 @@ Use this file at the start and end of every batch.
 - Hypothesis: limiting live execution to home-stable quote leaves actionable opportunities unused; controlled cross-quote routing will improve opportunity coverage while preserving risk controls.
 - Target KPI delta:
   - increase feasible candidate diversity (more than one quote family in executed or shortlisted symbols).
+  - reduce repeated `Daily loss caution (new symbols paused)` skip bursts by pre-filtering candidates to managed-open symbols when caution pause is active.
   - keep sizing reject pressure in low/medium band (no reversion to prior high storm behavior).
   - keep LIMIT lifecycle active and guard behavior stable.
 - Stop/rollback condition:
@@ -45,7 +46,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `ac3d1db`
+- Commit hash: `<set-after-commit>`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -66,25 +67,25 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `DAY (collection) / DAY (run end)`
+  - window (local): `EVENING (collection) / EVENING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `385.641`
-  - run end: `Thu Mar 05 2026 17:42:45 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `DAY_RUN`
+  - run duration (hours): `411.48`
+  - run end: `Fri Mar 06 2026 19:33:06 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=34, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=83.3%)
-  - sizing reject pressure: `low` (sizingRejectSkips=5, decisions=200, ratio=2.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=113, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=43.5%)
+  - sizing reject pressure: `medium` (sizingRejectSkips=25, decisions=200, ratio=12.5%)
 - Decision: `continue`
 - Next ticket candidate: `T-034` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - quote-shortfall loop (`DOGEBTC insufficient spendable BTC`) triaged; queued mitigation if still dominant after current patch.
-  - verify lock-state consistency patch: UI must not show `Risk: NORMAL` while global `STOPLOSS_GUARD` is active.
+  - sizing reject pressure is medium (12.5%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260305-154249.tgz`
-  - deploy note: global lock path now writes runtime `riskState` (`HALT` for stoploss/max-drawdown global locks) before skip return.
-  - auto-updated at: `2026-03-05T15:55:00.000Z`
+  - bundle: `autobot-feedback-20260306-173313.tgz`
+  - patch: caution-aware managed-open symbol prefilter added to feasible candidate selection (`T-034`).
+  - expected next evidence: night run should show lower repeated caution-new-symbol skips while guardrails remain stable.
+  - auto-updated at: `2026-03-06T17:33:32.689Z`
 
 ## 5) Copy/paste prompt for next session
 

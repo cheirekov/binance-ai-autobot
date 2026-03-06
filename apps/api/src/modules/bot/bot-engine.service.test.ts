@@ -178,6 +178,129 @@ describe("bot-engine pickFeasibleLiveCandidate", () => {
     expect(result.candidate).toBeNull();
     expect(result.sizingRejected).toBeGreaterThan(0);
   });
+
+  it("filters to managed-open symbols when caution pauses new entries", async () => {
+    const config = {
+      basic: {
+        homeStableCoin: "USDC",
+        traderRegion: "NON_EEA"
+      },
+      advanced: {
+        neverTradeSymbols: [],
+        symbolEntryCooldownMs: 0,
+        maxConsecutiveEntriesPerSymbol: 0,
+        universeQuoteAssets: ["USDC", "BTC"]
+      }
+    } as unknown as AppConfig;
+
+    const configService = { load: () => config };
+    const marketData = {
+      getSymbolRules: async (symbol: string) => {
+        if (symbol === "NEWBTC") {
+          return {
+            symbol,
+            status: "TRADING",
+            baseAsset: "NEW",
+            quoteAsset: "BTC"
+          } satisfies BinanceSymbolRules;
+        }
+        return {
+          symbol,
+          status: "TRADING",
+          baseAsset: "OPEN",
+          quoteAsset: "BTC"
+        } satisfies BinanceSymbolRules;
+      },
+      getTickerPrice: async (symbol: string) => {
+        if (symbol === "BTCUSDC") return "100";
+        return "0.001";
+      },
+      validateMarketOrderQty: async () =>
+        ({
+          ok: true,
+          normalizedQty: "1"
+        }) satisfies MarketQtyValidation
+    };
+
+    const service = new BotEngineService(
+      configService as unknown as ConfigService,
+      marketData as unknown as BinanceMarketDataService,
+      {} as unknown as BinanceTradingService,
+      {} as unknown as ConversionRouterService,
+      {} as unknown as UniverseService
+    );
+
+    const preferredCandidate: UniverseCandidate = {
+      symbol: "NEWBTC",
+      baseAsset: "NEW",
+      quoteAsset: "BTC",
+      lastPrice: 0.001,
+      quoteVolume24h: 2_000_000,
+      priceChangePct24h: 0,
+      score: 10,
+      reasons: []
+    };
+    const managedCandidate: UniverseCandidate = {
+      symbol: "OPENBTC",
+      baseAsset: "OPEN",
+      quoteAsset: "BTC",
+      lastPrice: 0.001,
+      quoteVolume24h: 1_500_000,
+      priceChangePct24h: 0,
+      score: 8,
+      reasons: []
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      orderHistory: [
+        {
+          id: "filled-open-buy",
+          ts: new Date("2026-03-01T00:00:00Z").toISOString(),
+          symbol: "OPENBTC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          qty: 100,
+          price: 0.001
+        }
+      ]
+    };
+
+    const balances: BinanceBalanceSnapshot[] = [
+      { asset: "BTC", free: 1, locked: 0, total: 1 },
+      { asset: "OPEN", free: 100, locked: 0, total: 100 },
+      { asset: "USDC", free: 0, locked: 0, total: 0 }
+    ];
+
+    const result = await (
+      service as unknown as {
+        pickFeasibleLiveCandidate: (params: unknown) => Promise<{ candidate: UniverseCandidate | null; reason?: string }>;
+      }
+    ).pickFeasibleLiveCandidate({
+      preferredCandidate,
+      snapshotCandidates: [managedCandidate],
+      state,
+      homeStable: "USDC",
+      allowedExecutionQuotes: new Set(["USDC", "BTC"]),
+      traderRegion: "NON_EEA",
+      neverTradeSymbols: [],
+      excludeStableStablePairs: true,
+      enforceRegionPolicy: true,
+      balances,
+      walletTotalHome: 1_000,
+      risk: 80,
+      maxPositionPct: 20,
+      minQuoteLiquidityHome: 3,
+      notionalCap: 0,
+      capitalNotionalCapMultiplier: 1,
+      bufferFactor: 1.002,
+      managedOpenSymbolsOnly: new Set(["OPENBTC"])
+    });
+
+    expect(result.candidate?.symbol).toBe("OPENBTC");
+    expect(result.reason).toBeUndefined();
+  });
 });
 
 describe("bot-engine insufficient-balance helpers", () => {

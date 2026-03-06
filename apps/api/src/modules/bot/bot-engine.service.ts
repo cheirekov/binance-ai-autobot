@@ -1889,6 +1889,7 @@ export class BotEngineService implements OnModuleInit {
     notionalCap: number;
     capitalNotionalCapMultiplier: number;
     bufferFactor: number;
+    managedOpenSymbolsOnly?: Set<string> | null;
   }): Promise<{
     candidate: UniverseCandidate | null;
     reason?: string;
@@ -1929,11 +1930,23 @@ export class BotEngineService implements OnModuleInit {
       minQuoteLiquidityHome,
       notionalCap,
       capitalNotionalCapMultiplier,
-      bufferFactor
+      bufferFactor,
+      managedOpenSymbolsOnly
     } = params;
 
     const pool = [preferredCandidate, ...snapshotCandidates].filter(Boolean) as UniverseCandidate[];
     const seen = new Set<string>();
+    const managedSymbolsOnlySet = managedOpenSymbolsOnly
+      ? new Set([...managedOpenSymbolsOnly].map((symbol) => symbol.trim().toUpperCase()).filter((symbol) => symbol.length > 0))
+      : null;
+    if (managedSymbolsOnlySet && managedSymbolsOnlySet.size === 0) {
+      return {
+        candidate: null,
+        reason: "No feasible candidates: daily loss caution paused new symbols (no managed inventory)",
+        sizingRejected: 0,
+        rejectionSamples: []
+      };
+    }
     const maxSymbolNotional = walletTotalHome * (maxPositionPct / 100);
     if (!Number.isFinite(maxSymbolNotional) || maxSymbolNotional <= 0) {
       return { candidate: null, reason: "Max symbol exposure is zero", sizingRejected: 0, rejectionSamples: [] };
@@ -1951,6 +1964,7 @@ export class BotEngineService implements OnModuleInit {
       allowedExecutionQuotes
     });
     let sizingRejected = 0;
+    let managedSymbolFiltered = 0;
     const rejectionSamples: Array<{
       symbol: string;
       stage: string;
@@ -1979,6 +1993,10 @@ export class BotEngineService implements OnModuleInit {
       const symbol = candidate.symbol.trim().toUpperCase();
       if (!symbol || seen.has(symbol)) continue;
       seen.add(symbol);
+      if (managedSymbolsOnlySet && !managedSymbolsOnlySet.has(symbol)) {
+        managedSymbolFiltered += 1;
+        continue;
+      }
 
       const quoteAsset = candidate.quoteAsset.trim().toUpperCase();
       if (!allowedExecutionQuotes.has(quoteAsset)) continue;
@@ -2199,7 +2217,9 @@ export class BotEngineService implements OnModuleInit {
     const reason =
       sizingRejected > 0
         ? `No feasible candidates after sizing/cap filters (${sizingRejected} rejected)`
-        : "No feasible candidates after policy/exposure filters";
+        : managedSymbolsOnlySet && managedSymbolFiltered > 0
+          ? `No feasible candidates: daily loss caution paused new symbols (${managedSymbolFiltered} filtered)`
+          : "No feasible candidates after policy/exposure filters";
     return { candidate: null, reason, sizingRejected, rejectionSamples };
   }
 
@@ -4398,6 +4418,20 @@ export class BotEngineService implements OnModuleInit {
           tickContext.walletTotalHome = walletTotalHome;
           const maxPositionPct = config?.derived.maxPositionPct ?? 1;
           tickContext.maxPositionPct = maxPositionPct;
+          const managedPositions = this.getManagedPositions(current);
+          const cautionManagedSymbolOnlyMinExposurePct = this.deriveCautionManagedSymbolOnlyMinExposurePct(risk);
+          const cautionPauseNewSymbols =
+            dailyLossGuard.state === "CAUTION" &&
+            (dailyLossGuard.trigger !== "PROFIT_GIVEBACK" ||
+              dailyLossGuard.managedExposurePct >= cautionManagedSymbolOnlyMinExposurePct);
+          const managedOpenSymbolsOnly = cautionPauseNewSymbols
+            ? new Set(
+                [...managedPositions.values()]
+                  .filter((position) => position.netQty > 0 && isExecutionQuoteSymbol(position.symbol))
+                  .map((position) => position.symbol.trim().toUpperCase())
+              )
+            : null;
+          const cautionModeActive = dailyLossGuard.state === "CAUTION";
 
           const preDrawdownProtectionFingerprint = protectionFingerprint(current);
           current = this.evaluateProtectionLocks({
@@ -4612,7 +4646,8 @@ export class BotEngineService implements OnModuleInit {
             minQuoteLiquidityHome,
             notionalCap,
             capitalNotionalCapMultiplier: capitalProfile.notionalCapMultiplier,
-            bufferFactor
+            bufferFactor,
+            managedOpenSymbolsOnly
           });
           if (!feasibleCandidateSelection.candidate) {
             const nowMs = Date.now();
@@ -4841,7 +4876,6 @@ export class BotEngineService implements OnModuleInit {
           tickContext.executionLane = executionLane;
           const gridEnabled = configuredGridEnabled && executionLane !== "MARKET";
 
-          const managedPositions = this.getManagedPositions(current);
           const managedOpenHomeSymbols = [...managedPositions.values()].filter(
             (position) => position.netQty > 0 && isExecutionQuoteSymbol(position.symbol)
           );
@@ -4852,13 +4886,6 @@ export class BotEngineService implements OnModuleInit {
           const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
           tickContext.maxOpenPositions = maxOpenPositions;
           const candidateIsOpen = (managedPositions.get(candidateSymbol)?.netQty ?? 0) > 0;
-          const cautionModeActive = dailyLossGuard.state === "CAUTION";
-          const cautionManagedSymbolOnlyMinExposurePct = this.deriveCautionManagedSymbolOnlyMinExposurePct(risk);
-          const cautionPauseNewSymbols =
-            cautionModeActive &&
-            (dailyLossGuard.trigger !== "PROFIT_GIVEBACK" ||
-              dailyLossGuard.managedExposurePct >= cautionManagedSymbolOnlyMinExposurePct);
-
           if (cautionPauseNewSymbols && !candidateIsOpen) {
             const summary = `Skip ${candidateSymbol}: Daily loss caution (new symbols paused)`;
             const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveCautionEntryPauseCooldownMs(risk));

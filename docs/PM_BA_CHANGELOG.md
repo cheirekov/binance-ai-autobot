@@ -16,6 +16,30 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-06 20:10 UTC — T-034 slice: caution-aware managed-symbol candidate filter
+- Scope:
+  - reduce non-actionable candidate churn when daily-loss CAUTION pauses new symbols.
+- BA requirement mapping:
+  - runtime decisions should stay explainable and actionable for non-trader operators; avoid repeated picks that are guaranteed to be skipped by caution policy.
+- PM milestone mapping:
+  - remains in active `T-034` lane; this is a bounded routing refinement (no strategy/regime redesign).
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - `pickFeasibleLiveCandidate(...)` now accepts optional `managedOpenSymbolsOnly` filter.
+    - when filter is active, candidate feasibility is restricted to managed-open symbols and emits explicit no-feasible reasons tied to caution pause.
+    - tick flow now computes caution pause policy **before** feasible-candidate selection and passes managed-open symbol set into selection.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression test confirming managed-open-only filtering prefers existing managed symbol over a preferred new symbol.
+- Risk slider impact:
+  - unchanged guardrail policy; risk still controls caution thresholds/cooldowns.
+  - this patch only aligns candidate routing with already-active caution behavior.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - deploy for night run and confirm lower repetition of `Daily loss caution (new symbols paused)` skip bursts while preserving lock/CAUTION behavior.
+- Follow-up:
+  - if quote-family insufficiency loops return as dominant reason, apply queued quote-family shortfall cooldown escalation slice in `T-034`.
+
 ## 2026-03-05 15:55 UTC — T-034 stability fix: global protection lock now forces runtime risk state
 - Scope:
   - fix risk-state inconsistency where UI could show `Risk: NORMAL` while active global `STOPLOSS_GUARD` lock was present.
