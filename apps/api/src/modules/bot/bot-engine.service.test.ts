@@ -410,6 +410,27 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(withTwoRecent.cooldownMs).toBeGreaterThanOrEqual(150_000);
   });
 
+  it("uses longer cooldown for no-feasible min-order sizing rejects", () => {
+    const helpers = service as unknown as {
+      deriveNoFeasibleSizingRejectCooldownMs: (params: { risk: number; stage?: string; reason?: string }) => number;
+    };
+
+    const minQtyCooldown = helpers.deriveNoFeasibleSizingRejectCooldownMs({
+      risk: 100,
+      stage: "validate-qty",
+      reason: "Below minQty 0.00010000"
+    });
+    const genericCooldown = helpers.deriveNoFeasibleSizingRejectCooldownMs({
+      risk: 100,
+      stage: "quote-liquidity",
+      reason: "Quote liquidity below threshold"
+    });
+
+    expect(minQtyCooldown).toBeGreaterThan(genericCooldown);
+    expect(minQtyCooldown).toBeGreaterThanOrEqual(900_000);
+    expect(genericCooldown).toBeGreaterThanOrEqual(240_000);
+  });
+
   it("enables no-feasible recovery after repeated sizing-cap skips", () => {
     const helpers = service as unknown as {
       deriveNoFeasibleRecoveryPolicy: (params: {

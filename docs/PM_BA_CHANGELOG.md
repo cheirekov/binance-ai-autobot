@@ -16,6 +16,29 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-07 12:35 UTC — T-034 slice: no-feasible sizing-reject symbol cooldown
+- Scope:
+  - mitigate repeated `No feasible candidates after sizing/cap filters (1 rejected)` loops caused by the same min-order-infeasible symbol.
+- BA requirement mapping:
+  - keep decisions actionable and avoid repeated non-actionable retries on symbols that cannot pass Binance min-order filters.
+- PM milestone mapping:
+  - remains in `T-034`; bounded routing stabilization with no changes to guardrail thresholds.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added `deriveNoFeasibleSizingRejectCooldownMs(...)` for stage/reason-sensitive cooldown sizing.
+    - when no feasible live candidate is produced, the primary rejected symbol now receives a cooldown lock (`NO_FEASIBLE_SIZING_REJECT`) instead of immediate re-selection loops.
+    - skip decision details now include `primaryRejectionCooldownMs`.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression test asserting longer cooldown for min-order (`minQty`) no-feasible rejects.
+- Risk slider impact:
+  - no change to risk guard policy; this only controls retry cadence for infeasible symbols.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - verify WBETHETH-like min-order rejects are spaced out (cooldown applied) and no longer dominate decision stream.
+- Follow-up:
+  - if medium sizing pressure persists, next `T-034` slice should add candidate-stage reject histogram + adaptive symbol deprioritization.
+
 ## 2026-03-06 20:10 UTC — T-034 slice: caution-aware managed-symbol candidate filter
 - Scope:
   - reduce non-actionable candidate churn when daily-loss CAUTION pauses new symbols.

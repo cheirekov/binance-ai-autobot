@@ -736,6 +736,28 @@ export class BotEngineService implements OnModuleInit {
     return Math.round(90_000 - t * 75_000); // 90s -> 15s
   }
 
+  private deriveNoFeasibleSizingRejectCooldownMs(params: {
+    risk: number;
+    stage?: string;
+    reason?: string;
+  }): number {
+    const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(params.risk), 120_000);
+    const stage = (params.stage ?? "").trim().toLowerCase();
+    const reason = (params.reason ?? "").trim().toLowerCase();
+    const isMinQtyLike =
+      stage === "validate-qty" &&
+      (reason.includes("minqty") || reason.includes("lot_size") || reason.includes("market_lot_size"));
+    const isNotionalLike = reason.includes("minnotional") || reason.includes("notional");
+
+    if (isMinQtyLike) {
+      return Math.max(baseCooldownMs * 6, 900_000); // >= 15m
+    }
+    if (isNotionalLike) {
+      return Math.max(baseCooldownMs * 4, 600_000); // >= 10m
+    }
+    return Math.max(baseCooldownMs * 2, 240_000); // >= 4m
+  }
+
   private deriveFeeEdgeCooldownMs(risk: number): number {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
     const t = boundedRisk / 100;
@@ -4757,6 +4779,19 @@ export class BotEngineService implements OnModuleInit {
               }
             }
 
+            const primaryRejectionSample = feasibleCandidateSelection.rejectionSamples[0];
+            const primaryRejectionSymbol = primaryRejectionSample?.symbol?.trim().toUpperCase() ?? "";
+            const primaryRejectionStage = primaryRejectionSample?.stage ?? "";
+            const primaryRejectionReason = primaryRejectionSample?.reason ?? "";
+            const noFeasibleSizingRejectCooldownMs =
+              primaryRejectionSymbol && feasibleCandidateSelection.sizingRejected > 0
+                ? this.deriveNoFeasibleSizingRejectCooldownMs({
+                    risk,
+                    stage: primaryRejectionStage,
+                    reason: primaryRejectionReason
+                  })
+                : 0;
+
             const summary = `Skip: ${feasibleCandidateSelection.reason ?? "No feasible live candidate"}`;
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
             const next = {
@@ -4781,6 +4816,8 @@ export class BotEngineService implements OnModuleInit {
                         liveTradeNotionalCap: Number.isFinite(notionalCap) ? notionalCap : null,
                         bufferFactor,
                         rejectionSamples: feasibleCandidateSelection.rejectionSamples,
+                        primaryRejectionCooldownMs:
+                          noFeasibleSizingRejectCooldownMs > 0 ? noFeasibleSizingRejectCooldownMs : undefined,
                         noFeasibleRecovery: {
                           enabled: noFeasibleRecoveryPolicy.enabled,
                           recentCount: noFeasibleRecoveryPolicy.recentCount,
@@ -4795,7 +4832,23 @@ export class BotEngineService implements OnModuleInit {
                     ...current.decisions
                   ].slice(0, 200)
             } satisfies BotState;
-            this.save(next);
+            const nextWithSizingCooldown =
+              primaryRejectionSymbol && noFeasibleSizingRejectCooldownMs > 0
+                ? this.upsertProtectionLock(next, {
+                    type: "COOLDOWN",
+                    scope: "SYMBOL",
+                    symbol: primaryRejectionSymbol,
+                    reason: `No-feasible sizing reject (${Math.round(noFeasibleSizingRejectCooldownMs / 1000)}s)`,
+                    expiresAt: new Date(Date.now() + noFeasibleSizingRejectCooldownMs).toISOString(),
+                    details: {
+                      category: "NO_FEASIBLE_SIZING_REJECT",
+                      stage: primaryRejectionStage,
+                      reason: primaryRejectionReason,
+                      cooldownMs: noFeasibleSizingRejectCooldownMs
+                    }
+                  })
+                : next;
+            this.save(nextWithSizingCooldown);
             return;
           }
 

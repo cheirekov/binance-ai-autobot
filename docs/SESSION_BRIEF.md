@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-06 20:12 UTC
+Last updated: 2026-03-07 12:25 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -67,25 +67,25 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `EVENING (collection) / EVENING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `411.48`
-  - run end: `Fri Mar 06 2026 19:33:06 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `NIGHT_RUN`
+  - run duration (hours): `430.337`
+  - run end: `Sat Mar 07 2026 14:24:30 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=113, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=43.5%)
-  - sizing reject pressure: `medium` (sizingRejectSkips=25, decisions=200, ratio=12.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=3, historyLimitOrders=107, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=46.5%)
+  - sizing reject pressure: `medium` (sizingRejectSkips=33, decisions=200, ratio=16.5%)
 - Decision: `continue`
 - Next ticket candidate: `T-034` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - sizing reject pressure is medium (12.5%).
+  - sizing reject pressure is medium (16.5%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260306-173313.tgz`
-  - patch: caution-aware managed-open symbol prefilter added to feasible candidate selection (`T-034`).
-  - expected next evidence: night run should show lower repeated caution-new-symbol skips while guardrails remain stable.
-  - auto-updated at: `2026-03-06T17:33:32.689Z`
+  - bundle: `autobot-feedback-20260307-122450.tgz`
+  - patch: no-feasible primary rejection now applies symbol cooldown (`NO_FEASIBLE_SIZING_REJECT`) to break repeated min-order loops.
+  - target: reduce repeated `WBETHETH validate-qty Below minQty` no-feasible storms in next night/day bundle.
+  - auto-updated at: `2026-03-07T12:25:04.046Z`
 
 ## 5) Copy/paste prompt for next session
 
