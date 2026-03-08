@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-08 12:45 UTC
+Last updated: 2026-03-08 18:42 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,10 +9,11 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-032` (Exit manager v2)
-- Goal (single sentence): improve HALT unwind behavior so concentrated losing exposure is reduced faster in bad-market windows.
+- Goal (single sentence): improve exit adaptation so concentrated losing exposure is reduced faster in HALT and normal/caution windows.
 - In scope:
   - rank HALT unwind candidates by concentration + loss severity and unwind higher-risk inventory first.
   - apply dynamic unwind fraction/cadence under HALT using risk-bounded policy.
+  - add concentration-triggered partial exits before hard HALT to reduce oversized single-symbol risk.
   - keep existing daily-loss/Caution/Halt guard thresholds unchanged.
 - Out of scope:
   - regime redesign (`T-031`),
@@ -67,33 +68,32 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `EVENING (collection) / EVENING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `451.616`
-  - run end: `Sun Mar 08 2026 11:41:18 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - run duration (hours): `460.524`
+  - run end: `Sun Mar 08 2026 20:35:44 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=13, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=93.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=6, decisions=200, ratio=3.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=2, historyLimitOrders=34, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=83.0%)
+  - sizing reject pressure: `medium` (sizingRejectSkips=37, decisions=200, ratio=18.5%)
 - Decision: `continue`
 - Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - none critical from automated checks.
+  - sizing reject pressure is medium (18.5%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260308-094123.tgz`
-  - pivot: moved active lane from `T-034` to `T-032` based on prolonged HALT/profit-giveback behavior.
-  - patch: HALT unwind now prioritizes concentrated losers with dynamic unwind fraction/cooldown.
-  - auto-updated at: `2026-03-08T09:41:37.079Z`
+  - bundle: `autobot-feedback-20260308-183556.tgz`
+  - patch: concentration partial exits enabled via `concentration-rebalance-exit` in normal/caution path.
+  - auto-updated at: `2026-03-08T18:42:43.513Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-032
 Batch: SHORT (1-3h)
-Goal: improve HALT unwind adaptation by prioritizing concentrated losers and reducing giveback persistence.
-In scope: unwind prioritization + dynamic unwind cadence/fraction + telemetry in decisions.
+Goal: improve exit adaptation by prioritizing concentrated losers and reducing giveback persistence.
+In scope: HALT unwind prioritization + concentration partial exits + telemetry in decisions.
 Out of scope: regime redesign, PnL schema changes, AI lane, multi-quote redesign.
 DoD:
 - HALT unwind decisions show concentrated loser prioritization.

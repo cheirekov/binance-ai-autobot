@@ -16,6 +16,32 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-08 13:20 UTC — T-032 slice: concentration rebalance exits in normal/caution markets
+- Scope:
+  - reduce prolonged drawdown from oversized single-symbol holdings even when hard HALT is not active.
+- BA requirement mapping:
+  - bot should adapt in bad/sideways conditions by trimming concentrated risk, not waiting only for stop-loss/HALT.
+- PM milestone mapping:
+  - continue `T-032` active lane (exit manager v2), focused on adaptive exits.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added `deriveMaxSymbolConcentrationPct(...)` and `deriveConcentrationTrimFraction(...)`.
+    - position-exit loop now computes per-symbol concentration exposure in home currency.
+    - added new exit reason `concentration-rebalance-exit` when exposure exceeds concentration cap.
+    - concentration exits use partial sell fraction (risk-bounded), and include concentration telemetry in decision details.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression test for concentration cap/fraction behavior.
+- Risk slider impact:
+  - higher risk allows wider concentration cap, but still enforces trim above cap.
+  - lower risk trims concentration earlier and slightly more aggressively.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - verify BTC/XRP-like oversized holdings begin partial trims via `concentration-rebalance-exit` instead of waiting for stop-loss/HALT only.
+  - check that this does not create a new min-order reject storm.
+- Follow-up:
+  - if concentration remains sticky due min-order constraints, add min-tradable tranche planner in next `T-032` slice.
+
 ## 2026-03-08 12:50 UTC — T-032 pivot: concentrated-loser HALT unwind prioritization
 - Scope:
   - pivot active lane from `T-034` to `T-032` and improve bearish/HALT adaptation without changing guard thresholds.

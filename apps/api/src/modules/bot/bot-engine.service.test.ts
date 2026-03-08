@@ -462,6 +462,39 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(concentratedLoser.priority).toBeGreaterThan(smallWinner.priority);
   });
 
+  it("derives concentration trim thresholds and fractions", () => {
+    const helpers = service as unknown as {
+      deriveMaxSymbolConcentrationPct: (risk: number) => number;
+      deriveConcentrationTrimFraction: (params: {
+        risk: number;
+        exposurePct: number;
+        capPct: number;
+        pnlPct: number;
+      }) => number;
+    };
+
+    const highRiskCap = helpers.deriveMaxSymbolConcentrationPct(100);
+    const lowRiskCap = helpers.deriveMaxSymbolConcentrationPct(0);
+    expect(highRiskCap).toBeGreaterThan(lowRiskCap);
+
+    const heavyLosingTrim = helpers.deriveConcentrationTrimFraction({
+      risk: 100,
+      exposurePct: 70,
+      capPct: highRiskCap,
+      pnlPct: -8
+    });
+    const mildTrim = helpers.deriveConcentrationTrimFraction({
+      risk: 100,
+      exposurePct: highRiskCap + 1,
+      capPct: highRiskCap,
+      pnlPct: 1
+    });
+
+    expect(heavyLosingTrim).toBeGreaterThan(mildTrim);
+    expect(heavyLosingTrim).toBeLessThanOrEqual(0.85);
+    expect(mildTrim).toBeGreaterThanOrEqual(0.15);
+  });
+
   it("enables no-feasible recovery after repeated sizing-cap skips", () => {
     const helpers = service as unknown as {
       deriveNoFeasibleRecoveryPolicy: (params: {

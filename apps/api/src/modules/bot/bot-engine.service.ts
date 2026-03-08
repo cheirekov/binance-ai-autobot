@@ -784,6 +784,28 @@ export class BotEngineService implements OnModuleInit {
     return Math.round(90_000 - t * 75_000); // 90s -> 15s
   }
 
+  private deriveMaxSymbolConcentrationPct(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    return Number((12 + (boundedRisk / 100) * 20).toFixed(2));
+  }
+
+  private deriveConcentrationTrimFraction(params: {
+    risk: number;
+    exposurePct: number;
+    capPct: number;
+    pnlPct: number;
+  }): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const exposurePct = Number.isFinite(params.exposurePct) ? Math.max(0, params.exposurePct) : 0;
+    const capPct = Number.isFinite(params.capPct) ? Math.max(1, params.capPct) : 1;
+    const pnlPct = Number.isFinite(params.pnlPct) ? params.pnlPct : 0;
+    const excessRatio = Math.max(0, (exposurePct - capPct) / capPct);
+
+    let fraction = 0.2 + excessRatio * 0.5 + (pnlPct < 0 ? Math.min(0.15, Math.abs(pnlPct) / 100) : 0);
+    fraction += ((100 - boundedRisk) / 100) * 0.08;
+    return Number(Math.min(0.85, Math.max(0.15, fraction)).toFixed(4));
+  }
+
   private deriveNoFeasibleSizingRejectCooldownMs(params: {
     risk: number;
     stage?: string;
@@ -5043,6 +5065,8 @@ export class BotEngineService implements OnModuleInit {
           const rebalanceSellCooldownMs = config?.advanced.liveTradeRebalanceSellCooldownMs ?? 900_000;
           const takeProfitPct = 0.35 + (risk / 100) * 0.9; // 0.35% .. 1.25%
           const stopLossPct = -(0.8 + (risk / 100) * 1.2); // -0.8% .. -2.0%
+          const maxSymbolConcentrationPct = this.deriveMaxSymbolConcentrationPct(risk);
+          const positionExitBridgeAssets = resolveRouteBridgeAssets(config, homeStable);
 
           for (const position of managedOpenHomeSymbols) {
             const baseAsset = getExecutionBaseFromSymbol(position.symbol);
@@ -5076,11 +5100,39 @@ export class BotEngineService implements OnModuleInit {
               regime: positionRegime
             });
             const pnlPct = ((nowPrice - avgEntryPrice) / avgEntryPrice) * 100;
+            const tradableQty = Math.min(position.netQty, baseFree);
+            const concentrationExposureHome = await this.estimateAssetValueInHome(
+              baseAsset,
+              tradableQty,
+              homeStable,
+              positionExitBridgeAssets
+            );
+            const concentrationExposurePct =
+              walletTotalHome > 0 && Number.isFinite(concentrationExposureHome ?? Number.NaN)
+                ? ((concentrationExposureHome ?? 0) / walletTotalHome) * 100
+                : 0;
+            const shouldConcentrationTrim = concentrationExposurePct > maxSymbolConcentrationPct;
+            const concentrationTrimFraction = shouldConcentrationTrim
+              ? this.deriveConcentrationTrimFraction({
+                  risk,
+                  exposurePct: concentrationExposurePct,
+                  capPct: maxSymbolConcentrationPct,
+                  pnlPct
+                })
+              : 0;
             const shouldTakeProfit = pnlPct >= takeProfitPct;
             const shouldStopLoss = pnlPct <= adjustedStopLossPct;
-            if (!shouldTakeProfit && !shouldStopLoss) continue;
+            if (!shouldTakeProfit && !shouldStopLoss && !shouldConcentrationTrim) continue;
+            const exitReason = shouldStopLoss
+              ? "stop-loss-exit"
+              : shouldTakeProfit
+                ? "take-profit-exit"
+                : "concentration-rebalance-exit";
 
-            const sellQtyDesired = Math.min(position.netQty, baseFree);
+            const sellQtyDesired =
+              shouldConcentrationTrim && !shouldTakeProfit && !shouldStopLoss
+                ? Math.min(position.netQty, baseFree) * concentrationTrimFraction
+                : Math.min(position.netQty, baseFree);
             if (!Number.isFinite(sellQtyDesired) || sellQtyDesired <= 0) continue;
 
             const sellCheck = await this.marketData.validateMarketOrderQty(position.symbol, sellQtyDesired);
@@ -5140,13 +5192,19 @@ export class BotEngineService implements OnModuleInit {
                     requestedQty: adjustedQtyStr,
                     fallbackQty: adjustedQty,
                     response: sellRes,
-                    reason: shouldTakeProfit ? "take-profit-exit" : "stop-loss-exit",
+                    reason: exitReason,
                     details: {
                       mode: "position-exit",
                       partialExitDueToBalanceDelta: true,
                       originalRequiredQty: Number(sellQty.toFixed(8)),
                       availableQty: Number(exitFunds.available.toFixed(8)),
                       pnlPct: Number(pnlPct.toFixed(4)),
+                      concentrationExposurePct: Number(concentrationExposurePct.toFixed(4)),
+                      maxSymbolConcentrationPct: Number(maxSymbolConcentrationPct.toFixed(4)),
+                      concentrationTrimFraction:
+                        shouldConcentrationTrim && !shouldTakeProfit && !shouldStopLoss
+                          ? Number(concentrationTrimFraction.toFixed(4))
+                          : null,
                       avgEntryPrice: Number(avgEntryPrice.toFixed(8)),
                       marketPrice: Number(nowPrice.toFixed(8)),
                       takeProfitPct: Number(takeProfitPct.toFixed(4)),
@@ -5190,9 +5248,15 @@ export class BotEngineService implements OnModuleInit {
               requestedQty: sellQtyStr,
               fallbackQty: sellQty,
               response: sellRes,
-              reason: shouldTakeProfit ? "take-profit-exit" : "stop-loss-exit",
+              reason: exitReason,
               details: {
                 mode: "position-exit",
+                concentrationExposurePct: Number(concentrationExposurePct.toFixed(4)),
+                maxSymbolConcentrationPct: Number(maxSymbolConcentrationPct.toFixed(4)),
+                concentrationTrimFraction:
+                  shouldConcentrationTrim && !shouldTakeProfit && !shouldStopLoss
+                    ? Number(concentrationTrimFraction.toFixed(4))
+                    : null,
                 pnlPct: Number(pnlPct.toFixed(4)),
                 avgEntryPrice: Number(avgEntryPrice.toFixed(8)),
                 marketPrice: Number(nowPrice.toFixed(8)),
