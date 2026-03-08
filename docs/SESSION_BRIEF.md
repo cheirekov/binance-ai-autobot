@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-07 12:25 UTC
+Last updated: 2026-03-08 12:45 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -8,36 +8,36 @@ Use this file at the start and end of every batch.
 ## 1) Batch contract (fill before coding)
 
 - Batch type: `SHORT (1-3h)`
-- Active ticket: `T-034` (Multi-quote execution policy v1)
-- Goal (single sentence): reduce CAUTION-mode non-actionable candidate churn while preserving controlled non-home quote routing guardrails.
+- Active ticket: `T-032` (Exit manager v2)
+- Goal (single sentence): improve HALT unwind behavior so concentrated losing exposure is reduced faster in bad-market windows.
 - In scope:
-  - define a strict allowlist policy for quote assets eligible for execution beyond home stable quote.
-  - add candidate/feasibility routing logic from home-quote fallback to approved cross-quote symbols.
-  - keep region policy, min-order validation, exposure caps, and cooldown guards unchanged.
+  - rank HALT unwind candidates by concentration + loss severity and unwind higher-risk inventory first.
+  - apply dynamic unwind fraction/cadence under HALT using risk-bounded policy.
+  - keep existing daily-loss/Caution/Halt guard thresholds unchanged.
 - Out of scope:
-  - regime/exit redesign (`T-031`, `T-032`),
+  - regime redesign (`T-031`),
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
+  - multi-quote routing redesign (`T-034`),
   - endpoint/auth/UI redesign.
-- Hypothesis: limiting live execution to home-stable quote leaves actionable opportunities unused; controlled cross-quote routing will improve opportunity coverage while preserving risk controls.
+- Hypothesis: concentrated losers during HALT are not unwound fast enough; prioritizing them should reduce drawdown persistence and profit giveback.
 - Target KPI delta:
-  - increase feasible candidate diversity (more than one quote family in executed or shortlisted symbols).
-  - reduce repeated `Daily loss caution (new symbols paused)` skip bursts by pre-filtering candidates to managed-open symbols when caution pause is active.
-  - keep sizing reject pressure in low/medium band (no reversion to prior high storm behavior).
-  - keep LIMIT lifecycle active and guard behavior stable.
+  - reduce prolonged HALT periods with high concentration exposure.
+  - increase HALT unwind effectiveness (larger reduction of highest-exposure losers per unwind cycle).
+  - keep guard behavior stable (no threshold regressions).
 - Stop/rollback condition:
-  - if CAUTION/HALT behavior regresses, or cross-quote introduces repeated infeasible loops.
+  - if HALT/Caution transitions regress, or unwind loop causes min-order reject storms.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
-  - eligible execution quotes are governed by explicit policy, not ad hoc symbol hardcoding.
-  - live candidate selection can route to approved cross-quote symbols when feasible.
+  - HALT unwind picks concentrated losing inventory first, not only highest raw cost order.
+  - unwind fraction/cooldown are dynamically adjusted but remain risk-bounded.
 - Runtime evidence in decisions/logs:
-  - cross-quote attempts appear with explainable reasons and remain bounded by current risk/exposure rules.
+  - `daily-loss-halt-unwind` decisions include priority/exposure/loss telemetry and show accelerated handling of top losers.
   - no guardrail regression from `T-005`.
 - Risk slider impact:
-  - high risk can widen cross-quote participation limits; low risk stays stricter.
+  - risk still bounds baseline unwind policy; dynamic boosts must not bypass hard caps.
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
 - Runtime validation plan:
@@ -67,38 +67,38 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `DAY (collection) / DAY (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `430.337`
-  - run end: `Sat Mar 07 2026 14:24:30 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `DAY_RUN`
+  - run duration (hours): `451.616`
+  - run end: `Sun Mar 08 2026 11:41:18 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=3, historyLimitOrders=107, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=46.5%)
-  - sizing reject pressure: `medium` (sizingRejectSkips=33, decisions=200, ratio=16.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=13, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=93.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=6, decisions=200, ratio=3.0%)
 - Decision: `continue`
-- Next ticket candidate: `T-034` (continue active lane unless PM/BA reprioritizes)
+- Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - sizing reject pressure is medium (16.5%).
+  - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260307-122450.tgz`
-  - patch: no-feasible primary rejection now applies symbol cooldown (`NO_FEASIBLE_SIZING_REJECT`) to break repeated min-order loops.
-  - target: reduce repeated `WBETHETH validate-qty Below minQty` no-feasible storms in next night/day bundle.
-  - auto-updated at: `2026-03-07T12:25:04.046Z`
+  - bundle: `autobot-feedback-20260308-094123.tgz`
+  - pivot: moved active lane from `T-034` to `T-032` based on prolonged HALT/profit-giveback behavior.
+  - patch: HALT unwind now prioritizes concentrated losers with dynamic unwind fraction/cooldown.
+  - auto-updated at: `2026-03-08T09:41:37.079Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
-Ticket: T-034
+Ticket: T-032
 Batch: SHORT (1-3h)
-Goal: implement controlled multi-quote routing in SPOT_GRID without breaking existing guardrails.
-In scope: policy-driven quote allowlist + candidate routing + explainable decision reasons.
-Out of scope: regime/exit redesign, PnL schema changes, AI lane.
+Goal: improve HALT unwind adaptation by prioritizing concentrated losers and reducing giveback persistence.
+In scope: unwind prioritization + dynamic unwind cadence/fraction + telemetry in decisions.
+Out of scope: regime redesign, PnL schema changes, AI lane, multi-quote redesign.
 DoD:
-- cross-quote candidates are visible/attempted under policy control.
+- HALT unwind decisions show concentrated loser prioritization.
 - T-005/T-007 behavior remains stable.
-- no dominant infeasible loop introduced by cross-quote routing.
+- no new dominant min-order reject loop from unwind logic.
 - docker CI passes: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

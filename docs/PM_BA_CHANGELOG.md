@@ -16,6 +16,36 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-08 12:50 UTC — T-032 pivot: concentrated-loser HALT unwind prioritization
+- Scope:
+  - pivot active lane from `T-034` to `T-032` and improve bearish/HALT adaptation without changing guard thresholds.
+- BA requirement mapping:
+  - in bad-market windows the bot must reduce risky concentrated inventory faster, not sit in long HALT with slow unwinds.
+- PM milestone mapping:
+  - `T-032` moved to IN_PROGRESS; `T-034` paused as follow-up lane.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added `deriveDailyLossHaltUnwindExecution(...)` to compute per-symbol unwind fraction/cooldown/priority from:
+      - exposure concentration (% wallet),
+      - unrealized loss severity,
+      - risk-bounded base unwind policy.
+    - refactored `dailyLossGuard.active` unwind loop:
+      - build ranked unwind candidates with home-normalized exposure estimation,
+      - prioritize concentrated losers first,
+      - execute per-symbol dynamic unwind cadence/fraction,
+      - include richer unwind telemetry (`baseUnwind*`, `unwindPriority`, `exposurePct`, `unrealizedPct`).
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression test confirming concentrated losers get higher unwind priority, higher unwind fraction, and shorter cooldown.
+- Risk slider impact:
+  - risk still defines baseline unwind policy; dynamic boosts are bounded and do not bypass daily-loss guard state machine.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - next run should show `daily-loss-halt-unwind` decisions targeting largest losing exposure first and shorter repeat interval for those symbols.
+  - verify HALT can recover faster (or managed exposure drops faster) compared with previous run.
+- Follow-up:
+  - if HALT still persists with concentrated losses, next `T-032` slice should add minimum-tradable-position dust-off policy for HALT unwind path.
+
 ## 2026-03-07 12:35 UTC — T-034 slice: no-feasible sizing-reject symbol cooldown
 - Scope:
   - mitigate repeated `No feasible candidates after sizing/cap filters (1 rejected)` loops caused by the same min-order-infeasible symbol.

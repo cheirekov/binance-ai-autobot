@@ -105,7 +105,8 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-034 | IN_PROGRESS | Multi-quote execution policy v1 | No AI promotion, no PnL schema redesign, no regime/exit redesign in this slice |
+| T-032 | IN_PROGRESS | Exit manager v2 | No AI lane, no PnL schema redesign, no universe/quote policy redesign in this slice |
+| T-034 | TODO | Multi-quote execution policy v1 | Keep current routing slices; continue after exit-manager stabilization |
 
 `T-005` status: moved to DONE after overnight evidence (`autobot-feedback-20260225-100508.tgz`) showed guard transitions/recovery without deadlock.
 `T-029` status: moved to DONE after overnight evidence (`autobot-feedback-20260219-103043.tgz`) showed unmanaged exposure controlled and no dominant no-feasible conversion loop.

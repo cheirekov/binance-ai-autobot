@@ -431,6 +431,37 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(genericCooldown).toBeGreaterThanOrEqual(240_000);
   });
 
+  it("prioritizes concentrated losers for daily-loss HALT unwind", () => {
+    const helpers = service as unknown as {
+      deriveDailyLossHaltUnwindExecution: (params: {
+        baseFraction: number;
+        baseCooldownMs: number;
+        risk: number;
+        exposurePct: number;
+        unrealizedPct: number | null;
+      }) => { fraction: number; cooldownMs: number; priority: number };
+    };
+
+    const concentratedLoser = helpers.deriveDailyLossHaltUnwindExecution({
+      baseFraction: 0.18,
+      baseCooldownMs: 720_000,
+      risk: 100,
+      exposurePct: 20,
+      unrealizedPct: -9
+    });
+    const smallWinner = helpers.deriveDailyLossHaltUnwindExecution({
+      baseFraction: 0.18,
+      baseCooldownMs: 720_000,
+      risk: 100,
+      exposurePct: 1,
+      unrealizedPct: 2
+    });
+
+    expect(concentratedLoser.fraction).toBeGreaterThan(0.18);
+    expect(concentratedLoser.cooldownMs).toBeLessThan(720_000);
+    expect(concentratedLoser.priority).toBeGreaterThan(smallWinner.priority);
+  });
+
   it("enables no-feasible recovery after repeated sizing-cap skips", () => {
     const helpers = service as unknown as {
       deriveNoFeasibleRecoveryPolicy: (params: {

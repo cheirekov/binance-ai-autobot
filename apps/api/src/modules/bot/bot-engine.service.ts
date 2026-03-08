@@ -567,6 +567,54 @@ export class BotEngineService implements OnModuleInit {
     return { cooldownMs, fraction };
   }
 
+  private deriveDailyLossHaltUnwindExecution(params: {
+    baseFraction: number;
+    baseCooldownMs: number;
+    risk: number;
+    exposurePct: number;
+    unrealizedPct: number | null;
+  }): { fraction: number; cooldownMs: number; priority: number } {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const t = boundedRisk / 100;
+    const exposurePct = Number.isFinite(params.exposurePct) ? Math.max(0, params.exposurePct) : 0;
+    const unrealizedPct = Number.isFinite(params.unrealizedPct ?? Number.NaN) ? (params.unrealizedPct as number) : 0;
+    const lossPct = Math.max(0, -unrealizedPct);
+
+    let fraction = params.baseFraction;
+    let cooldownMs = params.baseCooldownMs;
+
+    if (lossPct > 0) {
+      const lossFactor = Math.min(1.6, lossPct / 10);
+      fraction += 0.08 * lossFactor;
+      cooldownMs *= Math.max(0.55, 1 - 0.2 * lossFactor);
+    }
+
+    if (exposurePct >= 15) {
+      fraction += 0.18;
+      cooldownMs *= 0.55;
+    } else if (exposurePct >= 8) {
+      fraction += 0.1;
+      cooldownMs *= 0.75;
+    } else if (exposurePct >= 3) {
+      fraction += 0.04;
+      cooldownMs *= 0.9;
+    }
+
+    const lowRiskTighten = (1 - t) * 0.08;
+    fraction += lowRiskTighten;
+    cooldownMs *= 1 - (1 - t) * 0.2;
+
+    const clampedFraction = Math.max(params.baseFraction, Math.min(0.92, Number(fraction.toFixed(4))));
+    const clampedCooldownMs = Math.max(120_000, Math.round(cooldownMs));
+    const priority = Number((exposurePct * 4 + lossPct * 2 + (exposurePct >= 15 ? 20 : exposurePct >= 8 ? 10 : 0)).toFixed(6));
+
+    return {
+      fraction: clampedFraction,
+      cooldownMs: clampedCooldownMs,
+      priority
+    };
+  }
+
   private buildDailyLossGuardSkipSummary(guard: DailyLossGuardSnapshot, homeStable: string): string {
     if (guard.trigger === "PROFIT_GIVEBACK" && guard.peakDailyRealizedPnl > 0) {
       const givebackPct = guard.profitGivebackPct * 100;
@@ -5350,42 +5398,113 @@ export class BotEngineService implements OnModuleInit {
               this.save(current);
             }
 
-            const managedForUnwind = [...this.getManagedPositions(current).values()]
-              .filter((position) => position.netQty > 0 && isExecutionQuoteSymbol(position.symbol))
-              .sort((left, right) => right.costQuote - left.costQuote);
+            const managedForUnwind = [...this.getManagedPositions(current).values()].filter(
+              (position) => position.netQty > 0 && isExecutionQuoteSymbol(position.symbol)
+            );
             const unwindPolicy = this.deriveDailyLossHaltUnwindPolicy({
               risk,
               trigger: dailyLossGuard.trigger
             });
-            const unwindCooldownMs = unwindPolicy.cooldownMs;
-            const unwindFraction = unwindPolicy.fraction;
+            const baseUnwindCooldownMs = unwindPolicy.cooldownMs;
+            const baseUnwindFraction = unwindPolicy.fraction;
+            const unwindBridgeAssets = resolveRouteBridgeAssets(config, homeStable);
+            const unwindCandidates = (
+              await Promise.all(
+                managedForUnwind.map(async (position) => {
+                  const baseAsset = getExecutionBaseFromSymbol(position.symbol);
+                  if (!baseAsset) return null;
+                  const baseFree = balances.find((b) => b.asset.toUpperCase() === baseAsset.toUpperCase())?.free ?? 0;
+                  if (!Number.isFinite(baseFree) || baseFree <= 0) return null;
 
-            for (const position of managedForUnwind) {
+                  const tradableQty = Math.min(position.netQty, baseFree);
+                  if (!Number.isFinite(tradableQty) || tradableQty <= 0) return null;
+
+                  let exposureHome = await this.estimateAssetValueInHome(baseAsset, tradableQty, homeStable, unwindBridgeAssets);
+                  const quoteAsset = getExecutionQuoteFromSymbol(position.symbol);
+                  if ((!Number.isFinite(exposureHome ?? Number.NaN) || (exposureHome ?? 0) <= 0) && quoteAsset === homeStable) {
+                    exposureHome = position.costQuote;
+                  }
+                  const normalizedExposureHome = Number.isFinite(exposureHome ?? Number.NaN) ? Math.max(0, exposureHome ?? 0) : 0;
+                  const exposurePct = walletTotalHome > 0 ? (normalizedExposureHome / walletTotalHome) * 100 : 0;
+
+                  const avgEntry = position.netQty > 0 ? position.costQuote / position.netQty : Number.NaN;
+                  let unrealizedPct: number | null = null;
+                  if (Number.isFinite(avgEntry) && avgEntry > 0) {
+                    try {
+                      const markPrice = Number.parseFloat(await this.marketData.getTickerPrice(position.symbol));
+                      if (Number.isFinite(markPrice) && markPrice > 0) {
+                        unrealizedPct = ((markPrice - avgEntry) / avgEntry) * 100;
+                      }
+                    } catch {
+                      unrealizedPct = null;
+                    }
+                  }
+
+                  const unwindExecution = this.deriveDailyLossHaltUnwindExecution({
+                    baseFraction: baseUnwindFraction,
+                    baseCooldownMs: baseUnwindCooldownMs,
+                    risk,
+                    exposurePct,
+                    unrealizedPct
+                  });
+
+                  return {
+                    position,
+                    baseAsset,
+                    baseFree,
+                    exposureHome: normalizedExposureHome,
+                    exposurePct,
+                    unrealizedPct,
+                    unwindFraction: unwindExecution.fraction,
+                    unwindCooldownMs: unwindExecution.cooldownMs,
+                    unwindPriority: unwindExecution.priority
+                  };
+                })
+              )
+            )
+              .filter((candidate): candidate is {
+                position: ManagedPosition;
+                baseAsset: string;
+                baseFree: number;
+                exposureHome: number;
+                exposurePct: number;
+                unrealizedPct: number | null;
+                unwindFraction: number;
+                unwindCooldownMs: number;
+                unwindPriority: number;
+              } => Boolean(candidate))
+              .sort((left, right) => right.unwindPriority - left.unwindPriority);
+
+            for (const unwindCandidate of unwindCandidates) {
               const recentUnwind = current.decisions.find((decision) => {
                 if (decision.kind !== "TRADE") return false;
                 const details = decision.details as Record<string, unknown> | undefined;
                 if (details?.reason !== "daily-loss-halt-unwind") return false;
-                if (typeof details?.symbol !== "string" || details.symbol.trim().toUpperCase() !== position.symbol) return false;
+                if (
+                  typeof details?.symbol !== "string" ||
+                  details.symbol.trim().toUpperCase() !== unwindCandidate.position.symbol
+                ) {
+                  return false;
+                }
                 const ts = Date.parse(decision.ts);
-                return Number.isFinite(ts) && Date.now() - ts < unwindCooldownMs;
+                return Number.isFinite(ts) && Date.now() - ts < unwindCandidate.unwindCooldownMs;
               });
               if (recentUnwind) {
                 continue;
               }
 
-              const baseAsset = getExecutionBaseFromSymbol(position.symbol);
-              if (!baseAsset) continue;
-              const baseFree = balances.find((b) => b.asset.toUpperCase() === baseAsset.toUpperCase())?.free ?? 0;
-              if (!Number.isFinite(baseFree) || baseFree <= 0) continue;
-
-              const desiredQty = Math.min(position.netQty, baseFree) * unwindFraction;
+              const desiredQty = Math.min(unwindCandidate.position.netQty, unwindCandidate.baseFree) * unwindCandidate.unwindFraction;
               if (!Number.isFinite(desiredQty) || desiredQty <= 0) continue;
 
-              const sellCheck = await this.marketData.validateMarketOrderQty(position.symbol, desiredQty);
+              const sellCheck = await this.marketData.validateMarketOrderQty(unwindCandidate.position.symbol, desiredQty);
               let sellQtyStr = sellCheck.ok ? sellCheck.normalizedQty : undefined;
               if (!sellQtyStr && sellCheck.requiredQty) {
                 const requiredQty = Number.parseFloat(sellCheck.requiredQty);
-                if (Number.isFinite(requiredQty) && requiredQty > 0 && requiredQty <= Math.min(position.netQty, baseFree) + 1e-8) {
+                if (
+                  Number.isFinite(requiredQty) &&
+                  requiredQty > 0 &&
+                  requiredQty <= Math.min(unwindCandidate.position.netQty, unwindCandidate.baseFree) + 1e-8
+                ) {
                   sellQtyStr = sellCheck.requiredQty;
                 }
               }
@@ -5396,24 +5515,24 @@ export class BotEngineService implements OnModuleInit {
 
               setLiveOperation({
                 stage: "daily-loss-halt-unwind-market-sell",
-                symbol: position.symbol,
+                symbol: unwindCandidate.position.symbol,
                 side: "SELL",
-                asset: baseAsset,
+                asset: unwindCandidate.baseAsset,
                 required: sellQty
               });
               const unwindFunds = await ensureFundsBeforeOrder({
-                asset: baseAsset,
+                asset: unwindCandidate.baseAsset,
                 required: sellQty
               });
               if (!unwindFunds.ok) continue;
 
               const unwindRes = await this.trading.placeSpotMarketOrder({
-                symbol: position.symbol,
+                symbol: unwindCandidate.position.symbol,
                 side: "SELL",
                 quantity: sellQtyStr
               });
               persistLiveTrade({
-                symbol: position.symbol,
+                symbol: unwindCandidate.position.symbol,
                 side: "SELL",
                 requestedQty: sellQtyStr,
                 fallbackQty: sellQty,
@@ -5422,13 +5541,20 @@ export class BotEngineService implements OnModuleInit {
                 details: {
                   reason: "daily-loss-halt-unwind",
                   trigger: dailyLossGuard.trigger,
-                  symbol: position.symbol,
-                  unwindFraction,
-                  unwindCooldownMs,
+                  symbol: unwindCandidate.position.symbol,
+                  unwindFraction: unwindCandidate.unwindFraction,
+                  unwindCooldownMs: unwindCandidate.unwindCooldownMs,
+                  baseUnwindFraction,
+                  baseUnwindCooldownMs,
+                  unwindPriority: unwindCandidate.unwindPriority,
+                  exposureHome: Number(unwindCandidate.exposureHome.toFixed(8)),
+                  exposurePct: Number(unwindCandidate.exposurePct.toFixed(8)),
+                  unrealizedPct:
+                    unwindCandidate.unrealizedPct === null ? null : Number(unwindCandidate.unrealizedPct.toFixed(8)),
                   managedExposurePct: dailyLossGuard.managedExposurePct,
                   profitGivebackHaltMinExposurePct: dailyLossGuard.profitGivebackHaltMinExposurePct,
-                  managedPositionQty: Number(position.netQty.toFixed(8)),
-                  managedPositionCost: Number(position.costQuote.toFixed(8))
+                  managedPositionQty: Number(unwindCandidate.position.netQty.toFixed(8)),
+                  managedPositionCost: Number(unwindCandidate.position.costQuote.toFixed(8))
                 }
               });
               return;
@@ -5465,8 +5591,8 @@ export class BotEngineService implements OnModuleInit {
                         lookbackMs: dailyLossGuard.lookbackMs,
                         windowStart: dailyLossGuard.windowStartIso,
                         candidateSymbol,
-                        unwindFraction,
-                        unwindCooldownMs
+                        unwindFraction: baseUnwindFraction,
+                        unwindCooldownMs: baseUnwindCooldownMs
                       }
                     },
                     ...current.decisions
