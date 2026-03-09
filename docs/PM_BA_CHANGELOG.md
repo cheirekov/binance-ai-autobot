@@ -39,6 +39,30 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
   - if caution skip pressure remains high, add per-symbol caution retry budget and stricter candidate demotion in next `T-032` slice.
 
+## 2026-03-09 14:15 UTC — T-032 slice: caution managed-symbol quality filter
+- Scope:
+  - reduce CAUTION no-feasible loops caused by dust/low-exposure managed symbols dominating fallback/routing.
+- BA requirement mapping:
+  - CAUTION must prioritize actionable managed exposure, not tiny residual positions.
+- PM milestone mapping:
+  - continue `T-032` with lower loop pressure and cleaner exit candidate routing in drawdown windows.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - `pickManagedFallbackSymbol(...)` now supports `minExposureHome` and filters via `isManagedPositionCountable(...)`.
+    - caution fallback passes `deriveManagedPositionMinCountableExposureHome(risk)` to ignore dust managed symbols.
+    - `managedOpenSymbolsOnly` in CAUTION now includes only countable managed positions (same exposure floor).
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression test `ignores dust managed symbols for caution fallback`.
+- Risk slider impact:
+  - existing risk-derived exposure floor is reused; no new guard thresholds introduced.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - verify reduction of `Skip: No feasible candidates: daily loss caution paused new symbols (...)`.
+  - verify fallback symbol is not repeatedly tiny dust pair when larger managed exposure exists.
+- Follow-up:
+  - if CAUTION skip pressure remains elevated, add managed-symbol universe injection for symbols missing from snapshot.
+
 ## 2026-03-08 13:20 UTC — T-032 slice: concentration rebalance exits in normal/caution markets
 - Scope:
   - reduce prolonged drawdown from oversized single-symbol holdings even when hard HALT is not active.

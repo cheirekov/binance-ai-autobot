@@ -403,6 +403,67 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(fallback).toBe("AAAUSDC");
   });
 
+  it("ignores dust managed symbols for caution fallback", () => {
+    const configuredService = new BotEngineService(
+      {
+        load: () =>
+          ({
+            basic: {
+              traderRegion: "EEA",
+              homeStableCoin: "USDC"
+            },
+            advanced: {
+              neverTradeSymbols: []
+            }
+          }) as unknown as AppConfig
+      } as unknown as ConfigService,
+      {} as unknown as BinanceMarketDataService,
+      {} as unknown as BinanceTradingService,
+      {} as unknown as ConversionRouterService,
+      {} as unknown as UniverseService
+    );
+    const configuredHelpers = configuredService as unknown as {
+      pickManagedFallbackSymbol: (params: {
+        state: BotState;
+        isExecutionQuoteSymbol: (symbol: string) => boolean;
+        minExposureHome?: number;
+      }) => string | null;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      orderHistory: [
+        {
+          id: "buy-dust",
+          ts: new Date("2026-03-01T00:00:00Z").toISOString(),
+          symbol: "DUSTUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          qty: 4,
+          price: 1
+        },
+        {
+          id: "buy-main",
+          ts: new Date("2026-03-01T00:01:00Z").toISOString(),
+          symbol: "MAINUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          qty: 3,
+          price: 4
+        }
+      ]
+    };
+
+    const fallback = configuredHelpers.pickManagedFallbackSymbol({
+      state,
+      isExecutionQuoteSymbol: (symbol) => symbol.endsWith("USDC"),
+      minExposureHome: 5
+    });
+    expect(fallback).toBe("MAINUSDC");
+  });
+
   it("classifies grid waiting skips as storm-eligible", () => {
     const helpers = service as unknown as {
       getSkipStormKey: (summary: string) => string | null;

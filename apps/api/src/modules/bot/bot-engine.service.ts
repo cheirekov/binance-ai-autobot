@@ -1667,12 +1667,14 @@ export class BotEngineService implements OnModuleInit {
   private pickManagedFallbackSymbol(params: {
     state: BotState;
     isExecutionQuoteSymbol: (symbol: string) => boolean;
+    minExposureHome?: number;
   }): string | null {
+    const minExposureHome = Number.isFinite(params.minExposureHome) ? Math.max(0, params.minExposureHome ?? 0) : 0;
     return (
       [...this.getManagedPositions(params.state).values()]
         .filter(
           (position) =>
-            position.netQty > 0 &&
+            this.isManagedPositionCountable(position, minExposureHome) &&
             params.isExecutionQuoteSymbol(position.symbol) &&
             this.isSymbolBlocked(position.symbol, params.state) === null
         )
@@ -4114,7 +4116,8 @@ export class BotEngineService implements OnModuleInit {
       if (!candidateSymbol && candidateSelection.reason === "Daily loss caution: no eligible managed symbols") {
         const managedFallbackSymbol = this.pickManagedFallbackSymbol({
           state: current,
-          isExecutionQuoteSymbol
+          isExecutionQuoteSymbol,
+          minExposureHome: this.deriveManagedPositionMinCountableExposureHome(risk)
         });
         if (managedFallbackSymbol) {
           candidateSymbol = managedFallbackSymbol;
@@ -4563,6 +4566,7 @@ export class BotEngineService implements OnModuleInit {
           tickContext.maxPositionPct = maxPositionPct;
           const managedPositions = this.getManagedPositions(current);
           const cautionManagedSymbolOnlyMinExposurePct = this.deriveCautionManagedSymbolOnlyMinExposurePct(risk);
+          const cautionManagedMinExposureHome = this.deriveManagedPositionMinCountableExposureHome(risk);
           const cautionPauseNewSymbols =
             dailyLossGuard.state === "CAUTION" &&
             (dailyLossGuard.trigger !== "PROFIT_GIVEBACK" ||
@@ -4570,7 +4574,11 @@ export class BotEngineService implements OnModuleInit {
           const managedOpenSymbolsOnly = cautionPauseNewSymbols
             ? new Set(
                 [...managedPositions.values()]
-                  .filter((position) => position.netQty > 0 && isExecutionQuoteSymbol(position.symbol))
+                  .filter(
+                    (position) =>
+                      isExecutionQuoteSymbol(position.symbol) &&
+                      this.isManagedPositionCountable(position, cautionManagedMinExposureHome)
+                  )
                   .map((position) => position.symbol.trim().toUpperCase())
               )
             : null;
