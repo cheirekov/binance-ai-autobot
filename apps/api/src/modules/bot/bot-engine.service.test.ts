@@ -344,6 +344,65 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.shouldAttemptBalanceDeltaSellFallback(100, 0)).toBe(false);
   });
 
+  it("picks largest managed symbol as caution fallback candidate", () => {
+    const configuredService = new BotEngineService(
+      {
+        load: () =>
+          ({
+            basic: {
+              traderRegion: "EEA",
+              homeStableCoin: "USDC"
+            },
+            advanced: {
+              neverTradeSymbols: []
+            }
+          }) as unknown as AppConfig
+      } as unknown as ConfigService,
+      {} as unknown as BinanceMarketDataService,
+      {} as unknown as BinanceTradingService,
+      {} as unknown as ConversionRouterService,
+      {} as unknown as UniverseService
+    );
+    const configuredHelpers = configuredService as unknown as {
+      pickManagedFallbackSymbol: (params: {
+        state: BotState;
+        isExecutionQuoteSymbol: (symbol: string) => boolean;
+      }) => string | null;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      orderHistory: [
+        {
+          id: "buy-aaa",
+          ts: new Date("2026-03-01T00:00:00Z").toISOString(),
+          symbol: "AAAUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          qty: 10,
+          price: 10
+        },
+        {
+          id: "buy-bbb",
+          ts: new Date("2026-03-01T00:01:00Z").toISOString(),
+          symbol: "BBBUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          qty: 1,
+          price: 20
+        }
+      ]
+    };
+
+    const fallback = configuredHelpers.pickManagedFallbackSymbol({
+      state,
+      isExecutionQuoteSymbol: (symbol) => symbol.endsWith("USDC")
+    });
+    expect(fallback).toBe("AAAUSDC");
+  });
+
   it("classifies grid waiting skips as storm-eligible", () => {
     const helpers = service as unknown as {
       getSkipStormKey: (summary: string) => string | null;

@@ -1664,6 +1664,22 @@ export class BotEngineService implements OnModuleInit {
     return positions;
   }
 
+  private pickManagedFallbackSymbol(params: {
+    state: BotState;
+    isExecutionQuoteSymbol: (symbol: string) => boolean;
+  }): string | null {
+    return (
+      [...this.getManagedPositions(params.state).values()]
+        .filter(
+          (position) =>
+            position.netQty > 0 &&
+            params.isExecutionQuoteSymbol(position.symbol) &&
+            this.isSymbolBlocked(position.symbol, params.state) === null
+        )
+        .sort((left, right) => right.costQuote - left.costQuote)[0]?.symbol ?? null
+    );
+  }
+
   private async getPairPrice(baseAsset: string, quoteAsset: string): Promise<number | null> {
     const base = baseAsset.trim().toUpperCase();
     const quote = quoteAsset.trim().toUpperCase();
@@ -4093,7 +4109,44 @@ export class BotEngineService implements OnModuleInit {
           return { symbol: null, candidate: null, reason: "Universe snapshot unavailable" };
         }
       })();
-      if (!candidateSelection.symbol) {
+      let candidateSymbol: string | null = candidateSelection.symbol;
+      let selectedCandidate = candidateSelection.candidate;
+      if (!candidateSymbol && candidateSelection.reason === "Daily loss caution: no eligible managed symbols") {
+        const managedFallbackSymbol = this.pickManagedFallbackSymbol({
+          state: current,
+          isExecutionQuoteSymbol
+        });
+        if (managedFallbackSymbol) {
+          candidateSymbol = managedFallbackSymbol;
+          const fallbackSnapshot = await this.universe.getLatest().catch(() => null);
+          selectedCandidate =
+            (fallbackSnapshot?.candidates ?? []).find(
+              (candidate) => candidate.symbol.trim().toUpperCase() === managedFallbackSymbol
+            ) ?? null;
+          const summary = `Caution fallback: evaluate managed symbol ${managedFallbackSymbol}`;
+          const alreadyLogged = current.decisions[0]?.kind === "ENGINE" && current.decisions[0]?.summary === summary;
+          if (!alreadyLogged) {
+            current = {
+              ...current,
+              decisions: [
+                {
+                  id: crypto.randomUUID(),
+                  ts: new Date().toISOString(),
+                  kind: "ENGINE",
+                  summary,
+                  details: {
+                    stage: "daily-loss-caution-managed-fallback",
+                    reason: candidateSelection.reason
+                  }
+                },
+                ...current.decisions
+              ].slice(0, 200)
+            } satisfies BotState;
+            this.save(current);
+          }
+        }
+      }
+      if (!candidateSymbol) {
         const summary = `Skip: ${candidateSelection.reason ?? "No eligible trading candidate"}`;
         const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
         const next = {
@@ -4108,8 +4161,6 @@ export class BotEngineService implements OnModuleInit {
         return;
       }
 
-      let candidateSymbol = candidateSelection.symbol;
-      let selectedCandidate = candidateSelection.candidate;
       tickContext.candidateSymbol = candidateSymbol;
       tickContext.candidate = selectedCandidate;
       const blockedReason = this.isSymbolBlocked(candidateSymbol, current);

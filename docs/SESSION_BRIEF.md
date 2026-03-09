@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-08 18:42 UTC
+Last updated: 2026-03-09 09:24 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -14,6 +14,7 @@ Use this file at the start and end of every batch.
   - rank HALT unwind candidates by concentration + loss severity and unwind higher-risk inventory first.
   - apply dynamic unwind fraction/cadence under HALT using risk-bounded policy.
   - add concentration-triggered partial exits before hard HALT to reduce oversized single-symbol risk.
+  - keep CAUTION path progressing by evaluating managed fallback symbol when candidate selection reports no eligible managed symbols.
   - keep existing daily-loss/Caution/Halt guard thresholds unchanged.
 - Out of scope:
   - regime redesign (`T-031`),
@@ -34,6 +35,7 @@ Use this file at the start and end of every batch.
 - API behavior:
   - HALT unwind picks concentrated losing inventory first, not only highest raw cost order.
   - unwind fraction/cooldown are dynamically adjusted but remain risk-bounded.
+  - CAUTION mode avoids early return on `Daily loss caution: no eligible managed symbols` and continues with managed fallback symbol evaluation.
 - Runtime evidence in decisions/logs:
   - `daily-loss-halt-unwind` decisions include priority/exposure/loss telemetry and show accelerated handling of top losers.
   - no guardrail regression from `T-005`.
@@ -68,24 +70,25 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `EVENING (collection) / EVENING (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `460.524`
-  - run end: `Sun Mar 08 2026 20:35:44 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `NIGHT_RUN`
+  - run duration (hours): `475.04`
+  - run end: `Mon Mar 09 2026 11:06:43 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=2, historyLimitOrders=34, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=83.0%)
-  - sizing reject pressure: `medium` (sizingRejectSkips=37, decisions=200, ratio=18.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=71, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=64.5%)
+  - sizing reject pressure: `medium` (sizingRejectSkips=25, decisions=200, ratio=12.5%)
 - Decision: `continue`
 - Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - sizing reject pressure is medium (18.5%).
+  - sizing reject pressure is medium (12.5%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260308-183556.tgz`
-  - patch: concentration partial exits enabled via `concentration-rebalance-exit` in normal/caution path.
-  - auto-updated at: `2026-03-08T18:42:43.513Z`
+  - bundle: `autobot-feedback-20260309-090658.tgz`
+  - patch: `T-032` caution managed fallback routing added to avoid no-op CAUTION skips.
+  - validate runtime: watch for lower count of `Skip: Daily loss caution: no eligible managed symbols`.
+  - auto-updated at: `2026-03-09T09:24:00.000Z`
 
 ## 5) Copy/paste prompt for next session
 

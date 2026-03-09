@@ -16,6 +16,29 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-09 09:30 UTC — T-032 slice: caution managed-fallback routing
+- Scope:
+  - prevent early no-op returns in CAUTION when candidate selection reports “no eligible managed symbols”.
+- BA requirement mapping:
+  - in caution mode, bot should still evaluate managed inventory for exits/rebalance instead of repeatedly stalling.
+- PM milestone mapping:
+  - continue `T-032` lane with focus on adaptive exits under drawdown/caution states.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added `pickManagedFallbackSymbol(...)`.
+    - when candidate selection yields `Daily loss caution: no eligible managed symbols`, bot now falls back to largest managed symbol and continues exit/rebalance path.
+    - emits engine decision `Caution fallback: evaluate managed symbol ...` for observability.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression test for managed fallback symbol selection.
+- Risk slider impact:
+  - no guard threshold changes; this is routing continuity so caution mode can still execute exits.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - verify drop in `Skip: Daily loss caution: no eligible managed symbols` and increase in exit/rebalance attempts during caution windows.
+- Follow-up:
+  - if caution skip pressure remains high, add per-symbol caution retry budget and stricter candidate demotion in next `T-032` slice.
+
 ## 2026-03-08 13:20 UTC — T-032 slice: concentration rebalance exits in normal/caution markets
 - Scope:
   - reduce prolonged drawdown from oversized single-symbol holdings even when hard HALT is not active.
