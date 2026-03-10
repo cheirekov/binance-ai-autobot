@@ -7131,16 +7131,22 @@ export class BotEngineService implements OnModuleInit {
                   ].slice(0, 200),
               lastError: undefined
             } satisfies BotState;
-            if (cooldown.storm) {
+            const applyWaitingCooldown = cooldown.storm || hasBuyLimit || hasSellLimit;
+            if (applyWaitingCooldown) {
               const nextWithCooldown = this.upsertProtectionLock(next, {
                 type: "COOLDOWN",
                 scope: "SYMBOL",
                 symbol: candidateSymbol,
-                reason: `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`,
+                reason: cooldown.storm
+                  ? `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`
+                  : `Grid ladder waiting; rotating away (${Math.round(cooldownMs / 1000)}s)`,
                 expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
                 details: {
                   category: "GRID_WAIT_ROTATE",
                   cooldownMs,
+                  hasBuyLimit,
+                  hasSellLimit,
+                  openLimitOrders: symbolOpenLimits.length,
                   ...(cooldown.storm ? { storm: cooldown.storm } : {})
                 }
               });

@@ -16,6 +16,27 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-10 15:40 UTC — T-032 evening slice: ladder-wait rotation cooldown
+- Scope:
+  - cut repeated `Grid waiting for ladder slot or inventory` loops for symbols that already have pending grid legs.
+- BA requirement mapping:
+  - reduce non-actionable skip cycling and rotate to other candidates faster when a symbol cannot place a new ladder leg yet.
+- PM milestone mapping:
+  - continue `T-032` stabilization, targeting inventory-wait loop pressure (no guardrail threshold changes).
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - in grid waiting path, bot now applies symbol cooldown not only on storm mode, but also when there is an existing buy/sell ladder leg.
+    - cooldown lock details now include `hasBuyLimit`, `hasSellLimit`, and `openLimitOrders` for clearer diagnostics.
+- Risk slider impact:
+  - no new risk limits; only retry cadence/rotation behavior changes.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - next bundle should show lower dominance of `Grid waiting for ladder slot or inventory` (especially BTCUSDC/ETHUSDC).
+  - ensure trading throughput remains stable (no drop caused by over-cooling).
+- Follow-up:
+  - if wait-loop pressure remains medium/high, next slice should tune per-symbol ladder slot budget in candidate scoring.
+
 ## 2026-03-10 12:25 UTC — T-032 day slice: quote-insufficiency quarantine for grid BUY loops
 - Scope:
   - reduce repeated `Insufficient spendable <quote> for grid BUY` skip storms in multi-quote SPOT_GRID flow.
