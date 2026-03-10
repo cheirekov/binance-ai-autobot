@@ -16,6 +16,33 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-10 12:25 UTC — T-032 day slice: quote-insufficiency quarantine for grid BUY loops
+- Scope:
+  - reduce repeated `Insufficient spendable <quote> for grid BUY` skip storms in multi-quote SPOT_GRID flow.
+- BA requirement mapping:
+  - keep bot decisions actionable and reduce repeated no-op retries when quote-family liquidity is temporarily missing.
+- PM milestone mapping:
+  - continue `T-032` stabilization lane with skip-pressure reduction, without changing daily-loss guard thresholds.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added reason-quarantine family `GRID_BUY_QUOTE`.
+    - classify `Skip ... Insufficient spendable ... for grid BUY` into this family.
+    - applied reason quarantine lock from the grid-buy quote-insufficient path.
+    - candidate selection now considers recent quote-insufficient skips:
+      - adds reject penalty weight,
+      - suppresses no-inventory symbols when `GRID_BUY_QUOTE` quarantine is active.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression test for activating `GRID_BUY_QUOTE` quarantine.
+- Risk slider impact:
+  - no new hard limits; only retry cadence and candidate suppression behavior are adapted (risk-bounded via existing quarantine policy).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - verify drop in dominant `Insufficient spendable ... for grid BUY` loops (e.g. TRXETH) in next 1–3h / overnight bundle.
+  - verify no regressions in HALT/CAUTION transitions and no new min-order reject storm.
+- Follow-up:
+  - if sizing pressure remains medium/high after quote-insuff quarantine, next slice should target min-order feasibility pressure (T-032/T-034 handoff candidate).
+
 ## 2026-03-10 10:45 UTC — T-032 day slice: execution-lane de-risk under load/exposure
 - Scope:
   - keep SPOT_GRID in safer lane when portfolio is already loaded or caution/halt risk state is active.

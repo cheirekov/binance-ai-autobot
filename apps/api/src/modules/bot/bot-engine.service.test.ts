@@ -823,7 +823,9 @@ describe("bot-engine insufficient-balance helpers", () => {
   it("activates reason-level quarantine after repeated fee-edge skips", () => {
     const helpers = service as unknown as {
       maybeApplyReasonQuarantineLock: (params: { state: BotState; summary: string; risk: number }) => BotState;
-      getActiveReasonQuarantineFamilies: (state: BotState) => Set<"FEE_EDGE" | "GRID_BUY_SIZING" | "GRID_SELL_SIZING">;
+      getActiveReasonQuarantineFamilies: (
+        state: BotState
+      ) => Set<"FEE_EDGE" | "GRID_BUY_SIZING" | "GRID_SELL_SIZING" | "GRID_BUY_QUOTE">;
     };
 
     const now = Date.now();
@@ -848,6 +850,38 @@ describe("bot-engine insufficient-balance helpers", () => {
 
     const families = helpers.getActiveReasonQuarantineFamilies(next);
     expect(families.has("FEE_EDGE")).toBe(true);
+  });
+
+  it("activates reason-level quarantine after repeated grid buy quote insufficiency skips", () => {
+    const helpers = service as unknown as {
+      maybeApplyReasonQuarantineLock: (params: { state: BotState; summary: string; risk: number }) => BotState;
+      getActiveReasonQuarantineFamilies: (
+        state: BotState
+      ) => Set<"FEE_EDGE" | "GRID_BUY_SIZING" | "GRID_SELL_SIZING" | "GRID_BUY_QUOTE">;
+    };
+
+    const now = Date.now();
+    const skipSummary = "Skip TRXETH: Insufficient spendable ETH for grid BUY";
+    const decisions = Array.from({ length: 4 }).map((_, idx) => ({
+      id: `q-${idx}`,
+      ts: new Date(now - idx * 15_000).toISOString(),
+      kind: "SKIP",
+      summary: skipSummary
+    }));
+
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions
+    };
+
+    const next = helpers.maybeApplyReasonQuarantineLock({
+      state,
+      summary: skipSummary,
+      risk: 50
+    });
+
+    const families = helpers.getActiveReasonQuarantineFamilies(next);
+    expect(families.has("GRID_BUY_QUOTE")).toBe(true);
   });
 
   it("extracts wallet policy snapshot from latest wallet-sweep decision", () => {

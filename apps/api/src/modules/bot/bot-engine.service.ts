@@ -232,7 +232,7 @@ type DailyLossGuardSnapshot = {
   windowStartIso: string;
 };
 
-type ReasonQuarantineFamily = "FEE_EDGE" | "GRID_BUY_SIZING" | "GRID_SELL_SIZING";
+type ReasonQuarantineFamily = "FEE_EDGE" | "GRID_BUY_SIZING" | "GRID_SELL_SIZING" | "GRID_BUY_QUOTE";
 
 export type BotRunStatsResponse = {
   generatedAt: string;
@@ -404,7 +404,7 @@ export class BotEngineService implements OnModuleInit {
     if (!this.isReasonQuarantineLock(lock)) return null;
     const details = this.readLockDetails(lock);
     const raw = typeof details?.family === "string" ? details.family.trim().toUpperCase() : "";
-    if (raw === "FEE_EDGE" || raw === "GRID_BUY_SIZING" || raw === "GRID_SELL_SIZING") {
+    if (raw === "FEE_EDGE" || raw === "GRID_BUY_SIZING" || raw === "GRID_SELL_SIZING" || raw === "GRID_BUY_QUOTE") {
       return raw;
     }
     return null;
@@ -881,6 +881,7 @@ export class BotEngineService implements OnModuleInit {
       const detail = lower.includes("(") ? lower.slice(lower.indexOf("(")) : lower;
       if (this.isSizingFloorRejectReason(detail)) return "GRID_BUY_SIZING";
     }
+    if (lower.includes("insufficient spendable") && lower.includes("for grid buy")) return "GRID_BUY_QUOTE";
     return null;
   }
 
@@ -903,6 +904,13 @@ export class BotEngineService implements OnModuleInit {
         threshold: Math.max(2, Math.round(3 + t * 2)), // risk 0 -> 3, risk 100 -> 5
         windowMs: 12 * 60_000,
         cooldownMs: Math.round((20 - t * 12) * 60_000) // 20m -> 8m
+      };
+    }
+    if (params.family === "GRID_BUY_QUOTE") {
+      return {
+        threshold: Math.max(2, Math.round(3 + t * 2)), // risk 0 -> 3, risk 100 -> 5
+        windowMs: 12 * 60_000,
+        cooldownMs: Math.round((16 - t * 10) * 60_000) // 16m -> 6m
       };
     }
     return {
@@ -3980,6 +3988,12 @@ export class BotEngineService implements OnModuleInit {
                 contains: "grid buy sizing rejected",
                 windowMs: 15 * 60_000
               });
+              const recentGridBuyQuoteInsufficient = this.countRecentSymbolSkipMatches({
+                state: current,
+                symbol,
+                contains: "insufficient spendable",
+                windowMs: 15 * 60_000
+              });
               const recentGridSellSizingRejects = this.countRecentSymbolSkipMatches({
                 state: current,
                 symbol,
@@ -4046,6 +4060,14 @@ export class BotEngineService implements OnModuleInit {
               if (activeReasonQuarantineFamilies.has("GRID_BUY_SIZING") && recentGridBuySizingRejects > 0 && !hasBuyLimit) {
                 continue;
               }
+              if (
+                activeReasonQuarantineFamilies.has("GRID_BUY_QUOTE") &&
+                recentGridBuyQuoteInsufficient > 0 &&
+                !hasBuyLimit &&
+                !hasInventory
+              ) {
+                continue;
+              }
 
               if (minOrderPressureActive && recentGridBuySizingRejects > 0 && !hasInventory && !hasBuyLimit && !hasSellLimit) {
                 continue;
@@ -4068,7 +4090,10 @@ export class BotEngineService implements OnModuleInit {
               const openLimitPenalty = Math.min(0.2, (openLimitCount / Math.max(1, maxGridOrdersPerSymbol)) * 0.2);
               const rejectPenalty = Math.min(
                 0.55,
-                recentGridBuySizingRejects * 0.06 + recentGridSellSizingRejects * 0.08 + recentFeeEdgeRejects * 0.04
+                recentGridBuySizingRejects * 0.06 +
+                  recentGridBuyQuoteInsufficient * 0.05 +
+                  recentGridSellSizingRejects * 0.08 +
+                  recentFeeEdgeRejects * 0.04
               );
               const minOrderPressurePenalty =
                 minOrderPressureActive && recentGridBuySizingRejects > 0 && !hasInventory ? 0.18 : 0;
@@ -6734,6 +6759,7 @@ export class BotEngineService implements OnModuleInit {
                     ...(cooldown.storm ? { storm: cooldown.storm } : {})
                   }
                 });
+                pendingNoActionState = this.maybeApplyReasonQuarantineLock({ state: pendingNoActionState, summary, risk });
               } else {
                 const buyCheck = await this.marketData.validateLimitOrderQty(candidateSymbol, buyQtyTarget, buyPriceNorm.normalizedPrice);
               let buyQtyStr: string | undefined = buyCheck.ok ? buyCheck.normalizedQty : undefined;
