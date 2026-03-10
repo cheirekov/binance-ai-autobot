@@ -16,6 +16,34 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-10 10:45 UTC — T-032 day slice: execution-lane de-risk under load/exposure
+- Scope:
+  - keep SPOT_GRID in safer lane when portfolio is already loaded or caution/halt risk state is active.
+- BA requirement mapping:
+  - reduce churn and avoid market-only continuation when open managed inventory/exposure is already high.
+- PM milestone mapping:
+  - continue `T-032` (exit manager v2) with bounded execution-lane control; no strategy family redesign.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - wired runtime context into `resolveExecutionLane(...)`:
+      - `riskState`,
+      - `managedOpenPositions` (countable exposure only),
+      - `managedExposurePct`.
+    - lane policy now:
+      - `HALT` -> `DEFENSIVE`,
+      - `CAUTION` with open managed positions -> `DEFENSIVE`,
+      - strong trend preference can still run, but downgrades from `MARKET` to `GRID` when managed load/exposure is already high.
+    - reused existing risk-scaled countable-position floor to avoid dust inflating managed load.
+- Risk slider impact:
+  - no hard guard threshold changes; this tunes execution-lane selection based on existing risk-linked exposure state.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - verify lower persistence of market-only/no-op windows while CAUTION/HALT or high managed exposure is present.
+  - verify no increase in min-order reject storm after lane downgrades.
+- Follow-up:
+  - if skip pressure stays low and CAUTION persistence improves, keep this in `T-032` evidence set and proceed to next exit-manager slice.
+
 ## 2026-03-09 09:30 UTC — T-032 slice: caution managed-fallback routing
 - Scope:
   - prevent early no-op returns in CAUTION when candidate selection reports “no eligible managed symbols”.

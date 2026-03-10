@@ -2951,21 +2951,32 @@ export class BotEngineService implements OnModuleInit {
     tradeMode: "SPOT" | "SPOT_GRID";
     gridEnabled: boolean;
     risk: number;
+    riskState: "NORMAL" | "CAUTION" | "HALT";
+    managedOpenPositions: number;
+    managedExposurePct: number;
     regime: AdaptiveRegimeSnapshot;
     strategy: AdaptiveStrategyScores;
   }): AdaptiveExecutionLane {
     if (params.tradeMode !== "SPOT_GRID" || !params.gridEnabled) return "MARKET";
+    if (params.riskState === "HALT") return "DEFENSIVE";
+    if (params.riskState === "CAUTION" && params.managedOpenPositions > 0) return "DEFENSIVE";
 
     const bearPauseThreshold = this.getBearPauseConfidenceThreshold(params.risk);
     const bullTrendThreshold = this.toRounded(0.56 + (Math.max(0, Math.min(100, params.risk)) / 100) * 0.18, 4); // 0.56..0.74
     const regimeConfidence = Number.isFinite(params.regime.confidence) ? params.regime.confidence : 0;
+    const managedLoadThreshold = Math.max(3, Math.round(2 + Math.max(0, Math.min(100, params.risk)) / 40)); // risk 0 -> 3, risk 100 -> 5
+    const managedLoadHigh = params.managedOpenPositions >= managedLoadThreshold;
+    const managedExposureHigh =
+      Number.isFinite(params.managedExposurePct) &&
+      params.managedExposurePct >= Number((0.18 + (Math.max(0, Math.min(100, params.risk)) / 100) * 0.12).toFixed(4)); // 18%..30%
+    const restrictMarketLane = managedLoadHigh || managedExposureHigh;
 
     if (params.regime.label === "BEAR_TREND" && regimeConfidence >= bearPauseThreshold) {
       return "DEFENSIVE";
     }
 
     if (params.regime.label === "BULL_TREND" && regimeConfidence >= bullTrendThreshold) {
-      return "MARKET";
+      return restrictMarketLane ? "GRID" : "MARKET";
     }
 
     if (params.regime.label === "RANGE") {
@@ -2973,7 +2984,7 @@ export class BotEngineService implements OnModuleInit {
     }
 
     if (params.strategy.recommended === "TREND" && params.strategy.trend >= params.strategy.grid + 0.08) {
-      return "MARKET";
+      return restrictMarketLane ? "GRID" : "MARKET";
     }
 
     return "GRID";
@@ -5046,18 +5057,6 @@ export class BotEngineService implements OnModuleInit {
           const candidateBaseAsset = rules.baseAsset.toUpperCase();
           const tradeMode = config?.basic.tradeMode ?? "SPOT";
           const configuredGridEnabled = Boolean(config?.derived.allowGrid && tradeMode === "SPOT_GRID");
-          const selectedRegime = this.buildRegimeSnapshot(selectedCandidate ?? null);
-          const selectedStrategy = this.buildAdaptiveStrategyScores(selectedCandidate ?? null, selectedRegime.label);
-          const executionLane = this.resolveExecutionLane({
-            tradeMode,
-            gridEnabled: configuredGridEnabled,
-            risk,
-            regime: selectedRegime,
-            strategy: selectedStrategy
-          });
-          tickContext.executionLane = executionLane;
-          const gridEnabled = configuredGridEnabled && executionLane !== "MARKET";
-
           const managedOpenHomeSymbols = [...managedPositions.values()].filter(
             (position) => position.netQty > 0 && isExecutionQuoteSymbol(position.symbol)
           );
@@ -5065,6 +5064,21 @@ export class BotEngineService implements OnModuleInit {
           const countableOpenHomePositions = managedOpenHomeSymbols.filter((position) =>
             this.isManagedPositionCountable(position, minCountableExposureHome)
           );
+          const selectedRegime = this.buildRegimeSnapshot(selectedCandidate ?? null);
+          const selectedStrategy = this.buildAdaptiveStrategyScores(selectedCandidate ?? null, selectedRegime.label);
+          const executionLane = this.resolveExecutionLane({
+            tradeMode,
+            gridEnabled: configuredGridEnabled,
+            risk,
+            riskState: dailyLossGuard.state,
+            managedOpenPositions: countableOpenHomePositions.length,
+            managedExposurePct: Number.isFinite(dailyLossGuard.managedExposurePct) ? dailyLossGuard.managedExposurePct : 0,
+            regime: selectedRegime,
+            strategy: selectedStrategy
+          });
+          tickContext.executionLane = executionLane;
+          const gridEnabled = configuredGridEnabled && executionLane !== "MARKET";
+
           const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
           tickContext.maxOpenPositions = maxOpenPositions;
           const candidateIsOpen = (managedPositions.get(candidateSymbol)?.netQty ?? 0) > 0;
