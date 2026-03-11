@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-10 17:32 UTC
+Last updated: 2026-03-11 10:02 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -19,6 +19,7 @@ Use this file at the start and end of every batch.
   - de-risk SPOT_GRID execution lane under load: force DEFENSIVE in HALT/active-CAUTION inventory and prefer GRID over MARKET when managed load/exposure is high.
   - quarantine repeated `Insufficient spendable <quote> for grid BUY` skip families to rotate away from temporarily untradeable quote-liquidity conditions.
   - apply rotation cooldown for symbols that are in ladder-wait state (existing grid legs), to reduce repeated wait-loop picks.
+  - trigger sizing/quote reason quarantines earlier under high-risk mode and use longer base cooldown for ladder-wait loops.
   - keep existing daily-loss/Caution/Halt guard thresholds unchanged.
 - Out of scope:
   - regime redesign (`T-031`),
@@ -54,7 +55,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `11ddd2d`
+- Commit hash: `a481f66`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -75,23 +76,23 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `EVENING (collection) / EVENING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `507.458`
-  - run end: `Tue Mar 10 2026 19:31:47 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `NIGHT_RUN`
+  - run duration (hours): `523.968`
+  - run end: `Wed Mar 11 2026 12:02:22 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=5, historyLimitOrders=73, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=63.5%)
-  - sizing reject pressure: `medium` (sizingRejectSkips=27, decisions=200, ratio=13.5%)
-- Decision: `continue`
-- Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=3, historyLimitOrders=154, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=23.0%)
+  - sizing reject pressure: `high` (sizingRejectSkips=86, decisions=200, ratio=43.0%)
+- Decision: `pivot`
+- Next ticket candidate: `PM/BA-TRIAGE` (triage required before lane change)
 - Open risks:
-  - sizing reject pressure is medium (13.5%).
+  - sizing reject pressure is high (43.0%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260310-173201.tgz`
-  - auto-updated at: `2026-03-10T17:32:14.901Z`
+  - bundle: `autobot-feedback-20260311-100233.tgz`
+  - auto-updated at: `2026-03-11T10:02:47.326Z`
 
 ## 5) Copy/paste prompt for next session
 

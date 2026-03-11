@@ -16,6 +16,31 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-11 10:20 UTC — T-032 pivot mitigation: high sizing/wait pressure dampening
+- Scope:
+  - respond to high sizing reject pressure (`pivot` signal) by reducing repeated infeasible retries and extending ladder-wait rotation intervals.
+- BA requirement mapping:
+  - keep execution adaptive while preventing skip-dominated loops that produce no actionable trades.
+- PM milestone mapping:
+  - stay on `T-032`; this is a stabilization slice before any ticket pivot.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - adjusted reason-quarantine thresholds for sizing/quote families to trigger earlier at high risk:
+      - `GRID_BUY_SIZING`, `GRID_SELL_SIZING`, `GRID_BUY_QUOTE` now use risk-aware threshold `5 -> 3` (risk 0 -> risk 100).
+    - increased base cooldown for `Grid waiting for ladder slot or inventory` from fixed `>=60s` to risk-based guard cooldown (`deriveGridGuardNoInventoryCooldownMs`) to reduce repeated ETHUSDC/BTCUSDC wait loops.
+- Risk slider impact:
+  - risk still controls aggression; high risk remains aggressive but now quarantines repeated infeasible families sooner.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - next run should reduce:
+    - `Skip ETHUSDC: Grid waiting for ladder slot or inventory`
+    - `Skip: No feasible candidates after sizing/cap filters (...)`
+    - min-order sizing reject share.
+  - verify trade throughput remains non-zero and risk state behavior stays stable.
+- Follow-up:
+  - if sizingRejectPressure remains `high`, prepare PM/BA triage note for scoped `T-034` handoff focused only on min-order feasibility planning.
+
 ## 2026-03-10 15:40 UTC — T-032 evening slice: ladder-wait rotation cooldown
 - Scope:
   - cut repeated `Grid waiting for ladder slot or inventory` loops for symbols that already have pending grid legs.
