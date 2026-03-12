@@ -1806,6 +1806,70 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(0.03);
   });
 
+  it("suppresses stalled grid candidates when they cannot take action", () => {
+    const helpers = service as unknown as {
+      shouldSuppressGridStalledCandidate: (params: {
+        canTakeAction: boolean;
+        waiting: boolean;
+        buyPaused: boolean;
+        hasInventory: boolean;
+        recentInventoryWaitingSkips: number;
+        inventoryWaitingPressureActive: boolean;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldSuppressGridStalledCandidate({
+        canTakeAction: false,
+        waiting: false,
+        buyPaused: true,
+        hasInventory: false,
+        recentInventoryWaitingSkips: 0,
+        inventoryWaitingPressureActive: false
+      })
+    ).toBe(true);
+    expect(
+      helpers.shouldSuppressGridStalledCandidate({
+        canTakeAction: false,
+        waiting: true,
+        buyPaused: false,
+        hasInventory: true,
+        recentInventoryWaitingSkips: 2,
+        inventoryWaitingPressureActive: false
+      })
+    ).toBe(true);
+    expect(
+      helpers.shouldSuppressGridStalledCandidate({
+        canTakeAction: false,
+        waiting: true,
+        buyPaused: false,
+        hasInventory: true,
+        recentInventoryWaitingSkips: 0,
+        inventoryWaitingPressureActive: true
+      })
+    ).toBe(true);
+    expect(
+      helpers.shouldSuppressGridStalledCandidate({
+        canTakeAction: false,
+        waiting: true,
+        buyPaused: false,
+        hasInventory: true,
+        recentInventoryWaitingSkips: 1,
+        inventoryWaitingPressureActive: false
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldSuppressGridStalledCandidate({
+        canTakeAction: true,
+        waiting: true,
+        buyPaused: true,
+        hasInventory: false,
+        recentInventoryWaitingSkips: 10,
+        inventoryWaitingPressureActive: true
+      })
+    ).toBe(false);
+  });
+
   it("scales global-lock unwind cooldown with risk", () => {
     const helpers = service as unknown as {
       deriveGlobalLockUnwindCooldownMs: (risk: number) => number;

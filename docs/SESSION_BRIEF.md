@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-12 13:17 UTC
+Last updated: 2026-03-12 16:20 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,7 +9,7 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-032` (Exit manager v2)
-- Goal (single sentence): reduce CAUTION freeze loops by aligning new-symbol pause threshold with PROFIT_GIVEBACK halt exposure floor.
+- Goal (single sentence): reduce repeated no-action grid loops by suppressing stalled symbols while preserving the T-032 exit-manager behavior.
 - In scope:
   - rank HALT unwind candidates by concentration + loss severity and unwind higher-risk inventory first.
   - apply dynamic unwind fraction/cadence under HALT using risk-bounded policy.
@@ -22,6 +22,7 @@ Use this file at the start and end of every batch.
   - trigger sizing/quote reason quarantines earlier under high-risk mode and use longer base cooldown for ladder-wait loops.
   - use trigger-aware CAUTION pause threshold (PROFIT_GIVEBACK uses halt exposure floor) in both candidate selection and execution skip paths.
   - parse runtime risk-state trigger/floor codes to keep selection behavior consistent with runtime guard context.
+  - suppress re-selection of stalled grid symbols when BUY is paused with no inventory or ladder-wait repeats are already established.
   - keep existing daily-loss/Caution/Halt guard thresholds unchanged.
 - Out of scope:
   - regime redesign (`T-031`),
@@ -45,9 +46,11 @@ Use this file at the start and end of every batch.
   - CAUTION mode avoids early return on `Daily loss caution: no eligible managed symbols` and continues with managed fallback symbol evaluation.
   - CAUTION managed-symbol candidate set excludes dust exposure and prefers actionable managed symbols.
   - CAUTION new-symbol pause in PROFIT_GIVEBACK mode releases once managed exposure drops below halt exposure floor (instead of base caution floor).
+  - grid candidate fallback no longer repeatedly reselects clearly stalled symbols with no actionable leg.
 - Runtime evidence in decisions/logs:
   - `daily-loss-halt-unwind` decisions include priority/exposure/loss telemetry and show accelerated handling of top losers.
   - fewer repeats of `No feasible candidates: daily loss caution paused new symbols (...)` when managed exposure sits near halt floor.
+  - lower recurrence of `Grid guard paused BUY leg` / `Grid guard active (no inventory to sell)` / same-symbol ladder-wait loops.
   - no guardrail regression from `T-005`.
 - Risk slider impact:
   - risk still bounds baseline unwind policy; dynamic boosts must not bypass hard caps.
@@ -59,7 +62,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `38a8dc3+dirty`
+- Commit hash: `797bab0+dirty`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -93,10 +96,10 @@ Use this file at the start and end of every batch.
 - Decision: `pending`
 - Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - CAUTION freeze can still recur if reason codes are missing/malformed in persisted risk state.
+  - sizing reject pressure was medium in the pre-patch baseline bundle and may become the next blocker after stalled-loop suppression.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260312-131646.tgz` (pre-patch baseline)
-  - apply this patch, deploy, then collect next day/night bundle for T-032 evidence.
+  - bundle: `autobot-feedback-20260312-161224.tgz` (pre-patch baseline)
+  - deploy this patch without state reset and collect the next evening/night bundle for loop-pressure comparison.
 
 ## 5) Copy/paste prompt for next session
 

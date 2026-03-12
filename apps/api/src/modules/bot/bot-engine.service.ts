@@ -580,6 +580,21 @@ export class BotEngineService implements OnModuleInit {
     return params.managedExposurePct >= params.minManagedExposurePct;
   }
 
+  private shouldSuppressGridStalledCandidate(params: {
+    canTakeAction: boolean;
+    waiting: boolean;
+    buyPaused: boolean;
+    hasInventory: boolean;
+    recentInventoryWaitingSkips: number;
+    inventoryWaitingPressureActive: boolean;
+  }): boolean {
+    if (params.canTakeAction) return false;
+    if (params.buyPaused && !params.hasInventory) return true;
+    if (!params.waiting) return false;
+    if (params.inventoryWaitingPressureActive) return true;
+    return params.recentInventoryWaitingSkips >= 2;
+  }
+
   private deriveGlobalLockUnwindCooldownMs(risk: number): number {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
     const t = boundedRisk / 100;
@@ -4118,12 +4133,23 @@ export class BotEngineService implements OnModuleInit {
                 !hasBuyLimit && !buyPaused && !suppressBuyLegFromRejectStorm && !hasEntryGuard && (!openPositionCapReached || hasInventory);
               const missingSellLeg = !hasSellLimit && hasInventory && sellLegLikelyFeasible && !suppressSellLegFromRejectStorm;
               const canTakeAction = missingBuyLeg || missingSellLeg;
+              const waiting = hasBuyLimit && hasSellLimit;
               const hasGuardNoInventoryNoLadder = buyPaused && !hasInventory && !hasBuyLimit && !hasSellLimit;
               if (hasGuardNoInventoryNoLadder) {
                 continue;
               }
+              const suppressStalledCandidate = this.shouldSuppressGridStalledCandidate({
+                canTakeAction,
+                waiting,
+                buyPaused,
+                hasInventory,
+                recentInventoryWaitingSkips,
+                inventoryWaitingPressureActive
+              });
+              if (suppressStalledCandidate) {
+                continue;
+              }
 
-              const waiting = hasBuyLimit && hasSellLimit;
               const waitingPenalty = waiting ? 0.3 : 0;
               const guardNoInventoryPenalty = buyPaused && !hasInventory ? 0.45 : 0;
               const bearTrendGridPenalty =

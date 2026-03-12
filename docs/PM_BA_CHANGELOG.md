@@ -16,6 +16,33 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-12 14:20 UTC — T-032 day slice: suppress stalled grid candidate re-selection
+- Scope:
+  - reduce repeat selection of symbols that are already stalled and cannot take any grid action.
+- BA requirement mapping:
+  - keep exit/execution adaptation actionable by rotating away from buy-paused/no-inventory symbols and repeated ladder-wait loops.
+- PM milestone mapping:
+  - continue `T-032`; this is a loop-pressure reduction slice, not a regime or multi-quote redesign.
+- Technical changes:
+  - [apps/api/src/modules/bot/bot-engine.service.ts](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.ts): added `shouldSuppressGridStalledCandidate(...)`.
+  - candidate selection now skips non-actionable grid symbols when:
+    - BUY is paused and there is no inventory to work with,
+    - ladder-wait repeats are already visible (`>=2`) or waiting pressure is active.
+  - this prevents stalled symbols such as `ACXUSDC` / `PIXELUSDC` from repeatedly winning the fallback candidate slot.
+  - [apps/api/src/modules/bot/bot-engine.service.test.ts](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.test.ts): added regression coverage for stalled-candidate suppression behavior.
+- Risk slider impact:
+  - no guard thresholds changed; this only affects retry rotation for symbols that currently have no actionable leg.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - next bundle should show lower counts for:
+    - `Grid guard paused BUY leg`
+    - `Grid guard active (no inventory to sell)`
+    - repeated `Grid waiting for ladder slot or inventory` on the same symbol.
+  - verify trade throughput does not collapse while those loops decline.
+- Follow-up:
+  - if medium sizing pressure remains after this slice, next `T-032` patch should target min-order sell/buy reject suppression for dust-sized managed symbols.
+
 ## 2026-03-12 12:35 UTC — T-032 day slice: CAUTION recovery gating aligned to PROFIT_GIVEBACK floor
 - Scope:
   - reduce CAUTION no-action loops when managed exposure is already below PROFIT_GIVEBACK halt floor.
