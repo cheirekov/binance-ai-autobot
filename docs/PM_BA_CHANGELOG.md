@@ -16,6 +16,38 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-12 12:35 UTC — T-032 day slice: CAUTION recovery gating aligned to PROFIT_GIVEBACK floor
+- Scope:
+  - reduce CAUTION no-action loops when managed exposure is already below PROFIT_GIVEBACK halt floor.
+- BA requirement mapping:
+  - keep guardrails intact while restoring adaptive exit/entry flow once risk exposure is sufficiently reduced.
+- PM milestone mapping:
+  - continue `T-032` active lane; no regime/multi-quote redesign in this slice.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added runtime risk-state parsers:
+      - `extractRiskStateTrigger(...)`
+      - `extractRiskStateHaltExposureFloorPct(...)`
+    - added `deriveCautionPauseNewSymbolsMinExposurePct(...)` to compute trigger-aware CAUTION pause floor.
+    - candidate selection now uses trigger-aware floor when deciding `restrictToManagedSymbolsInCaution`.
+    - execution path now uses same trigger-aware floor for `cautionPauseNewSymbols` checks.
+    - skip decision details now include `cautionPauseNewSymbolsMinExposurePct` for diagnostics.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression tests for:
+      - risk-state trigger/halt-floor extraction,
+      - trigger-aware caution pause floor derivation.
+- Risk slider impact:
+  - baseline caution floor still scales with risk; PROFIT_GIVEBACK path now respects dynamic halt exposure floor as minimum release threshold.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - verify reduced dominance of:
+    - `No feasible candidates: daily loss caution paused new symbols (...)`
+    - `Daily loss caution paused GRID BUY leg`
+  - verify CAUTION remains active when needed, but transitions to actionable flow once managed exposure drops below halt floor.
+- Follow-up:
+  - if loops persist with `managedExposure < haltExposureFloor`, triage to `T-031` for regime routing interactions.
+
 ## 2026-03-11 10:20 UTC — T-032 pivot mitigation: high sizing/wait pressure dampening
 - Scope:
   - respond to high sizing reject pressure (`pivot` signal) by reducing repeated infeasible retries and extending ladder-wait rotation intervals.

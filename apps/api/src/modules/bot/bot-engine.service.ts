@@ -531,6 +531,41 @@ export class BotEngineService implements OnModuleInit {
     return pct / 100;
   }
 
+  private extractRiskStateTrigger(
+    riskState: BotState["riskState"] | undefined
+  ): DailyLossGuardSnapshot["trigger"] | null {
+    const raw = riskState?.reason_codes?.find((reason) => reason.startsWith("trigger="));
+    if (!raw) return null;
+    const match = /^trigger=(NONE|ABS_DAILY_LOSS|PROFIT_GIVEBACK)$/i.exec(raw.trim());
+    if (!match) return null;
+    return match[1].toUpperCase() as DailyLossGuardSnapshot["trigger"];
+  }
+
+  private extractRiskStateHaltExposureFloorPct(riskState: BotState["riskState"] | undefined): number | null {
+    const raw = riskState?.reason_codes?.find((reason) => reason.startsWith("haltExposureFloor="));
+    if (!raw) return null;
+    const match = /^haltExposureFloor=([0-9]+(?:\.[0-9]+)?)%$/i.exec(raw.trim());
+    if (!match) return null;
+    const pct = Number.parseFloat(match[1]);
+    if (!Number.isFinite(pct) || pct < 0) return null;
+    return pct / 100;
+  }
+
+  private deriveCautionPauseNewSymbolsMinExposurePct(params: {
+    risk: number;
+    trigger: DailyLossGuardSnapshot["trigger"];
+    haltExposureFloorPct: number | null;
+  }): number {
+    const base = this.deriveCautionManagedSymbolOnlyMinExposurePct(params.risk);
+    if (params.trigger !== "PROFIT_GIVEBACK") {
+      return base;
+    }
+    if (params.haltExposureFloorPct === null || !Number.isFinite(params.haltExposureFloorPct)) {
+      return base;
+    }
+    return Math.max(base, Math.max(0, params.haltExposureFloorPct));
+  }
+
   private shouldRestrictCautionToManagedSymbols(params: {
     tradeMode: AppConfig["basic"]["tradeMode"];
     riskState: DailyLossGuardSnapshot["state"];
@@ -3878,7 +3913,6 @@ export class BotEngineService implements OnModuleInit {
           const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(boundedRisk / 25)));
           const positions = tradeMode === "SPOT_GRID" ? this.getManagedPositions(current) : null;
           const minCountableExposureHome = this.deriveManagedPositionMinCountableExposureHome(boundedRisk);
-          const cautionManagedSymbolOnlyMinExposurePct = this.deriveCautionManagedSymbolOnlyMinExposurePct(boundedRisk);
           const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
           const activeReasonQuarantineFamilies = this.getActiveReasonQuarantineFamilies(current);
           const openHomePositionCount =
@@ -3891,12 +3925,19 @@ export class BotEngineService implements OnModuleInit {
               : 0;
           const selectionRiskState = current.riskState?.state ?? "NORMAL";
           const selectionManagedExposurePct = this.extractRiskStateManagedExposurePct(current.riskState);
+          const selectionTrigger = this.extractRiskStateTrigger(current.riskState) ?? "NONE";
+          const selectionHaltExposureFloorPct = this.extractRiskStateHaltExposureFloorPct(current.riskState);
+          const selectionCautionMinManagedExposurePct = this.deriveCautionPauseNewSymbolsMinExposurePct({
+            risk: boundedRisk,
+            trigger: selectionTrigger,
+            haltExposureFloorPct: selectionHaltExposureFloorPct
+          });
           const restrictToManagedSymbolsInCaution = this.shouldRestrictCautionToManagedSymbols({
             tradeMode,
             riskState: selectionRiskState,
             openHomePositionCount,
             managedExposurePct: selectionManagedExposurePct,
-            minManagedExposurePct: cautionManagedSymbolOnlyMinExposurePct
+            minManagedExposurePct: selectionCautionMinManagedExposurePct
           });
           const recentMinOrderSkipsGlobal = this.countRecentSkipCluster({
             state: current,
@@ -4601,12 +4642,16 @@ export class BotEngineService implements OnModuleInit {
           const maxPositionPct = config?.derived.maxPositionPct ?? 1;
           tickContext.maxPositionPct = maxPositionPct;
           const managedPositions = this.getManagedPositions(current);
-          const cautionManagedSymbolOnlyMinExposurePct = this.deriveCautionManagedSymbolOnlyMinExposurePct(risk);
           const cautionManagedMinExposureHome = this.deriveManagedPositionMinCountableExposureHome(risk);
+          const cautionPauseNewSymbolsMinExposurePct = this.deriveCautionPauseNewSymbolsMinExposurePct({
+            risk,
+            trigger: dailyLossGuard.trigger,
+            haltExposureFloorPct: dailyLossGuard.profitGivebackHaltMinExposurePct
+          });
           const cautionPauseNewSymbols =
             dailyLossGuard.state === "CAUTION" &&
             (dailyLossGuard.trigger !== "PROFIT_GIVEBACK" ||
-              dailyLossGuard.managedExposurePct >= cautionManagedSymbolOnlyMinExposurePct);
+              dailyLossGuard.managedExposurePct >= cautionPauseNewSymbolsMinExposurePct);
           const managedOpenSymbolsOnly = cautionPauseNewSymbols
             ? new Set(
                 [...managedPositions.values()]
@@ -5134,7 +5179,8 @@ export class BotEngineService implements OnModuleInit {
                         maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs,
                         maxDailyLossPct: dailyLossGuard.maxDailyLossPct,
                         managedExposurePct: dailyLossGuard.managedExposurePct,
-                        cautionManagedSymbolOnlyMinExposurePct,
+                        cautionManagedSymbolOnlyMinExposurePct: cautionPauseNewSymbolsMinExposurePct,
+                        cautionPauseNewSymbolsMinExposurePct,
                         lookbackMs: dailyLossGuard.lookbackMs,
                         windowStart: dailyLossGuard.windowStartIso,
                         cooldownMs
@@ -7190,7 +7236,8 @@ export class BotEngineService implements OnModuleInit {
                         maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs,
                         maxDailyLossPct: dailyLossGuard.maxDailyLossPct,
                         managedExposurePct: dailyLossGuard.managedExposurePct,
-                        cautionManagedSymbolOnlyMinExposurePct,
+                        cautionManagedSymbolOnlyMinExposurePct: cautionPauseNewSymbolsMinExposurePct,
+                        cautionPauseNewSymbolsMinExposurePct,
                         lookbackMs: dailyLossGuard.lookbackMs,
                         windowStart: dailyLossGuard.windowStartIso,
                         cooldownMs

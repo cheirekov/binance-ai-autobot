@@ -1734,6 +1734,78 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBeNull();
   });
 
+  it("extracts risk-state trigger and halt exposure floor from reasons", () => {
+    const helpers = service as unknown as {
+      extractRiskStateTrigger: (riskState:
+        | {
+            state: "NORMAL" | "CAUTION" | "HALT";
+            reason_codes: string[];
+            unwind_only: boolean;
+            resume_conditions: string[];
+          }
+        | undefined) => "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK" | null;
+      extractRiskStateHaltExposureFloorPct: (riskState:
+        | {
+            state: "NORMAL" | "CAUTION" | "HALT";
+            reason_codes: string[];
+            unwind_only: boolean;
+            resume_conditions: string[];
+          }
+        | undefined) => number | null;
+    };
+
+    const riskState = {
+      state: "CAUTION" as const,
+      reason_codes: ["DAILY_LOSS_GUARD", "trigger=PROFIT_GIVEBACK", "managedExposure=7.9%", "haltExposureFloor=8.0%"],
+      unwind_only: false,
+      resume_conditions: []
+    };
+
+    expect(helpers.extractRiskStateTrigger(riskState)).toBe("PROFIT_GIVEBACK");
+    expect(helpers.extractRiskStateHaltExposureFloorPct(riskState)).toBeCloseTo(0.08, 8);
+    expect(helpers.extractRiskStateTrigger(undefined)).toBeNull();
+    expect(
+      helpers.extractRiskStateHaltExposureFloorPct({
+        state: "CAUTION",
+        reason_codes: ["haltExposureFloor=bad"],
+        unwind_only: false,
+        resume_conditions: []
+      })
+    ).toBeNull();
+  });
+
+  it("uses halt exposure floor for PROFIT_GIVEBACK caution pause threshold", () => {
+    const helpers = service as unknown as {
+      deriveCautionPauseNewSymbolsMinExposurePct: (params: {
+        risk: number;
+        trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK";
+        haltExposureFloorPct: number | null;
+      }) => number;
+    };
+
+    expect(
+      helpers.deriveCautionPauseNewSymbolsMinExposurePct({
+        risk: 100,
+        trigger: "PROFIT_GIVEBACK",
+        haltExposureFloorPct: 0.08
+      })
+    ).toBe(0.08);
+    expect(
+      helpers.deriveCautionPauseNewSymbolsMinExposurePct({
+        risk: 100,
+        trigger: "PROFIT_GIVEBACK",
+        haltExposureFloorPct: null
+      })
+    ).toBe(0.03);
+    expect(
+      helpers.deriveCautionPauseNewSymbolsMinExposurePct({
+        risk: 100,
+        trigger: "ABS_DAILY_LOSS",
+        haltExposureFloorPct: 0.08
+      })
+    ).toBe(0.03);
+  });
+
   it("scales global-lock unwind cooldown with risk", () => {
     const helpers = service as unknown as {
       deriveGlobalLockUnwindCooldownMs: (risk: number) => number;

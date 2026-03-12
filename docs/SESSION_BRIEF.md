@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-11 10:02 UTC
+Last updated: 2026-03-12 13:17 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,7 +9,7 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-032` (Exit manager v2)
-- Goal (single sentence): improve exit adaptation so concentrated losing exposure is reduced faster in HALT and normal/caution windows.
+- Goal (single sentence): reduce CAUTION freeze loops by aligning new-symbol pause threshold with PROFIT_GIVEBACK halt exposure floor.
 - In scope:
   - rank HALT unwind candidates by concentration + loss severity and unwind higher-risk inventory first.
   - apply dynamic unwind fraction/cadence under HALT using risk-bounded policy.
@@ -20,6 +20,8 @@ Use this file at the start and end of every batch.
   - quarantine repeated `Insufficient spendable <quote> for grid BUY` skip families to rotate away from temporarily untradeable quote-liquidity conditions.
   - apply rotation cooldown for symbols that are in ladder-wait state (existing grid legs), to reduce repeated wait-loop picks.
   - trigger sizing/quote reason quarantines earlier under high-risk mode and use longer base cooldown for ladder-wait loops.
+  - use trigger-aware CAUTION pause threshold (PROFIT_GIVEBACK uses halt exposure floor) in both candidate selection and execution skip paths.
+  - parse runtime risk-state trigger/floor codes to keep selection behavior consistent with runtime guard context.
   - keep existing daily-loss/Caution/Halt guard thresholds unchanged.
 - Out of scope:
   - regime redesign (`T-031`),
@@ -42,8 +44,10 @@ Use this file at the start and end of every batch.
   - unwind fraction/cooldown are dynamically adjusted but remain risk-bounded.
   - CAUTION mode avoids early return on `Daily loss caution: no eligible managed symbols` and continues with managed fallback symbol evaluation.
   - CAUTION managed-symbol candidate set excludes dust exposure and prefers actionable managed symbols.
+  - CAUTION new-symbol pause in PROFIT_GIVEBACK mode releases once managed exposure drops below halt exposure floor (instead of base caution floor).
 - Runtime evidence in decisions/logs:
   - `daily-loss-halt-unwind` decisions include priority/exposure/loss telemetry and show accelerated handling of top losers.
+  - fewer repeats of `No feasible candidates: daily loss caution paused new symbols (...)` when managed exposure sits near halt floor.
   - no guardrail regression from `T-005`.
 - Risk slider impact:
   - risk still bounds baseline unwind policy; dynamic boosts must not bypass hard caps.
@@ -55,7 +59,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `a481f66`
+- Commit hash: `38a8dc3+dirty`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -76,23 +80,23 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `DAY (collection) / DAY (run end)`
+  - window (local): `PENDING`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `523.968`
-  - run end: `Wed Mar 11 2026 12:02:22 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `DAY_RUN`
-  - cycle source: `auto-inferred`
+  - run duration (hours): `pending`
+  - run end: `pending`
+  - declared cycle: `pending`
+  - cycle source: `pending`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=3, historyLimitOrders=154, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=23.0%)
-  - sizing reject pressure: `high` (sizingRejectSkips=86, decisions=200, ratio=43.0%)
-- Decision: `pivot`
-- Next ticket candidate: `PM/BA-TRIAGE` (triage required before lane change)
+  - open LIMIT lifecycle observed: `pending`
+  - market-only share reduced: `pending`
+  - sizing reject pressure: `pending`
+- Decision: `pending`
+- Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - sizing reject pressure is high (43.0%).
+  - CAUTION freeze can still recur if reason codes are missing/malformed in persisted risk state.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260311-100233.tgz`
-  - auto-updated at: `2026-03-11T10:02:47.326Z`
+  - bundle: `autobot-feedback-20260312-131646.tgz` (pre-patch baseline)
+  - apply this patch, deploy, then collect next day/night bundle for T-032 evidence.
 
 ## 5) Copy/paste prompt for next session
 
