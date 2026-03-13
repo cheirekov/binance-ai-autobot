@@ -16,6 +16,32 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-13 14:50 UTC — T-032 day slice: suppress CAUTION sell-ladder-only re-selection
+- Scope:
+  - reduce repeated selection of managed symbols that already have a resting SELL ladder but cannot add a BUY leg in CAUTION.
+- BA requirement mapping:
+  - keep `T-032` exit handling actionable and reduce no-op loops when the bot is already waiting on existing sell ladders.
+- PM milestone mapping:
+  - continue `T-032`; this is loop-pressure cleanup within the current execution/exit lane.
+- Technical changes:
+  - [apps/api/src/modules/bot/bot-engine.service.ts](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.ts): expanded `shouldSuppressGridStalledCandidate(...)` so a symbol is treated as stalled when:
+    - `BUY` is paused,
+    - no actionable leg exists,
+    - and there is already a resting SELL limit.
+  - this targets bundles where symbols like `XRPUSDC`, `ETHUSDC`, `SOLUSDC`, `BNBUSDC` keep reappearing as `Grid waiting for ladder slot or inventory` while only a sell ladder is resting.
+  - [apps/api/src/modules/bot/bot-engine.service.test.ts](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.test.ts): extended regression coverage for sell-ladder-only stalled suppression.
+- Risk slider impact:
+  - none; no guard or sizing threshold changes.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - next bundle should show lower recurrence of:
+    - `Grid waiting for ladder slot or inventory` on managed symbols with only a SELL limit
+    - `Daily loss caution paused GRID BUY leg` on those same symbols
+  - verify realized PnL / throughput do not collapse while this loop noise drops.
+- Follow-up:
+  - if CAUTION still produces high generic `paused new symbols` pressure after this slice, next patch should demote non-home quote candidates earlier during CAUTION routing.
+
 ## 2026-03-13 09:26 UTC — T-032 day slice: partial live-order sync resilience on exchange 502s
 - Scope:
   - stop one symbol-scoped `openOrders` failure from forcing a full live-order sync failure and long global backoff.

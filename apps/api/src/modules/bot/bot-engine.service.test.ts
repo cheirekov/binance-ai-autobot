@@ -1813,6 +1813,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         waiting: boolean;
         buyPaused: boolean;
         hasInventory: boolean;
+        hasSellLimit: boolean;
         recentInventoryWaitingSkips: number;
         inventoryWaitingPressureActive: boolean;
       }) => boolean;
@@ -1824,6 +1825,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         waiting: false,
         buyPaused: true,
         hasInventory: false,
+        hasSellLimit: false,
         recentInventoryWaitingSkips: 0,
         inventoryWaitingPressureActive: false
       })
@@ -1834,6 +1836,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         waiting: true,
         buyPaused: false,
         hasInventory: true,
+        hasSellLimit: true,
         recentInventoryWaitingSkips: 2,
         inventoryWaitingPressureActive: false
       })
@@ -1844,8 +1847,20 @@ describe("bot-engine insufficient-balance helpers", () => {
         waiting: true,
         buyPaused: false,
         hasInventory: true,
+        hasSellLimit: true,
         recentInventoryWaitingSkips: 0,
         inventoryWaitingPressureActive: true
+      })
+    ).toBe(true);
+    expect(
+      helpers.shouldSuppressGridStalledCandidate({
+        canTakeAction: false,
+        waiting: false,
+        buyPaused: true,
+        hasInventory: true,
+        hasSellLimit: true,
+        recentInventoryWaitingSkips: 0,
+        inventoryWaitingPressureActive: false
       })
     ).toBe(true);
     expect(
@@ -1854,6 +1869,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         waiting: true,
         buyPaused: false,
         hasInventory: true,
+        hasSellLimit: true,
         recentInventoryWaitingSkips: 1,
         inventoryWaitingPressureActive: false
       })
@@ -1864,6 +1880,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         waiting: true,
         buyPaused: true,
         hasInventory: false,
+        hasSellLimit: true,
         recentInventoryWaitingSkips: 10,
         inventoryWaitingPressureActive: true
       })
