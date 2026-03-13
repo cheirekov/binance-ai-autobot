@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-13 14:51 UTC
+Last updated: 2026-03-13 15:06 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,7 +9,7 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-032` (Exit manager v2)
-- Goal (single sentence): reduce CAUTION loop pressure from managed symbols that only have resting SELL ladders and no actionable BUY leg.
+- Goal (single sentence): reduce T-032 loop pressure from laddered symbols that already have resting orders but no actionable missing leg.
 - In scope:
   - rank HALT unwind candidates by concentration + loss severity and unwind higher-risk inventory first.
   - apply dynamic unwind fraction/cadence under HALT using risk-bounded policy.
@@ -25,6 +25,7 @@ Use this file at the start and end of every batch.
   - suppress re-selection of stalled grid symbols when BUY is paused with no inventory or ladder-wait repeats are already established.
   - preserve tracked open orders when some symbol-scoped live sync calls fail but others succeed.
   - suppress re-selection of managed CAUTION symbols that already have only a resting SELL limit and cannot open a BUY leg.
+  - suppress re-selection of non-actionable laddered symbols even when they already have both BUY+SELL limits resting.
   - keep existing daily-loss/Caution/Halt guard thresholds unchanged.
 - Out of scope:
   - regime redesign (`T-031`),
@@ -51,6 +52,7 @@ Use this file at the start and end of every batch.
   - grid candidate fallback no longer repeatedly reselects clearly stalled symbols with no actionable leg.
   - live order sync tolerates partial symbol failure and only enters global backoff on full sync failure.
   - managed symbols with only a resting SELL ladder while BUY is paused are treated as stalled and rotated away.
+  - symbols with resting ladder orders but no missing actionable leg are rotated away immediately during candidate selection.
 - Runtime evidence in decisions/logs:
   - `daily-loss-halt-unwind` decisions include priority/exposure/loss telemetry and show accelerated handling of top losers.
   - fewer repeats of `No feasible candidates: daily loss caution paused new symbols (...)` when managed exposure sits near halt floor.
@@ -68,7 +70,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `0b21845+dirty`
+- Commit hash: `092026c+dirty`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -89,23 +91,25 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `PENDING`
+  - window (local): `EVENING (collection) / EVENING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `pending`
-  - run end: `pending`
-  - declared cycle: `pending`
-  - cycle source: `pending`
+  - run duration (hours): `579.158`
+  - run end: `Fri Mar 13 2026 19:13:46 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `NIGHT_RUN`
+  - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `pending`
-  - market-only share reduced: `pending`
-  - sizing reject pressure: `pending`
-- Decision: `pending`
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=6, historyLimitOrders=161, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=19.5%)
+  - sizing reject pressure: `medium` (sizingRejectSkips=37, decisions=200, ratio=18.5%)
+- Decision: `continue`
 - Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - sizing reject pressure remains medium in the pre-patch baseline bundle, but the immediate dominant loop is managed sell-ladder waiting inside CAUTION.
+  - sizing reject pressure is medium (18.5%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260313-144451.tgz` (pre-patch baseline)
-  - deploy this patch without state reset and collect the next evening/night bundle for CAUTION loop comparison.
+  - bundle: `autobot-feedback-20260313-171401.tgz`
+  - this bundle is pre-patch baseline for repeated `XRPUSDC` / `RENDERUSDC` ladder-wait loops with existing resting ladder orders.
+  - next deploy: no state reset; verify those loop reasons stop dominating while active orders remain visible.
+  - auto-updated at: `2026-03-13T15:06:00Z`
 
 ## 5) Copy/paste prompt for next session
 

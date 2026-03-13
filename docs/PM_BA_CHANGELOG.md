@@ -16,6 +16,30 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-13 15:05 UTC — T-032 day slice: suppress re-selection of non-actionable laddered symbols
+- Scope:
+  - stop candidate selection from revisiting symbols that already have resting ladder orders but no missing actionable leg.
+- BA requirement mapping:
+  - keep `T-032` execution/exit routing focused on symbols where the bot can actually add, unwind, or rebalance exposure instead of re-scoring parked ladders.
+- PM milestone mapping:
+  - continue `T-032`; this is same-ticket loop mitigation triggered by PM/BA gate failure on repeated `Grid waiting for ladder slot or inventory`.
+- Technical changes:
+  - [apps/api/src/modules/bot/bot-engine.service.ts:583](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.ts#L583): expanded `shouldSuppressGridStalledCandidate(...)` so any symbol with resting ladder orders and no actionable missing leg is suppressed immediately during candidate selection.
+  - [apps/api/src/modules/bot/bot-engine.service.ts:4164](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.ts#L4164): candidate selection now passes both `hasBuyLimit` and `hasSellLimit` into stalled suppression.
+  - [apps/api/src/modules/bot/bot-engine.service.test.ts:1811](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.test.ts#L1811): extended regression coverage for one-sided and two-sided non-actionable ladder states.
+  - [docs/TRIAGE_NOTE_2026-03-13_T032_WAITING_LADDERS_RESELECTED.md:1](/home/yc/work/binance-ai-autobot/docs/TRIAGE_NOTE_2026-03-13_T032_WAITING_LADDERS_RESELECTED.md#L1): recorded PM/BA triage note for the repeated `XRPUSDC` wait-loop signature.
+- Risk slider impact:
+  - none; this does not loosen or tighten risk limits, only skips parked ladder symbols earlier.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - next bundle should show lower recurrence of:
+    - `Skip XRPUSDC: Grid waiting for ladder slot or inventory`
+    - `Skip RENDERUSDC: Grid waiting for ladder slot or inventory`
+  - active order maintenance should still keep those ladder orders visible until they fill or expire.
+- Follow-up:
+  - if wait-loop dominance remains after this slice, escalate from symbol rotation to family-level quarantine for `GRID_WAIT_ROTATE`.
+
 ## 2026-03-13 14:50 UTC — T-032 day slice: suppress CAUTION sell-ladder-only re-selection
 - Scope:
   - reduce repeated selection of managed symbols that already have a resting SELL ladder but cannot add a BUY leg in CAUTION.

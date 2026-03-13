@@ -1813,6 +1813,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         waiting: boolean;
         buyPaused: boolean;
         hasInventory: boolean;
+        hasBuyLimit: boolean;
         hasSellLimit: boolean;
         recentInventoryWaitingSkips: number;
         inventoryWaitingPressureActive: boolean;
@@ -1825,6 +1826,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         waiting: false,
         buyPaused: true,
         hasInventory: false,
+        hasBuyLimit: false,
         hasSellLimit: false,
         recentInventoryWaitingSkips: 0,
         inventoryWaitingPressureActive: false
@@ -1836,6 +1838,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         waiting: true,
         buyPaused: false,
         hasInventory: true,
+        hasBuyLimit: true,
         hasSellLimit: true,
         recentInventoryWaitingSkips: 2,
         inventoryWaitingPressureActive: false
@@ -1847,6 +1850,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         waiting: true,
         buyPaused: false,
         hasInventory: true,
+        hasBuyLimit: true,
         hasSellLimit: true,
         recentInventoryWaitingSkips: 0,
         inventoryWaitingPressureActive: true
@@ -1858,6 +1862,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         waiting: false,
         buyPaused: true,
         hasInventory: true,
+        hasBuyLimit: false,
         hasSellLimit: true,
         recentInventoryWaitingSkips: 0,
         inventoryWaitingPressureActive: false
@@ -1866,20 +1871,22 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(
       helpers.shouldSuppressGridStalledCandidate({
         canTakeAction: false,
-        waiting: true,
+        waiting: false,
         buyPaused: false,
-        hasInventory: true,
-        hasSellLimit: true,
-        recentInventoryWaitingSkips: 1,
+        hasInventory: false,
+        hasBuyLimit: true,
+        hasSellLimit: false,
+        recentInventoryWaitingSkips: 0,
         inventoryWaitingPressureActive: false
       })
-    ).toBe(false);
+    ).toBe(true);
     expect(
       helpers.shouldSuppressGridStalledCandidate({
         canTakeAction: true,
         waiting: true,
         buyPaused: true,
         hasInventory: false,
+        hasBuyLimit: true,
         hasSellLimit: true,
         recentInventoryWaitingSkips: 10,
         inventoryWaitingPressureActive: true

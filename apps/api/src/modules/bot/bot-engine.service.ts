@@ -585,12 +585,14 @@ export class BotEngineService implements OnModuleInit {
     waiting: boolean;
     buyPaused: boolean;
     hasInventory: boolean;
+    hasBuyLimit: boolean;
     hasSellLimit: boolean;
     recentInventoryWaitingSkips: number;
     inventoryWaitingPressureActive: boolean;
   }): boolean {
     if (params.canTakeAction) return false;
     if (params.buyPaused && (!params.hasInventory || params.hasSellLimit)) return true;
+    if (params.hasBuyLimit || params.hasSellLimit) return true;
     if (!params.waiting) return false;
     if (params.inventoryWaitingPressureActive) return true;
     return params.recentInventoryWaitingSkips >= 2;
@@ -4166,6 +4168,7 @@ export class BotEngineService implements OnModuleInit {
                 waiting,
                 buyPaused,
                 hasInventory,
+                hasBuyLimit,
                 hasSellLimit,
                 recentInventoryWaitingSkips,
                 inventoryWaitingPressureActive
