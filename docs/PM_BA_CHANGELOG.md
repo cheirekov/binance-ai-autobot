@@ -16,6 +16,32 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-13 09:26 UTC — T-032 day slice: partial live-order sync resilience on exchange 502s
+- Scope:
+  - stop one symbol-scoped `openOrders` failure from forcing a full live-order sync failure and long global backoff.
+- BA requirement mapping:
+  - keep execution adaptive and observable even when Binance testnet has intermittent gateway failures on some symbols.
+- PM milestone mapping:
+  - continue `T-032`; this is execution-stability hardening inside the active lane.
+- Technical changes:
+  - [apps/api/src/modules/bot/bot-engine.service.ts](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.ts): `syncLiveOrders(...)` now performs per-symbol sync collection and degrades partially:
+    - successful symbol syncs are applied,
+    - failed symbol syncs preserve existing tracked open orders for those symbols,
+    - a full throw/backoff only happens if every tracked symbol sync fails.
+  - this prevents testnet `502 Bad Gateway` on one `openOrders(symbol)` call from pausing the whole bot for 10 minutes.
+  - [apps/api/src/modules/bot/bot-engine.service.test.ts](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.test.ts): added regression test for partial sync success with one failed symbol.
+- Risk slider impact:
+  - none; this changes exchange-sync fault tolerance only.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - next bundle should show lower counts for:
+    - `Skip: Live order sync failed`
+    - `Skip: Transient exchange backoff active`
+  - verify open-order reconciliation still works and active order count remains plausible.
+- Follow-up:
+  - if global backoff remains dominant after this patch, narrow the backoff registration logic to systemic exchange failures only.
+
 ## 2026-03-12 14:20 UTC — T-032 day slice: suppress stalled grid candidate re-selection
 - Scope:
   - reduce repeat selection of symbols that are already stalled and cannot take any grid action.

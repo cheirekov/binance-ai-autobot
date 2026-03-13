@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-12 16:20 UTC
+Last updated: 2026-03-13 09:27 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,7 +9,7 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-032` (Exit manager v2)
-- Goal (single sentence): reduce repeated no-action grid loops by suppressing stalled symbols while preserving the T-032 exit-manager behavior.
+- Goal (single sentence): harden live order sync so intermittent per-symbol testnet 502s do not trigger coarse global backoff.
 - In scope:
   - rank HALT unwind candidates by concentration + loss severity and unwind higher-risk inventory first.
   - apply dynamic unwind fraction/cadence under HALT using risk-bounded policy.
@@ -23,6 +23,7 @@ Use this file at the start and end of every batch.
   - use trigger-aware CAUTION pause threshold (PROFIT_GIVEBACK uses halt exposure floor) in both candidate selection and execution skip paths.
   - parse runtime risk-state trigger/floor codes to keep selection behavior consistent with runtime guard context.
   - suppress re-selection of stalled grid symbols when BUY is paused with no inventory or ladder-wait repeats are already established.
+  - preserve tracked open orders when some symbol-scoped live sync calls fail but others succeed.
   - keep existing daily-loss/Caution/Halt guard thresholds unchanged.
 - Out of scope:
   - regime redesign (`T-031`),
@@ -47,10 +48,12 @@ Use this file at the start and end of every batch.
   - CAUTION managed-symbol candidate set excludes dust exposure and prefers actionable managed symbols.
   - CAUTION new-symbol pause in PROFIT_GIVEBACK mode releases once managed exposure drops below halt exposure floor (instead of base caution floor).
   - grid candidate fallback no longer repeatedly reselects clearly stalled symbols with no actionable leg.
+  - live order sync tolerates partial symbol failure and only enters global backoff on full sync failure.
 - Runtime evidence in decisions/logs:
   - `daily-loss-halt-unwind` decisions include priority/exposure/loss telemetry and show accelerated handling of top losers.
   - fewer repeats of `No feasible candidates: daily loss caution paused new symbols (...)` when managed exposure sits near halt floor.
   - lower recurrence of `Grid guard paused BUY leg` / `Grid guard active (no inventory to sell)` / same-symbol ladder-wait loops.
+  - lower recurrence of `Skip: Live order sync failed` / `Skip: Transient exchange backoff active`.
   - no guardrail regression from `T-005`.
 - Risk slider impact:
   - risk still bounds baseline unwind policy; dynamic boosts must not bypass hard caps.
@@ -62,7 +65,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `797bab0+dirty`
+- Commit hash: `3be8dfb+dirty`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -96,10 +99,10 @@ Use this file at the start and end of every batch.
 - Decision: `pending`
 - Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - sizing reject pressure was medium in the pre-patch baseline bundle and may become the next blocker after stalled-loop suppression.
+  - sizing reject pressure remains medium in the pre-patch baseline bundle and may become the next blocker once exchange-sync backoff is reduced.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260312-161224.tgz` (pre-patch baseline)
-  - deploy this patch without state reset and collect the next evening/night bundle for loop-pressure comparison.
+  - bundle: `autobot-feedback-20260313-091421.tgz` (pre-patch baseline)
+  - deploy this patch without state reset and collect the next day/night bundle to compare exchange-sync skip pressure.
 
 ## 5) Copy/paste prompt for next session
 

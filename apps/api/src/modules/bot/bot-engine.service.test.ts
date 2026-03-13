@@ -2249,4 +2249,70 @@ describe("bot-engine live order sync", () => {
     expect(synced.activeOrders.some((order) => order.id === "2002")).toBe(true);
     expect(synced.decisions[0]?.summary).toContain("Discovered 1 additional open order(s)");
   });
+
+  it("preserves tracked open orders when one symbol sync fails but others succeed", async () => {
+    const calls: string[] = [];
+    const trading = {
+      getOpenOrders: async (symbol?: string) => {
+        const normalized = (symbol ?? "").trim().toUpperCase();
+        calls.push(normalized);
+        if (normalized === "BTCUSDC") {
+          throw new Error("binance GET /openOrders 502 Bad Gateway");
+        }
+        if (normalized === "ETHUSDC") {
+          return [
+            {
+              symbol: "ETHUSDC",
+              orderId: "2002",
+              side: "SELL",
+              type: "LIMIT",
+              status: "NEW",
+              origQty: "0.5",
+              executedQty: "0.0",
+              price: "2200",
+              transactTime: Date.parse("2026-02-16T08:05:00.000Z"),
+              clientOrderId: "MANUAL-ETH"
+            }
+          ];
+        }
+        return [];
+      }
+    } as unknown as BinanceTradingService;
+
+    const service = new BotEngineService(
+      { load: () => null } as unknown as ConfigService,
+      {} as unknown as BinanceMarketDataService,
+      trading,
+      {} as unknown as ConversionRouterService,
+      {} as unknown as UniverseService
+    );
+
+    const state: BotState = {
+      ...defaultBotState(),
+      activeOrders: [
+        {
+          id: "1001",
+          ts: "2026-02-16T08:00:00.000Z",
+          symbol: "BTCUSDC",
+          clientOrderId: "ABOT-OLD-BTC",
+          side: "BUY",
+          type: "LIMIT",
+          status: "NEW",
+          qty: 0.01,
+          price: 100000
+        }
+      ]
+    };
+
+    const synced = await (
+      service as unknown as {
+        syncLiveOrders: (state: BotState, opts?: { symbolsHint?: string[] }) => Promise<BotState>;
+      }
+    ).syncLiveOrders(state, { symbolsHint: ["ETHUSDC"] });
+
+    expect(calls).toContain("BTCUSDC");
+    expect(calls).toContain("ETHUSDC");
+    expect(synced.activeOrders.some((order) => order.id === "1001")).toBe(true);
+    expect(synced.activeOrders.some((order) => order.id === "2002")).toBe(true);
+  });
 });

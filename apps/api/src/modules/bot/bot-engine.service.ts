@@ -2861,18 +2861,40 @@ export class BotEngineService implements OnModuleInit {
 
     if (trackedSymbols.length === 0) return state;
 
-    const openSnapshots = (
-      await Promise.all(
-        trackedSymbols.map(async (symbol) => {
-          return await this.trading.getOpenOrders(symbol);
-        })
-      )
-    ).flat();
-    const openOrders = openSnapshots
+    const syncResults = await Promise.all(
+      trackedSymbols.map(async (symbol) => {
+        try {
+          const snapshots = await this.trading.getOpenOrders(symbol);
+          return { symbol, snapshots, error: null as unknown };
+        } catch (error) {
+          return { symbol, snapshots: [] as BinanceOrderSnapshot[], error };
+        }
+      })
+    );
+    const successfulSyncs = syncResults.filter((result) => result.error === null);
+    const failedSyncs = syncResults.filter((result) => result.error !== null);
+    if (successfulSyncs.length === 0 && failedSyncs.length > 0) {
+      throw failedSyncs[0].error;
+    }
+
+    const failedSymbols = new Set(failedSyncs.map((result) => result.symbol));
+    const openSnapshots = successfulSyncs.flatMap((result) => result.snapshots);
+    const openOrdersFromExchange = openSnapshots
       .map((snapshot) => this.mapExchangeOrderToStateOrder(snapshot))
       .filter((order): order is Order => Boolean(order))
       .filter((order) => order.status === "NEW")
       .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts));
+    const preservedFailedSymbolOrders =
+      failedSymbols.size > 0
+        ? state.activeOrders.filter(
+            (order) => order.status === "NEW" && failedSymbols.has(order.symbol.trim().toUpperCase())
+          )
+        : [];
+    const openOrders = Array.from(
+      new Map<string, Order>(
+        [...openOrdersFromExchange, ...preservedFailedSymbolOrders].map((order) => [order.id, order])
+      ).values()
+    ).sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts));
     const openById = new Set(openOrders.map((order) => order.id));
 
     const closedActiveOrders = state.activeOrders.filter((order) => !openById.has(order.id));
