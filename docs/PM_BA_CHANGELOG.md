@@ -16,6 +16,26 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-14 11:20 UTC — T-032 day slice: classify minQty reserve-floor rejects as quote insufficiency
+- Scope:
+  - finish the reserve-floor quote-starvation reclassification for `Below minQty ...` grid BUY rejects that do not expose `requiredQty`.
+- BA requirement mapping:
+  - keep `T-032` reject metrics honest by routing unfundable reserve-floor attempts into quote insufficiency instead of leaving them in the sizing bucket.
+- PM milestone mapping:
+  - continue `T-032`; this is a direct follow-up to the previous same-ticket mitigation after the next bundle still showed high sizing pressure on `SUIUSDC`, `SOLUSDC`, `DOGEUSDC`, and `LINKUSDC`.
+- Technical changes:
+  - [apps/api/src/modules/bot/bot-engine.service.ts:601](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.ts#L601): `shouldTreatGridBuySizingRejectAsQuoteInsufficient(...)` now also parses `Below minQty ...` reasons and compares the minimum buffered cost against spendable quote.
+  - [apps/api/src/modules/bot/bot-engine.service.test.ts:1899](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.test.ts#L1899): added regression coverage for minQty-only quote-starvation rejects.
+- Risk slider impact:
+  - none; reserve policy and risk limits are unchanged.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - next bundle should move `SUIUSDC` / `SOLUSDC` / `DOGEUSDC` / `LINKUSDC` reserve-floor buy rejects from `Grid buy sizing rejected` into `Insufficient spendable <quote> for grid BUY`.
+  - sizingRejectPressure should drop again from the current high baseline.
+- Follow-up:
+  - if high pressure remains after this slice, add selection-time buy-leg feasibility filtering for reserve-starved symbols.
+
 ## 2026-03-14 11:00 UTC — T-032 day slice: reclassify reserve-floor buy rejects as quote insufficiency
 - Scope:
   - stop treating reserve-floor quote starvation as symbol-level grid buy sizing pressure.

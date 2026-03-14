@@ -616,6 +616,15 @@ export class BotEngineService implements OnModuleInit {
       }
     }
 
+    const minQtyMatch = params.check.reason?.match(/Below minQty\s+([0-9.]+)/i);
+    const minQty = minQtyMatch ? Number.parseFloat(minQtyMatch[1]) : Number.NaN;
+    if (Number.isFinite(minQty) && minQty > 0 && Number.isFinite(params.price) && params.price > 0) {
+      const minQtyBufferedCost = minQty * params.price * Math.max(1, params.bufferFactor);
+      if (Number.isFinite(minQtyBufferedCost) && minQtyBufferedCost > quoteSpendable + 1e-8) {
+        return true;
+      }
+    }
+
     const minNotional = params.check.minNotional ? Number.parseFloat(params.check.minNotional) : Number.NaN;
     if (Number.isFinite(minNotional) && minNotional > quoteSpendable + 1e-8) {
       return true;

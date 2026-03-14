@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-14 11:02 UTC
+Last updated: 2026-03-14 11:21 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -27,6 +27,7 @@ Use this file at the start and end of every batch.
   - suppress re-selection of managed CAUTION symbols that already have only a resting SELL limit and cannot open a BUY leg.
   - suppress re-selection of non-actionable laddered symbols even when they already have both BUY+SELL limits resting.
   - reclassify grid buy sizing rejects into quote insufficiency when spendable quote cannot fund the minimum order.
+  - cover `Below minQty ...` reserve-floor rejects even when Binance omits `requiredQty`.
   - keep existing daily-loss/Caution/Halt guard thresholds unchanged.
 - Out of scope:
   - regime redesign (`T-031`),
@@ -55,6 +56,7 @@ Use this file at the start and end of every batch.
   - managed symbols with only a resting SELL ladder while BUY is paused are treated as stalled and rotated away.
   - symbols with resting ladder orders but no missing actionable leg are rotated away immediately during candidate selection.
   - reserve-starved BUY attempts show up as quote insufficiency / quote quarantine instead of dominating sizing-reject metrics.
+  - reserve-floor `Below minQty ...` BUY rejects also flow into the quote-insufficiency path.
 - Runtime evidence in decisions/logs:
   - `daily-loss-halt-unwind` decisions include priority/exposure/loss telemetry and show accelerated handling of top losers.
   - fewer repeats of `No feasible candidates: daily loss caution paused new symbols (...)` when managed exposure sits near halt floor.
@@ -72,7 +74,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `8a5c356+dirty`
+- Commit hash: `a2cddcd+dirty`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -93,25 +95,26 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `DAY (collection) / DAY (run end)`
+  - window (local): `EVENING (collection) / EVENING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `596.6`
-  - run end: `Sat Mar 14 2026 12:40:20 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `DAY_RUN`
+  - run duration (hours): `602.978`
+  - run end: `Sat Mar 14 2026 19:02:58 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=2, historyLimitOrders=173, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=14.4%)
-  - sizing reject pressure: `high` (sizingRejectSkips=93, decisions=200, ratio=46.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=3, historyLimitOrders=174, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=13.4%)
+  - sizing reject pressure: `high` (sizingRejectSkips=52, decisions=200, ratio=26.0%)
 - Decision: `continue`
-- Next ticket candidate: `T-032` (same-ticket mitigation for reserve-floor quote starvation)
+- Next ticket candidate: `T-032` (same-ticket mitigation for remaining minQty quote-starvation rejects)
 - Open risks:
-  - sizing reject pressure is high (46.5%), but the dominant rejects are reserve-floor quote starvation with `quoteSpendable` near zero.
+  - sizing reject pressure is still high (26.0%), but the dominant remaining symbols are still reserve-floor BUY attempts with `quoteSpendable` near zero.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260314-104045.tgz`
-  - this bundle is pre-patch baseline for reserve-floor `Grid buy sizing rejected (...)` loops where `quoteSpendable` is effectively zero.
-  - next deploy: no state reset; verify those skips move into `Insufficient spendable <quote> for grid BUY` / quote quarantine and that sizingRejectPressure falls.
-  - auto-updated at: `2026-03-14T11:02:00Z`
+  - bundle: `autobot-feedback-20260314-170304.tgz`
+  - latest bundle showed the first quote-starvation reclassification working for `BANANAS31USDC`, `TAOUSDC`, and `TRUMPUSDC`.
+  - remaining `SUIUSDC`, `SOLUSDC`, `DOGEUSDC`, and `LINKUSDC` rejects are still reserve-floor `Below minQty ...` cases and are the target of this follow-up patch.
+  - next deploy: no state reset; verify those symbols also move into `Insufficient spendable <quote> for grid BUY` / quote quarantine and that sizingRejectPressure falls again.
+  - auto-updated at: `2026-03-14T11:21:00Z`
 
 ## 5) Copy/paste prompt for next session
 

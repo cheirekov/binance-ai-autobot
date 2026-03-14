@@ -1939,6 +1939,19 @@ describe("bot-engine insufficient-balance helpers", () => {
         quoteSpendable: 6
       })
     ).toBe(false);
+
+    expect(
+      helpers.shouldTreatGridBuySizingRejectAsQuoteInsufficient({
+        check: {
+          ok: false,
+          reason: "Below minQty 0.10000000",
+          normalizedQty: "0"
+        },
+        price: 1,
+        bufferFactor: 1,
+        quoteSpendable: 0.04
+      })
+    ).toBe(true);
   });
 
   it("scales global-lock unwind cooldown with risk", () => {
