@@ -16,6 +16,28 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-14 11:00 UTC — T-032 day slice: reclassify reserve-floor buy rejects as quote insufficiency
+- Scope:
+  - stop treating reserve-floor quote starvation as symbol-level grid buy sizing pressure.
+- BA requirement mapping:
+  - keep `T-032` telemetry and loop controls aligned with the real failure mode so the bot rotates away from unfundable buy legs instead of inflating sizing-reject pressure.
+- PM milestone mapping:
+  - continue `T-032`; this is a same-ticket mitigation triggered by PM/BA triage from `autobot-feedback-20260314-104045.tgz`.
+- Technical changes:
+  - [apps/api/src/modules/bot/bot-engine.service.ts:600](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.ts#L600): added `shouldTreatGridBuySizingRejectAsQuoteInsufficient(...)`.
+  - [apps/api/src/modules/bot/bot-engine.service.ts:6934](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.ts#L6934): grid buy LIMIT flow now converts sizing rejects into `Insufficient spendable <quote> for grid BUY` when the minimum required order cost exceeds spendable quote balance.
+  - [apps/api/src/modules/bot/bot-engine.service.test.ts:1896](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.test.ts#L1896): added regression coverage for quote-starvation reclassification.
+  - [docs/TRIAGE_NOTE_2026-03-14_T032_BUY_SIZING_IS_QUOTE_STARVATION.md:1](/home/yc/work/binance-ai-autobot/docs/TRIAGE_NOTE_2026-03-14_T032_BUY_SIZING_IS_QUOTE_STARVATION.md#L1): recorded PM/BA triage note for the bundle-driven mitigation.
+- Risk slider impact:
+  - none; reserve floor and risk caps are unchanged.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - next bundle should show lower `Grid buy sizing rejected (...)` counts for reserve-starved symbols and higher attribution to `Insufficient spendable <quote> for grid BUY` / `GRID_BUY_QUOTE` quarantine.
+  - sizingRejectPressure should drop from `high`.
+- Follow-up:
+  - if high sizing pressure persists after reclassification, add selection-time buy-leg feasibility filtering for reserve-starved symbols.
+
 ## 2026-03-13 15:05 UTC — T-032 day slice: suppress re-selection of non-actionable laddered symbols
 - Scope:
   - stop candidate selection from revisiting symbols that already have resting ladder orders but no missing actionable leg.

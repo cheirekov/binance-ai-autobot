@@ -598,6 +598,32 @@ export class BotEngineService implements OnModuleInit {
     return params.recentInventoryWaitingSkips >= 2;
   }
 
+  private shouldTreatGridBuySizingRejectAsQuoteInsufficient(params: {
+    check: MarketQtyValidation;
+    price: number;
+    bufferFactor: number;
+    quoteSpendable: number;
+  }): boolean {
+    if (params.check.ok) return false;
+    const quoteSpendable = Number.isFinite(params.quoteSpendable) ? Math.max(0, params.quoteSpendable) : 0;
+    if (quoteSpendable <= 0) return true;
+
+    const requiredQty = params.check.requiredQty ? Number.parseFloat(params.check.requiredQty) : Number.NaN;
+    if (Number.isFinite(requiredQty) && requiredQty > 0 && Number.isFinite(params.price) && params.price > 0) {
+      const requiredBufferedCost = requiredQty * params.price * Math.max(1, params.bufferFactor);
+      if (Number.isFinite(requiredBufferedCost) && requiredBufferedCost > quoteSpendable + 1e-8) {
+        return true;
+      }
+    }
+
+    const minNotional = params.check.minNotional ? Number.parseFloat(params.check.minNotional) : Number.NaN;
+    if (Number.isFinite(minNotional) && minNotional > quoteSpendable + 1e-8) {
+      return true;
+    }
+
+    return false;
+  }
+
   private deriveGlobalLockUnwindCooldownMs(risk: number): number {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
     const t = boundedRisk / 100;
@@ -6936,6 +6962,66 @@ export class BotEngineService implements OnModuleInit {
                   }
                 }
               } else if (buyCheck.reason) {
+                const sizingIsQuoteInsufficient = this.shouldTreatGridBuySizingRejectAsQuoteInsufficient({
+                  check: buyCheck,
+                  price: buyPrice,
+                  bufferFactor,
+                  quoteSpendable
+                });
+                if (sizingIsQuoteInsufficient) {
+                  const summary = `Skip ${candidateSymbol}: Insufficient spendable ${candidateQuoteAsset} for grid BUY`;
+                  const baseCooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
+                  const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
+                  const cooldownMs = cooldown.cooldownMs;
+                  const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+                  const next = {
+                    ...current,
+                    activeOrders: current.activeOrders,
+                    orderHistory: current.orderHistory,
+                    decisions: alreadyLogged
+                      ? current.decisions
+                      : [
+                          {
+                            id: crypto.randomUUID(),
+                            ts: new Date().toISOString(),
+                            kind: "SKIP",
+                            summary,
+                            details: {
+                              ...buyCheck,
+                              desiredQty: Number(qty.toFixed(8)),
+                              maxAffordableQty: Number(maxAffordableQty.toFixed(8)),
+                              limitPrice: buyPriceNorm.normalizedPrice,
+                              quoteFree: Number(quoteFree.toFixed(6)),
+                              quoteSpendable: Number(quoteSpendable.toFixed(6)),
+                              reserveHardTarget: Number(reserveHardTarget.toFixed(6)),
+                              reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
+                              derivedFromSizingReject: true,
+                              ...(cooldown.storm ? { storm: cooldown.storm } : {}),
+                              cooldownMs
+                            }
+                          },
+                          ...current.decisions
+                        ].slice(0, 200),
+                    lastError: undefined
+                  } satisfies BotState;
+                  pendingNoActionState = this.upsertProtectionLock(next, {
+                    type: "COOLDOWN",
+                    scope: "SYMBOL",
+                    symbol: candidateSymbol,
+                    reason: cooldown.storm
+                      ? `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`
+                      : `Cooldown after grid quote insufficiency (${Math.round(cooldownMs / 1000)}s)`,
+                    expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                    details: {
+                      category: "GRID_BUY_QUOTE_INSUFFICIENT",
+                      cooldownMs,
+                      limitPrice: buyPriceNorm.normalizedPrice,
+                      derivedFromSizingReject: true,
+                      ...(cooldown.storm ? { storm: cooldown.storm } : {})
+                    }
+                  });
+                  pendingNoActionState = this.maybeApplyReasonQuarantineLock({ state: pendingNoActionState, summary, risk });
+                } else {
                 const summary = `Skip ${candidateSymbol}: Grid buy sizing rejected (${buyCheck.reason})`;
                 const baseCooldownMs = Math.max(
                   this.deriveNoActionSymbolCooldownMs(risk),
@@ -6990,6 +7076,7 @@ export class BotEngineService implements OnModuleInit {
                   }
                 });
                 pendingNoActionState = this.maybeApplyReasonQuarantineLock({ state: pendingNoActionState, summary, risk });
+                }
               }
               }
             }

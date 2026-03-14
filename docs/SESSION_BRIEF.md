@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-13 15:06 UTC
+Last updated: 2026-03-14 11:02 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,7 +9,7 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-032` (Exit manager v2)
-- Goal (single sentence): reduce T-032 loop pressure from laddered symbols that already have resting orders but no actionable missing leg.
+- Goal (single sentence): reduce T-032 false sizing pressure by treating reserve-floor buy rejects as quote starvation, not symbol sizing failure.
 - In scope:
   - rank HALT unwind candidates by concentration + loss severity and unwind higher-risk inventory first.
   - apply dynamic unwind fraction/cadence under HALT using risk-bounded policy.
@@ -26,6 +26,7 @@ Use this file at the start and end of every batch.
   - preserve tracked open orders when some symbol-scoped live sync calls fail but others succeed.
   - suppress re-selection of managed CAUTION symbols that already have only a resting SELL limit and cannot open a BUY leg.
   - suppress re-selection of non-actionable laddered symbols even when they already have both BUY+SELL limits resting.
+  - reclassify grid buy sizing rejects into quote insufficiency when spendable quote cannot fund the minimum order.
   - keep existing daily-loss/Caution/Halt guard thresholds unchanged.
 - Out of scope:
   - regime redesign (`T-031`),
@@ -53,6 +54,7 @@ Use this file at the start and end of every batch.
   - live order sync tolerates partial symbol failure and only enters global backoff on full sync failure.
   - managed symbols with only a resting SELL ladder while BUY is paused are treated as stalled and rotated away.
   - symbols with resting ladder orders but no missing actionable leg are rotated away immediately during candidate selection.
+  - reserve-starved BUY attempts show up as quote insufficiency / quote quarantine instead of dominating sizing-reject metrics.
 - Runtime evidence in decisions/logs:
   - `daily-loss-halt-unwind` decisions include priority/exposure/loss telemetry and show accelerated handling of top losers.
   - fewer repeats of `No feasible candidates: daily loss caution paused new symbols (...)` when managed exposure sits near halt floor.
@@ -70,7 +72,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `092026c+dirty`
+- Commit hash: `8a5c356+dirty`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -91,25 +93,25 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `EVENING (collection) / EVENING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `579.158`
-  - run end: `Fri Mar 13 2026 19:13:46 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `NIGHT_RUN`
+  - run duration (hours): `596.6`
+  - run end: `Sat Mar 14 2026 12:40:20 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=6, historyLimitOrders=161, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=19.5%)
-  - sizing reject pressure: `medium` (sizingRejectSkips=37, decisions=200, ratio=18.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=2, historyLimitOrders=173, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=14.4%)
+  - sizing reject pressure: `high` (sizingRejectSkips=93, decisions=200, ratio=46.5%)
 - Decision: `continue`
-- Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
+- Next ticket candidate: `T-032` (same-ticket mitigation for reserve-floor quote starvation)
 - Open risks:
-  - sizing reject pressure is medium (18.5%).
+  - sizing reject pressure is high (46.5%), but the dominant rejects are reserve-floor quote starvation with `quoteSpendable` near zero.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260313-171401.tgz`
-  - this bundle is pre-patch baseline for repeated `XRPUSDC` / `RENDERUSDC` ladder-wait loops with existing resting ladder orders.
-  - next deploy: no state reset; verify those loop reasons stop dominating while active orders remain visible.
-  - auto-updated at: `2026-03-13T15:06:00Z`
+  - bundle: `autobot-feedback-20260314-104045.tgz`
+  - this bundle is pre-patch baseline for reserve-floor `Grid buy sizing rejected (...)` loops where `quoteSpendable` is effectively zero.
+  - next deploy: no state reset; verify those skips move into `Insufficient spendable <quote> for grid BUY` / quote quarantine and that sizingRejectPressure falls.
+  - auto-updated at: `2026-03-14T11:02:00Z`
 
 ## 5) Copy/paste prompt for next session
 

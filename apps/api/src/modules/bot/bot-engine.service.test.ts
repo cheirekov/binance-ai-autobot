@@ -1894,6 +1894,53 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(false);
   });
 
+  it("reclassifies buy sizing rejects as quote insufficiency when spendable quote cannot meet minimum order", () => {
+    const helpers = service as unknown as {
+      shouldTreatGridBuySizingRejectAsQuoteInsufficient: (params: {
+        check: {
+          ok: boolean;
+          reason?: string;
+          normalizedQty?: string;
+          requiredQty?: string;
+          minNotional?: string;
+        };
+        price: number;
+        bufferFactor: number;
+        quoteSpendable: number;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldTreatGridBuySizingRejectAsQuoteInsufficient({
+        check: {
+          ok: false,
+          reason: "Below minQty 0.10000000",
+          normalizedQty: "0",
+          requiredQty: "0.1",
+          minNotional: "5.00000000"
+        },
+        price: 1,
+        bufferFactor: 1,
+        quoteSpendable: 0.04
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldTreatGridBuySizingRejectAsQuoteInsufficient({
+        check: {
+          ok: false,
+          reason: "Below minQty 0.10000000",
+          normalizedQty: "0",
+          requiredQty: "0.1",
+          minNotional: "5.00000000"
+        },
+        price: 1,
+        bufferFactor: 1,
+        quoteSpendable: 6
+      })
+    ).toBe(false);
+  });
+
   it("scales global-lock unwind cooldown with risk", () => {
     const helpers = service as unknown as {
       deriveGlobalLockUnwindCooldownMs: (risk: number) => number;
