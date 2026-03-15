@@ -16,6 +16,27 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-15 10:10 UTC — T-032 day slice: lengthen dual-ladder wait rotation cooldown
+- Scope:
+  - reduce repeated `Grid waiting for ladder slot or inventory` loops for symbols that already have both resting BUY and SELL ladder orders.
+- BA requirement mapping:
+  - keep `T-032` execution focused on actionable inventory instead of revisiting already-parked dual-ladder symbols every few minutes.
+- PM milestone mapping:
+  - continue `T-032`; morning bundle passed gate, but `SUIUSDC` still dominated loop stalls with repeated ladder-wait skips.
+- Technical changes:
+  - [apps/api/src/modules/bot/bot-engine.service.ts:506](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.ts#L506): added `deriveGridWaitingRotationCooldownMs(...)`.
+  - [apps/api/src/modules/bot/bot-engine.service.ts:7270](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.ts#L7270): waiting-rotation cooldown now scales longer when both ladder legs are already resting, using a fraction of stale-order TTL instead of the short base cooldown.
+  - [apps/api/src/modules/bot/bot-engine.service.test.ts:1607](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.test.ts#L1607): added regression coverage for one-sided vs two-sided ladder wait cooldowns.
+- Risk slider impact:
+  - none; this only changes passive rotation timing for already-resting dual-ladder symbols.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- Runtime test request:
+  - next bundle should show lower `Skip SUIUSDC: Grid waiting for ladder slot or inventory`.
+  - active dual-ladder symbols should remain visible, but the skip count should fall because the bot rotates away longer before reconsidering them.
+- Follow-up:
+  - if dual-ladder wait remains dominant after this slice, promote `GRID_WAIT_ROTATE` to family-level quarantine.
+
 ## 2026-03-14 11:20 UTC — T-032 day slice: classify minQty reserve-floor rejects as quote insufficiency
 - Scope:
   - finish the reserve-floor quote-starvation reclassification for `Below minQty ...` grid BUY rejects that do not expose `requiredQty`.

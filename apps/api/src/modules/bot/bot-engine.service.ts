@@ -503,6 +503,27 @@ export class BotEngineService implements OnModuleInit {
     return Math.round((12 - t * 8) * 60_000); // 12m -> 4m
   }
 
+  private deriveGridWaitingRotationCooldownMs(params: {
+    risk: number;
+    hasBuyLimit: boolean;
+    hasSellLimit: boolean;
+    staleTtlMinutes?: number;
+  }): number {
+    const baseCooldownMs = Math.max(
+      this.deriveNoActionSymbolCooldownMs(params.risk),
+      this.deriveGridGuardNoInventoryCooldownMs(params.risk)
+    );
+    if (!(params.hasBuyLimit && params.hasSellLimit)) {
+      return baseCooldownMs;
+    }
+    const ttlMinutes =
+      Number.isFinite(params.staleTtlMinutes ?? Number.NaN) && (params.staleTtlMinutes ?? 0) > 0
+        ? (params.staleTtlMinutes as number)
+        : 30;
+    const ttlScaledCooldownMs = Math.round((ttlMinutes * 60_000) / 3);
+    return Math.max(baseCooldownMs, Math.min(15 * 60_000, ttlScaledCooldownMs));
+  }
+
   private deriveManagedPositionMinCountableExposureHome(risk: number): number {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
     const t = boundedRisk / 100;
@@ -5901,10 +5922,7 @@ export class BotEngineService implements OnModuleInit {
 
           if (countableOpenHomePositions.length >= maxOpenPositions && !candidateIsOpen) {
             const summary = `Skip ${candidateSymbol}: Max open positions reached (${maxOpenPositions})`;
-            const baseCooldownMs = Math.max(
-              this.deriveNoActionSymbolCooldownMs(risk),
-              this.deriveGridGuardNoInventoryCooldownMs(risk)
-            );
+            const baseCooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
             const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
             const cooldownMs = cooldown.cooldownMs;
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
@@ -7303,10 +7321,12 @@ export class BotEngineService implements OnModuleInit {
             const lastSimilarAt = lastSimilar ? Date.parse(lastSimilar.ts) : Number.NaN;
             const waitingThrottleMs = 60_000;
             const throttled = Number.isFinite(lastSimilarAt) && nowMs - lastSimilarAt < waitingThrottleMs;
-            const baseCooldownMs = Math.max(
-              this.deriveNoActionSymbolCooldownMs(risk),
-              this.deriveGridGuardNoInventoryCooldownMs(risk)
-            );
+            const baseCooldownMs = this.deriveGridWaitingRotationCooldownMs({
+              risk,
+              hasBuyLimit,
+              hasSellLimit,
+              staleTtlMinutes: config?.advanced.botOrderStaleTtlMinutes
+            });
             const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
             const cooldownMs = cooldown.cooldownMs;
             const next = {

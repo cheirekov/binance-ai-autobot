@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-14 11:21 UTC
+Last updated: 2026-03-15 10:11 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,7 +9,7 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-032` (Exit manager v2)
-- Goal (single sentence): reduce T-032 false sizing pressure by treating reserve-floor buy rejects as quote starvation, not symbol sizing failure.
+- Goal (single sentence): keep T-032 focused on actionable symbols by reducing dual-ladder wait churn after the quote-starvation fixes.
 - In scope:
   - rank HALT unwind candidates by concentration + loss severity and unwind higher-risk inventory first.
   - apply dynamic unwind fraction/cadence under HALT using risk-bounded policy.
@@ -28,6 +28,7 @@ Use this file at the start and end of every batch.
   - suppress re-selection of non-actionable laddered symbols even when they already have both BUY+SELL limits resting.
   - reclassify grid buy sizing rejects into quote insufficiency when spendable quote cannot fund the minimum order.
   - cover `Below minQty ...` reserve-floor rejects even when Binance omits `requiredQty`.
+  - lengthen wait rotation cooldown for symbols that already have both BUY and SELL ladder legs resting.
   - keep existing daily-loss/Caution/Halt guard thresholds unchanged.
 - Out of scope:
   - regime redesign (`T-031`),
@@ -57,6 +58,7 @@ Use this file at the start and end of every batch.
   - symbols with resting ladder orders but no missing actionable leg are rotated away immediately during candidate selection.
   - reserve-starved BUY attempts show up as quote insufficiency / quote quarantine instead of dominating sizing-reject metrics.
   - reserve-floor `Below minQty ...` BUY rejects also flow into the quote-insufficiency path.
+  - dual-ladder wait loops cool down longer than one-sided waiting ladders.
 - Runtime evidence in decisions/logs:
   - `daily-loss-halt-unwind` decisions include priority/exposure/loss telemetry and show accelerated handling of top losers.
   - fewer repeats of `No feasible candidates: daily loss caution paused new symbols (...)` when managed exposure sits near halt floor.
@@ -74,7 +76,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `a2cddcd+dirty`
+- Commit hash: `8daba90+dirty`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -95,26 +97,26 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `EVENING (collection) / EVENING (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `602.978`
-  - run end: `Sat Mar 14 2026 19:02:58 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `NIGHT_RUN`
+  - run duration (hours): `619.841`
+  - run end: `Sun Mar 15 2026 11:54:47 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=3, historyLimitOrders=174, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=13.4%)
-  - sizing reject pressure: `high` (sizingRejectSkips=52, decisions=200, ratio=26.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=6, historyLimitOrders=140, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=30.3%)
+  - sizing reject pressure: `medium` (sizingRejectSkips=36, decisions=200, ratio=18.0%)
 - Decision: `continue`
-- Next ticket candidate: `T-032` (same-ticket mitigation for remaining minQty quote-starvation rejects)
+- Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - sizing reject pressure is still high (26.0%), but the dominant remaining symbols are still reserve-floor BUY attempts with `quoteSpendable` near zero.
+  - sizing reject pressure is medium (18.0%), and `SUIUSDC` dual-ladder wait loops dominate loop stalls.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260314-170304.tgz`
-  - latest bundle showed the first quote-starvation reclassification working for `BANANAS31USDC`, `TAOUSDC`, and `TRUMPUSDC`.
-  - remaining `SUIUSDC`, `SOLUSDC`, `DOGEUSDC`, and `LINKUSDC` rejects are still reserve-floor `Below minQty ...` cases and are the target of this follow-up patch.
-  - next deploy: no state reset; verify those symbols also move into `Insufficient spendable <quote> for grid BUY` / quote quarantine and that sizingRejectPressure falls again.
-  - auto-updated at: `2026-03-14T11:21:00Z`
+  - bundle: `autobot-feedback-20260315-095525.tgz`
+  - quote-starvation reclassification is working; sizing pressure dropped to medium.
+  - remaining dominant loop is `Skip SUIUSDC: Grid waiting for ladder slot or inventory` with both ladder legs already resting.
+  - next deploy: no state reset; verify dual-ladder wait skips fall while active orders remain visible.
+  - auto-updated at: `2026-03-15T10:11:00Z`
 
 ## 5) Copy/paste prompt for next session
 

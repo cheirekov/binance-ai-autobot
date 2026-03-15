@@ -1604,6 +1604,35 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.deriveGridGuardNoInventoryCooldownMs(100)).toBe(240000);
   });
 
+  it("extends waiting rotation cooldown when both grid ladder legs are already resting", () => {
+    const helpers = service as unknown as {
+      deriveGridWaitingRotationCooldownMs: (params: {
+        risk: number;
+        hasBuyLimit: boolean;
+        hasSellLimit: boolean;
+        staleTtlMinutes?: number;
+      }) => number;
+    };
+
+    expect(
+      helpers.deriveGridWaitingRotationCooldownMs({
+        risk: 100,
+        hasBuyLimit: false,
+        hasSellLimit: true,
+        staleTtlMinutes: 30
+      })
+    ).toBe(240000);
+
+    expect(
+      helpers.deriveGridWaitingRotationCooldownMs({
+        risk: 100,
+        hasBuyLimit: true,
+        hasSellLimit: true,
+        staleTtlMinutes: 30
+      })
+    ).toBe(600000);
+  });
+
   it("scales countable managed-position exposure floor with risk", () => {
     const helpers = service as unknown as {
       deriveManagedPositionMinCountableExposureHome: (risk: number) => number;
