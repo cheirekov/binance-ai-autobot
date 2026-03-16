@@ -619,6 +619,19 @@ export class BotEngineService implements OnModuleInit {
     return params.recentInventoryWaitingSkips >= 2;
   }
 
+  private shouldSuppressGridQuoteStarvedCandidate(params: {
+    quoteQuarantineActive: boolean;
+    recentGridBuyQuoteInsufficient: number;
+    hasBuyLimit: boolean;
+    missingSellLeg: boolean;
+  }): boolean {
+    if (!params.quoteQuarantineActive) return false;
+    if (params.recentGridBuyQuoteInsufficient <= 0) return false;
+    if (params.hasBuyLimit) return false;
+    if (params.missingSellLeg) return false;
+    return true;
+  }
+
   private shouldTreatGridBuySizingRejectAsQuoteInsufficient(params: {
     check: MarketQtyValidation;
     price: number;
@@ -4197,15 +4210,6 @@ export class BotEngineService implements OnModuleInit {
               if (activeReasonQuarantineFamilies.has("GRID_BUY_SIZING") && recentGridBuySizingRejects > 0 && !hasBuyLimit) {
                 continue;
               }
-              if (
-                activeReasonQuarantineFamilies.has("GRID_BUY_QUOTE") &&
-                recentGridBuyQuoteInsufficient > 0 &&
-                !hasBuyLimit &&
-                !hasInventory
-              ) {
-                continue;
-              }
-
               if (minOrderPressureActive && recentGridBuySizingRejects > 0 && !hasInventory && !hasBuyLimit && !hasSellLimit) {
                 continue;
               }
@@ -4213,6 +4217,16 @@ export class BotEngineService implements OnModuleInit {
               const missingBuyLeg =
                 !hasBuyLimit && !buyPaused && !suppressBuyLegFromRejectStorm && !hasEntryGuard && (!openPositionCapReached || hasInventory);
               const missingSellLeg = !hasSellLimit && hasInventory && sellLegLikelyFeasible && !suppressSellLegFromRejectStorm;
+              if (
+                this.shouldSuppressGridQuoteStarvedCandidate({
+                  quoteQuarantineActive: activeReasonQuarantineFamilies.has("GRID_BUY_QUOTE"),
+                  recentGridBuyQuoteInsufficient,
+                  hasBuyLimit,
+                  missingSellLeg
+                })
+              ) {
+                continue;
+              }
               const canTakeAction = missingBuyLeg || missingSellLeg;
               const waiting = hasBuyLimit && hasSellLimit;
               const hasGuardNoInventoryNoLadder = buyPaused && !hasInventory && !hasBuyLimit && !hasSellLimit;

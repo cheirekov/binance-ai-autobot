@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-15 10:11 UTC
+Last updated: 2026-03-16 09:10 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -29,6 +29,7 @@ Use this file at the start and end of every batch.
   - reclassify grid buy sizing rejects into quote insufficiency when spendable quote cannot fund the minimum order.
   - cover `Below minQty ...` reserve-floor rejects even when Binance omits `requiredQty`.
   - lengthen wait rotation cooldown for symbols that already have both BUY and SELL ladder legs resting.
+  - suppress quote-starved candidates during active `GRID_BUY_QUOTE` quarantine when they still have no actionable missing SELL leg.
   - keep existing daily-loss/Caution/Halt guard thresholds unchanged.
 - Out of scope:
   - regime redesign (`T-031`),
@@ -59,6 +60,7 @@ Use this file at the start and end of every batch.
   - reserve-starved BUY attempts show up as quote insufficiency / quote quarantine instead of dominating sizing-reject metrics.
   - reserve-floor `Below minQty ...` BUY rejects also flow into the quote-insufficiency path.
   - dual-ladder wait loops cool down longer than one-sided waiting ladders.
+  - managed/no-buy-limit symbols already in quote-starvation quarantine are rotated away unless they still need a sell leg.
 - Runtime evidence in decisions/logs:
   - `daily-loss-halt-unwind` decisions include priority/exposure/loss telemetry and show accelerated handling of top losers.
   - fewer repeats of `No feasible candidates: daily loss caution paused new symbols (...)` when managed exposure sits near halt floor.
@@ -76,7 +78,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `8daba90+dirty`
+- Commit hash: `b6f8c7b`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -99,24 +101,21 @@ Use this file at the start and end of every batch.
 - Run context:
   - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `619.841`
-  - run end: `Sun Mar 15 2026 11:54:47 GMT+0200 (Eastern European Standard Time)`
+  - run duration (hours): `643.085`
+  - run end: `Mon Mar 16 2026 11:09:26 GMT+0200 (Eastern European Standard Time)`
   - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=6, historyLimitOrders=140, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=30.3%)
-  - sizing reject pressure: `medium` (sizingRejectSkips=36, decisions=200, ratio=18.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=7, historyLimitOrders=162, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=19.8%)
+  - sizing reject pressure: `low` (sizingRejectSkips=17, decisions=200, ratio=8.5%)
 - Decision: `continue`
 - Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - sizing reject pressure is medium (18.0%), and `SUIUSDC` dual-ladder wait loops dominate loop stalls.
+  - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260315-095525.tgz`
-  - quote-starvation reclassification is working; sizing pressure dropped to medium.
-  - remaining dominant loop is `Skip SUIUSDC: Grid waiting for ladder slot or inventory` with both ladder legs already resting.
-  - next deploy: no state reset; verify dual-ladder wait skips fall while active orders remain visible.
-  - auto-updated at: `2026-03-15T10:11:00Z`
+  - bundle: `autobot-feedback-20260316-090952.tgz`
+  - auto-updated at: `2026-03-16T09:10:04.493Z`
 
 ## 5) Copy/paste prompt for next session
 

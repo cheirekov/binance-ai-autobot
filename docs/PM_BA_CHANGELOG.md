@@ -16,6 +16,27 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-16 10:20 UTC — T-032 day slice: suppress managed quote-starved re-selection during buy-quote quarantine
+- Scope:
+  - reduce repeated `Insufficient spendable <quote> for grid BUY` loops on symbols that still have no actionable missing sell leg.
+- BA requirement mapping:
+  - keep `T-032` focused on actionable symbols by rotating away from managed/no-buy-limit candidates while quote-family quarantine is already active.
+- PM milestone mapping:
+  - continue `T-032`; morning ingest passed the main gate but raised a same-ticket triage failure because `TAOUSDC` remained the dominant repeated quote-starvation loop across two bundles.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `shouldSuppressGridQuoteStarvedCandidate(...)` and applied it in SPOT_GRID candidate selection after actionable-leg derivation.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage to keep sell-leg-capable symbols eligible while suppressing non-actionable quote-starved candidates.
+  - `docs/TRIAGE_NOTE_2026-03-16_T032_MANAGED_QUOTE_STARVATION_RESELECTION.md`: recorded same-ticket PM/BA triage.
+- Risk slider impact:
+  - none; reserve, daily-risk, and exposure limits are unchanged.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next bundle should reduce `Skip TAOUSDC: Insufficient spendable USDC for grid BUY` and similar loops on symbols without a missing sell leg.
+  - symbols that still need to place a sell leg must remain eligible.
+- Follow-up:
+  - if quote-starvation loops remain dominant after this slice, add a stronger quote-family idle gate keyed to available spendable home balance instead of only symbol history.
+
 ## 2026-03-15 10:10 UTC — T-032 day slice: lengthen dual-ladder wait rotation cooldown
 - Scope:
   - reduce repeated `Grid waiting for ladder slot or inventory` loops for symbols that already have both resting BUY and SELL ladder orders.

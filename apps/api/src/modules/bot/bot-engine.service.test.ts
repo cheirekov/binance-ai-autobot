@@ -1983,6 +1983,44 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(true);
   });
 
+  it("suppresses quote-starved grid candidates only when they cannot still place a sell leg", () => {
+    const helpers = service as unknown as {
+      shouldSuppressGridQuoteStarvedCandidate: (params: {
+        quoteQuarantineActive: boolean;
+        recentGridBuyQuoteInsufficient: number;
+        hasBuyLimit: boolean;
+        missingSellLeg: boolean;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldSuppressGridQuoteStarvedCandidate({
+        quoteQuarantineActive: true,
+        recentGridBuyQuoteInsufficient: 2,
+        hasBuyLimit: false,
+        missingSellLeg: false
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldSuppressGridQuoteStarvedCandidate({
+        quoteQuarantineActive: true,
+        recentGridBuyQuoteInsufficient: 2,
+        hasBuyLimit: false,
+        missingSellLeg: true
+      })
+    ).toBe(false);
+
+    expect(
+      helpers.shouldSuppressGridQuoteStarvedCandidate({
+        quoteQuarantineActive: true,
+        recentGridBuyQuoteInsufficient: 2,
+        hasBuyLimit: true,
+        missingSellLeg: false
+      })
+    ).toBe(false);
+  });
+
   it("scales global-lock unwind cooldown with risk", () => {
     const helpers = service as unknown as {
       deriveGlobalLockUnwindCooldownMs: (risk: number) => number;
