@@ -1990,6 +1990,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         recentGridBuyQuoteInsufficient: number;
         hasBuyLimit: boolean;
         missingSellLeg: boolean;
+        risk: number;
       }) => boolean;
     };
 
@@ -1998,16 +1999,38 @@ describe("bot-engine insufficient-balance helpers", () => {
         quoteQuarantineActive: true,
         recentGridBuyQuoteInsufficient: 2,
         hasBuyLimit: false,
-        missingSellLeg: false
+        missingSellLeg: false,
+        risk: 100
       })
     ).toBe(true);
+
+    expect(
+      helpers.shouldSuppressGridQuoteStarvedCandidate({
+        quoteQuarantineActive: false,
+        recentGridBuyQuoteInsufficient: 2,
+        hasBuyLimit: false,
+        missingSellLeg: false,
+        risk: 100
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldSuppressGridQuoteStarvedCandidate({
+        quoteQuarantineActive: false,
+        recentGridBuyQuoteInsufficient: 1,
+        hasBuyLimit: false,
+        missingSellLeg: false,
+        risk: 100
+      })
+    ).toBe(false);
 
     expect(
       helpers.shouldSuppressGridQuoteStarvedCandidate({
         quoteQuarantineActive: true,
         recentGridBuyQuoteInsufficient: 2,
         hasBuyLimit: false,
-        missingSellLeg: true
+        missingSellLeg: true,
+        risk: 100
       })
     ).toBe(false);
 
@@ -2016,7 +2039,8 @@ describe("bot-engine insufficient-balance helpers", () => {
         quoteQuarantineActive: true,
         recentGridBuyQuoteInsufficient: 2,
         hasBuyLimit: true,
-        missingSellLeg: false
+        missingSellLeg: false,
+        risk: 100
       })
     ).toBe(false);
   });

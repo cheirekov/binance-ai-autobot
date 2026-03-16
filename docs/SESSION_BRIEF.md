@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-16 09:10 UTC
+Last updated: 2026-03-16 17:36 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -30,6 +30,7 @@ Use this file at the start and end of every batch.
   - cover `Below minQty ...` reserve-floor rejects even when Binance omits `requiredQty`.
   - lengthen wait rotation cooldown for symbols that already have both BUY and SELL ladder legs resting.
   - suppress quote-starved candidates during active `GRID_BUY_QUOTE` quarantine when they still have no actionable missing SELL leg.
+  - suppress locally repeated quote-starved candidates earlier (risk-scaled) even before global quote-family quarantine is the deciding factor.
   - keep existing daily-loss/Caution/Halt guard thresholds unchanged.
 - Out of scope:
   - regime redesign (`T-031`),
@@ -61,6 +62,7 @@ Use this file at the start and end of every batch.
   - reserve-floor `Below minQty ...` BUY rejects also flow into the quote-insufficiency path.
   - dual-ladder wait loops cool down longer than one-sided waiting ladders.
   - managed/no-buy-limit symbols already in quote-starvation quarantine are rotated away unless they still need a sell leg.
+  - local repeated quote-starvation loops are reduced before family-level quarantine fully dominates a run.
 - Runtime evidence in decisions/logs:
   - `daily-loss-halt-unwind` decisions include priority/exposure/loss telemetry and show accelerated handling of top losers.
   - fewer repeats of `No feasible candidates: daily loss caution paused new symbols (...)` when managed exposure sits near halt floor.
@@ -78,7 +80,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `b6f8c7b`
+- Commit hash: `41b2ba3`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -99,23 +101,23 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `EVENING (collection) / EVENING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `643.085`
-  - run end: `Mon Mar 16 2026 11:09:26 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - run duration (hours): `651.525`
+  - run end: `Mon Mar 16 2026 19:35:47 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=7, historyLimitOrders=162, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=19.8%)
-  - sizing reject pressure: `low` (sizingRejectSkips=17, decisions=200, ratio=8.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=4, historyLimitOrders=169, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=15.5%)
+  - sizing reject pressure: `medium` (sizingRejectSkips=20, decisions=200, ratio=10.0%)
 - Decision: `continue`
 - Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - none critical from automated checks.
+  - sizing reject pressure is medium (10.0%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260316-090952.tgz`
-  - auto-updated at: `2026-03-16T09:10:04.493Z`
+  - bundle: `autobot-feedback-20260316-173623.tgz`
+  - auto-updated at: `2026-03-16T17:36:52.628Z`
 
 ## 5) Copy/paste prompt for next session
 

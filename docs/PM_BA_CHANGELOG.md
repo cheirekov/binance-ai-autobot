@@ -16,6 +16,26 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-16 18:05 UTC — T-032 evening slice: suppress local repeated quote-starvation before family quarantine dominates
+- Scope:
+  - reduce repeated `Insufficient spendable <quote> for grid BUY` loops even when the global quote-family quarantine has not yet fully taken over the rotation.
+- BA requirement mapping:
+  - keep `T-032` candidate selection focused on actionable symbols by rotating away sooner from symbols that repeatedly fail the same quote-funding check and have no missing sell leg.
+- PM milestone mapping:
+  - continue `T-032`; the evening bundle passed, but the dominant waste is still repeated quote-starvation across `TAOUSDC`, `PEPEUSDC`, `SOLUSDC`, and similar symbols.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: `shouldSuppressGridQuoteStarvedCandidate(...)` now suppresses after a small local repeat threshold (risk-scaled) even before global family quarantine is the deciding factor.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: expanded regression coverage for local repeat suppression vs sell-leg-capable candidates.
+- Risk slider impact:
+  - indirect only; higher-risk mode reaches the local suppression threshold sooner (`2` repeats at risk `100`), reducing waste without changing reserve or exposure policy.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next bundle should further reduce repeated quote-starvation loops on symbols with no missing sell leg.
+  - symbols that still need to place a sell leg must remain eligible.
+- Follow-up:
+  - if quote-starvation still dominates after this slice, add a spendable-quote family idle gate keyed to live free balance by quote asset.
+
 ## 2026-03-16 10:20 UTC — T-032 day slice: suppress managed quote-starved re-selection during buy-quote quarantine
 - Scope:
   - reduce repeated `Insufficient spendable <quote> for grid BUY` loops on symbols that still have no actionable missing sell leg.

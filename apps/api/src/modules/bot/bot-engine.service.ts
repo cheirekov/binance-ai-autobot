@@ -624,12 +624,16 @@ export class BotEngineService implements OnModuleInit {
     recentGridBuyQuoteInsufficient: number;
     hasBuyLimit: boolean;
     missingSellLeg: boolean;
+    risk: number;
   }): boolean {
-    if (!params.quoteQuarantineActive) return false;
-    if (params.recentGridBuyQuoteInsufficient <= 0) return false;
     if (params.hasBuyLimit) return false;
     if (params.missingSellLeg) return false;
-    return true;
+    if (params.recentGridBuyQuoteInsufficient <= 0) return false;
+
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const localThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
+    if (params.recentGridBuyQuoteInsufficient >= localThreshold) return true;
+    return params.quoteQuarantineActive;
   }
 
   private shouldTreatGridBuySizingRejectAsQuoteInsufficient(params: {
@@ -4222,7 +4226,8 @@ export class BotEngineService implements OnModuleInit {
                   quoteQuarantineActive: activeReasonQuarantineFamilies.has("GRID_BUY_QUOTE"),
                   recentGridBuyQuoteInsufficient,
                   hasBuyLimit,
-                  missingSellLeg
+                  missingSellLeg,
+                  risk: boundedRisk
                 })
               ) {
                 continue;
