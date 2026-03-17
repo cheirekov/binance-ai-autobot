@@ -636,6 +636,21 @@ export class BotEngineService implements OnModuleInit {
     return params.quoteQuarantineActive;
   }
 
+  private shouldSuppressGridEntryGuardCandidate(params: {
+    hasEntryGuard: boolean;
+    missingSellLeg: boolean;
+    recentEntryGuardSkips: number;
+    risk: number;
+  }): boolean {
+    if (!params.hasEntryGuard) return false;
+    if (params.missingSellLeg) return false;
+    if (params.recentEntryGuardSkips <= 0) return false;
+
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const localThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
+    return params.recentEntryGuardSkips >= localThreshold;
+  }
+
   private shouldTreatGridBuySizingRejectAsQuoteInsufficient(params: {
     check: MarketQtyValidation;
     price: number;
@@ -4154,6 +4169,12 @@ export class BotEngineService implements OnModuleInit {
                 contains: "grid sell sizing rejected",
                 windowMs: 15 * 60_000
               });
+              const recentEntryGuardSkips = this.countRecentSymbolSkipMatches({
+                state: current,
+                symbol,
+                contains: "entry cooldown active",
+                windowMs: 20 * 60_000
+              });
               const recentInventoryWaitingSkips = this.countRecentSymbolSkipMatches({
                 state: current,
                 symbol,
@@ -4227,6 +4248,16 @@ export class BotEngineService implements OnModuleInit {
                   recentGridBuyQuoteInsufficient,
                   hasBuyLimit,
                   missingSellLeg,
+                  risk: boundedRisk
+                })
+              ) {
+                continue;
+              }
+              if (
+                this.shouldSuppressGridEntryGuardCandidate({
+                  hasEntryGuard,
+                  missingSellLeg,
+                  recentEntryGuardSkips,
                   risk: boundedRisk
                 })
               ) {

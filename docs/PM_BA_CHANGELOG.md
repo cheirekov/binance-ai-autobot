@@ -16,6 +16,26 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-17 07:30 UTC — T-032 morning slice: suppress repeated entry-cooldown reselection
+- Scope:
+  - reduce repeated `Entry cooldown active` loops on symbols that cannot place a BUY leg yet and also have no actionable missing SELL leg.
+- BA requirement mapping:
+  - keep `T-032` candidate selection focused on symbols that can still do work, instead of repeatedly revisiting entry-cooled candidates with no immediate exit action.
+- PM milestone mapping:
+  - continue `T-032`; morning bundle passed, but the dominant loop shifted from quote-starvation to `PEPEUSDC: Entry cooldown active`.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `shouldSuppressGridEntryGuardCandidate(...)` and applied it after missing-leg derivation in SPOT_GRID selection.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage to keep sell-leg-capable entry-cooled symbols eligible while suppressing non-actionable repeats.
+- Risk slider impact:
+  - indirect only; higher-risk mode reaches the local suppression threshold sooner, reducing loop churn without changing exposure or reserve rules.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next bundle should lower `Skip <symbol>: Entry cooldown active`, especially when that symbol has no missing sell leg.
+  - CAUTION behavior should remain unchanged.
+- Follow-up:
+  - if CAUTION still spends time on `daily loss caution paused new symbols` after this slice, the next mitigation is managed-symbol fallback refinement, not more symbol loop suppression.
+
 ## 2026-03-16 18:05 UTC — T-032 evening slice: suppress local repeated quote-starvation before family quarantine dominates
 - Scope:
   - reduce repeated `Insufficient spendable <quote> for grid BUY` loops even when the global quote-family quarantine has not yet fully taken over the rotation.

@@ -2045,6 +2045,44 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(false);
   });
 
+  it("suppresses repeated entry-cooldown grid candidates only when they cannot still place a sell leg", () => {
+    const helpers = service as unknown as {
+      shouldSuppressGridEntryGuardCandidate: (params: {
+        hasEntryGuard: boolean;
+        missingSellLeg: boolean;
+        recentEntryGuardSkips: number;
+        risk: number;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldSuppressGridEntryGuardCandidate({
+        hasEntryGuard: true,
+        missingSellLeg: false,
+        recentEntryGuardSkips: 2,
+        risk: 100
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldSuppressGridEntryGuardCandidate({
+        hasEntryGuard: true,
+        missingSellLeg: false,
+        recentEntryGuardSkips: 1,
+        risk: 100
+      })
+    ).toBe(false);
+
+    expect(
+      helpers.shouldSuppressGridEntryGuardCandidate({
+        hasEntryGuard: true,
+        missingSellLeg: true,
+        recentEntryGuardSkips: 3,
+        risk: 100
+      })
+    ).toBe(false);
+  });
+
   it("scales global-lock unwind cooldown with risk", () => {
     const helpers = service as unknown as {
       deriveGlobalLockUnwindCooldownMs: (risk: number) => number;
