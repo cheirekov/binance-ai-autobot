@@ -651,6 +651,20 @@ export class BotEngineService implements OnModuleInit {
     return params.recentEntryGuardSkips >= localThreshold;
   }
 
+  private shouldSuppressGridQuoteAssetCandidate(params: {
+    quoteQuarantineActive: boolean;
+    recentQuoteAssetBuyQuoteInsufficient: number;
+    missingSellLeg: boolean;
+    risk: number;
+  }): boolean {
+    if (!params.quoteQuarantineActive) return false;
+    if (params.missingSellLeg) return false;
+
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const localThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
+    return params.recentQuoteAssetBuyQuoteInsufficient >= localThreshold;
+  }
+
   private shouldTreatGridBuySizingRejectAsQuoteInsufficient(params: {
     check: MarketQtyValidation;
     price: number;
@@ -1120,6 +1134,30 @@ export class BotEngineService implements OnModuleInit {
       const summary = decision.summary.trim();
       if (!summary.toUpperCase().startsWith(`SKIP ${symbol}:`)) continue;
       if (!summary.toLowerCase().includes(needle)) continue;
+      count += 1;
+    }
+    return count;
+  }
+
+  private countRecentQuoteAssetGridBuyQuoteSkips(params: {
+    state: BotState;
+    quoteAsset: string;
+    windowMs: number;
+  }): number {
+    const quoteAsset = params.quoteAsset.trim().toUpperCase();
+    if (!quoteAsset) return 0;
+
+    const nowMs = Date.now();
+    let count = 0;
+    for (const decision of params.state.decisions) {
+      if (decision.kind !== "SKIP") continue;
+      const ts = Date.parse(decision.ts);
+      if (Number.isFinite(ts) && nowMs - ts > params.windowMs) break;
+
+      const summary = decision.summary.trim().toUpperCase();
+      if (!summary.startsWith("SKIP ")) continue;
+      if (!summary.includes(`INSUFFICIENT SPENDABLE ${quoteAsset}`)) continue;
+      if (!summary.includes("FOR GRID BUY")) continue;
       count += 1;
     }
     return count;
@@ -4163,6 +4201,11 @@ export class BotEngineService implements OnModuleInit {
                 contains: "insufficient spendable",
                 windowMs: 15 * 60_000
               });
+              const recentQuoteAssetBuyQuoteInsufficient = this.countRecentQuoteAssetGridBuyQuoteSkips({
+                state: current,
+                quoteAsset: candidateQuote,
+                windowMs: 15 * 60_000
+              });
               const recentGridSellSizingRejects = this.countRecentSymbolSkipMatches({
                 state: current,
                 symbol,
@@ -4258,6 +4301,16 @@ export class BotEngineService implements OnModuleInit {
                   hasEntryGuard,
                   missingSellLeg,
                   recentEntryGuardSkips,
+                  risk: boundedRisk
+                })
+              ) {
+                continue;
+              }
+              if (
+                this.shouldSuppressGridQuoteAssetCandidate({
+                  quoteQuarantineActive: activeReasonQuarantineFamilies.has("GRID_BUY_QUOTE"),
+                  recentQuoteAssetBuyQuoteInsufficient,
+                  missingSellLeg,
                   risk: boundedRisk
                 })
               ) {

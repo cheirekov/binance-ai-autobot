@@ -16,6 +16,48 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-18 17:45 UTC — Process tooling: automatic retrospective
+- Scope:
+  - add a hard-rule retrospective artifact to the ingest flow so long tickets have explicit time-aware review signals.
+- BA requirement mapping:
+  - reduce process drift and force explicit review when bundles show repeated operational or PnL deterioration patterns.
+- PM milestone mapping:
+  - process support only; no runtime trading-policy change.
+- Technical changes:
+  - `scripts/auto-retro.sh`: added automatic retrospective generation from the latest local feedback bundles.
+  - `scripts/ingest-feedback.sh`: now runs `auto-retro.sh` after `update-session-brief.sh`.
+  - `docs/RUN_LOGGING_P0.md`: ingestion flow now documents the retrospective artifact.
+  - `docs/PM_BA_PLAYBOOK.md`: added hard rules and required actions for automatic retrospectives.
+- Risk slider impact:
+  - none.
+- Validation evidence:
+  - `./scripts/auto-retro.sh autobot-feedback-20260318-171743.tgz`
+- Runtime test request:
+  - next ingestion should regenerate `docs/RETROSPECTIVE_AUTO.md` automatically.
+- Follow-up:
+  - if the automatic retrospective proves too noisy, tighten the trigger thresholds instead of removing the process step.
+
+## 2026-03-18 17:40 UTC — T-032 evening slice: suppress quote-asset family churn during buy-quote quarantine
+- Scope:
+  - reduce symbol-to-symbol rotation inside the same quote asset family when spendable quote is already the limiting factor.
+- BA requirement mapping:
+  - keep `T-032` focused on actionable candidates by suppressing repeated `Insufficient spendable <quote> for grid BUY` loops at the quote-family level, not only per symbol.
+- PM milestone mapping:
+  - continue `T-032`; the longer run passed, but the dominant waste still rotates across quote-starved symbols in the same quote family (`USDC`, `ETH`).
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `countRecentQuoteAssetGridBuyQuoteSkips(...)` and `shouldSuppressGridQuoteAssetCandidate(...)`.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: SPOT_GRID candidate selection now suppresses a quote asset family during active `GRID_BUY_QUOTE` quarantine once repeated family-level quote-starvation is established and no sell leg is actionable.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for quote-family suppression behavior.
+- Risk slider impact:
+  - indirect only; higher-risk mode still reaches the suppression threshold sooner, but reserve/exposure policy is unchanged.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next bundle should lower repeated `Insufficient spendable USDC for grid BUY` / `Insufficient spendable ETH for grid BUY` across multiple symbols in the same run.
+  - symbols with an actionable sell leg must remain eligible.
+- Follow-up:
+  - if medium sizing pressure remains after family suppression, the next T-032 slice should target sell-sizing dust exits / residual ladder-wait cleanup.
+
 ## 2026-03-17 07:30 UTC — T-032 morning slice: suppress repeated entry-cooldown reselection
 - Scope:
   - reduce repeated `Entry cooldown active` loops on symbols that cannot place a BUY leg yet and also have no actionable missing SELL leg.

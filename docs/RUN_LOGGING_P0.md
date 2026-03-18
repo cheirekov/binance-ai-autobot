@@ -35,7 +35,11 @@ This command does:
 `ingest-feedback` performs:
 - bundle sanity check (`run-context`, `last_run_summary`, `info.txt`),
 - `update-session-brief.sh`,
+- `auto-retro.sh`,
 - `pmba-gate.sh end`.
+
+Generated retrospective artifact:
+- `docs/RETROSPECTIVE_AUTO.md`
 
 ## 4) Send to Codex
 

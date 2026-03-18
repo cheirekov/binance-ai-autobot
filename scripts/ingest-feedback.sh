@@ -74,6 +74,7 @@ console.log(`- Active ticket expected from board/session will be checked by pmba
 NODE
 
 ./scripts/update-session-brief.sh "$BUNDLE"
+./scripts/auto-retro.sh "$BUNDLE"
 ./scripts/pmba-gate.sh end
 
 echo "Ingestion complete: $BUNDLE"

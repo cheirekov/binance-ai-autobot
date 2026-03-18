@@ -2083,6 +2083,44 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(false);
   });
 
+  it("suppresses quote-asset families during active buy-quote quarantine only when no sell leg is actionable", () => {
+    const helpers = service as unknown as {
+      shouldSuppressGridQuoteAssetCandidate: (params: {
+        quoteQuarantineActive: boolean;
+        recentQuoteAssetBuyQuoteInsufficient: number;
+        missingSellLeg: boolean;
+        risk: number;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldSuppressGridQuoteAssetCandidate({
+        quoteQuarantineActive: true,
+        recentQuoteAssetBuyQuoteInsufficient: 2,
+        missingSellLeg: false,
+        risk: 100
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldSuppressGridQuoteAssetCandidate({
+        quoteQuarantineActive: true,
+        recentQuoteAssetBuyQuoteInsufficient: 1,
+        missingSellLeg: false,
+        risk: 100
+      })
+    ).toBe(false);
+
+    expect(
+      helpers.shouldSuppressGridQuoteAssetCandidate({
+        quoteQuarantineActive: true,
+        recentQuoteAssetBuyQuoteInsufficient: 3,
+        missingSellLeg: true,
+        risk: 100
+      })
+    ).toBe(false);
+  });
+
   it("scales global-lock unwind cooldown with risk", () => {
     const helpers = service as unknown as {
       deriveGlobalLockUnwindCooldownMs: (risk: number) => number;

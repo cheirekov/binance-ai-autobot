@@ -79,3 +79,21 @@ Track only these to avoid noisy interpretation:
    - direct mitigation batch for that exact failure,
    - explicit pivot/de-scope with reason.
 4. Use `./scripts/pmba-gate.sh start` before implementation and `./scripts/pmba-gate.sh end` before handoff.
+5. Run `./scripts/auto-retro.sh [bundle]` after each ingestion (or rely on `ingest-feedback.sh`, which now does it automatically).
+
+## Automatic retrospective rules (hard)
+
+The automatic retrospective is not optional process noise; it is the time-awareness layer for long tickets.
+
+- Artifact:
+  - `docs/RETROSPECTIVE_AUTO.md`
+- Trigger cadence:
+  - regenerate on every ingestion
+- Hard-rule checks:
+  - repeated dominant loop across latest 2 bundles,
+  - negative `daily_net_usdt` across latest 3 bundles,
+  - no KPI trend improvement across latest 3 bundles (daily net and max drawdown both not improving)
+- Required PM/BA action:
+  - `continue` → same lane can continue,
+  - `patch_required` → next batch must be direct same-ticket mitigation,
+  - `pivot_required` → PM/BA must explicitly review scope/ticket before the next long run.
