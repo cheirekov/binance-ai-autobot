@@ -16,6 +16,26 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-19 13:05 UTC — T-034 slice: quote-family suppression no longer waits for global quarantine
+- Scope:
+  - reduce repeated quote-family funding loops by suppressing starved quote assets from local repeat history, not only after global `GRID_BUY_QUOTE` quarantine is already active.
+- BA requirement mapping:
+  - the dominant `BNBETH: Insufficient spendable ETH for grid BUY` loop shows the first T-034 funding policy must react before global family quarantine becomes the only brake.
+- PM milestone mapping:
+  - continue `T-034`; first post-pivot bundle passed alignment but still showed repeated ETH/USDC quote-family starvation and negative PnL.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: `shouldSuppressGridQuoteAssetCandidate(...)` now suppresses once quote-family insufficiency reaches the local risk-scaled threshold, even if the global quarantine has not yet been raised.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: updated regression coverage for local quote-family suppression behavior.
+- Risk slider impact:
+  - indirect only; higher-risk mode still reaches the suppression threshold sooner.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next bundle should lower repeated `Insufficient spendable ETH for grid BUY` / `Insufficient spendable USDC for grid BUY` before global family quarantine is the dominant control.
+  - T-005/T-007/T-032 behavior must remain unchanged.
+- Follow-up:
+  - if negative PnL and quote-starvation still dominate after this slice, next T-034 change should use actual live quote-balance snapshots in candidate routing rather than only recent skip history.
+
 ## 2026-03-19 08:35 UTC — PM/BA pivot: T-032 → T-034 after repeated BNBETH quote-starvation loop
 - Scope:
   - close the current T-032 micro-loop batch and pivot the active lane to quote-routing/funding policy (`T-034`).

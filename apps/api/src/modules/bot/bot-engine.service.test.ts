@@ -2095,7 +2095,7 @@ describe("bot-engine insufficient-balance helpers", () => {
 
     expect(
       helpers.shouldSuppressGridQuoteAssetCandidate({
-        quoteQuarantineActive: true,
+        quoteQuarantineActive: false,
         recentQuoteAssetBuyQuoteInsufficient: 2,
         missingSellLeg: false,
         risk: 100
@@ -2109,13 +2109,22 @@ describe("bot-engine insufficient-balance helpers", () => {
         missingSellLeg: false,
         risk: 100
       })
-    ).toBe(false);
+    ).toBe(true);
 
     expect(
       helpers.shouldSuppressGridQuoteAssetCandidate({
         quoteQuarantineActive: true,
         recentQuoteAssetBuyQuoteInsufficient: 3,
         missingSellLeg: true,
+        risk: 100
+      })
+    ).toBe(false);
+
+    expect(
+      helpers.shouldSuppressGridQuoteAssetCandidate({
+        quoteQuarantineActive: false,
+        recentQuoteAssetBuyQuoteInsufficient: 1,
+        missingSellLeg: false,
         risk: 100
       })
     ).toBe(false);

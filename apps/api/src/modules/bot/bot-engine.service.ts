@@ -657,12 +657,13 @@ export class BotEngineService implements OnModuleInit {
     missingSellLeg: boolean;
     risk: number;
   }): boolean {
-    if (!params.quoteQuarantineActive) return false;
     if (params.missingSellLeg) return false;
+    if (params.recentQuoteAssetBuyQuoteInsufficient <= 0) return false;
 
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
     const localThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
-    return params.recentQuoteAssetBuyQuoteInsufficient >= localThreshold;
+    if (params.recentQuoteAssetBuyQuoteInsufficient >= localThreshold) return true;
+    return params.quoteQuarantineActive;
   }
 
   private shouldTreatGridBuySizingRejectAsQuoteInsufficient(params: {
