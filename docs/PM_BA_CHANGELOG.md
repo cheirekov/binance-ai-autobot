@@ -16,6 +16,27 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-19 08:35 UTC — PM/BA pivot: T-032 → T-034 after repeated BNBETH quote-starvation loop
+- Scope:
+  - close the current T-032 micro-loop batch and pivot the active lane to quote-routing/funding policy (`T-034`).
+- BA requirement mapping:
+  - repeated `BNBETH: Insufficient spendable ETH for grid BUY` loops are a quote-asset funding problem, not another exit-manager-only problem.
+- PM milestone mapping:
+  - follow automatic retrospective hard rules: repeated dominant loop + three negative bundles + no KPI trend improvement require pivot review before the next long run.
+- Technical changes:
+  - `docs/TRIAGE_NOTE_2026-03-19_T032_BNBETH_QUOTE_STARVATION_PIVOT.md`: recorded the pivot trigger and rationale.
+  - `docs/DELIVERY_BOARD.md`: switched `IN_PROGRESS` from `T-032` to `T-034`.
+  - `docs/SESSION_BRIEF.md`: rewrote the next-batch contract around `T-034`.
+- Risk slider impact:
+  - none directly; this is a planning pivot, not a runtime policy change.
+- Validation evidence:
+  - `docs/RETROSPECTIVE_AUTO.md`
+  - `./scripts/pmba-gate.sh start`
+- Runtime test request:
+  - next batch should target quote-family funding/routing behavior, not more T-032 exit-manager micro-cleanup.
+- Follow-up:
+  - keep T-032 open in backlog; return only after `T-034` removes quote-family starvation as the dominant blocker.
+
 ## 2026-03-18 17:45 UTC — Process tooling: automatic retrospective
 - Scope:
   - add a hard-rule retrospective artifact to the ingest flow so long tickets have explicit time-aware review signals.
