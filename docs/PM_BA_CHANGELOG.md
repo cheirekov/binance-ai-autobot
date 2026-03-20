@@ -16,6 +16,26 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-20 09:25 UTC — T-034 slice: quote reserves normalized into execution-quote units
+- Scope:
+  - remove false multi-quote funding starvation caused by comparing home-denominated reserve floors against non-home quote balances (`ETH`, `BTC`, `BNB`, etc.).
+- BA requirement mapping:
+  - repeated `BNBETH: Insufficient spendable ETH for grid BUY` loops showed the reserve policy was still effectively home-only and was over-blocking non-home quotes.
+- PM milestone mapping:
+  - continue `T-034`; latest bundle recovered to positive daily net, so this slice fixes a correctness bug before the next routing refinement.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added reserve-target normalization from home currency into quote-asset units and used it in execution-side reserve/spendable calculations for non-home quotes.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for non-home quote reserve normalization.
+- Risk slider impact:
+  - unchanged semantics; reserve policy still tightens at lower risk and loosens at higher risk, now in the correct quote units.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next bundle should stop treating sub-`5` `ETH` / `BTC` / `BNB` free balances as automatically unspendable when they are actually sufficient in home-value terms.
+  - USDC-family starvation may still exist and should be evaluated separately from this correctness fix.
+- Follow-up:
+  - if USDC-family starvation remains dominant after this slice, next T-034 change should gate candidate routing from live spendable quote snapshots per family, not only skip history.
+
 ## 2026-03-19 13:05 UTC — T-034 slice: quote-family suppression no longer waits for global quarantine
 - Scope:
   - reduce repeated quote-family funding loops by suppressing starved quote assets from local repeat history, not only after global `GRID_BUY_QUOTE` quarantine is already active.

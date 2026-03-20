@@ -1934,6 +1934,92 @@ export class BotEngineService implements OnModuleInit {
     return total;
   }
 
+  private async normalizeHomeAmountToQuoteUnits(params: {
+    amountHome: number;
+    quoteAsset: string;
+    homeStable: string;
+    bridgeAssets: string[];
+  }): Promise<number | null> {
+    if (!Number.isFinite(params.amountHome) || params.amountHome < 0) return null;
+    const normalizedQuote = params.quoteAsset.trim().toUpperCase();
+    const normalizedHome = params.homeStable.trim().toUpperCase();
+    if (!normalizedQuote || !normalizedHome) return null;
+    if (normalizedQuote === normalizedHome) return params.amountHome;
+
+    const quoteUnitValueHome = await this.estimateAssetValueInHome(normalizedQuote, 1, normalizedHome, params.bridgeAssets);
+    if (typeof quoteUnitValueHome !== "number" || !Number.isFinite(quoteUnitValueHome) || quoteUnitValueHome <= 0) return null;
+    return params.amountHome / quoteUnitValueHome;
+  }
+
+  private async deriveQuoteReserveTargets(params: {
+    config?: AppConfig;
+    walletTotalHome: number;
+    capitalProfile: CapitalProfile;
+    risk: number;
+    quoteAsset: string;
+    homeStable: string;
+    bridgeAssets: string[];
+  }): Promise<{
+    floorTopUpTarget: number;
+    reserveLowTarget: number;
+    reserveHighTarget: number;
+    reserveHardTarget: number;
+  }> {
+    const configuredMinTopUpTarget = params.config?.advanced.conversionTopUpMinTarget ?? 5;
+    const floorTopUpTargetHome =
+      Number.isFinite(configuredMinTopUpTarget) && configuredMinTopUpTarget > 0 ? configuredMinTopUpTarget : 5;
+    const conversionTopUpReserveMultiplier = Math.max(1, params.config?.advanced.conversionTopUpReserveMultiplier ?? 2);
+    const reserveScale = 1.8 - (params.risk / 100) * 0.8;
+    const reserveLowTargetHome = Math.max(
+      floorTopUpTargetHome,
+      floorTopUpTargetHome * conversionTopUpReserveMultiplier,
+      params.walletTotalHome * params.capitalProfile.reserveLowPct * reserveScale
+    );
+    const reserveHighTargetHome = Math.max(
+      reserveLowTargetHome,
+      reserveLowTargetHome * 2,
+      params.walletTotalHome * params.capitalProfile.reserveHighPct * reserveScale
+    );
+    const reserveHardTargetHome = (() => {
+      const t = Math.max(0, Math.min(1, params.risk / 100));
+      return floorTopUpTargetHome + (reserveLowTargetHome - floorTopUpTargetHome) * (1 - t);
+    })();
+
+    const [floorTopUpTargetQuote, reserveLowTargetQuote, reserveHighTargetQuote, reserveHardTargetQuote] = await Promise.all([
+      this.normalizeHomeAmountToQuoteUnits({
+        amountHome: floorTopUpTargetHome,
+        quoteAsset: params.quoteAsset,
+        homeStable: params.homeStable,
+        bridgeAssets: params.bridgeAssets
+      }),
+      this.normalizeHomeAmountToQuoteUnits({
+        amountHome: reserveLowTargetHome,
+        quoteAsset: params.quoteAsset,
+        homeStable: params.homeStable,
+        bridgeAssets: params.bridgeAssets
+      }),
+      this.normalizeHomeAmountToQuoteUnits({
+        amountHome: reserveHighTargetHome,
+        quoteAsset: params.quoteAsset,
+        homeStable: params.homeStable,
+        bridgeAssets: params.bridgeAssets
+      }),
+      this.normalizeHomeAmountToQuoteUnits({
+        amountHome: reserveHardTargetHome,
+        quoteAsset: params.quoteAsset,
+        homeStable: params.homeStable,
+        bridgeAssets: params.bridgeAssets
+      })
+    ]);
+
+    return {
+      floorTopUpTarget: floorTopUpTargetQuote ?? floorTopUpTargetHome,
+      reserveLowTarget: reserveLowTargetQuote ?? reserveLowTargetHome,
+      reserveHighTarget: reserveHighTargetQuote ?? reserveHighTargetHome,
+      reserveHardTarget: reserveHardTargetQuote ?? reserveHardTargetHome
+    };
+  }
+
   private getSymbolQuoteAssetByPriority(symbol: string, quoteAssets: Iterable<string>): string | null {
     const normalizedSymbol = symbol.trim().toUpperCase();
     if (!normalizedSymbol) return null;
@@ -2255,7 +2341,8 @@ export class BotEngineService implements OnModuleInit {
     const capForSizing = effectiveNotionalCap ? effectiveNotionalCap / bufferFactor : null;
     const rawTargetNotional = walletTotalHome * (maxPositionPct / 100);
     const normalizedHomeStable = homeStable.trim().toUpperCase();
-    const quoteBridgeAssets = resolveRouteBridgeAssets(this.configService.load(), normalizedHomeStable);
+    const liveConfig = this.configService.load() ?? undefined;
+    const quoteBridgeAssets = resolveRouteBridgeAssets(liveConfig ?? null, normalizedHomeStable);
     const quoteExposureHomeMap = await this.buildQuoteExposureHomeMap({
       state,
       homeStable: normalizedHomeStable,
@@ -4830,6 +4917,7 @@ export class BotEngineService implements OnModuleInit {
 
           const walletTotalHome = await this.estimateWalletTotalInHome(balances, homeStable);
           const capitalProfile = this.getCapitalProfile(walletTotalHome);
+          const executionBridgeAssets = resolveRouteBridgeAssets(config, homeStable);
           const dailyLossGuard = this.evaluateDailyLossGuard({
             state: current,
             risk,
@@ -6587,28 +6675,16 @@ export class BotEngineService implements OnModuleInit {
             const botOrderAutoCancelEnabled = Boolean(config?.advanced.botOrderAutoCancelEnabled);
             const baseFree = balances.find((b) => b.asset.toUpperCase() === candidateBaseAsset)?.free ?? 0;
 
-            // Wallet reserve policy (T-004 slice):
-            // Keep some free home-stable liquidity so grid BUY legs don't consume the last quote and then spam minQty rejects.
-            const configuredMinTopUpTarget = config?.advanced.conversionTopUpMinTarget ?? 5;
-            const floorTopUpTarget =
-              Number.isFinite(configuredMinTopUpTarget) && configuredMinTopUpTarget > 0 ? configuredMinTopUpTarget : 5;
             const conversionTopUpReserveMultiplier = Math.max(1, config?.advanced.conversionTopUpReserveMultiplier ?? 2);
-            const reserveScale = 1.8 - (risk / 100) * 0.8; // risk 0 -> 1.8x, risk 100 -> 1.0x
-            const reserveLowTarget = Math.max(
-              floorTopUpTarget,
-              floorTopUpTarget * conversionTopUpReserveMultiplier,
-              walletTotalHome * capitalProfile.reserveLowPct * reserveScale
-            );
-            const reserveHighTarget = Math.max(
-              reserveLowTarget,
-              reserveLowTarget * 2,
-              walletTotalHome * capitalProfile.reserveHighPct * reserveScale
-            );
-            const reserveHardTarget = (() => {
-              const t = Math.max(0, Math.min(1, risk / 100));
-              // risk=0 => hard reserve ~= low target (conservative), risk=100 => hard reserve ~= floor (aggressive)
-              return floorTopUpTarget + (reserveLowTarget - floorTopUpTarget) * (1 - t);
-            })();
+            const { floorTopUpTarget, reserveLowTarget, reserveHighTarget, reserveHardTarget } = await this.deriveQuoteReserveTargets({
+              config: config ?? undefined,
+              walletTotalHome,
+              capitalProfile,
+              risk,
+              quoteAsset: candidateQuoteAsset,
+              homeStable,
+              bridgeAssets: executionBridgeAssets
+            });
             const quoteSpendable = Math.max(0, quoteFree - reserveHardTarget);
 
             if (botOrderAutoCancelEnabled && config) {

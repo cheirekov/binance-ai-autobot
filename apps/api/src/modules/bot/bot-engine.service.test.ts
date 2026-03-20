@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { AppConfig, BotState, Order, UniverseCandidate } from "@autobot/shared";
 import { defaultBotState } from "@autobot/shared";
@@ -2128,6 +2128,67 @@ describe("bot-engine insufficient-balance helpers", () => {
         risk: 100
       })
     ).toBe(false);
+  });
+
+  it("normalizes reserve targets into quote units for non-home execution quotes", async () => {
+    const helpers = service as unknown as {
+      deriveQuoteReserveTargets: (params: {
+        config?: AppConfig;
+        walletTotalHome: number;
+        capitalProfile: {
+          tier: "MICRO" | "SMALL" | "STANDARD";
+          notionalCapMultiplier: number;
+          reserveLowPct: number;
+          reserveHighPct: number;
+          minNetEdgePct: number;
+        };
+        risk: number;
+        quoteAsset: string;
+        homeStable: string;
+        bridgeAssets: string[];
+      }) => Promise<{
+        floorTopUpTarget: number;
+        reserveLowTarget: number;
+        reserveHighTarget: number;
+        reserveHardTarget: number;
+      }>;
+    };
+
+    const estimateSpy = vi
+      .spyOn(service as unknown as { estimateAssetValueInHome: BotEngineService["estimateAssetValueInHome"] }, "estimateAssetValueInHome")
+      .mockImplementation(async (asset: string, amount: number) => {
+        if (asset === "ETH" && amount === 1) return 2_000;
+        if (asset === "USDC" && amount === 1) return 1;
+        return null;
+      });
+
+    const targets = await helpers.deriveQuoteReserveTargets({
+      config: {
+        advanced: {
+          conversionTopUpMinTarget: 5,
+          conversionTopUpReserveMultiplier: 2
+        }
+      } as unknown as AppConfig,
+      walletTotalHome: 1_000,
+      capitalProfile: {
+        tier: "MICRO",
+        notionalCapMultiplier: 1,
+        reserveLowPct: 0.01,
+        reserveHighPct: 0.02,
+        minNetEdgePct: 0.1
+      },
+      risk: 100,
+      quoteAsset: "ETH",
+      homeStable: "USDC",
+      bridgeAssets: ["BTC", "ETH"]
+    });
+
+    expect(targets.floorTopUpTarget).toBeCloseTo(0.0025, 8);
+    expect(targets.reserveLowTarget).toBeCloseTo(0.005, 8);
+    expect(targets.reserveHighTarget).toBeCloseTo(0.01, 8);
+    expect(targets.reserveHardTarget).toBeCloseTo(0.0025, 8);
+
+    estimateSpy.mockRestore();
   });
 
   it("scales global-lock unwind cooldown with risk", () => {
