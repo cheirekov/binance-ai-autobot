@@ -16,6 +16,25 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-20 14:05 UTC — T-034 slice: feasible candidate routing now gates on spendable quote after reserve
+- Scope:
+  - stop routing new buys into quote families that have free balance but zero spendable balance after reserve policy is applied.
+- BA requirement mapping:
+  - latest bundle still showed dominant `Insufficient spendable USDC for grid BUY` loops across multiple USDC symbols even after non-home reserve normalization.
+- PM milestone mapping:
+  - continue `T-034`; this is the next routing slice after fixing quote-unit normalization.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: `pickFeasibleLiveCandidate(...)` now derives quote reserves per quote asset, computes `quoteSpendable`, and rejects unfundable candidates before they reach later execution-time `insufficient spendable` skips.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for a non-home quote candidate that stays feasible once reserve math is normalized and spendable quote is used in routing.
+- Risk slider impact:
+  - unchanged semantics; reserve policy still scales by risk, but candidate routing now uses spendable quote instead of raw free balance.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next bundle should show fewer repeated `Insufficient spendable USDC for grid BUY` decisions and more early `no feasible candidate` routing when USDC spendable balance is exhausted.
+- Follow-up:
+  - if USDC-family starvation remains dominant after this slice, next T-034 change should add quote-family cooldown/gating from live spendable balance per quote asset family, not just per-candidate feasibility.
+
 ## 2026-03-20 09:25 UTC — T-034 slice: quote reserves normalized into execution-quote units
 - Scope:
   - remove false multi-quote funding starvation caused by comparing home-denominated reserve floors against non-home quote balances (`ETH`, `BTC`, `BNB`, etc.).

@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-20 08:14 UTC
+Last updated: 2026-03-20 13:49 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -15,6 +15,7 @@ Use this file at the start and end of every batch.
   - suppress quote-asset families (`ETH`, `USDC`, etc.) when spendable quote is repeatedly insufficient and no actionable sell leg exists.
   - suppress quote-asset families from local repeat history even before the global buy-quote quarantine becomes active.
   - normalize reserve floors into quote-asset units so non-home quotes are not over-blocked by home-denominated thresholds.
+  - gate feasible live-candidate routing on spendable quote after reserve, not raw free quote.
   - prefer funded routes over unfunded higher-score routes.
   - keep multi-quote candidates visible only when their quote asset can support minimum order sizing.
   - preserve existing T-005/T-007/T-032 guard behavior; no risk-guard regression.
@@ -38,6 +39,7 @@ Use this file at the start and end of every batch.
   - multi-quote candidate selection de-prioritizes or suppresses quote assets with repeated funding failure before symbol-level loops dominate.
   - quote-family suppression no longer depends solely on a pre-existing global quarantine lock.
   - execution quote reserves are evaluated in the quote asset's units, not raw home-currency units.
+  - feasible live-candidate routing now rejects candidates with zero spendable quote after reserve before they hit later execution skips.
   - funded routes remain eligible even when other quote families are quarantined.
   - T-005/T-007/T-032 guard behavior remains unchanged.
 - Runtime evidence in decisions/logs:
@@ -54,7 +56,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `da2f5b1`
+- Commit hash: `a3ecbfa`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -75,23 +77,23 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `738.16`
-  - run end: `Fri Mar 20 2026 10:13:55 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - run duration (hours): `743.749`
+  - run end: `Fri Mar 20 2026 15:49:13 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=7, historyLimitOrders=163, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=18.5%)
-  - sizing reject pressure: `medium` (sizingRejectSkips=20, decisions=200, ratio=10.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=7, historyLimitOrders=165, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=17.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=15, decisions=200, ratio=7.5%)
 - Decision: `continue`
 - Next ticket candidate: `T-034` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - sizing reject pressure is medium (10.0%).
+  - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260320-081418.tgz`
-  - auto-updated at: `2026-03-20T08:14:48.668Z`
+  - bundle: `autobot-feedback-20260320-134927.tgz`
+  - auto-updated at: `2026-03-20T13:49:40.491Z`
 
 ## 5) Copy/paste prompt for next session
 

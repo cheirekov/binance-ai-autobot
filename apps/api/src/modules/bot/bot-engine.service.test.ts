@@ -179,6 +179,94 @@ describe("bot-engine pickFeasibleLiveCandidate", () => {
     expect(result.sizingRejected).toBeGreaterThan(0);
   });
 
+  it("keeps non-home quote candidates eligible when quote reserve is normalized to quote units", async () => {
+    const config = {
+      basic: {
+        homeStableCoin: "USDC",
+        traderRegion: "NON_EEA"
+      },
+      advanced: {
+        neverTradeSymbols: [],
+        symbolEntryCooldownMs: 0,
+        maxConsecutiveEntriesPerSymbol: 0,
+        universeQuoteAssets: ["USDC", "ETH"],
+        conversionTopUpMinTarget: 5,
+        conversionTopUpReserveMultiplier: 2
+      }
+    } as unknown as AppConfig;
+
+    const configService = { load: () => config };
+    const rules: BinanceSymbolRules = {
+      symbol: "BNBETH",
+      status: "TRADING",
+      baseAsset: "BNB",
+      quoteAsset: "ETH"
+    };
+    const marketData = {
+      getSymbolRules: async () => rules,
+      getTickerPrice: async (symbol: string) => {
+        if (symbol === "ETHUSDC") return "2000";
+        if (symbol === "BNBETH") return "0.001";
+        return "1";
+      },
+      validateMarketOrderQty: async () =>
+        ({
+          ok: true,
+          normalizedQty: "1"
+        }) satisfies MarketQtyValidation
+    };
+
+    const service = new BotEngineService(
+      configService as unknown as ConfigService,
+      marketData as unknown as BinanceMarketDataService,
+      {} as unknown as BinanceTradingService,
+      {} as unknown as ConversionRouterService,
+      {} as unknown as UniverseService
+    );
+
+    const candidate: UniverseCandidate = {
+      symbol: "BNBETH",
+      baseAsset: "BNB",
+      quoteAsset: "ETH",
+      lastPrice: 0.001,
+      quoteVolume24h: 1_000_000,
+      priceChangePct24h: 0,
+      score: 1,
+      reasons: []
+    };
+
+    const balances: BinanceBalanceSnapshot[] = [
+      { asset: "ETH", free: 0.01, locked: 0, total: 0.01 },
+      { asset: "USDC", free: 0, locked: 0, total: 0 }
+    ];
+
+    const result = await (
+      service as unknown as {
+        pickFeasibleLiveCandidate: (params: unknown) => Promise<{ candidate: UniverseCandidate | null }>;
+      }
+    ).pickFeasibleLiveCandidate({
+      preferredCandidate: candidate,
+      snapshotCandidates: [],
+      state: defaultBotState(),
+      homeStable: "USDC",
+      allowedExecutionQuotes: new Set(["USDC", "ETH"]),
+      traderRegion: "NON_EEA",
+      neverTradeSymbols: [],
+      excludeStableStablePairs: true,
+      enforceRegionPolicy: true,
+      balances,
+      walletTotalHome: 1_000,
+      risk: 100,
+      maxPositionPct: 20,
+      minQuoteLiquidityHome: 3,
+      notionalCap: 0,
+      capitalNotionalCapMultiplier: 1,
+      bufferFactor: 1.002
+    });
+
+    expect(result.candidate?.symbol).toBe("BNBETH");
+  });
+
   it("filters to managed-open symbols when caution pauses new entries", async () => {
     const config = {
       basic: {

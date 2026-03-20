@@ -2343,6 +2343,7 @@ export class BotEngineService implements OnModuleInit {
     const normalizedHomeStable = homeStable.trim().toUpperCase();
     const liveConfig = this.configService.load() ?? undefined;
     const quoteBridgeAssets = resolveRouteBridgeAssets(liveConfig ?? null, normalizedHomeStable);
+    const capitalProfile = this.getCapitalProfile(walletTotalHome);
     const quoteExposureHomeMap = await this.buildQuoteExposureHomeMap({
       state,
       homeStable: normalizedHomeStable,
@@ -2389,6 +2390,25 @@ export class BotEngineService implements OnModuleInit {
       if (this.getEntryGuard({ symbol, state })) continue;
       const quoteFree = balances.find((b) => b.asset.trim().toUpperCase() === quoteAsset)?.free ?? 0;
       if (!Number.isFinite(quoteFree) || quoteFree <= 0) continue;
+      const quoteReserveTargets = await this.deriveQuoteReserveTargets({
+        config: liveConfig,
+        walletTotalHome,
+        capitalProfile,
+        risk,
+        quoteAsset,
+        homeStable: normalizedHomeStable,
+        bridgeAssets: quoteBridgeAssets
+      });
+      const quoteSpendable = Math.max(0, quoteFree - quoteReserveTargets.reserveHardTarget);
+      if (quoteSpendable <= 1e-8) {
+        recordRejection({
+          symbol,
+          stage: "quote-spendable",
+          reason: `Spendable ${quoteAsset} exhausted after reserve (${quoteFree.toFixed(8)} <= ${quoteReserveTargets.reserveHardTarget.toFixed(8)})`,
+          quoteAsset
+        });
+        continue;
+      }
 
       const policyReason = getPairPolicyBlockReason({
         symbol,
@@ -2423,7 +2443,7 @@ export class BotEngineService implements OnModuleInit {
         if (!hasInventory && quoteAsset !== normalizedHomeStable) {
           const quoteHomeValue = await this.estimateAssetValueInHome(
             quoteAsset,
-            quoteFree,
+            quoteSpendable,
             normalizedHomeStable,
             quoteBridgeAssets
           );
@@ -2444,7 +2464,7 @@ export class BotEngineService implements OnModuleInit {
         const remainingSymbolNotional = Math.max(0, maxSymbolNotional - currentNotional);
         if (remainingSymbolNotional <= 0) continue;
 
-        const targetNotional = Math.min(rawTargetNotional, capForSizing ?? rawTargetNotional, quoteFree, remainingSymbolNotional);
+        const targetNotional = Math.min(rawTargetNotional, capForSizing ?? rawTargetNotional, quoteSpendable, remainingSymbolNotional);
         if (!Number.isFinite(targetNotional) || targetNotional <= 0) continue;
         const quoteExposureCapPct = this.derivePerQuoteExposureCapPct({
           quoteAsset,
