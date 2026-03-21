@@ -16,6 +16,25 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-20 16:55 UTC — T-034 slice: spendable-quote floor gate in feasible routing
+- Scope:
+  - stop routing candidates when spendable quote remains above zero but still below the minimum funding floor needed for a meaningful buy leg.
+- BA requirement mapping:
+  - latest bundle still showed repeated `Insufficient spendable USDC for grid BUY` loops even after routing switched from raw `quoteFree` to reserve-aware `quoteSpendable`.
+- PM milestone mapping:
+  - continue `T-034`; same-ticket mitigation required by auto-retro before the next long run.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: `pickFeasibleLiveCandidate(...)` now rejects candidates when `quoteSpendable < floorTopUpTarget`, not only when `quoteSpendable <= 0`.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for home-quote candidates that must be rejected when spendable quote remains below the funding floor.
+- Risk slider impact:
+  - unchanged reserve semantics; this only enforces the existing funding floor earlier in routing.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next bundle should reduce repeated `Insufficient spendable USDC for grid BUY` loops and replace part of that churn with earlier no-feasible routing.
+- Follow-up:
+  - if the next bundle is still dominated by USDC-family starvation, add quote-family-level live-balance gating so one exhausted quote asset suppresses the whole family for the cycle.
+
 ## 2026-03-20 14:05 UTC — T-034 slice: feasible candidate routing now gates on spendable quote after reserve
 - Scope:
   - stop routing new buys into quote families that have free balance but zero spendable balance after reserve policy is applied.

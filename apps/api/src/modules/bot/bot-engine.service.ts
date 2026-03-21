@@ -2409,6 +2409,15 @@ export class BotEngineService implements OnModuleInit {
         });
         continue;
       }
+      if (quoteSpendable + 1e-8 < quoteReserveTargets.floorTopUpTarget) {
+        recordRejection({
+          symbol,
+          stage: "quote-spendable-floor",
+          reason: `Spendable ${quoteAsset} below funding floor (${quoteSpendable.toFixed(8)} < ${quoteReserveTargets.floorTopUpTarget.toFixed(8)})`,
+          quoteAsset
+        });
+        continue;
+      }
 
       const policyReason = getPairPolicyBlockReason({
         symbol,
