@@ -16,6 +16,25 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-22 16:00 UTC — T-031 slice: suppress repeated fee-edge churn even on parked sell-side ladders
+- Scope:
+  - reduce repeated `Fee/edge filter (...)` churn on symbols that still have only a sell-side grid action available.
+- BA requirement mapping:
+  - latest bundle (`autobot-feedback-20260322-155534.tgz`) ended in `HALT` with repeated fee-edge skips on `BTCUSDC`, `ETHBTC`, `SOLBTC`, and `SOLUSDC`; the first `T-031` slice was still too permissive for sell-leg-only candidates.
+- PM milestone mapping:
+  - same-ticket mitigation required by auto-retro before the next long run.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: tightened `shouldSuppressGridFeeEdgeCandidate(...)` so repeated fee-edge rejects also demote sell-leg-only candidates after a stricter local threshold.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: extended regression coverage for sell-leg fee-edge suppression.
+- Risk slider impact:
+  - fee floor is unchanged; this only changes how quickly repeated non-actionable fee-edge candidates are rotated away.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next bundle should show lower repeated `Fee/edge filter (...)` skips on sell-leg-only candidates while `HALT` / daily-loss guard behavior remains unchanged.
+- Follow-up:
+  - if fee-edge remains dominant after this slice, the next `T-031` step should move from symbol-local suppression to stronger family/regime demotion, not weaken the fee floor.
+
 ## 2026-03-22 08:10 UTC — Process fix: mandatory ticket-switch retrospective
 - Scope:
   - close the process gap that allowed a board/session ticket switch without a standalone retrospective artifact.

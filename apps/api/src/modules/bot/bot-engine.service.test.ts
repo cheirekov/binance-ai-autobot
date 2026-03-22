@@ -2344,6 +2344,15 @@ describe("bot-engine insufficient-balance helpers", () => {
         missingSellLeg: true,
         risk: 100
       })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldSuppressGridFeeEdgeCandidate({
+        feeEdgeQuarantineActive: false,
+        recentFeeEdgeRejects: 2,
+        missingSellLeg: true,
+        risk: 100
+      })
     ).toBe(false);
   });
 

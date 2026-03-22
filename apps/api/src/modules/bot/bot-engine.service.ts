@@ -672,12 +672,12 @@ export class BotEngineService implements OnModuleInit {
     missingSellLeg: boolean;
     risk: number;
   }): boolean {
-    if (params.missingSellLeg) return false;
     if (params.recentFeeEdgeRejects <= 0) return false;
 
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
     const localThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
-    if (params.recentFeeEdgeRejects >= localThreshold) return true;
+    const actionableSellThreshold = localThreshold + 1;
+    if (params.recentFeeEdgeRejects >= (params.missingSellLeg ? actionableSellThreshold : localThreshold)) return true;
     return params.feeEdgeQuarantineActive;
   }
 

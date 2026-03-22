@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-22 07:05 UTC
+Last updated: 2026-03-22 16:00 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -52,7 +52,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `<set-after-commit>`
+- Commit hash: `ed527d5`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -73,24 +73,24 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `784.489`
-  - run end: `Sun Mar 22 2026 08:33:39 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - run duration (hours): `793.852`
+  - run end: `Sun Mar 22 2026 17:55:26 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=160, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=20.0%)
-  - sizing reject pressure: `low` (sizingRejectSkips=5, decisions=200, ratio=2.5%)
-- Decision: `continue T-031 with first code slice applied`
-- Next ticket candidate: `T-031` (active lane switched by PM/BA after T-034 runtime evidence)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=113, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=43.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=6, decisions=200, ratio=3.0%)
+- Decision: `continue`
+- Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - repeated `Fee/edge filter (...)` churn can still dominate if candidate demotion is too weak.
+  - repeated fee-edge churn on sell-leg-only candidates can still dominate if the new suppression threshold is too weak.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260322-063344.tgz`
-  - auto-updated at: `2026-03-22T06:33:58.582Z`
-  - latest code slice: repeated fee-edge rejects are now suppressed earlier during SPOT_GRID candidate selection when no sell leg is actionable.
+  - bundle: `autobot-feedback-20260322-155534.tgz`
+  - auto-updated at: `2026-03-22T15:56:12.621Z`
+  - latest code slice: repeated fee-edge rejects now also suppress sell-leg-only candidates after a stricter local threshold.
 
 ## 5) Copy/paste prompt for next session
 
