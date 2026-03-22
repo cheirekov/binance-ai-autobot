@@ -105,21 +105,23 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
+| T-031 | IN_PROGRESS | Regime engine v2 | No quote-routing rework, no AI lane, no PnL redesign, no exit-manager redesign in this batch |
 | T-032 | TODO | Exit manager v2 | Return after quote-routing/funding policy stops dominating runtime churn |
-| T-034 | IN_PROGRESS | Multi-quote execution policy v1 | No AI lane, no PnL redesign, no exit-manager micro-tuning outside quote-routing/funding behavior |
+| T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
 
 `T-005` status: moved to DONE after overnight evidence (`autobot-feedback-20260225-100508.tgz`) showed guard transitions/recovery without deadlock.
 `T-029` status: moved to DONE after overnight evidence (`autobot-feedback-20260219-103043.tgz`) showed unmanaged exposure controlled and no dominant no-feasible conversion loop.
 `T-007` status: moved to DONE after restart-stability evidence (`autobot-feedback-20260302-112527.tgz`) confirmed fee-aware summary fields, executed-trade count consistency, and bounded drawdown reporting.
 `T-030` status: moved to DONE after sustained low sizing-reject pressure in follow-up evidence (`autobot-feedback-20260303-071331.tgz`) with PM/BA gate pass and no dominant min-order reject loop.
+`T-034` status: moved to DONE after follow-up evidence (`autobot-feedback-20260321-165459.tgz`, `autobot-feedback-20260322-063344.tgz`) showed quote-funding starvation was no longer the dominant blocker and runtime moved to fee/edge + ladder-wait behavior.
 
 ### NEXT (Gate A blockers)
 
 | Priority | ID | Status | Title | Acceptance focus |
 |---|---|---|---|---|
-| 1 | T-031 | TODO | Regime engine v2 | reduce repeated non-actionable candidate loops |
-| 2 | T-032 | TODO | Exit manager v2 | reduce profit giveback and improve downside exits |
-| 3 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source |
+| 1 | T-032 | TODO | Exit manager v2 | reduce profit giveback and improve downside exits |
+| 2 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source |
+| 3 | T-028 | TODO | Compact advanced UX | improve operator readability without changing strategy behavior |
 
 ### LATER (after Gate A)
 

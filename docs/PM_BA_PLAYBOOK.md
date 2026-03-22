@@ -97,3 +97,21 @@ The automatic retrospective is not optional process noise; it is the time-awaren
   - `continue` → same lane can continue,
   - `patch_required` → next batch must be direct same-ticket mitigation,
   - `pivot_required` → PM/BA must explicitly review scope/ticket before the next long run.
+
+## Ticket-switch retrospective rule (hard)
+
+A ticket switch is not complete just because the board and session brief changed.
+
+- Required artifact:
+  - `docs/TICKET_SWITCH_RETRO.md`
+- Minimum content:
+  - previous ticket,
+  - current ticket,
+  - switch decision,
+  - evidence bundles,
+  - why the previous lane is closed/pivoted,
+  - why the next lane is the correct target.
+- Enforcement:
+  - `./scripts/pmba-gate.sh start` must fail if `docs/TICKET_SWITCH_RETRO.md` does not align with the current active ticket.
+- Intent:
+  - prevent “board switch without real retrospective”.

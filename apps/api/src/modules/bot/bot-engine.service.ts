@@ -666,6 +666,21 @@ export class BotEngineService implements OnModuleInit {
     return params.quoteQuarantineActive;
   }
 
+  private shouldSuppressGridFeeEdgeCandidate(params: {
+    feeEdgeQuarantineActive: boolean;
+    recentFeeEdgeRejects: number;
+    missingSellLeg: boolean;
+    risk: number;
+  }): boolean {
+    if (params.missingSellLeg) return false;
+    if (params.recentFeeEdgeRejects <= 0) return false;
+
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const localThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
+    if (params.recentFeeEdgeRejects >= localThreshold) return true;
+    return params.feeEdgeQuarantineActive;
+  }
+
   private shouldTreatGridBuySizingRejectAsQuoteInsufficient(params: {
     check: MarketQtyValidation;
     price: number;
@@ -4427,6 +4442,16 @@ export class BotEngineService implements OnModuleInit {
                 this.shouldSuppressGridQuoteAssetCandidate({
                   quoteQuarantineActive: activeReasonQuarantineFamilies.has("GRID_BUY_QUOTE"),
                   recentQuoteAssetBuyQuoteInsufficient,
+                  missingSellLeg,
+                  risk: boundedRisk
+                })
+              ) {
+                continue;
+              }
+              if (
+                this.shouldSuppressGridFeeEdgeCandidate({
+                  feeEdgeQuarantineActive: activeReasonQuarantineFamilies.has("FEE_EDGE"),
+                  recentFeeEdgeRejects,
                   missingSellLeg,
                   risk: boundedRisk
                 })

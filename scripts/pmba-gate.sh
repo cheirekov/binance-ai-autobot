@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 BOARD_FILE="docs/DELIVERY_BOARD.md"
 SESSION_FILE="docs/SESSION_BRIEF.md"
 CHANGELOG_FILE="docs/PM_BA_CHANGELOG.md"
+SWITCH_RETRO_FILE="docs/TICKET_SWITCH_RETRO.md"
 
 PHASE="${1:-start}"
 if [[ "$PHASE" != "start" && "$PHASE" != "end" ]]; then
@@ -14,7 +15,7 @@ if [[ "$PHASE" != "start" && "$PHASE" != "end" ]]; then
   exit 2
 fi
 
-for required in "$BOARD_FILE" "$SESSION_FILE" "$CHANGELOG_FILE"; do
+for required in "$BOARD_FILE" "$SESSION_FILE" "$CHANGELOG_FILE" "$SWITCH_RETRO_FILE"; do
   if [[ ! -f "$required" ]]; then
     echo "FAIL: missing required file: $required" >&2
     exit 1
@@ -37,6 +38,21 @@ fi
 ACTIVE_TICKET="${ACTIVE_TICKETS[0]}"
 if ! grep -q "Active ticket: \`$ACTIVE_TICKET\`" "$SESSION_FILE"; then
   echo "FAIL: SESSION_BRIEF active ticket does not match board IN_PROGRESS ticket ($ACTIVE_TICKET)." >&2
+  exit 1
+fi
+
+if ! grep -q "Current ticket: \`$ACTIVE_TICKET\`" "$SWITCH_RETRO_FILE"; then
+  echo "FAIL: TICKET_SWITCH_RETRO current ticket does not match board IN_PROGRESS ticket ($ACTIVE_TICKET)." >&2
+  exit 1
+fi
+
+if ! grep -q "^Previous ticket: \`T-[0-9]\\{3\\}\`" "$SWITCH_RETRO_FILE"; then
+  echo "FAIL: TICKET_SWITCH_RETRO missing previous ticket reference." >&2
+  exit 1
+fi
+
+if ! grep -q "^Switch decision: \`" "$SWITCH_RETRO_FILE"; then
+  echo "FAIL: TICKET_SWITCH_RETRO missing switch decision line." >&2
   exit 1
 fi
 

@@ -16,6 +16,66 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-22 08:10 UTC — Process fix: mandatory ticket-switch retrospective
+- Scope:
+  - close the process gap that allowed a board/session ticket switch without a standalone retrospective artifact.
+- BA requirement mapping:
+  - the previous `T-034 -> T-031` move had changelog/session updates but no explicit switch-retro document, which weakened traceability and caused avoidable confusion.
+- PM milestone mapping:
+  - strengthen the PM/BA operating process so ticket switches are auditable and cannot happen as “docs only” state changes.
+- Technical changes:
+  - added `docs/TICKET_SWITCH_RETRO.md` with the missing `T-034 -> T-031` retrospective.
+  - updated `scripts/pmba-gate.sh` to require the switch-retro artifact and align it with the active ticket.
+  - updated `docs/PM_BA_PLAYBOOK.md` and `docs/RUN_LOGGING_P0.md` to document the new hard rule.
+- Risk slider impact:
+  - none; process-only change.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+- Runtime test request:
+  - none; this is process enforcement, not runtime behavior.
+- Follow-up:
+  - every future ticket closeout/pivot must update `docs/TICKET_SWITCH_RETRO.md` before the next coding batch starts.
+
+## 2026-03-22 07:05 UTC — T-031 slice: suppress repeated fee-edge candidates before execution
+- Scope:
+  - start the first actual `T-031` runtime slice by demoting candidates that repeatedly fail the fee/edge floor and have no actionable sell leg.
+- BA requirement mapping:
+  - latest `T-031` activation evidence showed quote-funding was stabilized, but the next dominant blockers were repeated `Fee/edge filter (...)` skips on the same symbols and parked ladder candidates.
+- PM milestone mapping:
+  - first concrete implementation batch for `T-031`; prove the new lane is code-bearing, not only a PM/BA state change.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `shouldSuppressGridFeeEdgeCandidate(...)` and wired it into SPOT_GRID candidate selection so repeated fee-edge rejects are demoted before execution-time churn.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for fee-edge suppression behavior.
+- Risk slider impact:
+  - no change to the fee floor itself; risk only scales the local suppression threshold, matching other candidate-demotion helpers.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next bundle should show lower recurrence of repeated same-symbol `Fee/edge filter (...)` skips without reintroducing dominant `Insufficient spendable <quote>` loops.
+- Follow-up:
+  - if fee-edge churn stays dominant, the next `T-031` slice should use stronger regime/edge demotion or family-level fee-edge cooldown, not weaken the fee floor.
+
+## 2026-03-22 07:10 UTC — PM/BA closeout: T-034 DONE, T-031 activated
+- Scope:
+  - close `T-034` based on sustained runtime evidence and move the active lane to `T-031`.
+- BA requirement mapping:
+  - latest bundles no longer show quote-funding starvation as the dominant blocker; the dominant blockers are now `Fee/edge filter` and non-actionable ladder waiting.
+- PM milestone mapping:
+  - `T-034` acceptance is satisfied well enough to stop spending more cycles on quote-routing/funding.
+  - next execution-quality lane is `T-031` (Regime engine v2).
+- Technical changes:
+  - `docs/DELIVERY_BOARD.md`: switched `IN_PROGRESS` from `T-034` to `T-031`; marked `T-034` as `DONE`.
+  - `docs/SESSION_BRIEF.md`: rewrote the batch contract around `T-031`.
+- Risk slider impact:
+  - none in this closeout batch; this is a PM/BA lane switch only.
+- Validation evidence:
+  - `autobot-feedback-20260321-165459.tgz`
+  - `autobot-feedback-20260322-063344.tgz`
+- Runtime test request:
+  - next bundle should confirm `Fee/edge filter` / ladder-wait loops are now the right active target and that `Insufficient spendable <quote>` does not return as the dominant blocker.
+- Follow-up:
+  - `T-031` first slice should target non-actionable candidate demotion without changing `T-034` funding gates or `T-032` exit-manager policy.
+
 ## 2026-03-20 16:55 UTC — T-034 slice: spendable-quote floor gate in feasible routing
 - Scope:
   - stop routing candidates when spendable quote remains above zero but still below the minimum funding floor needed for a meaningful buy leg.
