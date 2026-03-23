@@ -738,6 +738,35 @@ export class BotEngineService implements OnModuleInit {
     return { cooldownMs, fraction };
   }
 
+  private shouldRunDailyLossCautionUnwind(params: {
+    guard: DailyLossGuardSnapshot;
+    risk: number;
+  }): boolean {
+    if (params.guard.state !== "CAUTION") return false;
+    if (params.guard.trigger !== "PROFIT_GIVEBACK") return false;
+
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const t = boundedRisk / 100;
+    const minManagedExposurePct = Number((0.35 - t * 0.17).toFixed(4)); // 35% -> 18%
+    return params.guard.managedExposurePct >= minManagedExposurePct;
+  }
+
+  private deriveDailyLossCautionUnwindPolicy(params: {
+    risk: number;
+    trigger: DailyLossGuardSnapshot["trigger"];
+  }): { cooldownMs: number; fraction: number } {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const t = boundedRisk / 100;
+    const isGiveback = params.trigger === "PROFIT_GIVEBACK";
+    const cooldownMs = isGiveback
+      ? Math.round((24 - t * 14) * 60_000) // 24m -> 10m
+      : Math.round((18 - t * 10) * 60_000); // 18m -> 8m
+    const floor = isGiveback ? 0.12 : 0.16;
+    const span = isGiveback ? 0.12 : 0.1;
+    const fraction = Number((floor + (1 - t) * span).toFixed(4));
+    return { cooldownMs, fraction };
+  }
+
   private deriveDailyLossHaltUnwindExecution(params: {
     baseFraction: number;
     baseCooldownMs: number;
@@ -5944,30 +5973,42 @@ export class BotEngineService implements OnModuleInit {
             }
           }
 
-          if (dailyLossGuard.active) {
+          const cautionUnwindActive = this.shouldRunDailyLossCautionUnwind({
+            guard: dailyLossGuard,
+            risk
+          });
+
+          if (dailyLossGuard.active || cautionUnwindActive) {
             if (config?.advanced.autoCancelBotOrdersOnGlobalProtectionLock && config) {
-              current = await this.cancelBotOwnedOpenOrders({
-                config,
-                state: current,
-                orders: current.activeOrders,
-                reason: "daily-loss-halt",
-                details: {
-                  trigger: dailyLossGuard.trigger,
-                  dailyRealizedPnl: dailyLossGuard.dailyRealizedPnl,
-                  maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs
-                },
-                maxCancels: 10
-              });
-              this.save(current);
+              if (dailyLossGuard.active) {
+                current = await this.cancelBotOwnedOpenOrders({
+                  config,
+                  state: current,
+                  orders: current.activeOrders,
+                  reason: "daily-loss-halt",
+                  details: {
+                    trigger: dailyLossGuard.trigger,
+                    dailyRealizedPnl: dailyLossGuard.dailyRealizedPnl,
+                    maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs
+                  },
+                  maxCancels: 10
+                });
+                this.save(current);
+              }
             }
 
             const managedForUnwind = [...this.getManagedPositions(current).values()].filter(
               (position) => position.netQty > 0 && isExecutionQuoteSymbol(position.symbol)
             );
-            const unwindPolicy = this.deriveDailyLossHaltUnwindPolicy({
-              risk,
-              trigger: dailyLossGuard.trigger
-            });
+            const unwindPolicy = dailyLossGuard.active
+              ? this.deriveDailyLossHaltUnwindPolicy({
+                  risk,
+                  trigger: dailyLossGuard.trigger
+                })
+              : this.deriveDailyLossCautionUnwindPolicy({
+                  risk,
+                  trigger: dailyLossGuard.trigger
+                });
             const baseUnwindCooldownMs = unwindPolicy.cooldownMs;
             const baseUnwindFraction = unwindPolicy.fraction;
             const unwindBridgeAssets = resolveRouteBridgeAssets(config, homeStable);
@@ -6039,10 +6080,11 @@ export class BotEngineService implements OnModuleInit {
               .sort((left, right) => right.unwindPriority - left.unwindPriority);
 
             for (const unwindCandidate of unwindCandidates) {
+              const unwindReason = dailyLossGuard.active ? "daily-loss-halt-unwind" : "daily-loss-caution-unwind";
               const recentUnwind = current.decisions.find((decision) => {
                 if (decision.kind !== "TRADE") return false;
                 const details = decision.details as Record<string, unknown> | undefined;
-                if (details?.reason !== "daily-loss-halt-unwind") return false;
+                if (details?.reason !== unwindReason) return false;
                 if (
                   typeof details?.symbol !== "string" ||
                   details.symbol.trim().toUpperCase() !== unwindCandidate.position.symbol
@@ -6077,7 +6119,7 @@ export class BotEngineService implements OnModuleInit {
               if (!Number.isFinite(sellQty) || sellQty <= 0) continue;
 
               setLiveOperation({
-                stage: "daily-loss-halt-unwind-market-sell",
+                stage: dailyLossGuard.active ? "daily-loss-halt-unwind-market-sell" : "daily-loss-caution-unwind-market-sell",
                 symbol: unwindCandidate.position.symbol,
                 side: "SELL",
                 asset: unwindCandidate.baseAsset,
@@ -6088,6 +6130,22 @@ export class BotEngineService implements OnModuleInit {
                 required: sellQty
               });
               if (!unwindFunds.ok) continue;
+
+              if (!dailyLossGuard.active && config) {
+                current = await this.cancelBotOwnedOpenOrders({
+                  config,
+                  state: current,
+                  orders: current.activeOrders.filter((order) => order.symbol === unwindCandidate.position.symbol),
+                  reason: `daily-loss-caution-unwind ${unwindCandidate.position.symbol}`,
+                  details: {
+                    trigger: dailyLossGuard.trigger,
+                    managedExposurePct: dailyLossGuard.managedExposurePct,
+                    symbol: unwindCandidate.position.symbol
+                  },
+                  maxCancels: 4
+                });
+                this.save(current);
+              }
 
               const unwindRes = await this.trading.placeSpotMarketOrder({
                 symbol: unwindCandidate.position.symbol,
@@ -6100,9 +6158,9 @@ export class BotEngineService implements OnModuleInit {
                 requestedQty: sellQtyStr,
                 fallbackQty: sellQty,
                 response: unwindRes,
-                reason: "daily-loss-halt-unwind",
+                reason: unwindReason,
                 details: {
-                  reason: "daily-loss-halt-unwind",
+                  reason: unwindReason,
                   trigger: dailyLossGuard.trigger,
                   symbol: unwindCandidate.position.symbol,
                   unwindFraction: unwindCandidate.unwindFraction,
@@ -6123,6 +6181,9 @@ export class BotEngineService implements OnModuleInit {
               return;
             }
 
+            if (!dailyLossGuard.active) {
+              // CAUTION unwind is best-effort. If no unwind candidate is available, continue normal cycle.
+            } else {
             const summary = this.buildDailyLossGuardSkipSummary(dailyLossGuard, homeStable);
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
             const next = {
@@ -6164,6 +6225,7 @@ export class BotEngineService implements OnModuleInit {
             } satisfies BotState;
             this.save(next);
             return;
+            }
           }
 
           if (countableOpenHomePositions.length >= maxOpenPositions && !candidateIsOpen) {

@@ -1,57 +1,52 @@
 # Ticket Switch Retrospective
 
-Last updated: 2026-03-22 08:10 UTC
-Previous ticket: `T-034`
-Current ticket: `T-031`
-Switch decision: `close previous / activate next lane`
-Decision source: `manual PM/BA decision informed by runtime evidence + auto-retro`
+Last updated: 2026-03-23 08:25 UTC
+Previous ticket: `T-031`
+Current ticket: `T-032`
+Switch decision: `freeze previous / activate next lane`
+Decision source: `manual PM/BA decision informed by program-level retro + runtime evidence`
 
-## Why `T-034` was closed
+## Why `T-031` was frozen
 
-- Runtime evidence across the latest confirming bundles showed that quote-funding/routing was no longer the dominant blocker.
-- The previously dominant failure family:
-  - `Insufficient spendable <quote> for grid BUY`
-  - repeated quote-family starvation across `USDC` / `ETH` quote symbols
-  was materially reduced and no longer led the run.
-- Later bundles showed:
-  - `sizingRejectPressure=low`,
-  - `unmanaged_exposure_pct` materially reduced,
-  - top blockers shifted to `Fee/edge filter` and `Grid waiting for ladder slot or inventory`.
+- Runtime evidence showed `T-031` improved candidate hygiene, but not enough program-level outcome.
+- Wallet/equity remained materially weak across the multi-day window.
+- Recent bundles still showed excessive giveback, large allocation swings, and late downside control.
 
 ## Evidence used for the switch
 
-- `autobot-feedback-20260321-060548.tgz`
-  - dailyNet `+54.90`
-  - dominant blocker moved to `Fee/edge filter`
-- `autobot-feedback-20260321-165459.tgz`
-  - dailyNet `+18.54`
-  - `risk_state=NORMAL`
-  - no dominant quote-starvation loop
-- `autobot-feedback-20260322-063344.tgz`
-  - dailyNet `-138.87`
-  - dominant blockers were `Fee/edge filter` and `Grid waiting for ladder slot or inventory`, not quote funding
-- `docs/RETROSPECTIVE_AUTO.md`
-  - latest automatic decision at the time was `continue`, not `patch_required` or `pivot_required`, for the quote-funding lane
+- `autobot-feedback-20260322-155534.tgz`
+  - equity `7112.42`
+  - dailyNet `-163.90`
+  - `risk_state=HALT`
+- `autobot-feedback-20260323-074326.tgz`
+  - equity `7206.50`
+  - dailyNet `+17.11`
+  - still high allocation and guard/ladder dominated behavior
+- `docs/PROGRAM_RETRO_2026-03-23.md`
+  - program-level conclusion: execution hygiene improved, but wallet/equity protection did not improve enough
 
-## What `T-034` fixed and what it did not fix
+## What `T-031` fixed and what it did not fix
 
-### Fixed enough to close
-- reserve-floor math for non-home quotes (`ETH`, `BTC`, `BNB`, etc.)
-- spendable-quote gating before later execution-time failures
-- quote-family starvation suppression strong enough that it stopped dominating the run
+### Improved but not enough to stay active
+- repeated fee-edge churn was reduced
+- some non-actionable candidate reselection was reduced
+- `T-034` funding stability was preserved
 
-### Not fixed by `T-034` because it is a different lane
-- repeated `Fee/edge filter (...)` churn on weak candidates
-- repeated ladder-wait churn on non-actionable parked ladders
-- proactive adaptation / de-risking during market regime deterioration
+### Not fixed by `T-031` and now higher priority
+- profit giveback remains too large
+- downside control is still late
+- wallet/equity remains materially down
+- concentration / near-full allocation states remain too risky
 
-## Why `T-031` is the correct next lane
+## Why `T-032` is the correct next lane
 
-- Once funding/routing stopped being the dominant blocker, the next highest runtime waste became candidate quality:
-  - symbols reaching execution only to fail `Fee/edge filter`
-  - symbols with parked ladders being reconsidered despite no actionable missing leg
-- Those are regime/edge-selection problems, not routing/funding problems.
-- Continuing to patch `T-034` after that point would be micro-optimization in the wrong subsystem.
+- The program-level failure is now equity protection, not quote funding or candidate hygiene.
+- `T-032` directly targets:
+  - profit giveback reduction,
+  - earlier de-risking,
+  - stronger downside exits,
+  - lower time spent in adverse fully-allocated states.
+- Continuing to patch `T-031` first would be lower-leverage work.
 
 ## Hard process correction
 
@@ -63,7 +58,8 @@ Decision source: `manual PM/BA decision informed by runtime evidence + auto-retr
 
 ## Next expected outcome
 
-- `T-031` batches should reduce:
-  - repeated same-symbol `Fee/edge filter (...)` churn,
-  - repeated `Grid waiting for ladder slot or inventory` churn,
-  while preserving `T-034` funding stability.
+- `T-032` batches should reduce:
+  - profit giveback,
+  - drawdown persistence,
+  - late exits under adverse market conditions,
+  while preserving `T-034` funding stability and the `T-031` candidate-hygiene gains.

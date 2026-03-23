@@ -105,8 +105,8 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-031 | IN_PROGRESS | Regime engine v2 | No quote-routing rework, no AI lane, no PnL redesign, no exit-manager redesign in this batch |
-| T-032 | TODO | Exit manager v2 | Return after quote-routing/funding policy stops dominating runtime churn |
+| T-031 | TODO | Regime engine v2 | Resume after downside-control/equity-protection lane stops dominating program-level evidence |
+| T-032 | IN_PROGRESS | Exit manager v2 | No quote-routing redesign, no AI/news lane, no PnL redesign, no candidate-hygiene-only micro-optimizations in this batch |
 | T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
 
 `T-005` status: moved to DONE after overnight evidence (`autobot-feedback-20260225-100508.tgz`) showed guard transitions/recovery without deadlock.
@@ -119,7 +119,7 @@ Profit milestone rule:
 
 | Priority | ID | Status | Title | Acceptance focus |
 |---|---|---|---|---|
-| 1 | T-032 | TODO | Exit manager v2 | reduce profit giveback and improve downside exits |
+| 1 | T-031 | TODO | Regime engine v2 | resume only if downside control stops being the dominant program-level problem |
 | 2 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source |
 | 3 | T-028 | TODO | Compact advanced UX | improve operator readability without changing strategy behavior |
 

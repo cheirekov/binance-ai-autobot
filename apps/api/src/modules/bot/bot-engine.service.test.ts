@@ -2453,6 +2453,56 @@ describe("bot-engine insufficient-balance helpers", () => {
     });
   });
 
+  it("activates caution unwind only for profit-giveback caution with sufficiently high managed exposure", () => {
+    const helpers = service as unknown as {
+      shouldRunDailyLossCautionUnwind: (params: {
+        guard: {
+          state: "NORMAL" | "CAUTION" | "HALT";
+          trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK";
+          managedExposurePct: number;
+        };
+        risk: number;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldRunDailyLossCautionUnwind({
+        guard: { state: "CAUTION", trigger: "PROFIT_GIVEBACK", managedExposurePct: 0.25 },
+        risk: 100
+      })
+    ).toBe(true);
+    expect(
+      helpers.shouldRunDailyLossCautionUnwind({
+        guard: { state: "CAUTION", trigger: "PROFIT_GIVEBACK", managedExposurePct: 0.1 },
+        risk: 100
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldRunDailyLossCautionUnwind({
+        guard: { state: "CAUTION", trigger: "ABS_DAILY_LOSS", managedExposurePct: 0.4 },
+        risk: 100
+      })
+    ).toBe(false);
+  });
+
+  it("derives lighter caution unwind policy before HALT", () => {
+    const helpers = service as unknown as {
+      deriveDailyLossCautionUnwindPolicy: (params: { risk: number; trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK" }) => {
+        cooldownMs: number;
+        fraction: number;
+      };
+    };
+
+    expect(helpers.deriveDailyLossCautionUnwindPolicy({ risk: 0, trigger: "PROFIT_GIVEBACK" })).toEqual({
+      cooldownMs: 1440000,
+      fraction: 0.24
+    });
+    expect(helpers.deriveDailyLossCautionUnwindPolicy({ risk: 100, trigger: "PROFIT_GIVEBACK" })).toEqual({
+      cooldownMs: 600000,
+      fraction: 0.12
+    });
+  });
+
   it("formats daily-loss guard summary for profit-giveback trigger", () => {
     const helpers = service as unknown as {
       buildDailyLossGuardSkipSummary: (guard: {

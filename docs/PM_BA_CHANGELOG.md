@@ -16,6 +16,50 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-23 08:40 UTC — T-032 slice: controlled CAUTION unwind before HALT
+- Scope:
+  - start the first actual `T-032` runtime slice by adding earlier unwind behavior during `CAUTION` on `PROFIT_GIVEBACK`, instead of waiting only for `HALT`.
+- BA requirement mapping:
+  - recent evidence showed candidate hygiene improved, but downside control remained late; the bot was still giving back too much before the hard daily-loss guard dominated.
+- PM milestone mapping:
+  - first concrete `T-032` batch after freezing `T-031`; target profit giveback and adverse high-allocation persistence directly.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `shouldRunDailyLossCautionUnwind(...)` and `deriveDailyLossCautionUnwindPolicy(...)`.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: daily-loss handling now performs a lighter best-effort unwind in `CAUTION` for `PROFIT_GIVEBACK` when managed exposure remains high.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: symbol-local bot-owned orders are canceled before a caution unwind market sell to avoid oversell conflicts.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for caution-unwind activation and policy values.
+- Risk slider impact:
+  - no hard-cap change; risk only scales caution-unwind threshold, fraction, and cooldown.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next bundle should show earlier de-risking in `CAUTION/PROFIT_GIVEBACK`, lower giveback persistence, and no regression in `T-034` funding stability.
+- Follow-up:
+  - if this still exits too late, next `T-032` slice should tighten prioritization toward concentrated positions rather than broad micro-unwinds.
+
+## 2026-03-23 08:25 UTC — Program retro: freeze T-031, activate T-032
+- Scope:
+  - stop treating `T-031` candidate hygiene as the highest-leverage lane and reprioritize active work toward downside control / equity protection.
+- BA requirement mapping:
+  - latest runtime evidence and live wallet view show execution hygiene improved, but wallet/equity remains materially weak.
+- PM milestone mapping:
+  - freeze `T-031`; activate `T-032` as the primary lane because the current program-level failure is profit giveback / late de-risking.
+- Technical changes:
+  - added `docs/PROGRAM_RETRO_2026-03-23.md`.
+  - added `docs/TRIAGE_NOTE_2026-03-23_T031_WALLET_EQUITY_DRIFT_PIVOT.md`.
+  - updated `docs/TICKET_SWITCH_RETRO.md` for `T-031 -> T-032`.
+  - updated `docs/DELIVERY_BOARD.md` and `docs/SESSION_BRIEF.md` to switch the active lane to `T-032`.
+- Risk slider impact:
+  - none in this batch; this is PM/BA reprioritization before the next code slice.
+- Validation evidence:
+  - `autobot-feedback-20260322-155534.tgz`
+  - `autobot-feedback-20260323-074326.tgz`
+  - `docs/PROGRAM_RETRO_2026-03-23.md`
+- Runtime test request:
+  - next coding batch must target profit giveback / downside control, not more `T-031` micro-mitigation.
+- Follow-up:
+  - first `T-032` slice should reduce giveback while preserving `T-034` funding stability and not regressing the useful `T-031` candidate-hygiene gains.
+
 ## 2026-03-22 16:00 UTC — T-031 slice: suppress repeated fee-edge churn even on parked sell-side ladders
 - Scope:
   - reduce repeated `Fee/edge filter (...)` churn on symbols that still have only a sell-side grid action available.

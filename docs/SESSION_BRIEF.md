@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-22 16:00 UTC
+Last updated: 2026-03-23 08:40 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -8,26 +8,26 @@ Use this file at the start and end of every batch.
 ## 1) Batch contract (fill before coding)
 
 - Batch type: `SHORT (1-3h)`
-- Active ticket: `T-031` (Regime engine v2)
-- Goal (single sentence): reduce repeated non-actionable candidate loops by making regime/edge routing demote weak or structurally stalled opportunities earlier.
+- Active ticket: `T-032` (Exit manager v2)
+- Goal (single sentence): reduce profit giveback and improve downside control so wallet/equity stabilizes earlier under adverse conditions.
 - In scope:
-  - demote candidates whose current regime/edge state is repeatedly non-actionable (`fee/edge filter`, ladder-wait, paused buy legs).
-  - reduce repeated cross-quote candidate churn where regime quality is weak even if quote routing is now valid.
-  - keep candidate selection biased toward actionable symbols with realistic edge after fees.
-  - preserve existing `T-034` quote-routing/funding behavior and all `T-005` / `T-007` / `T-032` guard behavior.
+  - reduce profit giveback before `CAUTION` / `HALT` dominates the run.
+  - de-risk earlier when the bot is near full allocation and regime deteriorates.
+  - improve unwind / stable-coin reversion behavior without breaking current hard guards.
+  - preserve `T-034` funding stability and keep `T-031` candidate-hygiene gains intact.
 - Out of scope:
   - quote-routing redesign (`T-034` is closed unless runtime regresses),
-  - exit-manager redesign (`T-032`),
+  - candidate-hygiene-only optimization (`T-031` is frozen unless runtime regresses back there),
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: once quote starvation is no longer dominant, the next blocker is regime/edge quality — repeated `Fee/edge filter` and `Grid waiting for ladder slot or inventory` should be reduced at candidate-selection time.
+- Hypothesis: the main program-level failure is late downside control, not only entry quality; reducing giveback and lowering adverse high-allocation persistence should improve wallet/equity behavior more than another short `T-031` slice.
 - Target KPI delta:
-  - reduce repeated `Fee/edge filter` loops on the same symbols across a single run.
-  - reduce repeated `Grid waiting for ladder slot or inventory` loops on symbols with already parked ladders.
+  - reduce profit giveback / loss persistence in multi-hour runs.
+  - reduce time spent near full allocation under adverse conditions.
   - keep `T-034` funding behavior stable (no return of dominant `Insufficient spendable <quote>` loops).
 - Stop/rollback condition:
-  - if funded/actionable candidates are accidentally suppressed, or `T-034` funding loops return as dominant behavior.
+  - if `T-034` funding loops return as dominant behavior, or unwind logic causes uncontrolled churn.
 
 ## 2) Definition of Done (must be concrete)
 
@@ -52,7 +52,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `ed527d5`
+- Commit hash: `5a32b41`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -73,37 +73,38 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `DAY (collection) / DAY (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `793.852`
-  - run end: `Sun Mar 22 2026 17:55:26 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `DAY_RUN`
+  - run duration (hours): `809.651`
+  - run end: `Mon Mar 23 2026 09:43:21 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=113, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=43.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=6, decisions=200, ratio=3.0%)
-- Decision: `continue`
-- Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=119, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=40.5%)
+  - sizing reject pressure: `medium` (sizingRejectSkips=36, decisions=200, ratio=18.0%)
+- Decision: `pivot`
+- Next ticket candidate: `T-032` (active lane switched after program-level retro)
 - Open risks:
-  - repeated fee-edge churn on sell-leg-only candidates can still dominate if the new suppression threshold is too weak.
+  - wallet/equity remains materially below expected levels despite local bundle improvement.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260322-155534.tgz`
-  - auto-updated at: `2026-03-22T15:56:12.621Z`
-  - latest code slice: repeated fee-edge rejects now also suppress sell-leg-only candidates after a stricter local threshold.
+  - bundle: `autobot-feedback-20260323-074326.tgz`
+  - auto-updated at: `2026-03-23T07:48:11.524Z`
+  - PM/BA decision: freeze `T-031`, activate `T-032`, use `docs/PROGRAM_RETRO_2026-03-23.md` as the rationale.
+  - latest code slice: `CAUTION + PROFIT_GIVEBACK` can now trigger a lighter best-effort unwind before `HALT`, with symbol-local order cancellation before unwind sells.
 
 ## 5) Copy/paste prompt for next session
 
 ```text
-Ticket: T-031
+Ticket: T-032
 Batch: SHORT (1-3h)
-Goal: reduce repeated fee-edge / non-actionable candidate loops while preserving T-034 funding stability.
-In scope: regime-side candidate quality + actionability gating.
-Out of scope: quote-routing redesign, exit-manager redesign, PnL schema changes, AI lane.
+Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
+In scope: exit-manager / de-risking behavior under adverse conditions.
+Out of scope: quote-routing redesign, candidate-hygiene-only optimization, PnL schema changes, AI lane.
 DoD:
-- repeated `Fee/edge filter` and `Grid waiting for ladder slot or inventory` loops fall.
+- profit giveback and adverse high-allocation persistence fall.
 - `Insufficient spendable <quote>` does not return as the dominant blocker.
-- T-005/T-007/T-032/T-034 behavior remains stable.
+- T-005/T-007/T-031/T-034 behavior remains stable.
 - docker CI passes: `docker compose -f docker-compose.ci.yml run --rm ci`.
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```
