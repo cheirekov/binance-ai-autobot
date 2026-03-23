@@ -2503,6 +2503,85 @@ describe("bot-engine insufficient-balance helpers", () => {
     });
   });
 
+  it("activates defensive grid-guard unwind only for repeated bear-trend loops on home-quote inventory", () => {
+    const helpers = service as unknown as {
+      shouldRunDefensiveGridGuardUnwind: (params: {
+        executionLane: "GRID" | "MARKET" | "DEFENSIVE";
+        riskState: "NORMAL" | "CAUTION" | "HALT";
+        buyPaused: boolean;
+        hasInventory: boolean;
+        quoteIsHome: boolean;
+        recentBuyPauseSkips: number;
+        recentInventoryWaitingSkips: number;
+        recentGridSellSizingRejects: number;
+        risk: number;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldRunDefensiveGridGuardUnwind({
+        executionLane: "DEFENSIVE",
+        riskState: "NORMAL",
+        buyPaused: true,
+        hasInventory: true,
+        quoteIsHome: true,
+        recentBuyPauseSkips: 17,
+        recentInventoryWaitingSkips: 16,
+        recentGridSellSizingRejects: 0,
+        risk: 100
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldRunDefensiveGridGuardUnwind({
+        executionLane: "DEFENSIVE",
+        riskState: "CAUTION",
+        buyPaused: true,
+        hasInventory: true,
+        quoteIsHome: true,
+        recentBuyPauseSkips: 17,
+        recentInventoryWaitingSkips: 16,
+        recentGridSellSizingRejects: 0,
+        risk: 100
+      })
+    ).toBe(false);
+
+    expect(
+      helpers.shouldRunDefensiveGridGuardUnwind({
+        executionLane: "DEFENSIVE",
+        riskState: "NORMAL",
+        buyPaused: true,
+        hasInventory: true,
+        quoteIsHome: false,
+        recentBuyPauseSkips: 17,
+        recentInventoryWaitingSkips: 16,
+        recentGridSellSizingRejects: 0,
+        risk: 100
+      })
+    ).toBe(false);
+  });
+
+  it("derives tighter defensive grid-guard unwind policy for concentrated high-confidence bear loops", () => {
+    const helpers = service as unknown as {
+      deriveDefensiveGridGuardUnwindPolicy: (params: {
+        risk: number;
+        regimeConfidence: number;
+        positionExposurePct: number;
+      }) => { cooldownMs: number; fraction: number };
+    };
+
+    expect(
+      helpers.deriveDefensiveGridGuardUnwindPolicy({
+        risk: 100,
+        regimeConfidence: 0.9,
+        positionExposurePct: 18
+      })
+    ).toEqual({
+      cooldownMs: 680400,
+      fraction: 0.18
+    });
+  });
+
   it("formats daily-loss guard summary for profit-giveback trigger", () => {
     const helpers = service as unknown as {
       buildDailyLossGuardSkipSummary: (guard: {

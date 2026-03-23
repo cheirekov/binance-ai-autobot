@@ -16,6 +16,27 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-23 11:15 UTC — T-032 slice: reactive defensive unwind for repeated bear-guard loops
+- Scope:
+  - reduce repeated `Grid guard paused BUY leg` / `Grid waiting for ladder slot or inventory` loops by turning persistent defensive bear-trend inventory stalls into a controlled partial market unwind.
+- BA requirement mapping:
+  - latest bundle (`autobot-feedback-20260323-102308.tgz`) stayed `NORMAL` but still repeated the same `BTCUSDC` bear-guard loop while wallet/equity remained weak; passive sell-only handling was too slow.
+- PM milestone mapping:
+  - second concrete `T-032` batch; move from broad caution unwind toward symbol-level downside control on concentrated bear-trend inventory.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `shouldRunDefensiveGridGuardUnwind(...)` and `deriveDefensiveGridGuardUnwindPolicy(...)`.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: in `DEFENSIVE` lane + `NORMAL` risk state, repeated home-quote bear-guard loops can now trigger a throttled partial market sell (`grid-guard-defensive-unwind`) after canceling bot-owned resting orders for that symbol.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for defensive unwind activation and policy values.
+  - `docs/TRIAGE_NOTE_2026-03-23_T032_BEAR_GUARD_LOOP_REACTIVE_UNWIND.md`: recorded same-ticket triage for the repeated `BTCUSDC` loop.
+- Risk slider impact:
+  - no hard-cap change; risk only scales the defensive unwind fraction/cooldown, and the path is limited to `DEFENSIVE` + `NORMAL` with repeated bear-guard evidence.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next bundle should show lower repeated `Grid guard paused BUY leg` / `Grid waiting for ladder slot or inventory` on `BTCUSDC` / `SOLUSDC`, plus earlier reduction of concentrated bear-trend inventory.
+- Follow-up:
+  - if wallet/equity still deteriorates after this slice, the next `T-032` step should prioritize concentration-aware unwind size/order over more symbol-local loop suppression.
+
 ## 2026-03-23 08:40 UTC — T-032 slice: controlled CAUTION unwind before HALT
 - Scope:
   - start the first actual `T-032` runtime slice by adding earlier unwind behavior during `CAUTION` on `PROFIT_GIVEBACK`, instead of waiting only for `HALT`.

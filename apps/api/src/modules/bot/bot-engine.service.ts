@@ -767,6 +767,64 @@ export class BotEngineService implements OnModuleInit {
     return { cooldownMs, fraction };
   }
 
+  private shouldRunDefensiveGridGuardUnwind(params: {
+    executionLane: AdaptiveExecutionLane;
+    riskState: DailyLossGuardSnapshot["state"];
+    buyPaused: boolean;
+    hasInventory: boolean;
+    quoteIsHome: boolean;
+    recentBuyPauseSkips: number;
+    recentInventoryWaitingSkips: number;
+    recentGridSellSizingRejects: number;
+    risk: number;
+  }): boolean {
+    if (params.executionLane !== "DEFENSIVE") return false;
+    if (params.riskState !== "NORMAL") return false;
+    if (!params.quoteIsHome) return false;
+    if (!params.buyPaused || !params.hasInventory) return false;
+
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const localThreshold = Math.max(3, Math.round(5 - boundedRisk / 50)); // risk 0 -> 5, risk 100 -> 3
+    if (params.recentBuyPauseSkips < localThreshold) return false;
+
+    return (
+      params.recentInventoryWaitingSkips >= Math.max(2, localThreshold - 1) ||
+      params.recentGridSellSizingRejects >= localThreshold
+    );
+  }
+
+  private deriveDefensiveGridGuardUnwindPolicy(params: {
+    risk: number;
+    regimeConfidence: number;
+    positionExposurePct: number;
+  }): { cooldownMs: number; fraction: number } {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const t = boundedRisk / 100;
+    const exposurePct = Number.isFinite(params.positionExposurePct) ? Math.max(0, params.positionExposurePct) : 0;
+    const regimeConfidence = Number.isFinite(params.regimeConfidence) ? Math.max(0, Math.min(1, params.regimeConfidence)) : 0;
+
+    let fraction = 0.18 - t * 0.08; // 18% -> 10%
+    let cooldownMs = Math.round((36 - t * 18) * 60_000); // 36m -> 18m
+
+    if (exposurePct >= 15) {
+      fraction += 0.06;
+      cooldownMs *= 0.7;
+    } else if (exposurePct >= 8) {
+      fraction += 0.03;
+      cooldownMs *= 0.82;
+    }
+
+    if (regimeConfidence >= 0.9) {
+      fraction += 0.02;
+      cooldownMs *= 0.9;
+    }
+
+    return {
+      fraction: Math.max(0.08, Math.min(0.28, Number(fraction.toFixed(4)))),
+      cooldownMs: Math.max(300_000, Math.round(cooldownMs))
+    };
+  }
+
   private deriveDailyLossHaltUnwindExecution(params: {
     baseFraction: number;
     baseCooldownMs: number;
@@ -7001,6 +7059,145 @@ export class BotEngineService implements OnModuleInit {
             const hasBuyLimit = symbolOpenLimits.some((order) => order.side === "BUY");
             const hasSellLimit = symbolOpenLimits.some((order) => order.side === "SELL");
             const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(risk / 25)));
+            const recentGridGuardPausedSkips = this.countRecentSymbolSkipMatches({
+              state: current,
+              symbol: candidateSymbol,
+              contains: "grid guard paused buy leg",
+              windowMs: 30 * 60_000
+            });
+            const recentInventoryWaitingSkips = this.countRecentSymbolSkipMatches({
+              state: current,
+              symbol: candidateSymbol,
+              contains: "grid waiting for ladder slot or inventory",
+              windowMs: 30 * 60_000
+            });
+            const recentGridSellSizingRejects = this.countRecentSymbolSkipMatches({
+              state: current,
+              symbol: candidateSymbol,
+              contains: "grid sell sizing rejected",
+              windowMs: 30 * 60_000
+            });
+
+            const managedCandidatePosition = managedPositions.get(candidateSymbol);
+            const tradableManagedQty =
+              managedCandidatePosition && managedCandidatePosition.netQty > 0 ? Math.min(managedCandidatePosition.netQty, baseFree) : 0;
+            const positionExposureHome =
+              isExecutionQuoteSymbol(candidateSymbol) && Number.isFinite(price) && price > 0
+                ? tradableManagedQty * price
+                : 0;
+            const positionExposurePct = walletTotalHome > 0 ? (positionExposureHome / walletTotalHome) * 100 : 0;
+
+            if (
+              this.shouldRunDefensiveGridGuardUnwind({
+                executionLane,
+                riskState: dailyLossGuard.state,
+                buyPaused,
+                hasInventory: tradableManagedQty > 0,
+                quoteIsHome: isExecutionQuoteSymbol(candidateSymbol),
+                recentBuyPauseSkips: recentGridGuardPausedSkips,
+                recentInventoryWaitingSkips,
+                recentGridSellSizingRejects,
+                risk
+              })
+            ) {
+              const unwindPolicy = this.deriveDefensiveGridGuardUnwindPolicy({
+                risk,
+                regimeConfidence: regime.confidence,
+                positionExposurePct
+              });
+              const unwindReason = "grid-guard-defensive-unwind";
+              const recentUnwind = current.decisions.find((decision) => {
+                if (decision.kind !== "TRADE") return false;
+                const details = decision.details as Record<string, unknown> | undefined;
+                if (details?.reason !== unwindReason) return false;
+                if (typeof details?.symbol !== "string" || details.symbol.trim().toUpperCase() !== candidateSymbol) {
+                  return false;
+                }
+                const ts = Date.parse(decision.ts);
+                return Number.isFinite(ts) && Date.now() - ts < unwindPolicy.cooldownMs;
+              });
+
+              if (!recentUnwind) {
+                const desiredQty = tradableManagedQty * unwindPolicy.fraction;
+                if (Number.isFinite(desiredQty) && desiredQty > 0) {
+                  const sellCheck = await this.marketData.validateMarketOrderQty(candidateSymbol, desiredQty);
+                  let sellQtyStr = sellCheck.ok ? sellCheck.normalizedQty : undefined;
+                  if (!sellQtyStr && sellCheck.requiredQty) {
+                    const requiredQty = Number.parseFloat(sellCheck.requiredQty);
+                    if (Number.isFinite(requiredQty) && requiredQty > 0 && requiredQty <= tradableManagedQty + 1e-8) {
+                      sellQtyStr = sellCheck.requiredQty;
+                    }
+                  }
+
+                  if (sellQtyStr) {
+                    const sellQty = Number.parseFloat(sellQtyStr);
+                    if (Number.isFinite(sellQty) && sellQty > 0) {
+                      setLiveOperation({
+                        stage: "grid-guard-defensive-unwind-market-sell",
+                        symbol: candidateSymbol,
+                        side: "SELL",
+                        asset: candidateBaseAsset,
+                        required: sellQty
+                      });
+                      const unwindFunds = await ensureFundsBeforeOrder({
+                        asset: candidateBaseAsset,
+                        required: sellQty
+                      });
+                      if (unwindFunds.ok) {
+                        if (config) {
+                          current = await this.cancelBotOwnedOpenOrders({
+                            config,
+                            state: current,
+                            orders: current.activeOrders.filter((order) => order.symbol === candidateSymbol),
+                            reason: `grid-guard-defensive-unwind ${candidateSymbol}`,
+                            details: {
+                              executionLane,
+                              symbol: candidateSymbol,
+                              recentBuyPauseSkips: recentGridGuardPausedSkips,
+                              recentInventoryWaitingSkips,
+                              recentGridSellSizingRejects
+                            },
+                            maxCancels: 4
+                          });
+                          this.save(current);
+                        }
+
+                        const unwindRes = await this.trading.placeSpotMarketOrder({
+                          symbol: candidateSymbol,
+                          side: "SELL",
+                          quantity: sellQtyStr
+                        });
+                        persistLiveTrade({
+                          symbol: candidateSymbol,
+                          side: "SELL",
+                          requestedQty: sellQtyStr,
+                          fallbackQty: sellQty,
+                          response: unwindRes,
+                          reason: unwindReason,
+                          details: {
+                            reason: unwindReason,
+                            symbol: candidateSymbol,
+                            executionLane,
+                            unwindFraction: unwindPolicy.fraction,
+                            unwindCooldownMs: unwindPolicy.cooldownMs,
+                            recentBuyPauseSkips: recentGridGuardPausedSkips,
+                            recentInventoryWaitingSkips,
+                            recentGridSellSizingRejects,
+                            positionExposureHome: Number(positionExposureHome.toFixed(8)),
+                            positionExposurePct: Number(positionExposurePct.toFixed(8)),
+                            managedPositionQty: Number((managedCandidatePosition?.netQty ?? 0).toFixed(8)),
+                            managedPositionCost: Number((managedCandidatePosition?.costQuote ?? 0).toFixed(8)),
+                            regime,
+                            pauseConfidenceThreshold
+                          }
+                        });
+                        return;
+                      }
+                    }
+                  }
+                }
+              }
+            }
 
             // If we have no BUY ladder and quote is below reserve, try a reserve recovery conversion
             // (stable-like -> candidate quote asset) to reduce repeated minQty affordability rejects.

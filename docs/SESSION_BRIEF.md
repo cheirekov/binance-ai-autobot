@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-23 08:40 UTC
+Last updated: 2026-03-23 10:23 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -32,18 +32,16 @@ Use this file at the start and end of every batch.
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
-  - candidate selection demotes or suppresses symbols whose current regime/edge state is repeatedly non-actionable.
-  - parked ladder symbols with no actionable missing leg are rotated out earlier.
-  - fee/edge-reject loops are reduced without weakening the fee floor itself.
+  - repeated defensive bear-trend loops on concentrated home-quote inventory can escalate from passive sell-only handling to a throttled partial unwind.
   - `T-034` funding/routing behavior remains unchanged.
-  - `T-005` / `T-007` / `T-032` guard behavior remains unchanged.
+  - `T-005` / `T-007` guard behavior remains unchanged.
 - Runtime evidence in decisions/logs:
-  - lower recurrence of `Fee/edge filter (...)` on the same symbols in the same run.
-  - lower recurrence of `Grid waiting for ladder slot or inventory`.
+  - lower recurrence of `Grid guard paused BUY leg` and `Grid waiting for ladder slot or inventory` on the same high-allocation symbols.
+  - presence of `grid-guard-defensive-unwind` only when repeated bear-guard evidence exists.
   - no return of dominant `Insufficient spendable <quote>` loops.
-  - no guardrail regression from `T-005` / `T-007` / `T-032` / `T-034`.
+  - no guardrail regression from `T-005` / `T-007` / `T-034`.
 - Risk slider impact:
-  - risk still bounds baseline unwind policy; dynamic boosts must not bypass hard caps.
+  - risk still bounds unwind policy; dynamic boosts must not bypass hard caps.
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
 - Runtime validation plan:
@@ -52,7 +50,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `5a32b41`
+- Commit hash: `37502c1`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -73,25 +71,24 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - run duration (hours): `809.651`
-  - run end: `Mon Mar 23 2026 09:43:21 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - run duration (hours): `812.312`
+  - run end: `Mon Mar 23 2026 12:23:01 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Observed KPI delta:
   - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=119, activeMarketOrders=0)
   - market-only share reduced: `yes` (historyMarketShare=40.5%)
-  - sizing reject pressure: `medium` (sizingRejectSkips=36, decisions=200, ratio=18.0%)
-- Decision: `pivot`
-- Next ticket candidate: `T-032` (active lane switched after program-level retro)
+  - sizing reject pressure: `medium` (sizingRejectSkips=35, decisions=200, ratio=17.5%)
+- Decision: `continue`
+- Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
 - Open risks:
-  - wallet/equity remains materially below expected levels despite local bundle improvement.
+  - sizing reject pressure is medium (17.5%).
+  - repeated `BTCUSDC` / `SOLUSDC` bear-guard loops still dominate decision noise.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260323-074326.tgz`
-  - auto-updated at: `2026-03-23T07:48:11.524Z`
-  - PM/BA decision: freeze `T-031`, activate `T-032`, use `docs/PROGRAM_RETRO_2026-03-23.md` as the rationale.
-  - latest code slice: `CAUTION + PROFIT_GIVEBACK` can now trigger a lighter best-effort unwind before `HALT`, with symbol-local order cancellation before unwind sells.
+  - bundle: `autobot-feedback-20260323-102308.tgz`
+  - auto-updated at: `2026-03-23T10:23:38.282Z`
 
 ## 5) Copy/paste prompt for next session
 
@@ -103,6 +100,7 @@ In scope: exit-manager / de-risking behavior under adverse conditions.
 Out of scope: quote-routing redesign, candidate-hygiene-only optimization, PnL schema changes, AI lane.
 DoD:
 - profit giveback and adverse high-allocation persistence fall.
+- repeated bear-guard loops on high-allocation home-quote symbols fall.
 - `Insufficient spendable <quote>` does not return as the dominant blocker.
 - T-005/T-007/T-031/T-034 behavior remains stable.
 - docker CI passes: `docker compose -f docker-compose.ci.yml run --rm ci`.
