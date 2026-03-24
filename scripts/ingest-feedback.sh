@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 BUNDLE="${1:-}"
 if [[ -z "$BUNDLE" ]]; then
-  BUNDLE="$(ls -t autobot-feedback-*.tgz 2>/dev/null | head -n1 || true)"
+  BUNDLE="$(find . -maxdepth 1 -type f -name 'autobot-feedback-*.tgz' -printf '%f\n' | sort | tail -n1 || true)"
 fi
 
 if [[ -z "$BUNDLE" || ! -f "$BUNDLE" ]]; then
@@ -48,33 +48,28 @@ const summaryRaw = readFromTar([
 ]);
 const infoRaw = readFromTar(["./meta/info.txt", "meta/info.txt"]);
 
-if (!summaryRaw || !infoRaw) {
-  console.error("Bundle is missing required metadata files (summary/info).");
+if (!summaryRaw || !infoRaw || !runContextRaw) {
+  console.error("Bundle is missing required metadata files (summary/run-context/info).");
   process.exit(2);
 }
 
-const runContext = runContextRaw ? parseJson(runContextRaw) : null;
+const runContext = parseJson(runContextRaw);
 const summary = parseJson(summaryRaw);
-if (!summary) {
+if (!summary || !runContext) {
   console.error("Bundle metadata is present but invalid JSON.");
   process.exit(3);
 }
 
 const fmt = (v) => (v === null || v === undefined || v === "" ? "unknown" : String(v));
 console.log(`Bundle: ${bundlePath}`);
-if (!runContext) {
-  console.log("- Cycle: legacy bundle (no run-context metadata)");
-  console.log("- Window(local): unknown | Run end(local): unknown");
-} else {
-  console.log(`- Cycle: ${fmt(runContext.declared_cycle)}`);
-  console.log(`- Window(local): ${fmt(runContext.collection_window_local)} | Run end(local): ${fmt(runContext.run_end_window_local)}`);
-}
+console.log(`- Cycle: ${fmt(runContext.declared_cycle)}`);
+console.log(`- Window(local): ${fmt(runContext.collection_window_local)} | Run end(local): ${fmt(runContext.run_end_window_local)}`);
 console.log(`- Run end UTC: ${fmt(summary.ended_at_utc)}`);
 console.log(`- Active ticket expected from board/session will be checked by pmba-gate.`);
 NODE
 
-./scripts/update-session-brief.sh "$BUNDLE"
 ./scripts/auto-retro.sh "$BUNDLE"
+./scripts/update-session-brief.sh "$BUNDLE"
 ./scripts/pmba-gate.sh end
 
 echo "Ingestion complete: $BUNDLE"

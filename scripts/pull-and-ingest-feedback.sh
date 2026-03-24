@@ -19,7 +19,7 @@ USAGE
 fi
 
 LATEST_REMOTE="$(
-  ssh "$REMOTE_HOST" "ls -1t \"$REMOTE_DIR\"/autobot-feedback-*.tgz 2>/dev/null | head -n1" || true
+  ssh "$REMOTE_HOST" "bash -lc 'find \"$REMOTE_DIR\" -maxdepth 1 -type f -name \"autobot-feedback-*.tgz\" -printf \"%f\n\" | sort | tail -n1'" || true
 )"
 
 if [[ -z "$LATEST_REMOTE" ]]; then
@@ -28,7 +28,7 @@ if [[ -z "$LATEST_REMOTE" ]]; then
 fi
 
 LOCAL_BUNDLE="$(basename "$LATEST_REMOTE")"
-scp "$REMOTE_HOST:$LATEST_REMOTE" "$LOCAL_BUNDLE"
+scp "$REMOTE_HOST:$REMOTE_DIR/$LOCAL_BUNDLE" "$LOCAL_BUNDLE"
 
 echo "Pulled: $LOCAL_BUNDLE"
 ./scripts/ingest-feedback.sh "$LOCAL_BUNDLE"

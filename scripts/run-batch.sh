@@ -137,18 +137,19 @@ sleep "$((MINUTES * 60))"
 
 echo "Collecting feedback bundle..."
 ./scripts/collect-feedback.sh >/dev/null
-BUNDLE="$(ls -t autobot-feedback-*.tgz 2>/dev/null | head -n1 || true)"
+BUNDLE="$(find . -maxdepth 1 -type f -name 'autobot-feedback-*.tgz' -printf '%f\n' | sort | tail -n1 || true)"
 if [[ -z "$BUNDLE" || ! -f "$BUNDLE" ]]; then
   echo "Expected feedback bundle not found after collect-feedback." >&2
   exit 1
 fi
 
-if command -v node >/dev/null 2>&1; then
-  echo "Updating session brief from bundle: $BUNDLE"
-  ./scripts/update-session-brief.sh "$BUNDLE" >/dev/null
-else
-  echo "Skipping session brief update (node not found on host)."
+if ! command -v node >/dev/null 2>&1; then
+  echo "Node is required for ingest-feedback.sh and PM/BA automation." >&2
+  exit 1
 fi
+
+echo "Ingesting bundle: $BUNDLE"
+./scripts/ingest-feedback.sh "$BUNDLE"
 
 echo "Batch end (utc): $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 echo "Bundle: $BUNDLE"

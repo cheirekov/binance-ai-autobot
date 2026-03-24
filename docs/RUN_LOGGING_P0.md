@@ -11,7 +11,8 @@ Just run:
 
 Notes:
 - No manual phase is required.
-- Script auto-infers run cycle (`SHORT_REVIEW` / `DAY_RUN` / `NIGHT_RUN`) from runtime duration.
+- Script writes `run-context.json` automatically.
+- Cycle is inferred from collection/end windows unless `AUTOBOT_RUN_PHASE` is explicitly set.
 - If needed, you can still override with `AUTOBOT_RUN_PHASE=...`, but it is optional.
 
 Result: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
@@ -34,8 +35,8 @@ This command does:
 
 `ingest-feedback` performs:
 - bundle sanity check (`run-context`, `last_run_summary`, `info.txt`),
-- `update-session-brief.sh`,
 - `auto-retro.sh`,
+- `update-session-brief.sh` (using the auto-retro decision as the single source of truth),
 - `pmba-gate.sh end`.
 
 Generated retrospective artifact:
@@ -59,3 +60,8 @@ No extra manual edits before Codex review.
 - No strategy scope change during ingestion.
 - No state reset unless ticket explicitly requires it.
 - If `pmba-gate.sh end` fails, create triage note first (`docs/TRIAGE_NOTE_TEMPLATE.md`).
+- If `auto-retro` reports `await_fresh_evidence` or `validation_required`, stop collecting short “same state” bundles and switch to deterministic validation for the active ticket.
+- Deterministic validation command:
+  - `./scripts/validate-active-ticket.sh`
+  - add `--full` only when targeted validation is not mapped or when PM/BA explicitly asks for full CI.
+- Do not patch from stale cumulative history; check `fresh runtime evidence` first.

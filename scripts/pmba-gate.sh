@@ -8,6 +8,7 @@ BOARD_FILE="docs/DELIVERY_BOARD.md"
 SESSION_FILE="docs/SESSION_BRIEF.md"
 CHANGELOG_FILE="docs/PM_BA_CHANGELOG.md"
 SWITCH_RETRO_FILE="docs/TICKET_SWITCH_RETRO.md"
+RETRO_FILE="docs/RETROSPECTIVE_AUTO.md"
 
 PHASE="${1:-start}"
 if [[ "$PHASE" != "start" && "$PHASE" != "end" ]]; then
@@ -15,7 +16,7 @@ if [[ "$PHASE" != "start" && "$PHASE" != "end" ]]; then
   exit 2
 fi
 
-for required in "$BOARD_FILE" "$SESSION_FILE" "$CHANGELOG_FILE" "$SWITCH_RETRO_FILE"; do
+for required in "$BOARD_FILE" "$SESSION_FILE" "$CHANGELOG_FILE" "$SWITCH_RETRO_FILE" "$RETRO_FILE"; do
   if [[ ! -f "$required" ]]; then
     echo "FAIL: missing required file: $required" >&2
     exit 1
@@ -75,39 +76,33 @@ if [[ "$PHASE" == "end" ]]; then
   fi
 
   if command -v node >/dev/null 2>&1; then
-    mapfile -t LATEST_BUNDLES < <(ls -t autobot-feedback-*.tgz 2>/dev/null | head -n 2)
+    mapfile -t LATEST_BUNDLES < <(find . -maxdepth 1 -type f -name 'autobot-feedback-*.tgz' -printf '%f\n' | sort | tail -n 2 | tac)
     if [[ "${#LATEST_BUNDLES[@]}" -ge 2 ]]; then
       node - "${LATEST_BUNDLES[0]}" "${LATEST_BUNDLES[1]}" "$ACTIVE_TICKET" <<'NODE'
-const { execSync } = require("node:child_process");
+const path = require("node:path");
 
 const [latestBundle, previousBundle, activeTicket] = process.argv.slice(2);
+const { collectEvidence } = require(path.join(process.cwd(), "scripts", "feedback-evidence.js"));
+const evidence = collectEvidence([latestBundle, previousBundle]);
 
-const readSummaryFromBundle = (bundlePath) => {
-  const candidates = [
-    "data/telemetry/last_run_summary.json",
-    "./data/telemetry/last_run_summary.json"
-  ];
-  for (const innerPath of candidates) {
-    try {
-      const raw = execSync(`tar -xOf ${JSON.stringify(bundlePath)} ${JSON.stringify(innerPath)}`, {
-        stdio: ["ignore", "pipe", "ignore"]
-      }).toString("utf8");
-      return JSON.parse(raw);
-    } catch {
-      // try next path
-    }
+const latest = evidence.latest;
+if (!latest) process.exit(0);
+
+if (!latest.freshness?.hasFreshRuntimeEvidence) {
+  console.error(
+    `WARN: latest bundle ${latest.bundle} has no fresh runtime evidence (${latest.freshness?.classification ?? "unknown"}); dominant-loop gate is skipped.`
+  );
+  if (Number(evidence.staleStreak ?? 0) >= 2) {
+    console.error("WARN: repeated stale bundles detected; switch to deterministic validation instead of patching from cumulative history.");
   }
-  return null;
-};
+  process.exit(0);
+}
 
-const latest = readSummaryFromBundle(latestBundle);
-const previous = readSummaryFromBundle(previousBundle);
+const freshWindow = Array.isArray(evidence.freshWindow) ? evidence.freshWindow : [];
+if (freshWindow.length < 2) process.exit(0);
 
-if (!latest || !previous) process.exit(0);
-
-const latestTop = latest?.activity?.skips?.top_reasons?.[0];
-const previousTop = previous?.activity?.skips?.top_reasons?.[0];
-
+const latestTop = freshWindow[0]?.summary?.activity?.skips?.top_reasons?.[0];
+const previousTop = freshWindow[1]?.summary?.activity?.skips?.top_reasons?.[0];
 const latestReason = String(latestTop?.reason ?? "");
 const previousReason = String(previousTop?.reason ?? "");
 const latestCount = Number(latestTop?.count ?? 0);
@@ -121,13 +116,20 @@ const dominantLoopRepeated =
 
 if (dominantLoopRepeated) {
   console.error(
-    `FAIL: Dominant loop reason repeated in last 2 bundles for active ticket ${activeTicket}: "${latestReason}" (${previousCount} -> ${latestCount}).`
+    `FAIL: Dominant loop reason repeated in last 2 fresh bundles for active ticket ${activeTicket}: "${latestReason}" (${previousCount} -> ${latestCount}).`
   );
   console.error("Action required: add triage note (docs/TRIAGE_NOTE_TEMPLATE.md) and either patch mitigation or PM/BA pivot decision.");
   process.exit(1);
 }
 NODE
     fi
+  fi
+
+  SESSION_DECISION="$(grep -E '^- Decision: `' "$SESSION_FILE" | head -n1 | sed -E 's/^- Decision: `([^`]+)`.*/\1/')"
+  RETRO_DECISION="$(grep -E '^- Decision: `' "$RETRO_FILE" | head -n1 | sed -E 's/^- Decision: `([^`]+)`.*/\1/')"
+  if [[ -n "$RETRO_DECISION" && -n "$SESSION_DECISION" && "$RETRO_DECISION" != "$SESSION_DECISION" ]]; then
+    echo "FAIL: SESSION_BRIEF decision ($SESSION_DECISION) does not match RETROSPECTIVE_AUTO decision ($RETRO_DECISION)." >&2
+    exit 1
   fi
 fi
 

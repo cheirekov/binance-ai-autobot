@@ -78,8 +78,12 @@ Track only these to avoid noisy interpretation:
 3. If two consecutive bundles for one ticket have the same dominant failure pattern, the next batch must be one of:
    - direct mitigation batch for that exact failure,
    - explicit pivot/de-scope with reason.
-4. Use `./scripts/pmba-gate.sh start` before implementation and `./scripts/pmba-gate.sh end` before handoff.
-5. Run `./scripts/auto-retro.sh [bundle]` after each ingestion (or rely on `ingest-feedback.sh`, which now does it automatically).
+4. If the latest bundle has no fresh runtime evidence, do not patch from it.
+   - Use `docs/RETROSPECTIVE_AUTO.md` and `fresh runtime evidence` in `docs/SESSION_BRIEF.md`.
+   - Two consecutive stale/mark-to-market-only bundles require deterministic validation, not another live-wait loop.
+   - Default deterministic validation entrypoint: `./scripts/validate-active-ticket.sh`
+5. Use `./scripts/pmba-gate.sh start` before implementation and `./scripts/pmba-gate.sh end` before handoff.
+6. Run `./scripts/auto-retro.sh [bundle]` after each ingestion (or rely on `ingest-feedback.sh`, which now does it automatically).
 
 ## Automatic retrospective rules (hard)
 
@@ -90,13 +94,19 @@ The automatic retrospective is not optional process noise; it is the time-awaren
 - Trigger cadence:
   - regenerate on every ingestion
 - Hard-rule checks:
-  - repeated dominant loop across latest 2 bundles,
-  - negative `daily_net_usdt` across latest 3 bundles,
-  - no KPI trend improvement across latest 3 bundles (daily net and max drawdown both not improving)
+  - latest bundle freshness (`fresh` / `mark_to_market_only` / `stale`),
+  - repeated dominant loop across latest 2 fresh bundles,
+  - negative `daily_net_usdt` across latest 3 fresh bundles,
+  - no KPI trend improvement across latest 3 fresh bundles (daily net and max drawdown both not improving)
 - Required PM/BA action:
   - `continue` → same lane can continue,
   - `patch_required` → next batch must be direct same-ticket mitigation,
   - `pivot_required` → PM/BA must explicitly review scope/ticket before the next long run.
+  - `await_fresh_evidence` → do not patch from this bundle alone,
+  - `validation_required` → stop live waiting and move to deterministic validation.
+- Single source of truth:
+  - `docs/RETROSPECTIVE_AUTO.md` owns the batch decision,
+  - `docs/SESSION_BRIEF.md` must mirror that decision, not invent a second one.
 
 ## Ticket-switch retrospective rule (hard)
 
@@ -115,3 +125,15 @@ A ticket switch is not complete just because the board and session brief changed
   - `./scripts/pmba-gate.sh start` must fail if `docs/TICKET_SWITCH_RETRO.md` does not align with the current active ticket.
 - Intent:
   - prevent “board switch without real retrospective”.
+
+## Ticket-age retrospective rule (hard)
+
+- A ticket may not drift indefinitely on micro-patches.
+- Trigger a program/ticket retro when either is true:
+  - `5` fresh bundles have been reviewed on the same active ticket, or
+  - `3` calendar days have elapsed on the same active ticket.
+- Required output:
+  - what improved,
+  - what did not improve,
+  - why the ticket remains open,
+  - continue / split / pivot decision.

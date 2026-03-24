@@ -16,6 +16,34 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-24 10:30 UTC — Process hardening: fresh-evidence gating and deterministic ingestion
+- Scope:
+  - stop treating stale cumulative bundles as fresh runtime evidence and make ingestion/gating deterministic across remote/local collection.
+- BA requirement mapping:
+  - recent `T-032` reviews kept re-failing on the same `BTCUSDC` loop even when `lastDecisionTs` and activity totals were unchanged for >24h; the process was patching from stale evidence.
+- PM milestone mapping:
+  - process correction batch; no new trading hypothesis is accepted until evidence freshness, retrospective decision, and session brief all agree.
+- Technical changes:
+  - added `scripts/feedback-evidence.js` to classify bundle freshness (`fresh`, `mark_to_market_only`, `stale`) from summary + state deltas.
+  - updated `scripts/auto-retro.sh` to use fresh bundles only, emit `await_fresh_evidence` / `validation_required`, and stop treating cumulative duplicates as new evidence.
+  - updated `scripts/update-session-brief.sh` so Section 4 mirrors `RETROSPECTIVE_AUTO.md` instead of inventing an independent decision; it now records bundle interval vs runtime uptime and freshness status.
+  - updated `scripts/pmba-gate.sh` to compare fresh bundles only and to fail on session/retro decision mismatch.
+  - updated `scripts/ingest-feedback.sh`, `scripts/pull-and-ingest-feedback.sh`, and `scripts/run-batch.sh` to use deterministic filename ordering and a single ingest path.
+  - added `scripts/validate-active-ticket.sh` as the deterministic validation entrypoint when live bundles are stale.
+  - updated `scripts/collect-feedback.sh` to fail if `last_run_summary.json` / `run-context.json` / `info.txt` are missing and to bundle `TICKET_SWITCH_RETRO`, `PROGRAM_RETRO`, playbook, and run-logging references.
+  - updated `docs/RUN_LOGGING_P0.md` and `docs/PM_BA_PLAYBOOK.md` with fresh-evidence and deterministic-validation rules.
+- Risk slider impact:
+  - none; process-only change.
+- Validation evidence:
+  - `node scripts/feedback-evidence.js autobot-feedback-20260324-091829.tgz autobot-feedback-20260323-160632.tgz`
+  - `./scripts/auto-retro.sh autobot-feedback-20260324-091829.tgz`
+  - `./scripts/pmba-gate.sh end`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next ingestion on a stale live bundle must produce `await_fresh_evidence` or `validation_required`, not a false same-ticket patch signal from cumulative history.
+- Follow-up:
+  - add a deterministic validation harness for `T-032` so downside-control slices do not depend on waiting for the live market to reproduce a case.
+
 ## 2026-03-23 11:15 UTC — T-032 slice: reactive defensive unwind for repeated bear-guard loops
 - Scope:
   - reduce repeated `Grid guard paused BUY leg` / `Grid waiting for ladder slot or inventory` loops by turning persistent defensive bear-trend inventory stalls into a controlled partial market unwind.

@@ -60,7 +60,7 @@ classify_window() {
 
 # Generate compact last-run summary if generator exists.
 if [[ -x "scripts/generate-last-run-summary.sh" ]]; then
-  ./scripts/generate-last-run-summary.sh >/dev/null 2>&1 || true
+  ./scripts/generate-last-run-summary.sh >/dev/null
 fi
 
 # Core artifacts (no secrets)
@@ -79,6 +79,9 @@ fi
 copy_if_exists "docs/TEAM_OPERATING_RULES.md" "$TMP_DIR/meta/docs/TEAM_OPERATING_RULES.md"
 copy_if_exists "docs/DELIVERY_BOARD.md" "$TMP_DIR/meta/docs/DELIVERY_BOARD.md"
 copy_if_exists "docs/SESSION_BRIEF.md" "$TMP_DIR/meta/docs/SESSION_BRIEF.md"
+copy_if_exists "docs/PM_BA_PLAYBOOK.md" "$TMP_DIR/meta/docs/PM_BA_PLAYBOOK.md"
+copy_if_exists "docs/RUN_LOGGING_P0.md" "$TMP_DIR/meta/docs/RUN_LOGGING_P0.md"
+copy_if_exists "docs/TICKET_SWITCH_RETRO.md" "$TMP_DIR/meta/docs/TICKET_SWITCH_RETRO.md"
 if [[ -f "docs/PM_BA_CHANGELOG.md" ]]; then
   local_changelog_tail_lines="${AUTOBOT_CHANGELOG_TAIL_LINES:-500}"
   tail -n "$local_changelog_tail_lines" "docs/PM_BA_CHANGELOG.md" >"$TMP_DIR/meta/docs/PM_BA_CHANGELOG.tail.md" || true
@@ -89,6 +92,10 @@ fi
 copy_if_exists "docs/AI_DECISION_CONTRACT.md" "$TMP_DIR/meta/docs/AI_DECISION_CONTRACT.md"
 copy_if_exists "docs/schemas/last_run_summary.schema.json" "$TMP_DIR/meta/docs/last_run_summary.schema.json"
 for retro in docs/RETROSPECTIVE_*.md; do
+  [[ -f "$retro" ]] || continue
+  copy_if_exists "$retro" "$TMP_DIR/meta/docs/$(basename "$retro")"
+done
+for retro in docs/PROGRAM_RETRO_*.md; do
   [[ -f "$retro" ]] || continue
   copy_if_exists "$retro" "$TMP_DIR/meta/docs/$(basename "$retro")"
 done
@@ -157,6 +164,11 @@ const redact = (obj, path) => {
 process.stdout.write(JSON.stringify(cfg, null, 2));
 NODE
   fi
+fi
+
+if [[ ! -f "$TMP_DIR/data/telemetry/last_run_summary.json" ]]; then
+  echo "collect-feedback: missing data/telemetry/last_run_summary.json after summary generation." >&2
+  exit 1
 fi
 
 # Minimal environment/meta (safe to share)
@@ -245,6 +257,15 @@ else
     echo "  \"note\": \"run-context.json partial fallback (node unavailable)\""
     echo "}"
   } >"$TMP_DIR/meta/run-context.json"
+fi
+
+if [[ ! -f "$TMP_DIR/meta/run-context.json" ]]; then
+  echo "collect-feedback: missing meta/run-context.json." >&2
+  exit 1
+fi
+if [[ ! -f "$TMP_DIR/meta/info.txt" ]]; then
+  echo "collect-feedback: missing meta/info.txt." >&2
+  exit 1
 fi
 
 if [[ "$COMPOSE_AVAILABLE" -eq 1 ]]; then
