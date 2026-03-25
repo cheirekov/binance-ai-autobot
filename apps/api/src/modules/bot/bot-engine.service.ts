@@ -1299,6 +1299,7 @@ export class BotEngineService implements OnModuleInit {
       key.includes("temporarily blacklisted") ||
       key.includes("max consecutive entries reached") ||
       key.includes("waiting for ladder slot or inventory") ||
+      key.includes("grid guard paused buy leg") ||
       key.includes("fee/edge filter") ||
       key.includes("max open positions reached") ||
       key.includes("no feasible candidates") ||
@@ -1331,7 +1332,7 @@ export class BotEngineService implements OnModuleInit {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
     const t = boundedRisk / 100;
     const nowMs = Date.now();
-    const isGridWaitKey = key.includes("grid waiting for ladder slot or inventory");
+    const isGridWaitKey = key.includes("grid waiting for ladder slot or inventory") || key.includes("grid guard paused buy leg");
     const windowMs = isGridWaitKey ? 3 * 60_000 : 2 * 60_000;
     const threshold = isGridWaitKey
       ? Math.max(3, Math.round(5 - t * 2)) // risk 0 -> 5, risk 100 -> 3
@@ -7298,6 +7299,9 @@ export class BotEngineService implements OnModuleInit {
               const summary = buyPausedByCaution
                 ? `Skip ${candidateSymbol}: Daily loss caution paused GRID BUY leg`
                 : `Skip ${candidateSymbol}: Grid guard paused BUY leg`;
+              const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), guardLockMs);
+              const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
+              const cooldownMs = cooldown.cooldownMs;
               const nowMs = Date.now();
               const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
               const lastSimilar = current.decisions.find((d) => d.kind === "SKIP" && d.summary === summary);
@@ -7320,13 +7324,32 @@ export class BotEngineService implements OnModuleInit {
                         buyPausedByCaution,
                         buyPaused,
                         hasBuyLimit,
-                        hasSellLimit
+                        hasSellLimit,
+                        ...(cooldown.storm ? { storm: cooldown.storm } : {}),
+                        cooldownMs
                       }
                     },
                     ...current.decisions
                   ].slice(0, 200),
                   lastError: undefined
                 } satisfies BotState;
+                const nextWithCooldown = this.upsertProtectionLock(current, {
+                  type: "COOLDOWN",
+                  scope: "SYMBOL",
+                  symbol: candidateSymbol,
+                  reason: cooldown.storm
+                    ? `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`
+                    : `Cooldown after grid guard buy pause (${Math.round(cooldownMs / 1000)}s)`,
+                  expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                  details: {
+                    category: "GRID_GUARD_BUY_PAUSE",
+                    cooldownMs,
+                    hasSellLimit,
+                    buyPausedByCaution,
+                    ...(cooldown.storm ? { storm: cooldown.storm } : {})
+                  }
+                });
+                if (!pendingNoActionState) pendingNoActionState = nextWithCooldown;
               }
             }
 

@@ -16,6 +16,29 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-25 20:38 UTC — T-032 slice: persist cooldown for repeated grid-guard paused BUY loops
+- Scope:
+  - fix the fresh March 25 stuck-runtime case by turning repeated `Grid guard paused BUY leg` no-action ticks into a real symbol cooldown and by correcting stale easy-process state that still said validation-only.
+- BA requirement mapping:
+  - latest authoritative bundle (`autobot-feedback-20260325-195431.tgz`) is `fresh`, still repeats `Skip BTCUSDC: Grid guard paused BUY leg (17)`, and shows no runtime `grid-guard-defensive-unwind`; repeated same-symbol guard-pause loops remained professionally unacceptable.
+- PM milestone mapping:
+  - same-ticket mitigation required on fresh evidence; keep `T-032` as the only active ticket and resolve the process-state conflict in the repo handoff files.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: treat `Grid guard paused BUY leg` as skip-storm-eligible and give it the same gentler storm policy as `Grid waiting for ladder slot or inventory`.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: when a guard-paused BUY leg produces no order, persist a symbol `COOLDOWN` so the bot rotates away instead of immediately reselecting the same dead-end.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for guard-pause storm classification and cooldown derivation.
+  - `scripts/validate-active-ticket.sh`: expanded targeted T-032 validation to include the active guard-pause loop tests.
+  - `docs/easy_process/*`: corrected stale validation-only state to mirror fresh March 25 authority and recorded `PATCH_NOW`.
+- Risk slider impact:
+  - bounded behavior change; no hard-cap change. Risk still only affects cooldown length and storm thresholds.
+- Validation evidence:
+  - `./node_modules/.bin/vitest run --no-cache src/modules/bot/bot-engine.service.test.ts -t 'grid waiting skips as storm-eligible|grid guard pause|gentler skip-storm trigger|defensive grid-guard unwind'` (pass)
+  - `./scripts/validate-active-ticket.sh` (pass, Docker-backed targeted validation)
+- Runtime test request:
+  - next fresh bundle should show lower repeated `Grid guard paused BUY leg` / `Grid waiting for ladder slot or inventory` on `BTCUSDC` / `SOLUSDC`, or explicit cooldown-driven rotation away from those symbols.
+- Follow-up:
+  - `./scripts/pmba-gate.sh end` will stay red until a post-patch fresh bundle exists; if the next fresh bundle still shows unchanged loop pressure, decide between rollback and a deeper T-032 follow-up on sell-sizing / unwind reachability instead of repeating more micro-cooldown patches.
+
 ## 2026-03-24 10:30 UTC — Process hardening: fresh-evidence gating and deterministic ingestion
 - Scope:
   - stop treating stale cumulative bundles as fresh runtime evidence and make ingestion/gating deterministic across remote/local collection.
