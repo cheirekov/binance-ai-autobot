@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-24 09:46 UTC
+Last updated: 2026-03-24 09:56 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -50,7 +50,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `12c57f7`
+- Commit hash: `cce2322`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -73,13 +73,13 @@ Use this file at the start and end of every batch.
 - Run context:
   - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `17.2`
-  - runtime uptime (hours): `835.235`
-  - run end: `Tue Mar 24 2026 11:18:26 GMT+0200 (Eastern European Standard Time)`
+  - bundle interval (hours): `0.622`
+  - runtime uptime (hours): `835.858`
+  - run end: `Tue Mar 24 2026 11:55:46 GMT+0200 (Eastern European Standard Time)`
   - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
-  - fresh runtime evidence: `not met` (class=stale, staleStreak=2)
+  - fresh runtime evidence: `not met` (class=stale, staleStreak=3)
   - funding regression absent: `not measured` (no dominant funding regression in latest top skips)
   - active ticket runtime signal: `not measured` (Skip BTCUSDC: Grid guard paused BUY leg (17))
 - Observed KPI delta:
@@ -94,8 +94,8 @@ Use this file at the start and end of every batch.
   - sizing reject pressure is medium (17.5%).
   - latest bundle has no fresh runtime evidence (stale); do not patch from cumulative history alone.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260324-091829.tgz`
-  - auto-updated at: `2026-03-24T09:46:45.723Z`
+  - bundle: `autobot-feedback-20260324-095550.tgz`
+  - auto-updated at: `2026-03-24T09:56:21.702Z`
 
 ## 5) Copy/paste prompt for next session
 
@@ -103,7 +103,7 @@ Use this file at the start and end of every batch.
 Ticket: T-032
 Decision: validation_required
 Required action: switch to deterministic validation path before more live-wait bundles
-Latest bundle: autobot-feedback-20260324-091829.tgz
+Latest bundle: autobot-feedback-20260324-095550.tgz
 Fresh runtime evidence: no (stale)
 Do not patch from this bundle alone.
 Use deterministic validation or wait for a fresh runtime-evidence bundle before changing runtime code.
