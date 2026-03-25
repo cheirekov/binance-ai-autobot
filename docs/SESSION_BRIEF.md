@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-24 09:46 UTC
+Last updated: 2026-03-25 19:55 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -50,7 +50,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `12c57f7`
+- Commit hash: `cce2322`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -71,41 +71,42 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `EVENING (collection) / EVENING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `17.2`
-  - runtime uptime (hours): `835.235`
-  - run end: `Tue Mar 24 2026 11:18:26 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - bundle interval (hours): `33.973`
+  - runtime uptime (hours): `869.831`
+  - run end: `Wed Mar 25 2026 21:54:09 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
-  - fresh runtime evidence: `not met` (class=stale, staleStreak=2)
-  - funding regression absent: `not measured` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `not measured` (Skip BTCUSDC: Grid guard paused BUY leg (17))
+  - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
+  - funding regression absent: `met` (no dominant funding regression in latest top skips)
+  - active ticket runtime signal: `observed` (Skip BTCUSDC: Grid guard paused BUY leg (17))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=119, activeMarketOrders=0)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=119, activeMarketOrders=0)
   - market-only share reduced: `yes` (historyMarketShare=40.5%)
-  - sizing reject pressure: `medium` (sizingRejectSkips=35, decisions=200, ratio=17.5%)
-  - fresh runtime evidence: `no` (class=stale)
-- Decision: `validation_required`
-- Next ticket candidate: `PM/BA-VALIDATION` (stop live-wait loop and use deterministic validation)
-- Required action: `switch to deterministic validation path before more live-wait bundles`
+  - sizing reject pressure: `medium` (sizingRejectSkips=34, decisions=200, ratio=17.0%)
+  - fresh runtime evidence: `yes` (class=fresh)
+- Decision: `patch_required`
+- Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
+- Required action: `same-ticket mitigation required before next long run`
 - Open risks:
-  - sizing reject pressure is medium (17.5%).
-  - latest bundle has no fresh runtime evidence (stale); do not patch from cumulative history alone.
+  - sizing reject pressure is medium (17.0%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260324-091829.tgz`
-  - auto-updated at: `2026-03-24T09:46:45.723Z`
+  - bundle: `autobot-feedback-20260325-195431.tgz`
+  - auto-updated at: `2026-03-25T19:55:10.196Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-032
-Decision: validation_required
-Required action: switch to deterministic validation path before more live-wait bundles
-Latest bundle: autobot-feedback-20260324-091829.tgz
-Fresh runtime evidence: no (stale)
-Do not patch from this bundle alone.
-Use deterministic validation or wait for a fresh runtime-evidence bundle before changing runtime code.
-Keep active ticket scope unchanged unless PM/BA explicitly pivots.
+Decision: patch_required
+Required action: same-ticket mitigation required before next long run
+Latest bundle: autobot-feedback-20260325-195431.tgz
+Fresh runtime evidence: yes (fresh)
+Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
+In scope: exit-manager / de-risking behavior under adverse conditions.
+Out of scope: quote-routing redesign, candidate-hygiene-only optimization, PnL schema changes, AI lane.
+Validation: docker compose -f docker-compose.ci.yml run --rm ci
+After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

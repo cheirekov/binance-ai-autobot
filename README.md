@@ -1,46 +1,64 @@
-# Binance AI Autobot (monorepo)
+# Binance Autobot Hardening v4
 
-This repository is the starting point for a **dockerized** automated Binance trading bot with:
+This pack hardens the easy-process workflow against the two biggest LLM failure modes:
+- **context window loss** across many cycles,
+- **time/cycle ambiguity** when a new model starts from a fresh chat.
 
-- **API**: NestJS (`apps/api`)
-- **UI**: Vite + React (`apps/ui`) served behind **HTTP Basic Auth** on port **4173**
-- **Shared types/schemas**: (`packages/shared`)
+The goal is simple:
+**the project must remember itself; the LLM must not be asked to remember it.**
 
-> ⚠️ Important: This project is software engineering support — **not financial advice** and not a profit guarantee.
+## What this pack adds
+This pack extends the small living-file process with three mandatory continuity files:
 
-## Quick start (Docker)
+1. `docs/easy_process/RUN_CONTEXT.md`
+   - explicit current time, cycle, bundle freshness, active mode
+   - prevents day/time guessing
+2. `docs/easy_process/DECISION_LEDGER.md`
+   - compact append-only log of important decisions
+   - prevents losing the reasoning trail between cycles
+3. `docs/easy_process/NEXT_CYCLE_HANDOFF.md`
+   - strict handoff contract from one cycle to the next
+   - prevents drift when models change or chats restart
 
-1. Copy environment defaults:
-   - `cp .env.example .env`
-2. Start:
-   - `docker compose up --build`
-3. Open:
-   - UI: `http://localhost:4173`
+It also updates the onboarding prompt so every new LLM reads these files first.
 
-First run: the UI shows an onboarding wizard to create `./data/config.json`.
-After setup: use `Settings` in the UI to adjust Basic/Advanced options.
+## Design principles
+1. **Chat is disposable.** The repo is the memory.
+2. **Time must be declared, not inferred.**
+3. **Every batch must leave a handoff.**
+4. **Important decisions must be append-only.**
+5. **Raw state is forensic evidence, not default context.**
 
-## Dev (local)
+## Drop-in location
+Copy these files into your repo:
+- `docs/easy_process/`
+- `references/prompt_bundles/autobot_existing_master.md`
 
-- `pnpm install`
-- `pnpm dev`
+## Minimal operator flow
+1. Collect and ingest the latest bundle as you already do.
+2. Update only these small files:
+   - `RUN_CONTEXT.md`
+   - `BUNDLE_DIGEST.md`
+   - `STATE_DIGEST.md`
+   - `ACTIVE_TICKET.md` (only if changed)
+   - append one entry to `DECISION_LEDGER.md`
+   - write `NEXT_CYCLE_HANDOFF.md`
+3. Start a new model with only this prompt:
 
-## Support bundle (safe to share)
+```text
+Follow instructions in `references/prompt_bundles/autobot_existing_master.md`
+and write the requested outputs.
+```
 
-If you run the bot on a remote server and want to share debug info **without secrets**:
+## The 8 files that matter most
+1. `PROGRAM_STATUS.md`
+2. `ACTIVE_TICKET.md`
+3. `RUN_CONTEXT.md`
+4. `BUNDLE_DIGEST.md`
+5. `STATE_DIGEST.md`
+6. `VALIDATION_LEDGER.md`
+7. `DECISION_LEDGER.md`
+8. `NEXT_CYCLE_HANDOFF.md`
 
-- `bash scripts/collect-feedback.sh`
-
-This writes `autobot-feedback-*.tgz` containing state/universe/news/logs plus a redacted config (it does **not** include `data/config.json`).
-
-## Docs
-
-- `docs/AI_CONTEXT.md`
-- `docs/ARCHITECTURE.md`
-- `docs/CONFIG.md`
-- `docs/SECURITY.md`
-- `docs/ROADMAP.md`
-- `docs/CONVERSION.md`
-- `docs/TEAM_OPERATING_RULES.md`
-- `docs/DELIVERY_BOARD.md`
-- `docs/PM_BA_CHANGELOG.md`
+## Keep using from the repo
+This pack is additive. Keep the repo's existing process docs authoritative for deeper rules and scripts.
