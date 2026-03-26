@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-03-26 12:13 EET  
+Last updated: 2026-03-26 15:16 EET  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -11,22 +11,23 @@ Owner: PM/BA + Codex
 - Current incident override: `Lane A — Runtime stability`
 
 ## Problem statement
-`T-032` remains the correct active ticket, but the March 25 guard-pause slice introduced a runtime-regression surface on top of an already boxed-in live state. The latest UI/reporting P0 batch did not restore engine behavior.
+`T-032` remains the correct active ticket, but the active live blocker is no longer the March 25 guard-pause path. The latest fresh bundle on `2914263` shows the runtime is mostly boxed into `No feasible` / `No eligible` post-restart behavior with no working no-feasible liquidity recovery.
 
 ## Current decision
 - `BATCH_ACTION_CLASS`: `PATCH_NOW`
 - Ticket decision: `patch_same_ticket`
 - Process rule:
   - treat `docs/easy_process/P0_INCIDENT_SUMMARY.md` and `docs/easy_process/LATEST_BATCH_DECISION.md` as the batch authority
-  - treat `docs/SESSION_BRIEF.md` as mixed / non-authoritative for this incident batch
+  - treat `docs/SESSION_BRIEF.md` and `docs/RETROSPECTIVE_AUTO.md` as fresh evidence, but not as the final diagnosis
 
 ## Hypothesis under test
-- the March 25 guard-pause cooldown semantics were materially helping trap the runtime in non-productive `T-032` behavior
+- the live runtime remains boxed because the no-feasible liquidity-recovery path is disabled by reason drift and wrong quote-liquidity gating
 
 ## What counts as success
 - the engine emits fresh decisions after clean recreate
-- the next short bundle shows materially different runtime behavior from the March 26 boxed-in baseline
+- the next short bundle shows `noFeasibleRecovery` becoming eligible again or a `no-feasible-liquidity-recovery` trade
+- the recent decision mix changes materially away from pure post-restart idling
 
 ## Stop / rollback conditions
-- the next short fresh bundle still shows unchanged guard/wait loop pressure
-- the smallest safe next move becomes rollback toward `cce2322` engine behavior
+- this patch introduces a fresh validation/runtime regression
+- if the next short bundle still shows no progression after recreate, reopen same-ticket sell-side reachability / loop-continuity investigation before any blind rollback to `cce2322`

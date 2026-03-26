@@ -30,6 +30,25 @@ preserve the reasoning trail across cycles in a compact append-only form.
 
 ## Ledger
 
+### 2026-03-26T13:16:00Z | cycle=FOLLOWUP_P0_RUNTIME_RECOVERY | decision=patch_now
+- active_ticket: T-032
+- lane: Lane A — Runtime stability
+- evidence_class: fresh
+- observed:
+  - latest fresh bundle on `2914263` still looked non-credible
+  - cumulative top skips still show Mar 23 guard-pause counts
+  - latest recent decisions after restart are mostly `No feasible candidates after policy/exposure filters`
+  - latest no-feasible details still show `enabled=false`
+- inferred:
+  - the previous hotfix landed, but it hit the wrong live surface
+  - the current incident is primarily an unresolved engine defect on the no-feasible recovery path, with restart/recovery continuity as a secondary overlay
+- action:
+  - patch the no-feasible recovery gate now
+  - keep T-032 active
+  - require one short post-deploy bundle after clean recreate
+- rollback_or_revisit_when:
+  - the next short fresh bundle still shows no recovery progression after this patch and recreate
+
 ### 2026-03-26T10:13:00Z | cycle=P0_ENGINE_RECOVERY_PATCH | decision=patch_now
 - active_ticket: T-032
 - lane: Lane A — Runtime stability

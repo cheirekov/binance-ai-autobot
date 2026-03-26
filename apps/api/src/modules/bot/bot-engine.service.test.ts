@@ -888,6 +888,43 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(policy.cooldownMs).toBe(600_000);
   });
 
+  it("enables no-feasible recovery after repeated policy-exposure skips", () => {
+    const helpers = service as unknown as {
+      deriveNoFeasibleRecoveryPolicy: (params: {
+        state: BotState;
+        reason: string | undefined;
+        risk: number;
+        nowMs: number;
+      }) => { enabled: boolean; recentCount: number; threshold: number; cooldownMs: number };
+    };
+
+    const now = Date.now();
+    const summary = "Skip: No feasible candidates after policy/exposure filters";
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "nf-1",
+          ts: new Date(now - 45_000).toISOString(),
+          kind: "SKIP",
+          summary
+        }
+      ]
+    };
+
+    const policy = helpers.deriveNoFeasibleRecoveryPolicy({
+      state,
+      reason: "No feasible candidates after policy/exposure filters",
+      risk: 100,
+      nowMs: now
+    });
+
+    expect(policy.enabled).toBe(true);
+    expect(policy.threshold).toBe(2);
+    expect(policy.recentCount).toBe(2);
+    expect(policy.cooldownMs).toBe(600_000);
+  });
+
   it("keeps no-feasible recovery disabled during cooldown after recovery trade", () => {
     const helpers = service as unknown as {
       deriveNoFeasibleRecoveryPolicy: (params: {
@@ -937,6 +974,31 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(policy.enabled).toBe(false);
     expect(policy.recentCount).toBe(3);
     expect(policy.threshold).toBe(2);
+  });
+
+  it("gates no-feasible recovery on spendable quote liquidity after reserve", () => {
+    const helpers = service as unknown as {
+      shouldAttemptNoFeasibleRecovery: (params: {
+        policyEnabled: boolean;
+        maxExecutionQuoteSpendableHome: number;
+        risk: number;
+      }) => { attempt: boolean; thresholdHome: number };
+    };
+
+    const spendableGate = helpers.shouldAttemptNoFeasibleRecovery({
+      policyEnabled: true,
+      maxExecutionQuoteSpendableHome: 0.97400227,
+      risk: 100
+    });
+    const rawFreeGate = helpers.shouldAttemptNoFeasibleRecovery({
+      policyEnabled: true,
+      maxExecutionQuoteSpendableHome: 5.97400227,
+      risk: 100
+    });
+
+    expect(spendableGate.thresholdHome).toBe(1);
+    expect(spendableGate.attempt).toBe(true);
+    expect(rawFreeGate.attempt).toBe(false);
   });
 
   it("classifies skip reason clusters for KPI counters", () => {

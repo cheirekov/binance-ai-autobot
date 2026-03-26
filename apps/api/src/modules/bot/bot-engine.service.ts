@@ -2959,14 +2959,91 @@ export class BotEngineService implements OnModuleInit {
     return Number.isFinite(shortfallRatio) && shortfallRatio <= 0.03; // up to 3% shortfall
   }
 
+  private isNoFeasibleRecoveryReason(reason: string | undefined): boolean {
+    const normalized = (reason ?? "").trim().toLowerCase();
+    return (
+      normalized.includes("no feasible candidates after sizing/cap filters") ||
+      normalized.includes("no feasible candidates after policy/exposure filters")
+    );
+  }
+
+  private deriveNoFeasibleRecoveryQuoteLiquidityThresholdHome(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    return this.toRounded(1 + (1 - boundedRisk / 100) * 2, 4); // 1..3 home units
+  }
+
+  private shouldAttemptNoFeasibleRecovery(params: {
+    policyEnabled: boolean;
+    maxExecutionQuoteSpendableHome: number;
+    risk: number;
+  }): { attempt: boolean; thresholdHome: number } {
+    const thresholdHome = this.deriveNoFeasibleRecoveryQuoteLiquidityThresholdHome(params.risk);
+    const spendableHome = Number.isFinite(params.maxExecutionQuoteSpendableHome)
+      ? Math.max(0, params.maxExecutionQuoteSpendableHome)
+      : 0;
+    return {
+      attempt: params.policyEnabled && spendableHome <= thresholdHome + 1e-8,
+      thresholdHome
+    };
+  }
+
+  private async deriveMaxExecutionQuoteSpendableHome(params: {
+    config: AppConfig | undefined;
+    balances: BinanceBalanceSnapshot[];
+    allowedExecutionQuotes: Iterable<string>;
+    walletTotalHome: number;
+    capitalProfile: CapitalProfile;
+    risk: number;
+    homeStable: string;
+    bridgeAssets: string[];
+  }): Promise<number> {
+    const normalizedHomeStable = params.homeStable.trim().toUpperCase();
+    let maxSpendableHome = 0;
+
+    for (const asset of params.allowedExecutionQuotes) {
+      const quoteAsset = asset.trim().toUpperCase();
+      if (!quoteAsset) continue;
+
+      const quoteFree = params.balances.find((balance) => balance.asset.trim().toUpperCase() === quoteAsset)?.free ?? 0;
+      if (!Number.isFinite(quoteFree) || quoteFree <= 0) continue;
+
+      const quoteReserveTargets = await this.deriveQuoteReserveTargets({
+        config: params.config,
+        walletTotalHome: params.walletTotalHome,
+        capitalProfile: params.capitalProfile,
+        risk: params.risk,
+        quoteAsset,
+        homeStable: normalizedHomeStable,
+        bridgeAssets: params.bridgeAssets
+      });
+      const quoteSpendable = Math.max(0, quoteFree - quoteReserveTargets.reserveHardTarget);
+      if (quoteSpendable <= 1e-8) continue;
+
+      let spendableHome = quoteSpendable;
+      if (quoteAsset !== normalizedHomeStable) {
+        const estimatedHome = await this.estimateAssetValueInHome(
+          quoteAsset,
+          quoteSpendable,
+          normalizedHomeStable,
+          params.bridgeAssets
+        );
+        if (!Number.isFinite(estimatedHome ?? Number.NaN)) continue;
+        spendableHome = Math.max(0, estimatedHome ?? 0);
+      }
+
+      maxSpendableHome = Math.max(maxSpendableHome, spendableHome);
+    }
+
+    return this.toRounded(maxSpendableHome, 8);
+  }
+
   private deriveNoFeasibleRecoveryPolicy(params: {
     state: BotState;
     reason: string | undefined;
     risk: number;
     nowMs: number;
   }): { enabled: boolean; recentCount: number; threshold: number; cooldownMs: number } {
-    const reason = (params.reason ?? "").toLowerCase();
-    if (!reason.includes("no feasible candidates after sizing/cap filters")) {
+    if (!this.isNoFeasibleRecoveryReason(params.reason)) {
       return { enabled: false, recentCount: 0, threshold: 0, cooldownMs: 0 };
     }
 
@@ -2975,7 +3052,7 @@ export class BotEngineService implements OnModuleInit {
     const windowMs = 10 * 60_000;
     const recentSkips = params.state.decisions.filter((decision) => {
       if (decision.kind !== "SKIP") return false;
-      if (!decision.summary.toLowerCase().includes("no feasible candidates after sizing/cap filters")) return false;
+      if (!this.isNoFeasibleRecoveryReason(decision.summary)) return false;
       const ts = Date.parse(decision.ts);
       return Number.isFinite(ts) && params.nowMs - ts <= windowMs;
     }).length;
@@ -5348,14 +5425,28 @@ export class BotEngineService implements OnModuleInit {
               risk,
               nowMs
             });
-            const quoteLiquidityThreshold = this.toRounded(1 + (1 - Math.max(0, Math.min(100, risk)) / 100) * 2, 4); // 1..3
+            const maxExecutionQuoteSpendableHome = await this.deriveMaxExecutionQuoteSpendableHome({
+              config: config ?? undefined,
+              balances,
+              allowedExecutionQuotes,
+              walletTotalHome,
+              capitalProfile,
+              risk,
+              homeStable,
+              bridgeAssets: executionBridgeAssets
+            });
+            const noFeasibleRecoveryGate = this.shouldAttemptNoFeasibleRecovery({
+              policyEnabled: noFeasibleRecoveryPolicy.enabled,
+              maxExecutionQuoteSpendableHome,
+              risk
+            });
             let noFeasibleRecoveryAttempt:
               | {
                   symbol?: string;
                   reason: string;
                 }
               | null = null;
-            if (noFeasibleRecoveryPolicy.enabled && quoteFree <= quoteLiquidityThreshold) {
+            if (noFeasibleRecoveryGate.attempt) {
               const managedPositions = [...this.getManagedPositions(current).values()]
                 .filter((position) => {
                   if (position.netQty <= 0) return false;
@@ -5435,7 +5526,8 @@ export class BotEngineService implements OnModuleInit {
                     mode: "liquidity-recovery",
                     triggerReason: feasibleCandidateSelection.reason ?? null,
                     quoteFree: Number(quoteFree.toFixed(8)),
-                    quoteLiquidityThreshold: Number(quoteLiquidityThreshold.toFixed(8)),
+                    quoteLiquidityThreshold: Number(noFeasibleRecoveryGate.thresholdHome.toFixed(8)),
+                    maxExecutionQuoteSpendableHome: Number(maxExecutionQuoteSpendableHome.toFixed(8)),
                     recoverySellFraction,
                     managedPositionCost: Number(position.costQuote.toFixed(8)),
                     managedPositionQty: Number(position.netQty.toFixed(8)),
@@ -5492,7 +5584,8 @@ export class BotEngineService implements OnModuleInit {
                           recentCount: noFeasibleRecoveryPolicy.recentCount,
                           threshold: noFeasibleRecoveryPolicy.threshold,
                           cooldownMs: noFeasibleRecoveryPolicy.cooldownMs,
-                          quoteLiquidityThreshold: Number(quoteLiquidityThreshold.toFixed(6)),
+                          quoteLiquidityThreshold: Number(noFeasibleRecoveryGate.thresholdHome.toFixed(6)),
+                          maxExecutionQuoteSpendableHome: Number(maxExecutionQuoteSpendableHome.toFixed(6)),
                           attemptedSymbol: noFeasibleRecoveryAttempt?.symbol ?? null,
                           attemptedReason: noFeasibleRecoveryAttempt?.reason ?? null
                         }

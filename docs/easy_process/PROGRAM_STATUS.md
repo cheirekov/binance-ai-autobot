@@ -1,6 +1,6 @@
 # PROGRAM_STATUS
 
-Last updated: 2026-03-26 12:13 EET  
+Last updated: 2026-03-26 15:16 EET  
 Owner: PM/BA + Codex
 
 ## North Star
@@ -20,19 +20,19 @@ Build a **professional Binance autobot** that:
 ## Current program decision
 - Active lane: `Lane A — Runtime stability`
 - Why:
-  - the latest fresh bundle still showed a boxed-in live `T-032` runtime
-  - the prior P0 batch fixed credibility surfaces but not engine behavior
-  - the March 25 guard-pause slice was confirmed as a plausible engine-regression assist and was patched in this batch
+  - the latest fresh bundle on `2914263` still showed a non-credible live `T-032` runtime
+  - the previous guard-pause hotfix deployed, but the active blocker shifted to the no-feasible recovery path
+  - restart/recovery continuity still matters, but it is a secondary overlay rather than the primary code surface
 
 ## Current batch priority order
-1. `Lane A` — confirm the engine hotfix in a short fresh runtime bundle
-2. `Lane B` — if needed, decide rollback vs continue from the post-hotfix bundle
+1. `Lane A` — deploy and confirm the no-feasible recovery patch in one short fresh bundle
+2. `Lane B` — use the post-patch bundle to decide whether another same-ticket recovery slice is needed
 3. `Lane C` — only after runtime credibility is restored
-4. `Lane E` — keep process/state hygiene, but it is no longer the active blocker
+4. `Lane E` — preserve clean recreate and state hygiene, but do not widen to full reseed without proof
 5. `Lane D` — still out of scope
 
 ## Program-level hard rules
 1. Do not treat UI/reporting improvements as runtime recovery.
-2. Do not trust persisted `running=true` state if the actual runtime is absent.
-3. Do not do another blind long live `T-032` patch cycle before the short hotfix confirmation bundle.
+2. Do not trust the cumulative top-skip table alone when the run is long-lived.
+3. Do not wipe state before the fresh post-patch recreate unless corruption is proven.
 4. Keep one active ticket.

@@ -1,76 +1,57 @@
 # LATEST_BATCH_DECISION
 
-Last updated: 2026-03-26 12:13 EET  
+Last updated: 2026-03-26 15:16 EET  
 Owner: PM/BA + Codex
-
-## Batch outcome
-- `PROCESS_STATE_CONFLICT`: `true`
-- Incident classification: `P0 combined runtime-idle / process-confused incident`
-- Runtime class: `strategy-idle / boxed-in`, not proven engine-dead
-- `BATCH_ACTION_CLASS`: `PATCH_NOW`
-- Authoritative sources for this batch:
-  - `docs/RETROSPECTIVE_AUTO.md`
-  - `docs/TRIAGE_NOTE_2026-03-25_T032_GRID_GUARD_PAUSED_BUY_LEG_LOOP.md`
-  - `docs/easy_process/P0_INCIDENT_SUMMARY.md`
-  - `docs/easy_process/LATEST_BATCH_DECISION.md`
 
 ## Production capability lane
 - Chosen: `Lane A — Runtime stability`
-- Why:
-  - `observed`: the latest fresh bundle `autobot-feedback-20260326-090817.tgz` on `a2a9ad0` still showed `Skip BTCUSDC: Grid guard paused BUY leg (17 -> 17)` and no `grid-guard-defensive-unwind`
-  - `observed`: the last engine change on the bot path was `11cadf29` on 2026-03-25 22:45 +0200, merged to `main` as `a2a9ad01`
-  - `observed`: that March 25 slice added a generic symbol `COOLDOWN` and terminal no-action save on non-caution guard-pause ticks
-  - `inferred`: that change can hard-block symbol re-entry and preempt the later waiting / unwind path
+- Evidence tags:
+  - `observed`: latest fresh bundle `autobot-feedback-20260326-130152.tgz` runs `git.commit=2914263`
+  - `observed`: cumulative top skips still show `Skip BTCUSDC: Grid guard paused BUY leg (17)` and `Grid waiting for ladder slot or inventory (16)`
+  - `observed`: latest recent state decisions after restart are mostly `Skip: No feasible candidates after policy/exposure filters`
+  - `observed`: latest no-feasible skip details still show `noFeasibleRecovery.enabled=false` while spendable USDC after reserve is only `0.97400227`
+  - `inferred`: the March 26 guard-pause hotfix deployed, but it did not touch the active live blocker
 
 ## Chosen active ticket
 - Current: `T-032` (Exit manager v2)
-- Status: `IN_PROGRESS`
 - Decision: `patch_same_ticket`
-- Evidence tags:
-  - `observed`: `T-031` was the active ticket before `T-032`
-  - `observed`: `T-032` added caution unwind first, then defensive grid-guard unwind, then the March 25 guard-pause cooldown slice
-  - `observed`: the March 25 slice did not restore meaningful runtime behavior in the next fresh bundle
-  - `inferred`: the incident is partly engine-regression-driven, but not safely solved by a full rollback alone
-  - `assumption`: the next short post-deploy bundle is enough to confirm the engine is no longer being boxed in by the March 25 lock semantics
+- Why:
+  - `observed`: the current failure is still an exit/liquidity-recovery failure inside `T-032`
+  - `observed`: pre-patch `cce2322` already showed the same boxed-in runtime
+  - `inferred`: `ROLLBACK_NOW` is weaker than a bounded patch on the actual live surface
 
 ## Evidence class
 - Current: `fresh`
-- Basis:
-  - bundle: `autobot-feedback-20260326-090817.tgz`
-  - reviewed deployed sha: `a2a9ad0`
-  - audited engine range: `cce2322..a2a9ad0`
+- Latest bundle: `autobot-feedback-20260326-130152.tgz`
+- Compared bundle: `autobot-feedback-20260326-090817.tgz`
 
 ## Allowed work mode
-- Decision: `HOTFIX_ONLY`
-- Reason:
-  - this is a P0 runtime recovery batch with a bounded engine-path fix
-  - UI/reporting-only work is not sufficient
+- `PATCH_ALLOWED`
 
-## Engine-first audit
-1. Last commit that changed `apps/api/src/modules/bot/bot-engine.service.ts`:
-   - `11cadf29d7b3c8d564a5ee5cab4ab4e1b33fbf50`
-   - merged into `main` as `a2a9ad01cd87642c4c2c69eab7e73529ec183399`
-2. Ticket intent of that change:
-   - make repeated `Grid guard paused BUY leg` skips storm-eligible
-   - persist a symbol cooldown so the bot rotates away from repeated guard-paused symbols
-3. Did engine behavior likely regress after that change:
-   - `yes`
-   - the non-caution guard-pause branch now saves a generic symbol `COOLDOWN` and returns before later `Grid waiting for ladder slot or inventory` / no-inventory handling can run
-4. Is rollback to the prior engine state safer than another forward patch:
-   - `no`
-   - pre-patch `cce2322` already had the same dominant live loop, so a full rollback would knowingly return to an already unresolved runtime
-5. Smallest safe engine patch:
-   - keep `grid guard pause` storm visibility
-   - stop terminally persisting non-caution guard-pause cooldown as the final no-action state
-   - treat legacy non-caution `GRID_GUARD_BUY_PAUSE` cooldown locks as non-blocking so deployed runtimes can recover immediately after rollout
-
-## Executed action
-- Code changed: `yes`
-- Bot-engine changed: `yes`
-- Files changed:
+## Batch decision
+- `BATCH_ACTION_CLASS`: `PATCH_NOW`
+- Incident classification: `P0 runtime-boxed / recovery-continuity incident`
+- Primary incident type:
+  - unresolved pre-existing engine defect on the no-feasible recovery path
+  - restart/recovery continuity confusion
+- Previous recovery action:
+  - `2026-03-26` same-ticket bot-engine hotfix `2914263` on the March 25 guard-pause path
+  - preceded by an earlier observability/process `OPERATIONS_ADJUSTMENT`
+- Why the previous intervention did not restore runtime behavior:
+  - it touched bot-engine, but on the wrong surface
+  - the latest deployed bundle still had `noFeasibleRecovery.enabled=false`
+  - the recovery policy still matched only `sizing/cap filters` while live skips now say `policy/exposure filters`
+  - the recovery gate still used raw `quoteFree`, not spendable quote after reserve
+- Likely rollback surface:
+  - narrow: `2914263 -> a2a9ad0`
+  - deeper but weak: `a2a9ad0 -> cce2322`
+- Likely patch surface:
   - `apps/api/src/modules/bot/bot-engine.service.ts`
-  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
-  - `scripts/validate-active-ticket.sh`
-- Validation run:
-  - `./scripts/validate-active-ticket.sh`
-  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `deriveNoFeasibleRecoveryPolicy(...)`
+  - the no-feasible recovery gate in the main tick flow
+- Likely state/ops recovery surface:
+  - clean recreate only
+  - no reseed / wipe is proven necessary
+- Validation:
+  - `./scripts/validate-active-ticket.sh` ✅
+  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅

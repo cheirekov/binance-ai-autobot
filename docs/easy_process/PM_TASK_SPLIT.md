@@ -1,45 +1,45 @@
 # PM_TASK_SPLIT
 
-Last updated: 2026-03-26 12:13 EET  
+Last updated: 2026-03-26 15:16 EET  
 Owner: PM/BA + Codex
 
 ## PM/BA
-- Objective: close the P0 runtime ambiguity with one bounded engine recovery batch
+- Objective: close the follow-up P0 incident with one explicit same-ticket recovery action
 - Tasks:
   - keep `T-032` active
-  - record `PATCH_NOW` and the audited rollback target
+  - record why the March 26 hotfix failed to restore runtime credibility
   - gate the next move on one short fresh post-deploy bundle
 - Deliverable: single-source runtime recovery decision
-- Dependency: audited engine diff `cce2322..a2a9ad0`
+- Dependency: fresh-bundle audit on `2914263`
 
 ## Architect
-- Objective: remove the March 25 guard-pause regression without widening scope
+- Objective: restore the designed no-feasible liquidity-recovery path without widening scope
 - Tasks:
-  - stop non-caution guard-pause no-action ticks from short-circuiting later runtime handling
-  - keep legacy guard-pause cooldowns from acting as hard selection blocks
-  - preserve existing defensive unwind policy
-- Deliverable: bounded engine hotfix
+  - align no-feasible recovery matching with the actual live skip family
+  - gate recovery on spendable quote after reserve, in home units
+  - leave guard-pause and hard-risk policy unchanged
+- Deliverable: bounded engine patch
 - Dependency: `apps/api/src/modules/bot/bot-engine.service.ts`
 
 ## Trader
-- Objective: keep runtime inactivity within professional acceptability bounds
+- Objective: reject professionally unacceptable high-allocation idling
 - Tasks:
-  - reject another boxed-in short bundle as acceptable behavior
-  - require changed runtime decision mix before calling the hotfix credible
+  - treat repeated post-restart `No feasible` / `No eligible` behavior as non-credible
+  - require either recovery sells or materially changed decision mix before accepting the patch
 - Deliverable: accept/reject rule for the next bundle
 - Dependency: post-deploy fresh evidence
 
 ## Runtime Analyst
-- Objective: verify the engine is alive after deployment
+- Objective: prove the runtime does more than wake up after restart
 - Tasks:
   - perform clean recreate
-  - confirm fresh timestamps and non-stale decisions
+  - confirm fresh timestamps continue after the initial recovery message
   - capture one short bundle
 - Deliverable: post-deploy runtime confirmation
 - Dependency: operator deployment
 
 ## AI Specialist
-- Objective: keep the recovery strictly deterministic
+- Objective: keep the recovery deterministic
 - Tasks:
   - confirm no AI autonomy behavior changed
   - keep hard risk policy untouched
@@ -47,19 +47,19 @@ Owner: PM/BA + Codex
 - Dependency: code review only
 
 ## State Steward
-- Objective: prevent stale March 25 lock semantics from masquerading as healthy runtime control
+- Objective: preserve state unless hard evidence proves it is corrupted
 - Tasks:
-  - preserve existing state
-  - rely on the patch instead of manual state wipe
-  - keep P0 authority in the easy-process outputs
+  - use clean recreate, not reseed
+  - distinguish cumulative historical top skips from fresh recent decisions
+  - keep incident authority in the easy-process outputs
 - Deliverable: state-safe recovery handoff
 - Dependency: deployed patch
 
 ## Senior BE/UI
-- Objective: restore bot-engine behavior credibly
+- Objective: restore bot-engine behavior on the actual live blocker
 - Tasks:
-  - ship the guard-pause hotfix
-  - keep regression coverage on lock semantics
+  - ship the no-feasible recovery patch
+  - keep regression coverage on reason matching and spendable-liquidity gating
   - validate with targeted and full CI
 - Deliverable: tested engine recovery patch
 - Dependency: Architect findings

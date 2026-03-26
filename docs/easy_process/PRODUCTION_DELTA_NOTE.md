@@ -1,19 +1,19 @@
 # PRODUCTION_DELTA_NOTE
 
-Last updated: 2026-03-26 12:13 EET  
+Last updated: 2026-03-26 15:16 EET  
 Owner: PM/BA + Codex
 
 ## How this batch moves the bot closer to production
-This batch restores the engine path itself. The March 25 guard-pause slice was leaving the bot boxed in on repeated non-caution BUY-leg pauses; the hotfix reopens the later waiting / unwind path and removes legacy hard-block semantics from that regression surface.
+This batch restores an already-designed runtime escape hatch. The live bundle showed a highly allocated bot with low spendable quote after reserve and no working liquidity-recovery path; the patch makes that recovery path reachable again on the actual live skip family.
 
 ## What is still missing before the next gate
-- one short fresh post-deploy bundle proving the runtime is no longer boxed in the same way
-- confirmation that the patch did not reintroduce funding loops
-- a follow-up PM/BA decision on whether `T-032` now continues cleanly or still needs rollback
+- one short fresh post-deploy bundle proving the runtime progresses after restart
+- confirmation that low-spendable-quote conditions now produce recovery attempts or materially better recent decisions
+- proof that the patch did not reintroduce funding or churn regressions
 
 ## Whether this batch improves execution, risk, validation, event awareness, or learning
 - Execution: `yes`
 - Risk: `yes`
 - Validation: `yes`
-- Event awareness: `no direct change in this batch`
+- Event awareness: `no`
 - Learning: `no`

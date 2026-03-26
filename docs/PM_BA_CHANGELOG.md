@@ -16,6 +16,29 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-26 13:16 UTC — T-032 hotfix: restore no-feasible liquidity recovery
+- Scope:
+  - follow-up P0 runtime recovery after `autobot-feedback-20260326-130152.tgz`.
+- BA requirement mapping:
+  - latest fresh bundle runs `2914263`, but recent decisions after restart are mostly `Skip: No feasible candidates after policy/exposure filters` with `noFeasibleRecovery.enabled=false`.
+- PM milestone mapping:
+  - same-ticket runtime recovery batch; patch the actual live blocker rather than rollback to a pre-existing unresolved state.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: broadened no-feasible recovery reason matching to include `policy/exposure filters`.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: gated no-feasible recovery on max spendable execution-quote liquidity after reserve, in home units, instead of raw `quoteFree`.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for policy/exposure reason matching and spendable-liquidity gating.
+  - `scripts/validate-active-ticket.sh`: included no-feasible recovery tests in the targeted T-032 validator.
+- Risk slider impact:
+  - no change to hard caps, unwind fractions, or cooldown curves; this patch only restores reachability of the existing liquidity-recovery path.
+- Validation evidence:
+  - `./scripts/validate-active-ticket.sh` (pass)
+  - `docker compose -f docker-compose.ci.yml run --rm ci` (pass)
+- Runtime test request:
+  - deploy this patch, clean-recreate, keep state, and collect one short fresh bundle.
+  - the next bundle should show `noFeasibleRecovery` enabled/attempted under low spendable quote, or a `no-feasible-liquidity-recovery` trade, or otherwise materially changed recent decision mix.
+- Follow-up:
+  - if the next short bundle still only advances right after restart and never reaches recovery execution, keep `T-032` active and investigate sell-side reachability / loop continuity before any ticket pivot.
+
 ## 2026-03-26 10:13 UTC — T-032 hotfix: remove March 25 guard-pause cooldown hard block
 - Scope:
   - restore credible engine progression on the active `T-032` path after the prior P0 batch fixed only UI/reporting credibility.

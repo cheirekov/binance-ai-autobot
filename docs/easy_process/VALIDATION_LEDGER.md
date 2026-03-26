@@ -1,6 +1,6 @@
 # VALIDATION_LEDGER
 
-Last updated: 2026-03-26 12:13 EET  
+Last updated: 2026-03-26 15:16 EET  
 Owner: PM/BA + Runtime Analyst + Trader
 
 Purpose:
@@ -31,9 +31,9 @@ Question:
 - does the system escalate from passive waiting to bounded unwind?
 
 Status:
-- patched
-- this batch removed the March 25 hard-block / short-circuit regression surface
-- fresh post-deploy confirmation is still required
+- still not proved
+- cumulative bundle summaries still carry the Mar 23 guard-pause loop
+- this is no longer the only live blocker
 
 ### S4 — Funding/routing pressure
 Question:
@@ -48,8 +48,15 @@ Question:
 
 Status:
 - running
-- prior ops-adjustment batch repaired the credibility surface
-- this batch repaired an engine-path blocker
+- latest bundle shows the runtime is alive after restart, but not credibly progressing
+
+### S6 — No-feasible liquidity recovery under reserve starvation
+Question:
+- when spendable quote after reserve is too low, does the bot re-enable recovery sells instead of staying boxed into `No feasible` skips?
+
+Status:
+- patched
+- fresh post-deploy confirmation is required
 
 ## Validation result states
 Use only one:
@@ -69,4 +76,4 @@ A runtime/strategy behavior is not "adaptive" just because it looked good in one
 Before promotion, it must have evidence from at least:
 - one range-leaning case
 - one trend-leaning case
-or deterministic equivalents accepted by PM/BA.
+- or deterministic equivalents accepted by PM/BA

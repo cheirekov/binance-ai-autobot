@@ -1,10 +1,10 @@
 # PATCH_RESULT
 
-Last updated: 2026-03-26 12:13 EET  
+Last updated: 2026-03-26 15:16 EET  
 Owner: PM/BA + Codex
 
 ## Incident classification
-- `P0 combined runtime-idle / process-confused incident`
+- `P0 runtime-boxed / recovery-continuity incident`
 
 ## Chosen action class
 - `PATCH_NOW`
@@ -25,35 +25,40 @@ Owner: PM/BA + Codex
 - `docs/easy_process/P0_ROOT_CAUSE_TREE.md`
 - `docs/easy_process/P0_RECOVERY_PLAN.md`
 - `docs/easy_process/PATCH_RESULT.md`
+- `docs/easy_process/PROGRAM_STATUS.md`
+- `docs/easy_process/ACTIVE_TICKET.md`
+- `docs/easy_process/RUN_CONTEXT.md`
+- `docs/easy_process/VALIDATION_LEDGER.md`
 
 ## Exact behavior changed
-- legacy non-caution `GRID_GUARD_BUY_PAUSE` cooldown locks no longer act as hard symbol blocks
-- non-caution guard-pause no-action ticks no longer terminate the tick before later waiting / no-inventory handling can run
+- no-feasible recovery now recognizes both `sizing/cap filters` and `policy/exposure filters`
+- no-feasible recovery now uses max spendable execution-quote liquidity after reserve, in home units, instead of raw `quoteFree`
 
 ## Why this is the minimum viable patch
-- it only touches the March 25 regression surface
-- it does not change `T-032` unwind thresholds or risk policy
-- it does not widen into a new ticket
+- it only touches the active live blocker shown in `autobot-feedback-20260326-130152.tgz`
+- it reuses the existing `no-feasible-liquidity-recovery` sell path instead of inventing a new behavior
+- it does not widen into a new ticket or change hard risk policy
 
 ## Hypothesis addressed
-- the March 25 guard-pause cooldown slice was helping box the runtime in by blocking or preempting the path that should eventually lead to meaningful progression
+- the latest live runtime remains boxed because the liquidity-recovery gate is disabled by reason drift and wrong quote-liquidity gating, not because the March 26 hotfix failed to deploy
 
 ## Tests added/updated
-- added symbol-lock regression coverage for legacy guard-pause cooldown semantics in `apps/api/src/modules/bot/bot-engine.service.test.ts`
-- updated `scripts/validate-active-ticket.sh` so the targeted T-032 validator includes the new guard-pause coverage
+- added regression coverage for policy/exposure reason matching in `apps/api/src/modules/bot/bot-engine.service.test.ts`
+- added regression coverage for spendable-liquidity gating in `apps/api/src/modules/bot/bot-engine.service.test.ts`
+- updated `scripts/validate-active-ticket.sh` so targeted T-032 validation includes no-feasible recovery coverage
 
 ## Validation run
-- `./scripts/validate-active-ticket.sh`
-- `docker compose -f docker-compose.ci.yml run --rm ci`
+- `./scripts/validate-active-ticket.sh` ✅
+- `docker compose -f docker-compose.ci.yml run --rm ci` ✅
 
 ## Remaining risk
-- the pre-March25 `T-032` runtime was already not fully healthy
-- this hotfix removes a confirmed regression surface, but the next short bundle still has to prove meaningful runtime improvement
+- the runtime still may only advance after restart if another sell-side reachability bug exists
+- the cumulative top-skip table may keep advertising the old Mar 23 guard-pause counts until new activity pushes them out
 
 ## Rollback trigger
-- the next short fresh bundle still shows unchanged boxed-in guard/wait loop behavior with no meaningful decision-mix improvement
+- this patch introduces a fresh regression, funding churn, or validation failure
 
 ## What the next bundle must confirm
-- the bot produces fresh runtime decisions after recreate
-- the March 26 boxed-in pattern changes materially
+- recent decisions keep advancing after recreate
+- `noFeasibleRecovery.enabled=true` or `no-feasible-liquidity-recovery` appears when quote remains starved
 - no dominant quote-funding regression returns
