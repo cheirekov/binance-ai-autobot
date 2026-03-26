@@ -1,6 +1,6 @@
 # VALIDATION_LEDGER
 
-Last updated: 2026-03-26 15:16 EET  
+Last updated: 2026-03-26 18:47 EET  
 Owner: PM/BA + Runtime Analyst + Trader
 
 Purpose:
@@ -55,7 +55,8 @@ Question:
 - when spendable quote after reserve is too low, does the bot re-enable recovery sells instead of staying boxed into `No feasible` skips?
 
 Status:
-- patched
+- patched again
+- latest `3a6a14f` bundle proved the previous amendment was still too strict
 - fresh post-deploy confirmation is required
 
 ## Validation result states

@@ -1,6 +1,6 @@
 # PROGRAM_STATUS
 
-Last updated: 2026-03-26 15:16 EET  
+Last updated: 2026-03-26 18:47 EET  
 Owner: PM/BA + Codex
 
 ## North Star
@@ -20,12 +20,12 @@ Build a **professional Binance autobot** that:
 ## Current program decision
 - Active lane: `Lane A — Runtime stability`
 - Why:
-  - the latest fresh bundle on `2914263` still showed a non-credible live `T-032` runtime
-  - the previous guard-pause hotfix deployed, but the active blocker shifted to the no-feasible recovery path
+  - the latest fresh bundle on `3a6a14f` still showed a non-credible live `T-032` runtime
+  - the previous no-feasible patch deployed, but the recovery trigger still stayed below live funding floors and below live cadence needs
   - restart/recovery continuity still matters, but it is a secondary overlay rather than the primary code surface
 
 ## Current batch priority order
-1. `Lane A` — deploy and confirm the no-feasible recovery patch in one short fresh bundle
+1. `Lane A` — deploy and confirm the no-feasible recovery threshold/window amendment in one short fresh bundle
 2. `Lane B` — use the post-patch bundle to decide whether another same-ticket recovery slice is needed
 3. `Lane C` — only after runtime credibility is restored
 4. `Lane E` — preserve clean recreate and state hygiene, but do not widen to full reseed without proof

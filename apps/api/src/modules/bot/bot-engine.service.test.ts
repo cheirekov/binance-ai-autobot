@@ -925,6 +925,84 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(policy.cooldownMs).toBe(600_000);
   });
 
+  it("enables no-feasible recovery after spaced policy-exposure skips inside the wider starvation window", () => {
+    const helpers = service as unknown as {
+      deriveNoFeasibleRecoveryPolicy: (params: {
+        state: BotState;
+        reason: string | undefined;
+        risk: number;
+        nowMs: number;
+      }) => { enabled: boolean; recentCount: number; threshold: number; cooldownMs: number };
+    };
+
+    const now = Date.now();
+    const summary = "Skip: No feasible candidates after policy/exposure filters";
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "nf-1",
+          ts: new Date(now - 4 * 60 * 60_000).toISOString(),
+          kind: "SKIP",
+          summary
+        }
+      ]
+    };
+
+    const policy = helpers.deriveNoFeasibleRecoveryPolicy({
+      state,
+      reason: "No feasible candidates after policy/exposure filters",
+      risk: 100,
+      nowMs: now
+    });
+
+    expect(policy.enabled).toBe(true);
+    expect(policy.recentCount).toBe(2);
+    expect(policy.threshold).toBe(2);
+  });
+
+  it("resets no-feasible recovery accumulation after an intervening trade", () => {
+    const helpers = service as unknown as {
+      deriveNoFeasibleRecoveryPolicy: (params: {
+        state: BotState;
+        reason: string | undefined;
+        risk: number;
+        nowMs: number;
+      }) => { enabled: boolean; recentCount: number; threshold: number; cooldownMs: number };
+    };
+
+    const now = Date.now();
+    const summary = "Skip: No feasible candidates after policy/exposure filters";
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "trade-1",
+          ts: new Date(now - 2 * 60 * 60_000).toISOString(),
+          kind: "TRADE",
+          summary: "Normal trade progression"
+        },
+        {
+          id: "nf-1",
+          ts: new Date(now - 4 * 60 * 60_000).toISOString(),
+          kind: "SKIP",
+          summary
+        }
+      ]
+    };
+
+    const policy = helpers.deriveNoFeasibleRecoveryPolicy({
+      state,
+      reason: "No feasible candidates after policy/exposure filters",
+      risk: 100,
+      nowMs: now
+    });
+
+    expect(policy.enabled).toBe(false);
+    expect(policy.recentCount).toBe(1);
+    expect(policy.threshold).toBe(2);
+  });
+
   it("keeps no-feasible recovery disabled during cooldown after recovery trade", () => {
     const helpers = service as unknown as {
       deriveNoFeasibleRecoveryPolicy: (params: {
@@ -972,7 +1050,7 @@ describe("bot-engine insufficient-balance helpers", () => {
     });
 
     expect(policy.enabled).toBe(false);
-    expect(policy.recentCount).toBe(3);
+    expect(policy.recentCount).toBe(1);
     expect(policy.threshold).toBe(2);
   });
 
@@ -981,24 +1059,30 @@ describe("bot-engine insufficient-balance helpers", () => {
       shouldAttemptNoFeasibleRecovery: (params: {
         policyEnabled: boolean;
         maxExecutionQuoteSpendableHome: number;
-        risk: number;
+        quoteLiquidityThresholdHome: number;
       }) => { attempt: boolean; thresholdHome: number };
     };
 
     const spendableGate = helpers.shouldAttemptNoFeasibleRecovery({
       policyEnabled: true,
       maxExecutionQuoteSpendableHome: 0.97400227,
-      risk: 100
+      quoteLiquidityThresholdHome: 3
     });
     const rawFreeGate = helpers.shouldAttemptNoFeasibleRecovery({
       policyEnabled: true,
-      maxExecutionQuoteSpendableHome: 5.97400227,
-      risk: 100
+      maxExecutionQuoteSpendableHome: 2.841632,
+      quoteLiquidityThresholdHome: 3
+    });
+    const aboveFloorGate = helpers.shouldAttemptNoFeasibleRecovery({
+      policyEnabled: true,
+      maxExecutionQuoteSpendableHome: 3.100001,
+      quoteLiquidityThresholdHome: 3
     });
 
-    expect(spendableGate.thresholdHome).toBe(1);
+    expect(spendableGate.thresholdHome).toBe(3);
     expect(spendableGate.attempt).toBe(true);
-    expect(rawFreeGate.attempt).toBe(false);
+    expect(rawFreeGate.attempt).toBe(true);
+    expect(aboveFloorGate.attempt).toBe(false);
   });
 
   it("classifies skip reason clusters for KPI counters", () => {

@@ -30,6 +30,24 @@ preserve the reasoning trail across cycles in a compact append-only form.
 
 ## Ledger
 
+### 2026-03-26T16:47:00Z | cycle=FOLLOWUP_P0_RUNTIME_RECOVERY_2 | decision=patch_now
+- active_ticket: T-032
+- lane: Lane A — Runtime stability
+- evidence_class: fresh
+- observed:
+  - latest fresh bundle on `3a6a14f` still looked non-credible
+  - cumulative top skips still show Mar 23 guard-pause counts unchanged
+  - the deployed runtime still recorded `noFeasibleRecovery.enabled=false`, `recentCount=1`, `threshold=2`, `quoteLiquidityThreshold=1`, and `maxExecutionQuoteSpendableHome=2.841632`
+- inferred:
+  - the previous no-feasible recovery patch deployed, but it was incomplete
+  - the live engine still under-triggers recovery because its repeat window is tighter than the observed runtime cadence and its threshold is below the observed funding floor
+- action:
+  - patch the no-feasible recovery threshold/window now
+  - keep T-032 active
+  - require one short post-deploy bundle after clean recreate
+- rollback_or_revisit_when:
+  - the next short fresh bundle still shows no recovery progression after this amendment, or the new trigger over-fires into churn
+
 ### 2026-03-26T13:16:00Z | cycle=FOLLOWUP_P0_RUNTIME_RECOVERY | decision=patch_now
 - active_ticket: T-032
 - lane: Lane A — Runtime stability

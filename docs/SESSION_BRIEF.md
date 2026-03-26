@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-26 13:02 UTC
+Last updated: 2026-03-26 16:42 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -50,7 +50,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `2914263`
+- Commit hash: `3a6a14f`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -71,12 +71,12 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `DAY (collection) / DAY (run end)`
+  - window (local): `EVENING (collection) / EVENING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `3.893`
-  - runtime uptime (hours): `886.957`
-  - run end: `Thu Mar 26 2026 15:01:44 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `DAY_RUN`
+  - bundle interval (hours): `3.67`
+  - runtime uptime (hours): `890.627`
+  - run end: `Thu Mar 26 2026 18:41:56 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
@@ -93,8 +93,8 @@ Use this file at the start and end of every batch.
 - Open risks:
   - sizing reject pressure is medium (15.0%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260326-130152.tgz`
-  - auto-updated at: `2026-03-26T13:02:16.156Z`
+  - bundle: `autobot-feedback-20260326-164157.tgz`
+  - auto-updated at: `2026-03-26T16:42:12.380Z`
 
 ## 5) Copy/paste prompt for next session
 
@@ -102,7 +102,7 @@ Use this file at the start and end of every batch.
 Ticket: T-032
 Decision: patch_required
 Required action: same-ticket mitigation required before next long run
-Latest bundle: autobot-feedback-20260326-130152.tgz
+Latest bundle: autobot-feedback-20260326-164157.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
 In scope: exit-manager / de-risking behavior under adverse conditions.

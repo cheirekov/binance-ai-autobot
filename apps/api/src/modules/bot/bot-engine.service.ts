@@ -2967,17 +2967,19 @@ export class BotEngineService implements OnModuleInit {
     );
   }
 
-  private deriveNoFeasibleRecoveryQuoteLiquidityThresholdHome(risk: number): number {
-    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
-    return this.toRounded(1 + (1 - boundedRisk / 100) * 2, 4); // 1..3 home units
+  private deriveMinQuoteLiquidityHome(config: AppConfig | null | undefined, risk: number): number {
+    const configuredMinTopUpTarget = config?.advanced.conversionTopUpMinTarget ?? 5;
+    return Math.max(1, configuredMinTopUpTarget * (risk >= 80 ? 0.6 : risk >= 50 ? 0.8 : 1));
   }
 
   private shouldAttemptNoFeasibleRecovery(params: {
     policyEnabled: boolean;
     maxExecutionQuoteSpendableHome: number;
-    risk: number;
+    quoteLiquidityThresholdHome: number;
   }): { attempt: boolean; thresholdHome: number } {
-    const thresholdHome = this.deriveNoFeasibleRecoveryQuoteLiquidityThresholdHome(params.risk);
+    const thresholdHome = Number.isFinite(params.quoteLiquidityThresholdHome)
+      ? Math.max(0, params.quoteLiquidityThresholdHome)
+      : 0;
     const spendableHome = Number.isFinite(params.maxExecutionQuoteSpendableHome)
       ? Math.max(0, params.maxExecutionQuoteSpendableHome)
       : 0;
@@ -3042,19 +3044,28 @@ export class BotEngineService implements OnModuleInit {
     reason: string | undefined;
     risk: number;
     nowMs: number;
-  }): { enabled: boolean; recentCount: number; threshold: number; cooldownMs: number } {
+  }): { enabled: boolean; recentCount: number; threshold: number; cooldownMs: number; windowMs: number } {
     if (!this.isNoFeasibleRecoveryReason(params.reason)) {
-      return { enabled: false, recentCount: 0, threshold: 0, cooldownMs: 0 };
+      return { enabled: false, recentCount: 0, threshold: 0, cooldownMs: 0, windowMs: 0 };
     }
 
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
     const threshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
-    const windowMs = 10 * 60_000;
+    const windowMs = 24 * 60 * 60_000;
+    const mostRecentTradeMs = params.state.decisions.reduce<number | null>((latest, decision) => {
+      if (decision.kind !== "TRADE") return latest;
+      const ts = Date.parse(decision.ts);
+      if (!Number.isFinite(ts)) return latest;
+      if (ts > params.nowMs) return latest;
+      return latest === null ? ts : Math.max(latest, ts);
+    }, null);
+    const windowStartMs =
+      mostRecentTradeMs === null ? params.nowMs - windowMs : Math.max(params.nowMs - windowMs, mostRecentTradeMs);
     const recentSkips = params.state.decisions.filter((decision) => {
       if (decision.kind !== "SKIP") return false;
       if (!this.isNoFeasibleRecoveryReason(decision.summary)) return false;
       const ts = Date.parse(decision.ts);
-      return Number.isFinite(ts) && params.nowMs - ts <= windowMs;
+      return Number.isFinite(ts) && ts >= windowStartMs && ts <= params.nowMs;
     }).length;
     const recentCount = recentSkips + 1; // include current skip
 
@@ -3071,7 +3082,8 @@ export class BotEngineService implements OnModuleInit {
       enabled: recentCount >= threshold && !recentRecoveryTrade,
       recentCount,
       threshold,
-      cooldownMs
+      cooldownMs,
+      windowMs
     };
   }
 
@@ -5392,11 +5404,7 @@ export class BotEngineService implements OnModuleInit {
           const notionalCap = config?.advanced.liveTradeNotionalCap ?? 25;
           const slippageBuffer = config?.advanced.liveTradeSlippageBuffer ?? 1.005;
           const bufferFactor = Number.isFinite(slippageBuffer) && slippageBuffer > 0 ? slippageBuffer : 1;
-          const minQuoteLiquidityHome = Math.max(
-            1,
-            (config?.advanced.conversionTopUpMinTarget ?? 5) *
-              (risk >= 80 ? 0.6 : risk >= 50 ? 0.8 : 1)
-          );
+          const minQuoteLiquidityHome = this.deriveMinQuoteLiquidityHome(config, risk);
           const feasibleCandidateSelection = await this.pickFeasibleLiveCandidate({
             preferredCandidate: selectedCandidate,
             snapshotCandidates: universeSnapshot?.candidates ?? [],
@@ -5438,7 +5446,7 @@ export class BotEngineService implements OnModuleInit {
             const noFeasibleRecoveryGate = this.shouldAttemptNoFeasibleRecovery({
               policyEnabled: noFeasibleRecoveryPolicy.enabled,
               maxExecutionQuoteSpendableHome,
-              risk
+              quoteLiquidityThresholdHome: minQuoteLiquidityHome
             });
             let noFeasibleRecoveryAttempt:
               | {
@@ -5584,6 +5592,7 @@ export class BotEngineService implements OnModuleInit {
                           recentCount: noFeasibleRecoveryPolicy.recentCount,
                           threshold: noFeasibleRecoveryPolicy.threshold,
                           cooldownMs: noFeasibleRecoveryPolicy.cooldownMs,
+                          windowMs: noFeasibleRecoveryPolicy.windowMs,
                           quoteLiquidityThreshold: Number(noFeasibleRecoveryGate.thresholdHome.toFixed(6)),
                           maxExecutionQuoteSpendableHome: Number(maxExecutionQuoteSpendableHome.toFixed(6)),
                           attemptedSymbol: noFeasibleRecoveryAttempt?.symbol ?? null,

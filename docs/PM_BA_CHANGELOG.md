@@ -16,6 +16,28 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-26 16:47 UTC — T-032 hotfix: align no-feasible recovery with live cadence and funding floor
+- Scope:
+  - second follow-up P0 runtime recovery after `autobot-feedback-20260326-164157.tgz`.
+- BA requirement mapping:
+  - latest fresh bundle runs `3a6a14f`, but recent decisions still remain `No feasible` / `No eligible` and the bundle records `noFeasibleRecovery.enabled=false`, `recentCount=1`, `threshold=2`, `quoteLiquidityThreshold=1`, `maxExecutionQuoteSpendableHome=2.841632`.
+- PM milestone mapping:
+  - same-ticket runtime recovery batch; amend the already-deployed no-feasible path rather than broad-rollback to a weaker known state.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `deriveMinQuoteLiquidityHome(...)` so the no-feasible recovery gate uses the same liquidity floor as candidate feasibility.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: widened no-feasible recovery accumulation from a tight 10-minute cluster to a live starvation window that resets after trades.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for spaced policy/exposure starvation skips, trade-reset semantics, and the corrected liquidity threshold.
+- Risk slider impact:
+  - no change to hard caps, unwind fractions, or hard risk policy; this patch only makes the existing liquidity-recovery path reachable under live conditions.
+- Validation evidence:
+  - `./scripts/validate-active-ticket.sh` (pass)
+  - `docker compose -f docker-compose.ci.yml run --rm ci` (pass)
+- Runtime test request:
+  - deploy this patch, clean-recreate, keep state, and collect one short fresh bundle.
+  - the next bundle should show `noFeasibleRecovery` enabled/attempted under reserve starvation, or a `no-feasible-liquidity-recovery` trade, or otherwise materially changed recent decision mix.
+- Follow-up:
+  - if the next short bundle still only advances right after restart and never reaches recovery execution, keep `T-032` active and investigate sell-side execution reachability before any broad rollback.
+
 ## 2026-03-26 13:16 UTC — T-032 hotfix: restore no-feasible liquidity recovery
 - Scope:
   - follow-up P0 runtime recovery after `autobot-feedback-20260326-130152.tgz`.

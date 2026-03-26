@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-03-26 15:16 EET  
+Last updated: 2026-03-26 18:47 EET  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -11,7 +11,7 @@ Owner: PM/BA + Codex
 - Current incident override: `Lane A — Runtime stability`
 
 ## Problem statement
-`T-032` remains the correct active ticket, but the active live blocker is no longer the March 25 guard-pause path. The latest fresh bundle on `2914263` shows the runtime is mostly boxed into `No feasible` / `No eligible` post-restart behavior with no working no-feasible liquidity recovery.
+`T-032` remains the correct active ticket. The latest fresh bundle on `3a6a14f` proves the previous no-feasible patch deployed, but the runtime is still boxed into `No feasible` / `No eligible` post-restart behavior because the remaining recovery trigger is too strict for live funding floors and live cadence.
 
 ## Current decision
 - `BATCH_ACTION_CLASS`: `PATCH_NOW`
@@ -21,7 +21,7 @@ Owner: PM/BA + Codex
   - treat `docs/SESSION_BRIEF.md` and `docs/RETROSPECTIVE_AUTO.md` as fresh evidence, but not as the final diagnosis
 
 ## Hypothesis under test
-- the live runtime remains boxed because the no-feasible liquidity-recovery path is disabled by reason drift and wrong quote-liquidity gating
+- the live runtime remains boxed because the no-feasible liquidity-recovery path still under-triggers: its repeat window is too tight and its quote-liquidity threshold is too low
 
 ## What counts as success
 - the engine emits fresh decisions after clean recreate
@@ -30,4 +30,4 @@ Owner: PM/BA + Codex
 
 ## Stop / rollback conditions
 - this patch introduces a fresh validation/runtime regression
-- if the next short bundle still shows no progression after recreate, reopen same-ticket sell-side reachability / loop-continuity investigation before any blind rollback to `cce2322`
+- if the next short bundle still shows no progression after recreate, reopen same-ticket sell-side reachability / loop-continuity investigation before any broad rollback
