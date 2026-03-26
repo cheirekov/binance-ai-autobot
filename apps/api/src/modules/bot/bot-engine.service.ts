@@ -464,6 +464,16 @@ export class BotEngineService implements OnModuleInit {
     return null;
   }
 
+  private isNonBlockingGridGuardPauseCooldownLock(lock: ProtectionLockEntry | null): boolean {
+    if (!lock) return false;
+    if (lock.scope !== "SYMBOL") return false;
+    if (lock.type.trim().toUpperCase() !== "COOLDOWN") return false;
+    const details = this.readLockDetails(lock);
+    const category = typeof details?.category === "string" ? details.category.trim().toUpperCase() : "";
+    if (category !== "GRID_GUARD_BUY_PAUSE") return false;
+    return details?.buyPausedByCaution !== true;
+  }
+
   private deriveProtectionPolicy(risk: number): ProtectionPolicy {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
     const t = boundedRisk / 100;
@@ -1555,12 +1565,18 @@ export class BotEngineService implements OnModuleInit {
       return "Blocked by Advanced never-trade list";
     }
 
-    const symbolLock = this.getActiveSymbolProtectionLock(state, symbol, { excludeTypes: ["GRID_GUARD_BUY_PAUSE"] });
-    if (symbolLock) {
-      return `Protection lock ${symbolLock.type}: ${symbolLock.reason}`;
+    const normalized = symbol.trim().toUpperCase();
+    const now = Date.now();
+    for (const lock of state.protectionLocks ?? []) {
+      if (lock.scope !== "SYMBOL") continue;
+      if (lock.symbol?.trim().toUpperCase() !== normalized) continue;
+      const expiresAt = Date.parse(lock.expiresAt);
+      if (!Number.isFinite(expiresAt) || expiresAt <= now) continue;
+      if (lock.type.trim().toUpperCase() === "GRID_GUARD_BUY_PAUSE") continue;
+      if (this.isNonBlockingGridGuardPauseCooldownLock(lock)) continue;
+      return `Protection lock ${lock.type}: ${lock.reason}`;
     }
 
-    const now = Date.now();
     const active = (state.symbolBlacklist ?? []).find((e) => e.symbol === symbol && Date.parse(e.expiresAt) > now);
     if (active) {
       return `Temporarily blacklisted (${active.reason})`;
@@ -7349,7 +7365,9 @@ export class BotEngineService implements OnModuleInit {
                     ...(cooldown.storm ? { storm: cooldown.storm } : {})
                   }
                 });
-                if (!pendingNoActionState) pendingNoActionState = nextWithCooldown;
+                if (buyPausedByCaution && !pendingNoActionState) {
+                  pendingNoActionState = nextWithCooldown;
+                }
               }
             }
 

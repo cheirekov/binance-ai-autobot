@@ -1,6 +1,6 @@
 # VALIDATION_LEDGER
 
-Last updated: 2026-03-26  
+Last updated: 2026-03-26 12:13 EET  
 Owner: PM/BA + Runtime Analyst + Trader
 
 Purpose:
@@ -8,10 +8,9 @@ track which runtime behaviors have real proof and which are still only hypothese
 
 ## Ticket currently under validation
 - `T-032`
-- Current batch action: `DETERMINISTIC_VALIDATION`
+- Current batch action: `PATCH_NOW`
 
 ## Required scenario classes
-Each strategy/runtime change should eventually cover more than one market condition.
 
 ### S1 — Green repricing with low free quote
 Question:
@@ -32,8 +31,9 @@ Question:
 - does the system escalate from passive waiting to bounded unwind?
 
 Status:
-- running
-- March 26 evidence shows no live unwind proof after the March 25 patch deployment
+- patched
+- this batch removed the March 25 hard-block / short-circuit regression surface
+- fresh post-deploy confirmation is still required
 
 ### S4 — Funding/routing pressure
 Question:
@@ -48,7 +48,8 @@ Question:
 
 Status:
 - running
-- March 26 evidence suggests boxed-in `no feasible candidates` waiting is being conflated with a hard-stuck loop
+- prior ops-adjustment batch repaired the credibility surface
+- this batch repaired an engine-path blocker
 
 ## Validation result states
 Use only one:
@@ -58,6 +59,10 @@ Use only one:
 - `proved`
 - `failed`
 - `inconclusive`
+
+## Current validation evidence
+- `./scripts/validate-active-ticket.sh` ✅
+- `docker compose -f docker-compose.ci.yml run --rm ci` ✅
 
 ## Promotion rule
 A runtime/strategy behavior is not "adaptive" just because it looked good in one recent market patch.

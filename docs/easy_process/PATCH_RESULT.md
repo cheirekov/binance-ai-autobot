@@ -1,36 +1,59 @@
 # PATCH_RESULT
 
-Last updated: 2026-03-26 11:44 EET  
+Last updated: 2026-03-26 12:13 EET  
 Owner: PM/BA + Codex
 
 ## Incident classification
-- `P0 combined operational non-credibility incident`
+- `P0 combined runtime-idle / process-confused incident`
 
 ## Chosen action class
-- `OPERATIONS_ADJUSTMENT`
+- `PATCH_NOW`
+
+## Whether bot-engine changed
+- `yes`
 
 ## Files changed
-- [generate-last-run-summary.sh](/home/yc/work/binance-ai-autobot/scripts/generate-last-run-summary.sh)
-- [DashboardPage.tsx](/home/yc/work/binance-ai-autobot/apps/ui/src/pages/DashboardPage.tsx)
-- incident outputs under `docs/easy_process/`
+- `apps/api/src/modules/bot/bot-engine.service.ts`
+- `apps/api/src/modules/bot/bot-engine.service.test.ts`
+- `scripts/validate-active-ticket.sh`
+- `docs/easy_process/LATEST_BATCH_DECISION.md`
+- `docs/easy_process/NEXT_BATCH_PLAN.md`
+- `docs/easy_process/PM_TASK_SPLIT.md`
+- `docs/easy_process/OPERATOR_NOTE.md`
+- `docs/easy_process/PRODUCTION_DELTA_NOTE.md`
+- `docs/easy_process/P0_INCIDENT_SUMMARY.md`
+- `docs/easy_process/P0_ROOT_CAUSE_TREE.md`
+- `docs/easy_process/P0_RECOVERY_PLAN.md`
+- `docs/easy_process/PATCH_RESULT.md`
+
+## Exact behavior changed
+- legacy non-caution `GRID_GUARD_BUY_PAUSE` cooldown locks no longer act as hard symbol blocks
+- non-caution guard-pause no-action ticks no longer terminate the tick before later waiting / no-inventory handling can run
+
+## Why this is the minimum viable patch
+- it only touches the March 25 regression surface
+- it does not change `T-032` unwind thresholds or risk policy
+- it does not widen into a new ticket
 
 ## Hypothesis addressed
-- the operator-facing incident was not only unresolved `T-032` behavior
-- the runtime was also being judged through misleading surfaces:
-  - `daily_net_usdt` reused lifetime `net`
-  - stale state and stale adaptive timelines were not obvious in the dashboard
+- the March 25 guard-pause cooldown slice was helping box the runtime in by blocking or preempting the path that should eventually lead to meaningful progression
+
+## Tests added/updated
+- added symbol-lock regression coverage for legacy guard-pause cooldown semantics in `apps/api/src/modules/bot/bot-engine.service.test.ts`
+- updated `scripts/validate-active-ticket.sh` so the targeted T-032 validator includes the new guard-pause coverage
 
 ## Validation run
-- `bash -n scripts/generate-last-run-summary.sh`
-- `./scripts/generate-last-run-summary.sh /tmp/last_run_summary.p0.json`
+- `./scripts/validate-active-ticket.sh`
 - `docker compose -f docker-compose.ci.yml run --rm ci`
 
 ## Remaining risk
-- this batch does not change trading behavior
-- the March 25 guard-pause `COOLDOWN` slice is still a plausible rollback surface
-- `T-032` still needs deterministic proof before the next behavior change
+- the pre-March25 `T-032` runtime was already not fully healthy
+- this hotfix removes a confirmed regression surface, but the next short bundle still has to prove meaningful runtime improvement
+
+## Rollback trigger
+- the next short fresh bundle still shows unchanged boxed-in guard/wait loop behavior with no meaningful decision-mix improvement
 
 ## What the next bundle must confirm
-- after clean recreate, state timestamps move and the dashboard freshness pills stay green/warn instead of silently stale
-- `daily_net_usdt` no longer stays flat only because lifetime `net` was being reused
-- the next proof batch can decide whether to `ROLLBACK_NOW` the March 25 guard-pause slice or replace it with a smaller non-blocking patch
+- the bot produces fresh runtime decisions after recreate
+- the March 26 boxed-in pattern changes materially
+- no dominant quote-funding regression returns

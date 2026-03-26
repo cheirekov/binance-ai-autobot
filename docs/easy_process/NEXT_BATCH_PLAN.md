@@ -1,34 +1,36 @@
 # NEXT_BATCH_PLAN
 
-Last updated: 2026-03-26 11:44 EET  
+Last updated: 2026-03-26 12:13 EET  
 Owner: PM/BA + Codex
 
 ## Exact scope
-Run a post-adjustment `T-032` proof batch that separates truthful runtime freshness from the unresolved guard-pause / unwind behavior.
+Deploy the engine hotfix, clean-recreate the runtime, and confirm from one short fresh bundle that the March 25 guard-pause regression is no longer suppressing meaningful runtime behavior.
 
 ## In scope
-- confirm after deployment that decision timestamps, run-stats freshness, and rolling 24h `daily_net_usdt` are no longer misleading
-- reproduce the March 26 boxed-in runtime conditions from `autobot-feedback-20260326-090817.tgz`
-- add deterministic coverage for guard-pause `COOLDOWN` interaction with next-tick symbol blocking and `grid-guard-defensive-unwind`
-- decide from proof whether the narrow March 25 guard-pause slice should be `ROLLBACK_NOW` or replaced by a smaller non-blocking patch
+- deploy the patched bot-engine runtime
+- preserve current state and config; do not wipe runtime state unless the patch fails
+- collect one short fresh bundle after recreate
+- verify the decision mix changes away from pure guard-pause dead-end behavior
+- decide whether the follow-up is `continue_same_ticket` or `rollback_same_ticket`
 
 ## Out of scope
-- another long live run from stale or unreconciled process state
-- a broad `T-032` strategy rewrite before the guard-pause interaction is proven
+- dashboard-only or reporting-only work
+- broad `T-032` strategy redesign
 - reopening `T-031` or `T-034`
-- AI-lane, auth, or unrelated UI work
+- AI-lane or auth/UI scope
 
 ## Acceptance criteria
-- one short post-adjustment bundle shows fresh state timestamps and a non-misleading rolling 24h `daily_net_usdt`
-- deterministic validation proves one of:
-  - the March 25 guard-pause `COOLDOWN` is a real regression and should be rolled back
-  - a smaller non-blocking guard-pause patch is safer than rollback
-  - the remaining boxed-in behavior is strategy-consistent and the ticket should pivot
-- PM/BA can choose the next single action from proof: `ROLLBACK_NOW`, `PATCH_NOW`, or `PIVOT_TICKET`
+- the runtime emits fresh decisions after clean recreate
+- legacy non-caution guard-pause cooldown no longer hard-blocks symbol progression
+- the short bundle shows at least one of:
+  - `grid-guard-defensive-unwind`
+  - changed guard/wait loop counts
+  - different actionable decision mix than the March 26 boxed-in baseline
+- no funding regression dominates the bundle
 
 ## Rollback condition
-- the guard-pause `COOLDOWN` is shown to block or preempt the intended unwind path
-- post-adjustment evidence still shows strategy-idle behavior with no benefit from the March 25 slice
+- the next short fresh bundle still shows unchanged `Grid guard paused BUY leg` / `Grid waiting for ladder slot or inventory` pressure with no meaningful runtime change
+- new validation or runtime evidence shows the remaining safe action is to revert the March 25 slice fully back to `cce2322` engine behavior
 
 ## What capability this moves forward
-Moves `Lane B — Deterministic validation` forward while preserving the operator-trust gains from this `Lane E` recovery batch.
+Moves `Lane A — Runtime stability` forward by restoring the bot-engine path itself, not just its operator-facing surfaces.

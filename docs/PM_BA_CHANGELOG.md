@@ -16,6 +16,28 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-26 10:13 UTC — T-032 hotfix: remove March 25 guard-pause cooldown hard block
+- Scope:
+  - restore credible engine progression on the active `T-032` path after the prior P0 batch fixed only UI/reporting credibility.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260326-090817.tgz`) still showed unchanged `Grid guard paused BUY leg (17 -> 17)` on deployed `a2a9ad0`, so the engine remained boxed in.
+- PM milestone mapping:
+  - P0 runtime recovery batch; execute the smallest safe engine-path fix and defer any ticket pivot or rollback until one short post-deploy bundle exists.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: legacy non-caution `GRID_GUARD_BUY_PAUSE` cooldown locks no longer act as hard symbol blocks.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: non-caution guard-pause no-action ticks no longer terminate the tick before later waiting / no-inventory handling can run.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for legacy guard-pause cooldown semantics.
+  - `scripts/validate-active-ticket.sh`: widened the targeted `T-032` validator to include the new guard-pause cooldown coverage.
+- Risk slider impact:
+  - no change to hard risk policy or unwind thresholds; this batch only removes a blocking regression surface on the runtime path.
+- Validation evidence:
+  - `./scripts/validate-active-ticket.sh`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - next short bundle should show changed runtime decision mix relative to the March 26 boxed-in baseline, ideally including `grid-guard-defensive-unwind` or lower repeated guard/wait loop pressure.
+- Follow-up:
+  - if the next short fresh bundle still shows no meaningful runtime change, the next action should be `ROLLBACK_NOW` toward pre-March25 `cce2322` engine behavior.
+
 ## 2026-03-25 20:38 UTC — T-032 slice: persist cooldown for repeated grid-guard paused BUY loops
 - Scope:
   - fix the fresh March 25 stuck-runtime case by turning repeated `Grid guard paused BUY leg` no-action ticks into a real symbol cooldown and by correcting stale easy-process state that still said validation-only.

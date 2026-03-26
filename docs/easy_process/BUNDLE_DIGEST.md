@@ -1,6 +1,6 @@
 # BUNDLE_DIGEST
 
-Last updated: 2026-03-26 11:23 EET  
+Last updated: 2026-03-26 12:13 EET  
 Owner: PM/BA + Runtime Analyst
 
 Use this file instead of pasting large bundle narratives into chat.
@@ -12,7 +12,7 @@ Use this file instead of pasting large bundle narratives into chat.
 - Evidence class: `fresh`
 
 ## Why this matters
-This bundle is valid proof that the March 25 same-ticket patch was actually deployed (`a2a9ad0`) but did not improve the dominant aggregate T-032 loop. That ends the March 25 `PATCH_NOW` justification and shifts the correct next action to deterministic validation.
+This bundle is still the authoritative proof that deployed `a2a9ad0` did not restore credible runtime behavior. It justified an engine-path hotfix in this batch because the prior P0 commit only repaired operator-facing credibility surfaces.
 
 ## Observed
 - latest reviewed git sha from bundle: `a2a9ad0`
@@ -26,20 +26,13 @@ This bundle is valid proof that the March 25 same-ticket patch was actually depl
   - `total_alloc_pct = 93.93`
   - `open_positions = 10`
   - `activeOrders = 0`
-  - spendable quote examples remained below reserve floors
-- bundle-carried `meta/docs/SESSION_BRIEF.md` and `meta/docs/RETROSPECTIVE_AUTO.md` were stale March 25 pre-patch copies and should not be treated as current decision authority
 
 ## Inferred
-- the runtime is not ops-blocked; it is healthy but unproductive
-- unchanged aggregate loop counts no longer justify another blind live micro-patch
-- current deterministic validation is insufficient because it still passes while the live runtime remains unresolved
-- the next useful proof must distinguish a real code bug from strategy-consistent no-feasible waiting
+- the runtime was alive but unproductive
+- the March 25 guard-pause cooldown slice was not solving the observed live problem
+- the next correct move was engine recovery, not more reporting work
 
-## Assumptions to verify
-- whether guard-pause cooldown persistence fails when skip logging is already throttled
-- whether `grid-guard-defensive-unwind` is effectively unreachable under the current gates
-- whether candidate demotion is too weak for repeated guard-paused / ladder-wait symbols
-
-## Fresh-evidence rule
-Do not run another long live test from the current code hoping for a clearer answer.
-Use the next batch to add deterministic proof on the active T-032 surfaces first.
+## Next proof required
+- deploy the engine hotfix from this batch
+- collect one short fresh bundle
+- decide whether the hotfix changed runtime behavior enough to continue `T-032` or whether rollback is safer

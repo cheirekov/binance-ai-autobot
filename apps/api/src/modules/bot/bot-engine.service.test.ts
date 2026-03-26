@@ -2883,6 +2883,62 @@ describe("bot-engine symbol lock checks", () => {
     expect(helpers.isSymbolBlocked("BTCUSDC", state)).toBeNull();
   });
 
+  it("does not hard-block legacy grid-guard pause cooldown locks", () => {
+    const helpers = service as unknown as {
+      isSymbolBlocked: (symbol: string, state: BotState) => string | null;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      protectionLocks: [
+        {
+          id: "lock-gp",
+          type: "COOLDOWN",
+          createdAt: "2026-03-25T20:40:00.000Z",
+          scope: "SYMBOL",
+          symbol: "BTCUSDC",
+          reason: "Cooldown after grid guard buy pause (150s)",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "GRID_GUARD_BUY_PAUSE",
+            buyPausedByCaution: false,
+            cooldownMs: 150000
+          }
+        }
+      ]
+    };
+
+    expect(helpers.isSymbolBlocked("BTCUSDC", state)).toBeNull();
+  });
+
+  it("keeps caution-paused grid-buy cooldown locks blocking", () => {
+    const helpers = service as unknown as {
+      isSymbolBlocked: (symbol: string, state: BotState) => string | null;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      protectionLocks: [
+        {
+          id: "lock-caution",
+          type: "COOLDOWN",
+          createdAt: "2026-03-25T20:40:00.000Z",
+          scope: "SYMBOL",
+          symbol: "BTCUSDC",
+          reason: "Cooldown after grid guard buy pause (150s)",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "GRID_GUARD_BUY_PAUSE",
+            buyPausedByCaution: true,
+            cooldownMs: 150000
+          }
+        }
+      ]
+    };
+
+    expect(helpers.isSymbolBlocked("BTCUSDC", state)).not.toBeNull();
+  });
+
   it("does not treat reason-quarantine global cooldown as hard global lock", () => {
     const helpers = service as unknown as {
       isSymbolBlocked: (symbol: string, state: BotState) => string | null;
@@ -2908,6 +2964,47 @@ describe("bot-engine symbol lock checks", () => {
     };
 
     expect(helpers.isSymbolBlocked("BTCUSDC", state)).toBeNull();
+  });
+
+  it("still honors later hard symbol locks after skipping soft grid-guard cooldowns", () => {
+    const helpers = service as unknown as {
+      isSymbolBlocked: (symbol: string, state: BotState) => string | null;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      protectionLocks: [
+        {
+          id: "lock-soft",
+          type: "COOLDOWN",
+          createdAt: "2026-02-17T11:00:00.000Z",
+          scope: "SYMBOL",
+          symbol: "BTCUSDC",
+          reason: "Cooldown after grid guard buy pause (150s)",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "GRID_GUARD_BUY_PAUSE",
+            cooldownMs: 150_000,
+            buyPausedByCaution: false
+          }
+        },
+        {
+          id: "lock-hard",
+          type: "COOLDOWN",
+          createdAt: "2026-02-17T11:01:00.000Z",
+          scope: "SYMBOL",
+          symbol: "BTCUSDC",
+          reason: "Grid sell sizing reject",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "GRID_SELL_SIZING_REJECT",
+            cooldownMs: 240_000
+          }
+        }
+      ]
+    };
+
+    expect(helpers.isSymbolBlocked("BTCUSDC", state)).toContain("Grid sell sizing reject");
   });
 });
 

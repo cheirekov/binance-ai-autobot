@@ -30,6 +30,24 @@ preserve the reasoning trail across cycles in a compact append-only form.
 
 ## Ledger
 
+### 2026-03-26T10:13:00Z | cycle=P0_ENGINE_RECOVERY_PATCH | decision=patch_now
+- active_ticket: T-032
+- lane: Lane A — Runtime stability
+- evidence_class: fresh
+- observed:
+  - latest fresh bundle on `a2a9ad0` still showed unchanged `Grid guard paused BUY leg (17 -> 17)`
+  - the last engine-path change was the March 25 `11cadf29` / `a2a9ad0` guard-pause cooldown slice
+  - that slice wrote a generic symbol `COOLDOWN` and could terminate the tick before later waiting / no-inventory handling
+- inferred:
+  - the current incident is partly engine-regression-driven
+  - full rollback is not the safest first move because pre-patch `cce2322` was already unresolved in fresh live evidence
+- action:
+  - execute a bounded engine hotfix now
+  - keep T-032 active
+  - require one short post-deploy bundle before any broader T-032 decision
+- rollback_or_revisit_when:
+  - the next short fresh bundle still shows unchanged boxed-in runtime behavior
+
 ### 2026-03-26T09:44:49Z | cycle=P0_INCIDENT_RECOVERY | decision=operations_adjustment
 - active_ticket: T-032
 - lane: Lane E — State/process hygiene

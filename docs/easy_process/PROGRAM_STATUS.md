@@ -1,6 +1,6 @@
 # PROGRAM_STATUS
 
-Last updated: 2026-03-26 11:44 EET  
+Last updated: 2026-03-26 12:13 EET  
 Owner: PM/BA + Codex
 
 ## North Star
@@ -18,21 +18,21 @@ Build a **professional Binance autobot** that:
 - `Lane E — State/process hygiene`
 
 ## Current program decision
-- Active lane: `Lane E — State/process hygiene`
+- Active lane: `Lane A — Runtime stability`
 - Why:
-  - the bot is currently operationally non-credible, not just unresolved on `T-032`
-  - the March 26 fresh bundle still left the strategy boxed-in
-  - telemetry and local process memory were also misleading
+  - the latest fresh bundle still showed a boxed-in live `T-032` runtime
+  - the prior P0 batch fixed credibility surfaces but not engine behavior
+  - the March 25 guard-pause slice was confirmed as a plausible engine-regression assist and was patched in this batch
 
 ## Current batch priority order
-1. `Lane E` — restore truthful daily-net and stale-state visibility
-2. `Lane B` — prove whether the March 25 guard-pause slice is a rollback candidate
-3. `Lane A` — only after proof, execute the smallest safe rollback or patch
-4. `Lane C` — broader strategy quality work after the current ambiguity is removed
+1. `Lane A` — confirm the engine hotfix in a short fresh runtime bundle
+2. `Lane B` — if needed, decide rollback vs continue from the post-hotfix bundle
+3. `Lane C` — only after runtime credibility is restored
+4. `Lane E` — keep process/state hygiene, but it is no longer the active blocker
 5. `Lane D` — still out of scope
 
 ## Program-level hard rules
-1. Do not treat non-credible telemetry as strategy evidence.
+1. Do not treat UI/reporting improvements as runtime recovery.
 2. Do not trust persisted `running=true` state if the actual runtime is absent.
-3. Do not do another blind live `T-032` hotfix from the March 25 / March 26 pair.
+3. Do not do another blind long live `T-032` patch cycle before the short hotfix confirmation bundle.
 4. Keep one active ticket.

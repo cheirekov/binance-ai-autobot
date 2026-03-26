@@ -1,31 +1,30 @@
 # P0_RECOVERY_PLAN
 
-Last updated: 2026-03-26 11:44 EET  
+Last updated: 2026-03-26 12:13 EET  
 Owner: PM/BA + Codex
 
 ## Immediate action executed
-- `OPERATIONS_ADJUSTMENT`
+- `PATCH_NOW`
 - purpose:
-  - restore operator trust in 24h PnL and decision freshness surfaces
-  - stop making `T-032` strategy calls from misleading telemetry
+  - remove the March 25 guard-pause runtime regression
+  - restore credible engine progression on the `T-032` path
 
 ## Recovery sequence
-1. Deploy this batch as an ops-credibility fix.
-2. Recreate the runtime cleanly instead of trusting stale recovered process memory.
-3. Collect one short confirmation bundle.
-4. Run the deterministic `T-032` proof batch on guard-pause `COOLDOWN` vs unwind interaction.
-5. Choose exactly one next behavior action:
-   - `ROLLBACK_NOW` if March 25 guard-pause `COOLDOWN` blocks the intended path
-   - `PATCH_NOW` if a smaller non-blocking guard-pause patch is proven safer
-   - `PIVOT_TICKET` if the remaining behavior is strategy-consistent and `T-032` is no longer the right lane
+1. Deploy this engine hotfix.
+2. Clean-recreate the target runtime.
+3. Keep state/config intact unless the patch clearly fails.
+4. Collect one short fresh bundle.
+5. Choose exactly one follow-up:
+   - `continue_same_ticket` if runtime behavior changes materially in the right direction
+   - `ROLLBACK_NOW` if the short bundle still proves no effective recovery
 
 ## Success criteria for the next bundle
-- state timestamps advance after clean recreate
-- dashboard freshness pills no longer hide stale state
-- rolling 24h `daily_net_usdt` no longer stays flat only because lifetime `net` was reused
-- runtime evidence is fresh enough to separate dead/stale process from boxed-in but live strategy behavior
+- fresh decision timestamps after recreate
+- no legacy hard-block from non-caution `GRID_GUARD_BUY_PAUSE` cooldown
+- changed runtime decision mix relative to the March 26 boxed-in baseline
+- no dominant funding regression
 
 ## Do not do
-- do not run another long live evaluation from the old stale process surface
-- do not apply another blind `T-032` strategy patch before the guard-pause interaction is proven
-- do not trust pre-adjustment `daily_net_usdt` values as a real 24h field
+- do not stop at dashboard/reporting confirmation alone
+- do not wipe state before trying this patch
+- do not run another long ambiguous live batch before the short recovery confirmation

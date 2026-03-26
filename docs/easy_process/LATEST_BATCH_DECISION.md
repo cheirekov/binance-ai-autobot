@@ -1,92 +1,76 @@
 # LATEST_BATCH_DECISION
 
-Last updated: 2026-03-26 11:44 EET  
+Last updated: 2026-03-26 12:13 EET  
 Owner: PM/BA + Codex
 
 ## Batch outcome
 - `PROCESS_STATE_CONFLICT`: `true`
-- Incident classification: `P0 combined operational non-credibility incident`
-- `BATCH_ACTION_CLASS`: `OPERATIONS_ADJUSTMENT`
+- Incident classification: `P0 combined runtime-idle / process-confused incident`
+- Runtime class: `strategy-idle / boxed-in`, not proven engine-dead
+- `BATCH_ACTION_CLASS`: `PATCH_NOW`
 - Authoritative sources for this batch:
   - `docs/RETROSPECTIVE_AUTO.md`
+  - `docs/TRIAGE_NOTE_2026-03-25_T032_GRID_GUARD_PAUSED_BUY_LEG_LOOP.md`
   - `docs/easy_process/P0_INCIDENT_SUMMARY.md`
   - `docs/easy_process/LATEST_BATCH_DECISION.md`
-- Still-stale or conflicting inputs:
-  - `docs/SESSION_BRIEF.md` remains internally mixed for this incident batch
-  - `docs/easy_process/STATE_DIGEST.md` was stale before this batch
-  - local `data/state.json` says `running=true` while `docker compose ps` showed no active local services
 
 ## Production capability lane
-- Chosen: `Lane E — State/process hygiene`
-- Capability moved forward: `operator trust + incident-grade state clarity`
+- Chosen: `Lane A — Runtime stability`
 - Why:
-  - `observed`: the latest fresh bundle `autobot-feedback-20260326-090817.tgz` on `a2a9ad0` still showed `Skip BTCUSDC: Grid guard paused BUY leg (17 -> 17)` with no `grid-guard-defensive-unwind`
-  - `observed`: the operator-facing telemetry path was non-credible because `last_run_summary.pnl.daily_net_usdt` was being written from overall `net`, not a distinct rolling 24h figure
-  - `observed`: the local workspace also showed stale process memory (`running=true` in state, no active Compose services)
-  - `inferred`: rollback or strategy patch from this state would still leave the operator blind on whether the bot is truly dead, boxed-in, or simply misreported
+  - `observed`: the latest fresh bundle `autobot-feedback-20260326-090817.tgz` on `a2a9ad0` still showed `Skip BTCUSDC: Grid guard paused BUY leg (17 -> 17)` and no `grid-guard-defensive-unwind`
+  - `observed`: the last engine change on the bot path was `11cadf29` on 2026-03-25 22:45 +0200, merged to `main` as `a2a9ad01`
+  - `observed`: that March 25 slice added a generic symbol `COOLDOWN` and terminal no-action save on non-caution guard-pause ticks
+  - `inferred`: that change can hard-block symbol re-entry and preempt the later waiting / unwind path
 
 ## Chosen active ticket
 - Current: `T-032` (Exit manager v2)
 - Status: `IN_PROGRESS`
-- Decision: `continue_same_ticket`
-- PM/BA resolution:
-  - keep `T-032` as the only active trading-behavior ticket
-  - do not continue routine same-ticket hotfixing from the March 25 / March 26 bundle pair
-  - finish the operator-trust adjustment now, then return to deterministic `T-032` proof for rollback vs patch
-
-## Evidence class
-- Current: `fresh` for the March 26 bundle, with a separate stale local runtime/state surface
+- Decision: `patch_same_ticket`
 - Evidence tags:
   - `observed`: `T-031` was the active ticket before `T-032`
-  - `observed`: the `T-031 -> T-032` switch changed the code from candidate-hygiene work to downside-control/unwind work
-  - `observed`: the March 25 slice added a generic guard-pause `COOLDOWN` that can hard-block a symbol before unwind paths are evaluated
-  - `observed`: `daily_net_usdt` in `last_run_summary` was not a rolling 24h field
-  - `inferred`: the current incident is not one thing; it is a combined runtime + process/state + telemetry credibility failure
+  - `observed`: `T-032` added caution unwind first, then defensive grid-guard unwind, then the March 25 guard-pause cooldown slice
+  - `observed`: the March 25 slice did not restore meaningful runtime behavior in the next fresh bundle
+  - `inferred`: the incident is partly engine-regression-driven, but not safely solved by a full rollback alone
+  - `assumption`: the next short post-deploy bundle is enough to confirm the engine is no longer being boxed in by the March 25 lock semantics
+
+## Evidence class
+- Current: `fresh`
+- Basis:
+  - bundle: `autobot-feedback-20260326-090817.tgz`
+  - reviewed deployed sha: `a2a9ad0`
+  - audited engine range: `cce2322..a2a9ad0`
 
 ## Allowed work mode
-- Decision: `PATCH_ALLOWED`
+- Decision: `HOTFIX_ONLY`
 - Reason:
-  - the safest immediate action is an ops-credibility patch that does not change trading behavior
-  - rollback was considered, but it would not fix the confirmed reporting/state defects and is not yet clearly safer than a non-behavioral adjustment
+  - this is a P0 runtime recovery batch with a bounded engine-path fix
+  - UI/reporting-only work is not sufficient
 
-## Ticket/change audit
-- Ticket active before `T-032`: `T-031`
-- What changed around the switch:
-  - `T-032` first added CAUTION/`PROFIT_GIVEBACK` unwind behavior
-  - `T-032` then added defensive bear-loop unwind behavior
-  - the March 25 slice added guard-pause storm handling plus a generic symbol `COOLDOWN`
-- Did implementation drift from ticket intent?
-  - `yes, partially`
-  - the March 25 slice mostly rotated away from repeated guard-paused symbols; that is weaker and more candidate-hygiene-like than the core `T-032` intent of earlier de-risking and stronger downside exits
-- Current incident is most likely:
-  - `combined failure`
-  - components: `strategy-idle boxed-in runtime` + `March 25 off-intent regression surface` + `metrics/reporting defect` + `process/state confusion`
+## Engine-first audit
+1. Last commit that changed `apps/api/src/modules/bot/bot-engine.service.ts`:
+   - `11cadf29d7b3c8d564a5ee5cab4ab4e1b33fbf50`
+   - merged into `main` as `a2a9ad01cd87642c4c2c69eab7e73529ec183399`
+2. Ticket intent of that change:
+   - make repeated `Grid guard paused BUY leg` skips storm-eligible
+   - persist a symbol cooldown so the bot rotates away from repeated guard-paused symbols
+3. Did engine behavior likely regress after that change:
+   - `yes`
+   - the non-caution guard-pause branch now saves a generic symbol `COOLDOWN` and returns before later `Grid waiting for ladder slot or inventory` / no-inventory handling can run
+4. Is rollback to the prior engine state safer than another forward patch:
+   - `no`
+   - pre-patch `cce2322` already had the same dominant live loop, so a full rollback would knowingly return to an already unresolved runtime
+5. Smallest safe engine patch:
+   - keep `grid guard pause` storm visibility
+   - stop terminally persisting non-caution guard-pause cooldown as the final no-action state
+   - treat legacy non-caution `GRID_GUARD_BUY_PAUSE` cooldown locks as non-blocking so deployed runtimes can recover immediately after rollout
 
-## Code-surface discovery
-- Likely rollback surface:
-  - the March 25 guard-pause `COOLDOWN` slice in [bot-engine.service.ts](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.ts)
-  - helper tests added for that slice in [bot-engine.service.test.ts](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.test.ts)
-- Likely patch surface:
-  - guard-pause lock semantics around `buyPaused` handling and symbol blocking in [bot-engine.service.ts](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.ts)
-  - operator-facing telemetry/timeline trust surfaces in [generate-last-run-summary.sh](/home/yc/work/binance-ai-autobot/scripts/generate-last-run-summary.sh) and [DashboardPage.tsx](/home/yc/work/binance-ai-autobot/apps/ui/src/pages/DashboardPage.tsx)
-- Likely validation surface:
-  - [bot-engine.service.test.ts](/home/yc/work/binance-ai-autobot/apps/api/src/modules/bot/bot-engine.service.test.ts)
-  - [validate-active-ticket.sh](/home/yc/work/binance-ai-autobot/scripts/validate-active-ticket.sh)
-- Primary issue type:
-  - `combination`
-  - not process-only
-  - not PnL-only
-  - not yet proven to be a pure March 25 regression either
-
-## Execution result
+## Executed action
 - Code changed: `yes`
+- Bot-engine changed: `yes`
 - Files changed:
-  - [generate-last-run-summary.sh](/home/yc/work/binance-ai-autobot/scripts/generate-last-run-summary.sh)
-  - [DashboardPage.tsx](/home/yc/work/binance-ai-autobot/apps/ui/src/pages/DashboardPage.tsx)
-- Executed action:
-  - `daily_net_usdt` now comes from a rolling 24h wallet-delta path with a realized-PnL fallback, instead of reusing lifetime `net`
-  - the dashboard now exposes stale state/run-stats/adaptive timelines with absolute timestamps
+  - `apps/api/src/modules/bot/bot-engine.service.ts`
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`
+  - `scripts/validate-active-ticket.sh`
 - Validation run:
-  - `bash -n scripts/generate-last-run-summary.sh`
-  - `./scripts/generate-last-run-summary.sh /tmp/last_run_summary.p0.json`
+  - `./scripts/validate-active-ticket.sh`
   - `docker compose -f docker-compose.ci.yml run --rm ci`

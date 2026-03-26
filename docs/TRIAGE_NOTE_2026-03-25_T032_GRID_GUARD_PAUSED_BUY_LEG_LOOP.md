@@ -63,3 +63,18 @@ PM/BA decision needed: Should this be addressed as a patch mitigation to T-032 o
   - deterministic coverage for guard-pause cooldown persistence when skip logging is throttled or already logged
   - deterministic coverage for `grid-guard-defensive-unwind` reachability or explicit failure reasons
   - explicit classification of healthy-idle vs unacceptable boxed-in waiting
+
+## Recovery Update (2026-03-26 10:13 UTC)
+- Chosen action: `PATCH_NOW`
+- Ticket decision: `patch_same_ticket`
+- Rollback considered: `yes`
+- Why not rollback first:
+  - fresh March 25 evidence was already unresolved before the March 25 patch, so full rollback alone was not a safe enough runtime recovery action
+- Implemented in this batch:
+  - legacy non-caution `GRID_GUARD_BUY_PAUSE` cooldown locks no longer hard-block symbol progression
+  - non-caution guard-pause no-action ticks no longer short-circuit the later waiting / no-inventory path
+- Validation:
+  - `./scripts/validate-active-ticket.sh` passed
+  - `docker compose -f docker-compose.ci.yml run --rm ci` passed
+- Next proof required:
+  - one short fresh post-deploy bundle showing changed runtime behavior

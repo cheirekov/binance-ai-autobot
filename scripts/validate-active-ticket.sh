@@ -50,7 +50,7 @@ case "$ACTIVE_TICKET" in
   T-032)
     echo "Validation mode: targeted deterministic validation"
     echo "Active ticket: $ACTIVE_TICKET"
-    run_in_ci "corepack enable && pnpm install --no-frozen-lockfile && pnpm -C apps/api exec vitest run src/modules/bot/bot-engine.service.test.ts -t 'caution unwind|defensive grid-guard unwind|grid guard pause|grid waiting skips as storm-eligible'"
+    run_in_ci "corepack enable && pnpm install --no-frozen-lockfile && pnpm -C apps/api exec vitest run src/modules/bot/bot-engine.service.test.ts -t 'caution unwind|defensive grid-guard unwind|grid-guard pause|GRID_GUARD_BUY_PAUSE|grid waiting skips as storm-eligible'"
     ;;
   *)
     echo "No ticket-specific deterministic validation mapped for $ACTIVE_TICKET; running full CI instead."
