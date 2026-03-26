@@ -1,47 +1,28 @@
 # RUN_CONTEXT
 
-Last updated: 2026-03-25 20:38 UTC  
+Last updated: 2026-03-26 11:44 EET  
 Owner: Operator or PM/BA
 
-Purpose:
-make the current cycle and current time explicit so the LLM never has to guess.
-
 ## Current run facts
-- Current UTC now: `2026-03-25T20:38:57Z`
-- Current local date: `2026-03-25`
+- Current UTC now: `2026-03-26T09:44:49Z`
+- Current local date: `2026-03-26`
 - Current local timezone: `Europe/Sofia`
-- Current mode: `hotfix`  
-  Allowed values: `live_monitoring` / `analysis` / `validation` / `replay` / `hotfix`
-- Current cycle label: `POST_FRESH_RUNTIME_PATCH`
+- Current mode: `hotfix`
+- Current cycle label: `P0_INCIDENT_RECOVERY`
 - Active ticket: `T-032`
-- Active lane: `Lane A — Runtime stability`
+- Active lane: `Lane E — State/process hygiene`
 
 ## Latest bundle facts
-- Latest bundle id: `autobot-feedback-20260325-195431.tgz`
-- Bundle run end UTC: `2026-03-25T19:54:09.822Z`
+- Latest bundle id: `autobot-feedback-20260326-090817.tgz`
+- Bundle run end UTC: `2026-03-26T09:08:09.738Z`
 - Bundle freshness class: `fresh`
-- Latest ingest decision: `patch_required`
-- Current reviewed git sha: `cce2322`
+- Latest ingest decision: `pivot_required`
+- Reviewed repo base sha: `a2a9ad0`
+- Local incident note:
+  - local persisted state said `running=true`
+  - local `docker compose ps` showed no active services
 
-## Cycle timing facts
-- Previous reviewed bundle id: `autobot-feedback-20260324-095550.tgz`
-- Previous reviewed bundle run end UTC: `2026-03-24T09:55:46.729Z`
-- Evidence delta expectation for next real cycle:
-  - lower repeated guard-pause / ladder-wait counts, or
-  - explicit cooldown-driven rotation away from the same stuck symbols, or
-  - first justified `grid-guard-defensive-unwind`, or
-  - a rollback signal if churn/funding regression appears
-
-## Hard rules for this file
-1. Never leave this file blank at the start of a cycle.
-2. Use actual timestamps from the workflow or bundle, not approximate prose.
-3. If a new model starts, it must trust this file over chat history.
-4. If the mode changes, update this file first.
-5. If the bundle is fresh, write `fresh` explicitly; do not inherit stale wording from older digests.
-
-## Required update points
-Update this file:
-- after ingest,
-- after switching mode,
-- after changing the active ticket or lane,
-- before handing off to a new LLM session.
+## Evidence delta expectation for next cycle
+- truthful rolling 24h `daily_net_usdt`
+- explicit stale/fresh runtime visibility
+- proof of whether the March 25 guard-pause slice should be rolled back

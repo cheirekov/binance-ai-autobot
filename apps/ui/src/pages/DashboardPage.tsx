@@ -28,6 +28,50 @@ function normalizeRegimeLabel(label: string | undefined): "BULL_TREND" | "BEAR_T
   return "NEUTRAL";
 }
 
+function parseTimestamp(value: string | undefined): number | null {
+  const ts = Date.parse(value ?? "");
+  return Number.isFinite(ts) ? ts : null;
+}
+
+function formatDateTime(value: string | undefined): string {
+  const ts = parseTimestamp(value);
+  if (ts === null) return "—";
+  return new Date(ts).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
+
+function formatAge(ageMs: number): string {
+  if (ageMs < 60_000) return `${Math.max(0, Math.round(ageMs / 1000))}s`;
+  if (ageMs < 3_600_000) return `${Math.round(ageMs / 60_000)}m`;
+  return `${(ageMs / 3_600_000).toFixed(ageMs < 24 * 3_600_000 ? 1 : 0)}h`;
+}
+
+function buildFreshnessPill(params: {
+  label: string;
+  snapshotMs: number | null;
+  valueMs: number | null;
+  warnMs: number;
+  badMs: number;
+}): { label: string; tone: PillTone } {
+  if (params.snapshotMs === null || params.valueMs === null) {
+    return { label: `${params.label}: —`, tone: "neutral" };
+  }
+
+  const ageMs = Math.max(0, params.snapshotMs - params.valueMs);
+  if (ageMs >= params.badMs) {
+    return { label: `${params.label}: stale (${formatAge(ageMs)})`, tone: "bad" };
+  }
+  if (ageMs >= params.warnMs) {
+    return { label: `${params.label}: lagging (${formatAge(ageMs)})`, tone: "warn" };
+  }
+  return { label: `${params.label}: fresh (${formatAge(ageMs)})`, tone: "ok" };
+}
+
 export function DashboardPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,6 +111,10 @@ export function DashboardPage(): JSX.Element {
     if (!state) return "…";
     return state.running ? `Running · ${state.phase}` : "Stopped";
   }, [state]);
+
+  const snapshotGeneratedAtMs = useMemo(() => parseTimestamp(dashboard.snapshot?.generatedAt), [dashboard.snapshot?.generatedAt]);
+  const stateUpdatedAtMs = useMemo(() => parseTimestamp(state?.updatedAt), [state?.updatedAt]);
+  const kpiGeneratedAtMs = useMemo(() => parseTimestamp(runStats.stats?.kpi?.generatedAt), [runStats.stats?.kpi?.generatedAt]);
 
   const activeLimitOrdersCount = useMemo(() => {
     const activeOrders = state?.activeOrders ?? [];
@@ -165,6 +213,43 @@ export function DashboardPage(): JSX.Element {
   const latestAdaptiveEvent = adaptiveTail.length ? adaptiveTail[adaptiveTail.length - 1] : undefined;
   const adaptiveRows = [...adaptiveTail].reverse().slice(0, 30);
   const walletPolicySnapshot = runStats.stats?.walletPolicy ?? null;
+  const latestAdaptiveEventMs = useMemo(() => parseTimestamp(latestAdaptiveEvent?.ts), [latestAdaptiveEvent?.ts]);
+
+  const stateFreshnessPill = useMemo(
+    () =>
+      buildFreshnessPill({
+        label: "State",
+        snapshotMs: snapshotGeneratedAtMs,
+        valueMs: stateUpdatedAtMs,
+        warnMs: 5 * 60_000,
+        badMs: 30 * 60_000
+      }),
+    [snapshotGeneratedAtMs, stateUpdatedAtMs]
+  );
+
+  const runStatsFreshnessPill = useMemo(
+    () =>
+      buildFreshnessPill({
+        label: "Run stats",
+        snapshotMs: snapshotGeneratedAtMs,
+        valueMs: kpiGeneratedAtMs,
+        warnMs: 10 * 60_000,
+        badMs: 60 * 60_000
+      }),
+    [kpiGeneratedAtMs, snapshotGeneratedAtMs]
+  );
+
+  const adaptiveFreshnessPill = useMemo(
+    () =>
+      buildFreshnessPill({
+        label: "Adaptive tail",
+        snapshotMs: snapshotGeneratedAtMs,
+        valueMs: latestAdaptiveEventMs,
+        warnMs: 10 * 60_000,
+        badMs: 60 * 60_000
+      }),
+    [latestAdaptiveEventMs, snapshotGeneratedAtMs]
+  );
 
   const pnlSummary = useMemo(() => {
     const kpi = runStats.stats?.kpi;
@@ -469,10 +554,12 @@ export function DashboardPage(): JSX.Element {
 
         <div className="card">
           <div className="title">Status</div>
-          <div className="subtitle">Last update: {state?.updatedAt ?? "—"}</div>
+          <div className="subtitle">Last update: {formatDateTime(state?.updatedAt)}</div>
           <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <span className="pill">Running: {String(state?.running ?? false)}</span>
             <span className="pill">Phase: {state?.phase ?? "—"}</span>
+            <span className={pillClass(stateFreshnessPill.tone)}>{stateFreshnessPill.label}</span>
+            <span className={pillClass(runStatsFreshnessPill.tone)}>{runStatsFreshnessPill.label}</span>
             <span className="pill">Active orders: {state?.activeOrders?.length ?? 0}</span>
             <span className="pill">Decisions: {state?.decisions?.length ?? 0}</span>
             <span className="pill">Blacklisted: {state?.symbolBlacklist?.length ?? 0}</span>
@@ -904,6 +991,10 @@ export function DashboardPage(): JSX.Element {
             Last decision: <b>{latestAdaptiveEvent ? normalizeDecisionKindLabel(latestAdaptiveEvent.decision.kind) : "—"}</b>
           </span>
           <span className="pill">
+            Last event at: <b>{formatDateTime(latestAdaptiveEvent?.ts)}</b>
+          </span>
+          <span className={pillClass(adaptiveFreshnessPill.tone)}>{adaptiveFreshnessPill.label}</span>
+          <span className="pill">
             History loaded: <b>{adaptiveTail.length}</b>
           </span>
         </div>
@@ -921,7 +1012,7 @@ export function DashboardPage(): JSX.Element {
             <tbody>
               {adaptiveRows.map((event, idx) => (
                 <tr key={`${event.ts}:${idx}`}>
-                  <td className="col-time">{new Date(event.ts).toLocaleTimeString()}</td>
+                  <td className="col-time">{formatDateTime(event.ts)}</td>
                   <td>{event.candidateSymbol ?? "—"}</td>
                   <td>{normalizeRegimeLabel(event.regime.label)}</td>
                   <td>{event.strategy.recommended}</td>
@@ -963,7 +1054,7 @@ export function DashboardPage(): JSX.Element {
                   return (
                     <Fragment key={d.id}>
                       <tr>
-                        <td className="col-time">{new Date(d.ts).toLocaleTimeString()}</td>
+                        <td className="col-time">{formatDateTime(d.ts)}</td>
                         <td className="col-kind">{normalizeDecisionKindLabel(d.kind)}</td>
                         <td>{d.summary}</td>
                         <td className="col-kind">
@@ -1021,12 +1112,12 @@ export function DashboardPage(): JSX.Element {
                 </tr>
               </thead>
               <tbody>
-                {(state?.activeOrders ?? []).slice(0, 50).map((o) => (
-                  <tr key={o.id}>
-                    <td className="col-time">{new Date(o.ts).toLocaleTimeString()}</td>
-                    <td>{o.symbol}</td>
-                    <td className="col-kind">{o.side}</td>
-                    <td>{o.type}</td>
+              {(state?.activeOrders ?? []).slice(0, 50).map((o) => (
+                <tr key={o.id}>
+                  <td className="col-time">{formatDateTime(o.ts)}</td>
+                  <td>{o.symbol}</td>
+                  <td className="col-kind">{o.side}</td>
+                  <td>{o.type}</td>
                     <td>{o.status}</td>
                     <td>{o.qty}</td>
                   </tr>
@@ -1062,7 +1153,7 @@ export function DashboardPage(): JSX.Element {
             <tbody>
               {(state?.orderHistory ?? []).slice(0, 80).map((o) => (
                 <tr key={o.id}>
-                  <td className="col-time">{new Date(o.ts).toLocaleTimeString()}</td>
+                  <td className="col-time">{formatDateTime(o.ts)}</td>
                   <td>{o.symbol}</td>
                   <td className="col-kind">{o.side}</td>
                   <td>{o.type}</td>

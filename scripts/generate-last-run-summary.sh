@@ -75,6 +75,63 @@ const readJsonLinesTail = (path, limit = 2000) => {
   }
 };
 
+const collectClosedPnlEvents = (filledOrders) => {
+  const positions = new Map();
+  const events = [];
+
+  for (const order of filledOrders) {
+    const symbol = String(order?.symbol ?? "").trim().toUpperCase();
+    const qty = safeNum(order?.qty, NaN);
+    const price = safeNum(order?.price, NaN);
+    if (!symbol || !Number.isFinite(qty) || !Number.isFinite(price) || qty <= 0 || price <= 0) continue;
+
+    const current = positions.get(symbol) ?? { netQty: 0, costQuote: 0 };
+    const notional = qty * price;
+    const feeHome = Math.max(0, safeNum(order?.feeHome, 0));
+
+    if (String(order?.side ?? "").toUpperCase() === "BUY") {
+      current.netQty += qty;
+      current.costQuote += notional + feeHome;
+      positions.set(symbol, current);
+      continue;
+    }
+
+    const closeQty = Math.min(qty, current.netQty);
+    const avgCost = current.netQty > 0 ? current.costQuote / current.netQty : 0;
+    if (closeQty > 0 && avgCost > 0) {
+      events.push({
+        ts: String(order?.ts ?? ""),
+        pnlAbs: (price - avgCost) * closeQty
+      });
+      current.costQuote = Math.max(0, current.costQuote - avgCost * closeQty);
+      current.netQty = Math.max(0, current.netQty - closeQty);
+    }
+    positions.set(symbol, current);
+  }
+
+  return events;
+};
+
+const resolveRollingWalletDelta = (walletSeries, windowStartMs, endedAtMs) => {
+  if (!Array.isArray(walletSeries) || walletSeries.length === 0) return Number.NaN;
+
+  const latest = [...walletSeries].reverse().find((point) => point.ts <= endedAtMs) ?? walletSeries[walletSeries.length - 1];
+  if (!latest || latest.ts < windowStartMs) return Number.NaN;
+
+  let baseline = null;
+  for (const point of walletSeries) {
+    if (point.ts <= windowStartMs) {
+      baseline = point;
+      continue;
+    }
+    baseline = baseline ?? point;
+    break;
+  }
+
+  if (!baseline) return Number.NaN;
+  return latest.walletTotalHome - baseline.walletTotalHome;
+};
+
 const configHash = crypto.createHash("sha256").update(configRaw).digest("hex").slice(0, 16);
 const commit = exec("git rev-parse --short HEAD");
 const branch = exec("git rev-parse --abbrev-ref HEAD");
@@ -82,6 +139,9 @@ const branch = exec("git rev-parse --abbrev-ref HEAD");
 const nowIso = new Date().toISOString();
 const startedAt = kpis.startedAt ?? state.startedAt ?? nowIso;
 const endedAt = kpis.generatedAt ?? state.updatedAt ?? nowIso;
+const endedAtMs = Number.isFinite(Date.parse(endedAt)) ? Date.parse(endedAt) : Date.now();
+const dailyWindowMs = 24 * 60 * 60 * 1000;
+const dailyWindowStartMs = endedAtMs - dailyWindowMs;
 const runId = crypto
   .createHash("sha1")
   .update(`${startedAt}|${endedAt}|${commit}|${configHash}`)
@@ -138,8 +198,11 @@ const realized = safeNum(totals.realizedPnl, 0);
 const fees = Math.max(0, safeNum(totals.feesHome, safeNum(totals.fees, 0)));
 const openExposureCost = safeNum(totals.openExposureCost, 0);
 const latestFillPriceBySymbol = new Map();
-for (const order of orderHistory) {
-  if (String(order?.status ?? "").toUpperCase() !== "FILLED") continue;
+const filledOrderList = orderHistory
+  .filter((order) => String(order?.status ?? "").toUpperCase() === "FILLED")
+  .sort((left, right) => Date.parse(String(left?.ts ?? "")) - Date.parse(String(right?.ts ?? "")));
+
+for (const order of filledOrderList) {
   const symbol = String(order?.symbol ?? "").trim().toUpperCase();
   const ts = Date.parse(String(order?.ts ?? ""));
   const price = safeNum(order?.price, NaN);
@@ -164,6 +227,13 @@ const unrealized = openValueEstimate > 0 ? openValueEstimate - openExposureCost 
 const net = realized + unrealized - fees;
 
 const adaptiveEvents = readJsonLinesTail("data/telemetry/adaptive-shadow.jsonl");
+const walletSeries = adaptiveEvents
+  .map((event) => ({
+    ts: Date.parse(String(event?.ts ?? "")),
+    walletTotalHome: safeNum(event?.risk?.walletTotalHome, NaN)
+  }))
+  .filter((event) => Number.isFinite(event.ts) && Number.isFinite(event.walletTotalHome) && event.walletTotalHome > 0)
+  .sort((left, right) => left.ts - right.ts);
 const walletTotals = adaptiveEvents
   .map((event) => safeNum(event?.risk?.walletTotalHome, NaN))
   .filter((value) => Number.isFinite(value) && value > 0);
@@ -198,7 +268,28 @@ const equity =
     ? latestWalletTotalHome
     : Math.max(0, openExposureCost + Math.max(0, net));
 const totalAllocPct = equity > 0 ? Math.max(0, Math.min(100, (openExposureCost / equity) * 100)) : 0;
-const dailyNetPct = equity > 0 ? (net / equity) * 100 : 0;
+const dailyRealizedNetFallback = (() => {
+  const feesInWindow = filledOrderList.reduce((sum, order) => {
+    const ts = Date.parse(String(order?.ts ?? ""));
+    if (!Number.isFinite(ts) || ts < dailyWindowStartMs || ts > endedAtMs) return sum;
+    return sum + Math.max(0, safeNum(order?.feeHome, 0));
+  }, 0);
+
+  const realizedInWindow = collectClosedPnlEvents(filledOrderList).reduce((sum, event) => {
+    const ts = Date.parse(String(event?.ts ?? ""));
+    if (!Number.isFinite(ts) || ts < dailyWindowStartMs || ts > endedAtMs) return sum;
+    return sum + safeNum(event?.pnlAbs, 0);
+  }, 0);
+
+  return realizedInWindow - feesInWindow;
+})();
+const dailyNet = (() => {
+  const walletDelta = resolveRollingWalletDelta(walletSeries, dailyWindowStartMs, endedAtMs);
+  if (Number.isFinite(walletDelta)) return walletDelta;
+  if (Number.isFinite(dailyRealizedNetFallback)) return dailyRealizedNetFallback;
+  return net;
+})();
+const dailyNetPct = equity > 0 && Number.isFinite(dailyNet) ? (dailyNet / equity) * 100 : 0;
 const maxDrawdownPctRaw = walletTotals.length > 1 ? walletMaxDrawdownPct : guardMaxDrawdownPct;
 const maxDrawdownPct = Math.max(0, Math.min(100, maxDrawdownPctRaw));
 
@@ -295,7 +386,7 @@ const output = {
     unrealized_usdt: unrealized,
     fees_usdt: fees,
     net_usdt: net,
-    daily_net_usdt: net,
+    daily_net_usdt: dailyNet,
     daily_net_pct: dailyNetPct,
     max_drawdown_pct: maxDrawdownPct
   },

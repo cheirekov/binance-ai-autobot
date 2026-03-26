@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-25 19:55 UTC
+Last updated: 2026-03-26 09:08 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -50,7 +50,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `cce2322`
+- Commit hash: `a2a9ad0`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -71,12 +71,12 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `EVENING (collection) / EVENING (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `33.973`
-  - runtime uptime (hours): `869.831`
-  - run end: `Wed Mar 25 2026 21:54:09 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `NIGHT_RUN`
+  - bundle interval (hours): `13.233`
+  - runtime uptime (hours): `883.064`
+  - run end: `Thu Mar 26 2026 11:08:09 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
@@ -85,24 +85,24 @@ Use this file at the start and end of every batch.
 - Observed KPI delta:
   - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=119, activeMarketOrders=0)
   - market-only share reduced: `yes` (historyMarketShare=40.5%)
-  - sizing reject pressure: `medium` (sizingRejectSkips=34, decisions=200, ratio=17.0%)
+  - sizing reject pressure: `medium` (sizingRejectSkips=32, decisions=200, ratio=16.0%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `patch_required`
-- Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
-- Required action: `same-ticket mitigation required before next long run`
+- Decision: `pivot_required`
+- Next ticket candidate: `PM/BA-TRIAGE` (triage required before lane change)
+- Required action: `PM/BA pivot review required before next long run`
 - Open risks:
-  - sizing reject pressure is medium (17.0%).
+  - sizing reject pressure is medium (16.0%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260325-195431.tgz`
-  - auto-updated at: `2026-03-25T19:55:10.196Z`
+  - bundle: `autobot-feedback-20260326-090817.tgz`
+  - auto-updated at: `2026-03-26T09:08:29.392Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-032
-Decision: patch_required
-Required action: same-ticket mitigation required before next long run
-Latest bundle: autobot-feedback-20260325-195431.tgz
+Decision: pivot_required
+Required action: PM/BA pivot review required before next long run
+Latest bundle: autobot-feedback-20260326-090817.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
 In scope: exit-manager / de-risking behavior under adverse conditions.

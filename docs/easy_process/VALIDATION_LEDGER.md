@@ -1,6 +1,6 @@
 # VALIDATION_LEDGER
 
-Last updated: 2026-03-25  
+Last updated: 2026-03-26  
 Owner: PM/BA + Runtime Analyst + Trader
 
 Purpose:
@@ -8,6 +8,7 @@ track which runtime behaviors have real proof and which are still only hypothese
 
 ## Ticket currently under validation
 - `T-032`
+- Current batch action: `DETERMINISTIC_VALIDATION`
 
 ## Required scenario classes
 Each strategy/runtime change should eventually cover more than one market condition.
@@ -31,21 +32,23 @@ Question:
 - does the system escalate from passive waiting to bounded unwind?
 
 Status:
-- hypothesis only
+- running
+- March 26 evidence shows no live unwind proof after the March 25 patch deployment
 
 ### S4 — Funding/routing pressure
 Question:
 - does the new behavior avoid reintroducing funding deadlocks?
 
 Status:
-- must be checked in deterministic validation
+- planned
 
 ### S5 — Healthy idle vs stuck
 Question:
 - can we distinguish "correctly idle" from "execution/process deadlock"?
 
 Status:
-- needs explicit classifier and acceptance criteria
+- running
+- March 26 evidence suggests boxed-in `no feasible candidates` waiting is being conflated with a hard-stuck loop
 
 ## Validation result states
 Use only one:

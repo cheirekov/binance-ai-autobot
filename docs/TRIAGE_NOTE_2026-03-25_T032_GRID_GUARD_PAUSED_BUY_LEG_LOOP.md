@@ -45,3 +45,21 @@ PM/BA decision needed: Should this be addressed as a patch mitigation to T-032 o
 - Pending proof:
   - targeted Docker validation
   - next fresh runtime bundle after deployment
+
+## Review Update (2026-03-26 11:23 EET)
+- Fresh bundle reviewed: `autobot-feedback-20260326-090817.tgz`
+- Fresh bundle git sha: `a2a9ad0` (the March 25 patch was deployed)
+- Aggregate dominant loop result: still `Skip BTCUSDC: Grid guard paused BUY leg (17 -> 17)`
+- New runtime nuance:
+  - latest live tail is mostly `No eligible universe candidates` / `No feasible candidates`
+  - spendable quote remains boxed in under reserve floors
+  - no `grid-guard-defensive-unwind` evidence appeared
+- PM/BA resolution:
+  - `PROCESS_STATE_CONFLICT`: `true` because easy-process files still advertised the March 25 `PATCH_NOW` state
+  - Chosen action: `DETERMINISTIC_VALIDATION`
+  - Ticket decision: `continue_same_ticket`
+  - No new code patch is justified in this batch
+- Next proof required:
+  - deterministic coverage for guard-pause cooldown persistence when skip logging is throttled or already logged
+  - deterministic coverage for `grid-guard-defensive-unwind` reachability or explicit failure reasons
+  - explicit classification of healthy-idle vs unacceptable boxed-in waiting

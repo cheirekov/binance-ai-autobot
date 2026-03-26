@@ -1,6 +1,6 @@
 # DECISION_LEDGER
 
-Last updated: 2026-03-25  
+Last updated: 2026-03-26  
 Owner: PM/BA
 
 Purpose:
@@ -29,6 +29,46 @@ preserve the reasoning trail across cycles in a compact append-only form.
 ```
 
 ## Ledger
+
+### 2026-03-26T09:44:49Z | cycle=P0_INCIDENT_RECOVERY | decision=operations_adjustment
+- active_ticket: T-032
+- lane: Lane E — State/process hygiene
+- evidence_class: fresh bundle + stale local state surface
+- observed:
+  - March 26 fresh bundle on `a2a9ad0` still showed `Grid guard paused BUY leg (17 -> 17)` with no unwind evidence
+  - `daily_net_usdt` in `last_run_summary` reused overall `net`
+  - local `data/state.json` still said `running=true` while local Compose runtime was absent
+- inferred:
+  - operator trust was too weak to make another strategy decision safely
+  - rollback was plausible but not yet proven as the dominant fix
+- action:
+  - execute an ops-credibility patch now
+  - keep T-032 active
+  - make the next behavior batch deterministic proof for rollback vs patch
+- rollback_or_revisit_when:
+  - deterministic validation proves the March 25 guard-pause slice should be reverted, or fresh post-adjustment evidence materially changes the picture
+
+### 2026-03-26T09:23:36Z | cycle=POST_PIVOT_REVIEW_VALIDATION | decision=deterministic_validation
+- active_ticket: T-032
+- lane: Lane B — Deterministic validation
+- evidence_class: fresh
+- observed:
+  - latest authoritative bundle is `autobot-feedback-20260326-090817.tgz`
+  - fresh bundle git sha is `a2a9ad0`, so the March 25 patch was deployed
+  - dominant aggregate loop still remained `Skip BTCUSDC: Grid guard paused BUY leg (17 -> 17)`
+  - no runtime `grid-guard-defensive-unwind` evidence appeared
+  - latest live decision tail was mostly `No eligible universe candidates` / `No feasible candidates`
+- inferred:
+  - runtime health is normal, so this is not primarily an ops incident
+  - current validation is too weak to distinguish a real code bug from boxed-in but strategy-consistent waiting
+  - the March 25 `PATCH_NOW` state is no longer the correct repository action
+- action:
+  - stop same-ticket live patching
+  - keep `T-032` as the only active ticket
+  - move the next engineering batch to deterministic validation
+  - update easy-process files to mirror the March 26 authority pair
+- rollback_or_revisit_when:
+  - deterministic validation proves a minimal safe patch or rollback, or a materially different fresh bundle changes the runtime picture
 
 ### 2026-03-25T20:38:57Z | cycle=POST_FRESH_RUNTIME_PATCH | decision=patch_now
 - active_ticket: T-032

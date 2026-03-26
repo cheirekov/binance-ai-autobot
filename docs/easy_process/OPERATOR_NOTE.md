@@ -1,19 +1,20 @@
 # OPERATOR_NOTE
 
-Last updated: 2026-03-25 20:38 UTC  
+Last updated: 2026-03-26 11:44 EET  
 Owner: PM/BA + Codex
 
 ## What to run next
-- targeted validation already passed in this batch
-- deploy the current patched workspace to the testnet runtime
-- collect one fresh bundle with `AUTOBOT_COMPOSE_CMD=docker-compose ./scripts/collect-feedback.sh`
+- deploy this batch only as an operator-trust / telemetry fix
+- on the target runtime, do a clean recreate instead of trusting recovered `running=true` process memory
+- collect one short post-adjustment bundle to confirm fresh timestamps and truthful rolling 24h `daily_net_usdt`
+- after that, hand the repo to the next deterministic `T-032` validation batch
 
 ## What not to do next
-- do not patch again from `autobot-feedback-20260325-195431.tgz`
-- do not reopen the stale validation-only lane narrative unless a new bundle or validation result changes the evidence
-- do not widen T-032 unwind policy before measuring this cooldown fix
+- do not run another long live evaluation from the stale March 25 / March 26 decision pair
+- do not apply another blind `T-032` strategy hotfix before proving the March 25 guard-pause interaction
+- do not treat pre-fix `daily_net_usdt` values as a real 24h field
 
 ## What fresh evidence would change the decision
-- the next fresh bundle still shows unchanged BTCUSDC/SOLUSDC guard-pause loop pressure
-- the next fresh bundle shows churn or funding regression after the cooldown patch
-- a fresh bundle shows clean loop reduction and/or first justified `grid-guard-defensive-unwind` evidence
+- deterministic proof that the March 25 guard-pause `COOLDOWN` blocks unwind and should be rolled back
+- a short post-adjustment bundle that still shows frozen timestamps or stale state despite clean restart
+- a materially different fresh bundle with new trades or explicit `grid-guard-defensive-unwind` evidence
