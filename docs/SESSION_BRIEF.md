@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-27 14:40 EET
+Last updated: 2026-03-27 16:03 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,10 +9,11 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-032` (Exit manager v2)
-- Goal (single sentence): release profit-giveback `CAUTION` from a global new-symbol pause once managed exposure has already de-risked materially, while preserving symbol-level bear-trend buy pauses and hard guards.
+- Goal (single sentence): stop `DEFENSIVE` order maintenance from canceling resting BUY ladder orders unless the symbol is actually under a buy pause, while preserving existing caution/grid-guard protections and prior `T-032` fixes.
 - In scope:
-  - relax the `daily loss caution paused new symbols` threshold after material de-risking.
-  - preserve the existing per-symbol grid-guard / bear-trend BUY pause behavior.
+  - gate defensive bot-owned BUY-limit cancellation behind an active buy pause.
+  - preserve resting BUY ladder orders in `DEFENSIVE` when regime is `NEUTRAL`/`RANGE` and buys are allowed.
+  - keep the prior profit-giveback caution-release behavior intact.
   - keep the prior no-feasible recovery patch intact and observable.
   - preserve `T-034` funding stability and all closed guardrail tickets.
 - Out of scope:
@@ -21,24 +22,25 @@ Use this file at the start and end of every batch.
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: the previous recovery patch worked, but profit-giveback `CAUTION` is now staying too restrictive after the bot has already sold down to about `18%` managed exposure; allowing new symbols again below a materially higher caution threshold should reduce `59 filtered` loops without removing the existing bear-trend pause on `BTCUSDC`.
+- Hypothesis: the newest fresh bundle still trips the aggregate loop-persistence gate, but the raw decision stream shows a narrower same-ticket defect: in `DEFENSIVE`, the engine is canceling bot-owned BUY LIMIT orders even while regime is only `NEUTRAL` and buys are not paused. Restricting that cancel path to true buy-pause states should remove the cancel/recreate churn without reopening earlier caution/funding failures.
 - Target KPI delta:
-  - remove the dominant `No feasible candidates: daily loss caution paused new symbols` loop once exposure is already low-to-moderate.
-  - keep `Skip BTCUSDC: Daily loss caution paused GRID BUY leg` or `Grid guard paused BUY leg` available when the symbol itself still merits a pause.
+  - remove alternating `BUY LIMIT ... grid-ladder-buy` / `Canceled 1 bot open order(s): defensive-bear-cancel-buy` churn when buys are allowed.
+  - keep explicit caution/grid-guard BUY pause evidence when the symbol really is paused.
   - keep `T-034` funding behavior stable and preserve the working no-feasible recovery path.
 - Stop/rollback condition:
-  - if `T-034` funding loops return, the no-feasible recovery path regresses, or the relaxed caution threshold reintroduces churn after giveback.
+  - if `T-034` funding loops return, the no-feasible recovery path regresses, or the next bundle still shows the same defensive cancel/recreate churn.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
-  - profit-giveback `CAUTION` no longer pauses all new symbols once managed exposure has already de-risked below the new trigger-aware threshold.
+  - defensive bot-owned BUY-limit cleanup only runs when buys are actually paused by caution or grid/bear guard.
+  - `DEFENSIVE` + `NEUTRAL`/`RANGE` can keep resting BUY ladder orders when buys are allowed.
   - symbol-level bear-trend/grid-guard BUY pauses still work on the risky managed symbol itself.
   - `T-034` funding/routing behavior remains unchanged.
   - `T-005` / `T-007` guard behavior remains unchanged.
 - Runtime evidence in decisions/logs:
-  - the dominant latest loop is no longer `No feasible candidates: daily loss caution paused new symbols (59 filtered)`.
-  - if `BTCUSDC` remains in bearish defensive handling, symbol-level BUY pause evidence still appears there instead of globally blocking all fresh entries.
+  - no repeated alternation between `grid-ladder-buy` and `defensive-buy-pause-cancel-buy` / legacy `defensive-bear-cancel-buy` when regime is `NEUTRAL` and buys are allowed.
+  - if `BTCUSDC` or `ETHUSDC` remains under an actual buy pause, the bundle shows explicit caution/grid-guard evidence instead of blind defensive cancels.
   - no return of dominant `Insufficient spendable <quote>` loops.
   - no regression of `no-feasible-liquidity-recovery`.
 - Risk slider impact:
@@ -52,7 +54,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `aaf532b`
+- Commit hash: `9e58796` (current local HEAD; latest ingested runtime bundle still reports deployed `aaf532b`)
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -75,39 +77,42 @@ Use this file at the start and end of every batch.
 - Run context:
   - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `2.186`
-  - runtime uptime (hours): `910.522`
-  - run end: `Fri Mar 27 2026 14:35:38 GMT+0200 (Eastern European Standard Time)`
+  - bundle interval (hours): `3.296`
+  - runtime uptime (hours): `913.818`
+  - run end: `Fri Mar 27 2026 17:53:24 GMT+0200 (Eastern European Standard Time)`
   - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
-  - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip: No feasible candidates: daily loss caution paused new symbols (59 filtered) (48))
+  - same-ticket root cause isolated: `met` (manual raw bundle review found defensive BUY-limit cancel/recreate churn)
+  - active ticket runtime signal: `observed` (aggregate skips still show `daily loss caution paused new symbols`, while raw decisions alternate `grid-ladder-buy` with `defensive-bear-cancel-buy` on `BTCUSDC`/`ETHUSDC`)
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=106, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=47.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=3, historyLimitOrders=175, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=36.4%)
+  - defensive cancel churn observed: `yes` (orders.canceled=129, byDecisionKind.ENGINE=75)
   - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `patch_required`
-- Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
-- Required action: `same-ticket mitigation required before next long run`
+- Decision: `patch_same_ticket`
+- Next ticket candidate: `T-032`
+- Required action: `deploy same-ticket defensive cancel-churn fix before next long run`
 - Open risks:
-  - none critical from automated checks.
+  - auto-retro still reports `pivot_required` from the repeated aggregate top-skip summary; the next fresh bundle must prove the runtime mix changed materially.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260327-123604.tgz`
-  - auto-updated at: `2026-03-27T12:36:20.868Z`
+  - bundle: `autobot-feedback-20260327-155408.tgz`
+  - deployed bundle commit: `aaf532b`
+  - raw runtime evidence showed repeated `defensive-bear-cancel-buy` against `BTCUSDC` / `ETHUSDC` while regime was only `NEUTRAL`.
+  - auto-updated at: `2026-03-27T15:54:37.087Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-032
-Decision: patch_required
-Required action: same-ticket mitigation required before next long run
-Latest bundle: autobot-feedback-20260327-123604.tgz
+Decision: patch_same_ticket
+Required action: deploy same-ticket defensive cancel-churn fix and inspect the next fresh bundle
+Latest bundle: autobot-feedback-20260327-155408.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
-In scope: exit-manager / de-risking behavior under adverse conditions.
+Goal: stop defensive BUY-limit cancel/recreate churn while preserving downside-control and T-034 funding stability.
+In scope: exit-manager / defensive order-maintenance behavior under adverse conditions.
 Out of scope: quote-routing redesign, candidate-hygiene-only optimization, PnL schema changes, AI lane.
 Validation: docker compose -f docker-compose.ci.yml run --rm ci
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.

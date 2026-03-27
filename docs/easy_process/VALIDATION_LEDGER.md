@@ -1,6 +1,6 @@
 # VALIDATION_LEDGER
 
-Last updated: 2026-03-27 14:40 EET  
+Last updated: 2026-03-27 18:03 EET  
 Owner: PM/BA + Runtime Analyst + Trader
 
 Purpose:
@@ -51,8 +51,8 @@ Question:
 Status:
 - `running`
 - latest bundle is fresh and not a proved engine-dead incident
-- the current same-ticket question is whether profit-giveback `CAUTION` is now too sticky after material de-risking
-- next proof needed: confirm whether low-to-moderate managed exposure can resume fresh candidates without churn
+- the current same-ticket question is whether defensive order maintenance is falsely canceling BUY limits that should be allowed to rest
+- next proof needed: confirm the next bundle no longer alternates `grid-ladder-buy` with defensive cancel cleanup while buys are allowed
 
 ### S6 — No-feasible liquidity recovery under reserve starvation
 Question:
@@ -62,6 +62,15 @@ Status:
 - `proved`
 - latest fresh bundle contains a real `no-feasible-liquidity-recovery` sell on `TAOUSDC`
 - the prior same-ticket gate patch now has live runtime evidence
+
+### S7 — Defensive BUY-order maintenance
+Question:
+- does `DEFENSIVE` cancel bot-owned BUY LIMIT orders only when a true buy pause is active?
+
+Status:
+- `running`
+- latest fresh bundle shows repeated defensive BUY-order cancel/recreate churn on `BTCUSDC` / `ETHUSDC` while regime is `NEUTRAL`
+- next proof needed: no repeated churn when `buyPaused=false`, and any remaining cancel should align with an active caution/grid-guard pause
 
 ## Validation result states
 Use only one:

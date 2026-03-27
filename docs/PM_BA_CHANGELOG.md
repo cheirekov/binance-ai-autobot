@@ -16,6 +16,30 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-27 16:03 UTC — T-032 hotfix: stop defensive BUY-limit cancel/recreate churn
+- Scope:
+  - respond to `autobot-feedback-20260327-155408.tgz`, which auto-retro marked `pivot_required`, by manually triaging the raw bundle and applying the smallest same-ticket fix that matches the actual runtime behavior.
+- BA requirement mapping:
+  - the aggregate top skip still repeats `daily loss caution paused new symbols`, but the raw latest decisions and adaptive-shadow tail now show a narrower defect: `DEFENSIVE` order maintenance repeatedly cancels bot-owned BUY LIMIT orders on `BTCUSDC` / `ETHUSDC` even while regime is only `NEUTRAL` and buys are not otherwise paused.
+- PM milestone mapping:
+  - keep `T-032` as the active lane and override the coarse auto `pivot_required` result with a bounded `patch_same_ticket`, because the low-level runtime behavior changed materially and still maps to current exit-manager / defensive-entry logic.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `shouldCancelDefensiveGridBuyOrders(...)` and gated defensive BUY-order cancellation on an actual buy-pause state instead of canceling all defensive BUY limits unconditionally.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: upgraded cancellation reason/details to reflect buy-pause-driven cleanup rather than a blanket defensive bear cancel.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage proving defensive BUY limits are preserved when buys are allowed and only canceled when a real pause is active.
+  - `docs/TRIAGE_NOTE_2026-03-27_T032_DEFENSIVE_BUY_LIMIT_CANCEL_CHURN.md`: recorded the fresh-bundle triage note and same-ticket decision.
+  - `docs/SESSION_BRIEF.md` and `docs/easy_process/*`: realigned the current batch contract and operator handoff to the manual same-ticket decision.
+- Risk slider impact:
+  - no hard-cap or unwind-policy change; this patch only stops false defensive cleanup when buys are already allowed.
+- Validation evidence:
+  - `./node_modules/.bin/vitest run --no-cache src/modules/bot/bot-engine.service.test.ts` (pass)
+  - `./scripts/validate-active-ticket.sh` (pass)
+- Runtime test request:
+  - deploy this patch and collect one fresh bundle.
+  - the next bundle should stop alternating `grid-ladder-buy` with `defensive-buy-pause-cancel-buy` / `defensive-bear-cancel-buy` while regime is `NEUTRAL`, and any remaining cancel should align with an actual caution/grid-guard pause.
+- Follow-up:
+  - if the next fresh bundle still shows the same cancel/recreate churn, or if the raw behavior no longer fits `T-032`, escalate to an explicit PM/BA pivot instead of applying another blind same-ticket patch.
+
 ## 2026-03-27 10:33 UTC — Process normalization: restore authoritative workflow after March 27 fresh bundle
 - Scope:
   - normalize process state after the March 27 ingestion advanced `docs/SESSION_BRIEF.md` and `docs/RETROSPECTIVE_AUTO.md`, while the easy-process layer still reflected the March 26 `PATCH_NOW` incident batch.

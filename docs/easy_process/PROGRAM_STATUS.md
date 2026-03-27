@@ -1,6 +1,6 @@
 # PROGRAM_STATUS
 
-Last updated: 2026-03-27 14:40 EET  
+Last updated: 2026-03-27 18:03 EET  
 Owner: PM/BA + Codex
 
 ## North Star
@@ -22,12 +22,12 @@ Build a **professional Binance autobot** that:
 - Next validation lane: `Lane B — Deterministic validation`
 - Active ticket: `T-032` (Exit manager v2)
 - Why:
-  - the latest fresh bundle still says `patch_required` on `T-032`
-  - the previous recovery-gate slice is now evidenced as working
-  - the remaining defect is a bounded profit-giveback caution-threshold mismatch inside `T-032`
+  - the latest fresh bundle auto-signaled `pivot_required`, but raw behavior changed materially
+  - the runtime is already placing BUY ladder orders; the current blocker is false defensive cancel cleanup inside `T-032`
+  - the next action is still a bounded same-ticket patch plus fresh-bundle validation, not a lane rewrite
 
 ## Current batch priority order
-1. `Lane A` — patch profit-giveback caution release after material de-risking
+1. `Lane A` — patch defensive BUY-limit cancel gating inside `T-032`
 2. `Lane B` — validate the patch on the next fresh live bundle
 3. `Lane C` — defer broader strategy work until the gate behavior is proved
 4. `Lane D` — still out of scope

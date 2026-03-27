@@ -617,6 +617,16 @@ export class BotEngineService implements OnModuleInit {
     return params.managedExposurePct >= params.minManagedExposurePct;
   }
 
+  private shouldCancelDefensiveGridBuyOrders(params: {
+    executionLane: AdaptiveExecutionLane;
+    hasBotBuyOrders: boolean;
+    buyPaused: boolean;
+  }): boolean {
+    if (params.executionLane !== "DEFENSIVE") return false;
+    if (!params.hasBotBuyOrders) return false;
+    return params.buyPaused;
+  }
+
   private shouldSuppressGridStalledCandidate(params: {
     canTakeAction: boolean;
     waiting: boolean;
@@ -7089,34 +7099,6 @@ export class BotEngineService implements OnModuleInit {
               return;
             }
 
-            if (executionLane === "DEFENSIVE" && config) {
-              const defensiveBuyOrders = symbolOpenLimitOrdersAll.filter(
-                (order) => order.side === "BUY" && this.isBotOwnedOrder(order, botPrefix)
-              );
-              if (defensiveBuyOrders.length > 0) {
-                current = await this.cancelBotOwnedOpenOrders({
-                  config,
-                  state: current,
-                  orders: defensiveBuyOrders,
-                  reason: `defensive-bear-cancel-buy ${candidateSymbol}`,
-                  details: {
-                    executionLane,
-                    regime: selectedRegime,
-                    strategy: selectedStrategy,
-                    canceledBuyOrders: defensiveBuyOrders.length
-                  },
-                  maxCancels: Math.min(5, defensiveBuyOrders.length)
-                });
-                symbolOpenLimitOrdersAll = current.activeOrders.filter((order) => {
-                  if (order.symbol !== candidateSymbol) return false;
-                  if (order.status !== "NEW") return false;
-                  const t = order.type.trim().toUpperCase();
-                  return t === "LIMIT" || t === "LIMIT_MAKER";
-                });
-                this.save(current);
-              }
-            }
-
             const existingBuyPauseLock = this.getActiveSymbolProtectionLock(current, candidateSymbol, {
               onlyTypes: ["GRID_GUARD_BUY_PAUSE"]
             });
@@ -7128,6 +7110,46 @@ export class BotEngineService implements OnModuleInit {
               typeof regime.confidence === "number" &&
               Number.isFinite(regime.confidence) &&
               regime.confidence >= pauseConfidenceThreshold;
+            const buyPausedByCaution = cautionPauseNewSymbols;
+            const buyPaused = buyPausedByCaution || Boolean(existingBuyPauseLock) || shouldPauseBuys;
+
+            const defensiveBuyOrders = symbolOpenLimitOrdersAll.filter(
+              (order) => order.side === "BUY" && this.isBotOwnedOrder(order, botPrefix)
+            );
+            if (
+              config &&
+              this.shouldCancelDefensiveGridBuyOrders({
+                executionLane,
+                hasBotBuyOrders: defensiveBuyOrders.length > 0,
+                buyPaused
+              })
+            ) {
+              current = await this.cancelBotOwnedOpenOrders({
+                config,
+                state: current,
+                orders: defensiveBuyOrders,
+                reason: `defensive-buy-pause-cancel-buy ${candidateSymbol}`,
+                details: {
+                  executionLane,
+                  regime,
+                  strategy: selectedStrategy,
+                  buyPaused,
+                  buyPausedByCaution,
+                  pauseConfidenceThreshold,
+                  existingBuyPauseLock: Boolean(existingBuyPauseLock),
+                  canceledBuyOrders: defensiveBuyOrders.length
+                },
+                maxCancels: Math.min(5, defensiveBuyOrders.length)
+              });
+              symbolOpenLimitOrdersAll = current.activeOrders.filter((order) => {
+                if (order.symbol !== candidateSymbol) return false;
+                if (order.status !== "NEW") return false;
+                const t = order.type.trim().toUpperCase();
+                return t === "LIMIT" || t === "LIMIT_MAKER";
+              });
+              this.save(current);
+            }
+
             const guardLockMs = Math.max(60_000, Math.round((3 - t * 2) * 60_000)); // 3m -> 1m
             if (shouldPauseBuys) {
               current = this.upsertProtectionLock(current, {
@@ -7143,8 +7165,6 @@ export class BotEngineService implements OnModuleInit {
                 }
               });
             }
-            const buyPausedByCaution = cautionPauseNewSymbols;
-            const buyPaused = buyPausedByCaution || Boolean(existingBuyPauseLock) || shouldPauseBuys;
 
             const atr = Number.isFinite(selectedCandidate?.atrPct14) ? Math.max(0.1, selectedCandidate?.atrPct14 ?? 0.4) : 0.4;
             const gridSpacingPct = Math.max(0.2, Math.min(2.5, atr * (0.6 - (risk / 100) * 0.25)));

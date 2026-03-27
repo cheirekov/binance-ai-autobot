@@ -1,36 +1,36 @@
 # LATEST_BATCH_DECISION
 
-Last updated: 2026-03-27 14:40 EET  
+Last updated: 2026-03-27 18:03 EET  
 Owner: PM/BA + Codex
 
 ## Production capability lane
 - Chosen: `Lane A — Runtime stability`
 - Why:
-  - `observed`: the latest fresh bundle is now `autobot-feedback-20260327-123604.tgz`
-  - `observed`: the bundle contains a real `no-feasible-liquidity-recovery` trade on `TAOUSDC` at `2026-03-27T11:13:21.360Z`
-  - `observed`: the dominant new blocker is `Skip: No feasible candidates: daily loss caution paused new symbols (59 filtered)`
-  - `inferred`: the next same-ticket defect is profit-giveback `CAUTION` staying too global after the book has already de-risked
+  - `observed`: the latest fresh bundle is now `autobot-feedback-20260327-155408.tgz`
+  - `observed`: auto-retro raised `pivot_required` because the aggregate top skip repeated across the latest 2 fresh bundles
+  - `observed`: the raw latest decisions are not a pure no-candidate stall; they repeatedly alternate `grid-ladder-buy` with `defensive-bear-cancel-buy` on `BTCUSDC` / `ETHUSDC`
+  - `inferred`: the current blocker is still a bounded `T-032` defensive order-maintenance bug, so a same-ticket patch remains justified before any lane pivot
 - Evidence tags:
-  - `observed`: latest bundle risk state is `CAUTION` with trigger `PROFIT_GIVEBACK`
-  - `observed`: latest risk-state reason codes report `managedExposure=18.0%` and `haltExposureFloor=8.0%`
-  - `observed`: latest skip details show `quoteFree=5889.612684`, `rejectionSamples=[]`, and `noFeasibleRecovery.enabled=false`
-  - `observed`: top alternating skips are global new-symbol pause plus symbol-level `BTCUSDC` daily-loss caution BUY-leg pause
-  - `inferred`: after de-risking to about `18%` managed exposure, the global caution pause should relax sooner while symbol-level bearish pauses remain active
-  - `assumption`: the next fresh bundle is required to prove this threshold change improves behavior without reintroducing churn
+  - `observed`: latest bundle runs `git.commit=aaf532b`
+  - `observed`: latest bundle risk state is `CAUTION` with trigger `PROFIT_GIVEBACK` and `managedExposure=6.7%`
+  - `observed`: latest bundle totals show `TRADE=84`, `ENGINE=75`, `SKIP=41`, `orders.canceled=129`, `activeOrders=3`
+  - `observed`: latest state/adaptive-shadow evidence shows repeated `BUY LIMIT ... grid-ladder-buy` immediately followed by `defensive-bear-cancel-buy` while regime is `NEUTRAL` with confidence `0.4`
+  - `observed`: the earlier `no-feasible-liquidity-recovery` path remains a previously validated `T-032` behavior and is not the dominant current blocker
+  - `inferred`: the aggregate skip summary is lagging the actual low-level runtime behavior in this bundle
 
 ## Chosen active ticket
 - Current: `T-032` (Exit manager v2)
 - Decision: `patch_same_ticket`
 - Why:
   - `observed`: board and changelog still keep `T-032` as the sole active lane
-  - `observed`: the prior no-feasible recovery patch is now evidenced as working in the latest bundle
-  - `observed`: the new runtime blocker is still inside `T-032` downside-control / defensive-entry behavior
-  - `inferred`: no ticket pivot is needed unless the next bundle disproves this runtime hypothesis
+  - `observed`: the raw latest bundle behavior still lands inside `T-032` downside-control / defensive-entry behavior
+  - `observed`: the auto `pivot_required` result came from a repeated coarse summary, not from unchanged low-level behavior
+  - `inferred`: no ticket pivot is needed unless the next bundle disproves this cancel-churn hypothesis
 
 ## Evidence class
 - Current: `fresh`
-- Latest bundle: `autobot-feedback-20260327-123604.tgz`
-- Compared bundle: `autobot-feedback-20260327-102432.tgz`
+- Latest bundle: `autobot-feedback-20260327-155408.tgz`
+- Compared bundle: `autobot-feedback-20260327-123604.tgz`
 
 ## Allowed work mode
 - Current batch: `PATCH_ALLOWED`
@@ -38,8 +38,9 @@ Owner: PM/BA + Codex
 ## Batch decision
 - Decision: `patch_same_ticket`
 - Patch slice:
-  - keep the proven no-feasible recovery path unchanged
-  - relax profit-giveback `CAUTION` new-symbol pause so it only stays global while managed exposure is still materially high
-  - preserve symbol-level bearish BUY pauses on the risky managed symbol itself
+  - cancel defensive bot-owned BUY limits only when buys are actually paused
+  - preserve resting BUY ladder orders in `DEFENSIVE` when regime is `NEUTRAL`/`RANGE` and no pause is active
+  - keep the proven caution-release and no-feasible recovery paths unchanged
 - Validation:
   - `./node_modules/.bin/vitest run --no-cache src/modules/bot/bot-engine.service.test.ts` ✅
+  - `./scripts/validate-active-ticket.sh` ✅
