@@ -1060,7 +1060,8 @@ describe("bot-engine insufficient-balance helpers", () => {
         policyEnabled: boolean;
         maxExecutionQuoteSpendableHome: number;
         quoteLiquidityThresholdHome: number;
-      }) => { attempt: boolean; thresholdHome: number };
+        rejectionSamples?: Array<{ stage?: string }>;
+      }) => { attempt: boolean; thresholdHome: number; pressureDetected: boolean };
     };
 
     const spendableGate = helpers.shouldAttemptNoFeasibleRecovery({
@@ -1081,8 +1082,46 @@ describe("bot-engine insufficient-balance helpers", () => {
 
     expect(spendableGate.thresholdHome).toBe(3);
     expect(spendableGate.attempt).toBe(true);
+    expect(spendableGate.pressureDetected).toBe(false);
     expect(rawFreeGate.attempt).toBe(true);
     expect(aboveFloorGate.attempt).toBe(false);
+  });
+
+  it("keeps no-feasible recovery eligible when rejection pressure proves quote starvation despite raw spendable elsewhere", () => {
+    const helpers = service as unknown as {
+      shouldAttemptNoFeasibleRecovery: (params: {
+        policyEnabled: boolean;
+        maxExecutionQuoteSpendableHome: number;
+        quoteLiquidityThresholdHome: number;
+        rejectionSamples?: Array<{ stage?: string }>;
+      }) => { attempt: boolean; thresholdHome: number; pressureDetected: boolean };
+    };
+
+    const pressureGate = helpers.shouldAttemptNoFeasibleRecovery({
+      policyEnabled: true,
+      maxExecutionQuoteSpendableHome: 1588.033641,
+      quoteLiquidityThresholdHome: 3,
+      rejectionSamples: [
+        {
+          stage: "quote-exposure-cap"
+        }
+      ]
+    });
+    const unrelatedGate = helpers.shouldAttemptNoFeasibleRecovery({
+      policyEnabled: true,
+      maxExecutionQuoteSpendableHome: 1588.033641,
+      quoteLiquidityThresholdHome: 3,
+      rejectionSamples: [
+        {
+          stage: "validate-qty"
+        }
+      ]
+    });
+
+    expect(pressureGate.attempt).toBe(true);
+    expect(pressureGate.pressureDetected).toBe(true);
+    expect(unrelatedGate.attempt).toBe(false);
+    expect(unrelatedGate.pressureDetected).toBe(false);
   });
 
   it("classifies skip reason clusters for KPI counters", () => {

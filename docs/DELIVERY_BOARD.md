@@ -1,6 +1,6 @@
 # DELIVERY BOARD (PM v2) — Binance AI Autobot
 
-Last updated: 2026-02-25  
+Last updated: 2026-03-27  
 Owner: PM/BA + Codex + User
 
 This board is structured to reduce scope drift and context-window churn.
@@ -147,11 +147,11 @@ Profit milestone rule:
 
 ### Completed baseline (already delivered)
 
-`T-000`, `T-001`, `T-002`, `T-004`, `T-005`, `T-006`, `T-007`, `T-008`, `T-009`, `T-010`, `T-011`, `T-012`, `T-013`, `T-014`, `T-015`, `T-016`, `T-017`, `T-019`, `T-021`, `T-022`, `T-024`, `T-027`, `T-029`, `T-030`, `T-033`
+`T-000`, `T-001`, `T-002`, `T-004`, `T-005`, `T-006`, `T-007`, `T-008`, `T-009`, `T-010`, `T-011`, `T-012`, `T-013`, `T-014`, `T-015`, `T-016`, `T-017`, `T-019`, `T-021`, `T-022`, `T-024`, `T-027`, `T-029`, `T-030`, `T-033`, `T-034`
 
 ### Open backlog
 
-`T-003`, `T-020`, `T-023`, `T-025`, `T-026`, `T-028`, `T-031`, `T-032`, `T-034`, `T-035`, `T-036`, `T-037`, `T-038`
+`T-003`, `T-020`, `T-023`, `T-025`, `T-026`, `T-028`, `T-031`, `T-032`, `T-035`, `T-036`, `T-037`, `T-038`
 
 ---
 

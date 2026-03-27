@@ -1,65 +1,66 @@
 # PM_TASK_SPLIT
 
-Last updated: 2026-03-26 18:47 EET  
+Last updated: 2026-03-27 12:46 EET  
 Owner: PM/BA + Codex
 
 ## PM/BA
-- Objective: close the follow-up P0 incident with one explicit same-ticket recovery action
+- Objective: keep the batch bounded to the fresh March 27 `T-032` defect
 - Tasks:
-  - keep `T-032` active
-  - record why the `3a6a14f` hotfix deployed but still failed to restore runtime credibility
-  - gate the next move on one short fresh post-deploy bundle
-- Deliverable: single-source runtime recovery decision
-- Dependency: fresh-bundle audit on `3a6a14f`
+  - record `patch_same_ticket`
+  - keep `T-032` as the only active lane
+  - require the next bundle before any broader conclusion
+- Deliverable: bounded ticket decision
+- Dependency: latest bundle evidence
 
 ## Architect
-- Objective: restore the designed no-feasible liquidity-recovery path without widening scope
+- Objective: patch the smallest runtime gate that matches the evidence
 - Tasks:
-  - align the recovery threshold with the same liquidity floor used for candidate feasibility
-  - let repeated starvation across the real production cadence arm recovery
-  - leave guard-pause and hard-risk policy unchanged
-- Deliverable: bounded engine amendment
-- Dependency: `apps/api/src/modules/bot/bot-engine.service.ts`
+  - tie recovery activation to quote-pressure rejection stages, not only raw spendable quote
+  - avoid widening into unrelated exit-manager refactors
+  - expose enough telemetry to validate the patch from the next bundle
+- Deliverable: narrow gate-design correction
+- Dependency: direct bundle read + bot-engine path review
 
 ## Trader
-- Objective: reject professionally unacceptable high-allocation idling
+- Objective: keep recovery sells bounded and capital-aware
 - Tasks:
-  - treat repeated post-restart `No feasible` / `No eligible` behavior as non-credible
-  - require either recovery sells, `enabled=true`, or materially changed decision mix before accepting the patch
-- Deliverable: accept/reject rule for the next bundle
-- Dependency: post-deploy fresh evidence
+  - treat quote-spendable-floor and quote-exposure-cap loops as trapped-liquidity pressure
+  - reject panic-style liquidation outside the bounded recovery fraction
+  - use the next bundle to judge whether the patch reduces deadlock without creating churn
+- Deliverable: execution-risk sanity check
+- Dependency: live bundle facts
 
 ## Runtime Analyst
-- Objective: prove the runtime does more than wake up after restart
+- Objective: prove or falsify the new gate behavior quickly
 - Tasks:
-  - perform clean recreate
-  - confirm fresh timestamps continue after the initial recovery message
-  - capture one short bundle
-- Deliverable: post-deploy runtime confirmation
-- Dependency: operator deployment
+  - inspect the next fresh bundle for `gateAttempted`, `pressureDetected`, and `attemptedReason`
+  - confirm whether a `no-feasible-liquidity-recovery` trade appears
+  - escalate only if the next bundle shows continued boxed-in behavior
+- Deliverable: next-bundle validation read
+- Dependency: patched runtime + next ingestion
 
 ## AI Specialist
-- Objective: keep the recovery deterministic
+- Objective: keep AI scope unchanged
 - Tasks:
-  - confirm no AI autonomy behavior changed
-  - keep hard risk policy untouched
-- Deliverable: AI scope isolation note
-- Dependency: code review only
+  - confirm this patch does not alter AI autonomy or learning claims
+  - keep the lane strictly deterministic runtime recovery hardening
+- Deliverable: AI scope freeze
+- Dependency: none
 
 ## State Steward
-- Objective: preserve state unless hard evidence proves it is corrupted
+- Objective: keep process memory aligned to the actual patch batch
 - Tasks:
-  - use clean recreate, not reseed
-  - distinguish cumulative historical top skips from fresh recent decisions
-  - keep incident authority in the easy-process outputs
-- Deliverable: state-safe recovery handoff
-- Dependency: deployed patch
+  - update batch decision artifacts from normalization mode to `T-032` patch mode
+  - keep DONE history untouched
+  - carry forward only fresh-bundle evidence
+- Deliverable: current batch docs aligned to code state
+- Dependency: PM/BA decision
 
 ## Senior BE/UI
-- Objective: restore bot-engine behavior on the actual live blocker
+- Objective: implement and validate the bounded runtime fix
 - Tasks:
-  - ship the no-feasible recovery threshold/window amendment
-  - keep regression coverage on spaced no-feasible skips and liquidity-floor gating
-  - validate with targeted and full CI
-- Deliverable: tested engine recovery patch
-- Dependency: Architect findings
+  - patch `apps/api/src/modules/bot/bot-engine.service.ts`
+  - extend `apps/api/src/modules/bot/bot-engine.service.test.ts`
+  - run focused bot-engine tests without cache
+- Deliverable: tested `T-032` code slice
+- Dependency: architected patch hypothesis

@@ -16,6 +16,29 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-27 10:33 UTC — Process normalization: restore authoritative workflow after March 27 fresh bundle
+- Scope:
+  - normalize process state after the March 27 ingestion advanced `docs/SESSION_BRIEF.md` and `docs/RETROSPECTIVE_AUTO.md`, while the easy-process layer still reflected the March 26 `PATCH_NOW` incident batch.
+- BA requirement mapping:
+  - keep `T-032` as the single active ticket, keep `T-034` closed, and do not let stale derived docs silently reopen or redefine DONE history.
+- PM milestone mapping:
+  - choose `OPERATIONS_ADJUSTMENT`, not `PATCH_NOW` or `ROLLBACK_NOW`, because the latest fresh evidence says `continue active ticket` and does not currently prove a live `P0/P1` runtime incident.
+- Technical changes:
+  - `docs/DELIVERY_BOARD.md`: updated metadata, added `T-034` to the completed snapshot, and removed `T-034` from the open backlog snapshot.
+  - `docs/easy_process/*`: rewrote the current working-memory decision set so March 27 runtime evidence, board/changelog authority, and the next active lane all align on `T-032`.
+  - `docs/easy_process/AUTHORITATIVE_SOURCE_DECISION.md`, `docs/easy_process/PROCESS_NORMALIZATION_SUMMARY.md`, and `docs/easy_process/NEXT_ACTIVE_LANE_DECISION.md`: added explicit source-priority, normalization audit, and next-lane decisions.
+- Risk slider impact:
+  - none; process-only normalization.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start` (pass)
+  - `./scripts/pmba-gate.sh end` (pass)
+  - `./scripts/validate-active-ticket.sh` (pass)
+- Runtime test request:
+  - none in this normalization batch; the next coding batch must rewrite the start-of-batch `T-032` contract before code and scope itself against the March 27 bundle, not the stale March 26 incident paperwork.
+- Follow-up:
+  - keep `T-032` as the sole active ticket.
+  - if future fresh evidence proves a closed-ticket regression, open a new follow-up / hardening / incident ticket instead of reopening `T-034` or redefining any DONE ticket.
+
 ## 2026-03-26 16:47 UTC — T-032 hotfix: align no-feasible recovery with live cadence and funding floor
 - Scope:
   - second follow-up P0 runtime recovery after `autobot-feedback-20260326-164157.tgz`.

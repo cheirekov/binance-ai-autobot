@@ -1,58 +1,43 @@
 # LATEST_BATCH_DECISION
 
-Last updated: 2026-03-26 18:47 EET  
+Last updated: 2026-03-27 12:46 EET  
 Owner: PM/BA + Codex
 
 ## Production capability lane
 - Chosen: `Lane A — Runtime stability`
+- Why:
+  - `observed`: the latest fresh bundle is still `autobot-feedback-20260327-102432.tgz`
+  - `observed`: `docs/SESSION_BRIEF.md` and `docs/RETROSPECTIVE_AUTO.md` both keep `T-032` active with decision `continue`
+  - `observed`: bundle state shows `noFeasibleRecovery.enabled=true` while repeated skips still end at `attemptedSymbol=null`
+  - `inferred`: the remaining same-ticket defect is runtime recovery gating, not process authority drift
 - Evidence tags:
-  - `observed`: latest fresh bundle `autobot-feedback-20260326-164157.tgz` runs `git.commit=3a6a14f`
-  - `observed`: cumulative top skips still show `Skip BTCUSDC: Grid guard paused BUY leg (17)` and `Grid waiting for ladder slot or inventory (16)`, unchanged from the prior fresh bundle
-  - `observed`: latest recent decisions are still mostly `Skip: No feasible candidates after policy/exposure filters` with restart markers in between
-  - `observed`: latest no-feasible details still show `noFeasibleRecovery.enabled=false`, `recentCount=1`, `threshold=2`, `quoteLiquidityThreshold=1`, and `maxExecutionQuoteSpendableHome=2.841632`
-  - `inferred`: the previous no-feasible recovery patch deployed, but its trigger math was still too strict for live runtime cadence and live funding floors
+  - `observed`: `Skip: No feasible candidates after sizing/cap filters` remains the dominant latest runtime signature
+  - `observed`: latest skip details record `maxExecutionQuoteSpendableHome=1588.033641`, `quoteLiquidityThreshold=3`, and `attemptedSymbol=null`
+  - `observed`: rejection samples in the same bundle include `quote-spendable`, `quote-spendable-floor`, and prior bundle evidence also showed `quote-exposure-cap`
+  - `inferred`: raw spendable quote on another execution-quote family can keep the recovery gate closed even when the active candidate pool is boxed in
+  - `assumption`: the next fresh bundle is required to prove live behavior changed, not just helper logic
 
 ## Chosen active ticket
 - Current: `T-032` (Exit manager v2)
 - Decision: `patch_same_ticket`
 - Why:
-  - `observed`: the active failure is still an exit/liquidity-recovery failure inside `T-032`
-  - `observed`: the new bundle proves the previous recovery action deployed and narrows the remaining defect to the same engine path
-  - `inferred`: `ROLLBACK_NOW` would reintroduce the already-fixed reason-matching/spendable-liquidity work and is weaker than one bounded same-surface amendment
+  - `observed`: board and changelog still keep `T-032` as the sole active lane
+  - `observed`: the bundle defect is inside the existing no-feasible recovery path already being hardened under `T-032`
+  - `inferred`: no ticket pivot is needed unless the next bundle disproves this runtime hypothesis
 
 ## Evidence class
 - Current: `fresh`
-- Latest bundle: `autobot-feedback-20260326-164157.tgz`
-- Compared bundle: `autobot-feedback-20260326-130152.tgz`
+- Latest bundle: `autobot-feedback-20260327-102432.tgz`
+- Compared bundle: `autobot-feedback-20260326-164157.tgz`
 
 ## Allowed work mode
-- `PATCH_ALLOWED`
+- Current batch: `PATCH_ALLOWED`
 
 ## Batch decision
-- `BATCH_ACTION_CLASS`: `PATCH_NOW`
-- Incident classification: `P0 runtime-boxed / incomplete no-feasible recovery incident`
-- Primary incident type:
-  - incomplete bot-engine recovery patch on the no-feasible recovery path
-  - restart/recovery cadence as a secondary amplifier
-- Previous recovery action:
-  - `2026-03-26 13:16 UTC` same-ticket bot-engine patch on the no-feasible liquidity-recovery path
-  - it broadened reason matching and moved the gate to spendable quote after reserve
-- Why the previous intervention did not restore runtime behavior:
-  - it touched the bot-engine path and it did deploy
-  - but the activation policy still needed two no-feasible skips inside a 10-minute cluster
-  - the recovery gate still used a `1` home-unit threshold even though the live funding floor was effectively `3-5` home units
-  - result: the runtime stayed boxed even on the patched commit because the recovery arm still could not activate
-- Likely rollback surface:
-  - only the new no-feasible window/threshold amendment if it over-fires after deployment
-  - broad rollback before `3a6a14f` is not preferred
-- Likely patch surface:
-  - `apps/api/src/modules/bot/bot-engine.service.ts`
-  - `deriveNoFeasibleRecoveryPolicy(...)`
-  - `deriveMinQuoteLiquidityHome(...)`
-  - `shouldAttemptNoFeasibleRecovery(...)`
-- Likely state/ops recovery surface:
-  - clean recreate after deploy
-  - no reseed / wipe is justified by current evidence
+- Decision: `patch_same_ticket`
+- Patch slice:
+  - allow no-feasible recovery to trigger when repeated rejection samples already prove quote starvation or quote-family saturation, even if another execution quote still shows raw spendable balance
+  - add clearer skip telemetry with `gateAttempted` and `pressureDetected`
+  - record an explicit recovery attempt reason when no eligible managed position exists or clamp math leaves a non-positive sell quantity
 - Validation:
-  - `./scripts/validate-active-ticket.sh` ✅
-  - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+  - `./node_modules/.bin/vitest run --no-cache src/modules/bot/bot-engine.service.test.ts` ✅

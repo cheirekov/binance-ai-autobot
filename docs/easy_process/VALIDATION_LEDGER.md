@@ -1,6 +1,6 @@
 # VALIDATION_LEDGER
 
-Last updated: 2026-03-26 18:47 EET  
+Last updated: 2026-03-27 12:46 EET  
 Owner: PM/BA + Runtime Analyst + Trader
 
 Purpose:
@@ -8,7 +8,7 @@ track which runtime behaviors have real proof and which are still only hypothese
 
 ## Ticket currently under validation
 - `T-032`
-- Current batch action: `PATCH_NOW`
+- Current batch action: `patch_same_ticket`
 
 ## Required scenario classes
 
@@ -31,33 +31,37 @@ Question:
 - does the system escalate from passive waiting to bounded unwind?
 
 Status:
-- still not proved
-- cumulative bundle summaries still carry the Mar 23 guard-pause loop
-- this is no longer the only live blocker
+- `inconclusive`
+- the March 23 guard-pause loop is no longer the dominant latest signal in the 2026-03-27 bundle
+- keep the old guard-pause evidence as history, not as current batch authority
 
 ### S4 — Funding/routing pressure
 Question:
 - does the new behavior avoid reintroducing funding deadlocks?
 
 Status:
-- planned
+- `running`
+- latest March 27 evidence says funding regression absent
+- `T-034` stays closed unless fresh evidence proves a new follow-up is needed
 
 ### S5 — Healthy idle vs stuck
 Question:
 - can we distinguish "correctly idle" from "execution/process deadlock"?
 
 Status:
-- running
-- latest bundle shows the runtime is alive after restart, but not credibly progressing
+- `running`
+- latest bundle is fresh, `risk_state=NORMAL`, and the current read is not a proved engine-dead incident
+- the next coding batch still needs an explicit same-ticket hypothesis, not stale emergency paperwork
 
 ### S6 — No-feasible liquidity recovery under reserve starvation
 Question:
 - when spendable quote after reserve is too low, does the bot re-enable recovery sells instead of staying boxed into `No feasible` skips?
 
 Status:
-- patched again
-- latest `3a6a14f` bundle proved the previous amendment was still too strict
-- fresh post-deploy confirmation is required
+- `running`
+- the March 27 bundle directly proves `noFeasibleRecovery.enabled=true`
+- this batch patched the remaining gate mismatch so quote-pressure rejection stages can trigger recovery even when another quote family still has raw spendable balance
+- the next fresh bundle must prove whether the runtime now attempts recovery sells or emits a non-null attempt reason
 
 ## Validation result states
 Use only one:
@@ -69,8 +73,10 @@ Use only one:
 - `inconclusive`
 
 ## Current validation evidence
+- `./scripts/pmba-gate.sh start` ✅
+- `./scripts/pmba-gate.sh end` ✅
 - `./scripts/validate-active-ticket.sh` ✅
-- `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- `./node_modules/.bin/vitest run --no-cache src/modules/bot/bot-engine.service.test.ts` ✅
 
 ## Promotion rule
 A runtime/strategy behavior is not "adaptive" just because it looked good in one recent market patch.

@@ -1,38 +1,35 @@
 # NEXT_BATCH_PLAN
 
-Last updated: 2026-03-26 18:47 EET  
+Last updated: 2026-03-27 12:46 EET  
 Owner: PM/BA + Codex
 
 ## Exact scope
-Deploy the amended no-feasible recovery patch, clean-recreate the runtime, and confirm from one short fresh bundle that the bot can actually arm liquidity recovery under the live reserve-starvation pattern seen in `autobot-feedback-20260326-164157.tgz`.
+Validate the March 27 `T-032` recovery-gate patch against the next fresh live bundle. Confirm that repeated no-feasible pressure now produces either a bounded recovery sell or an explicit recovery-attempt reason, without widening into unrelated strategy work.
 
 ## In scope
-- deploy the patched bot-engine runtime
-- preserve current `state.json` and config; do not wipe state unless the patch itself proves unsafe
-- clean-recreate the runtime before collecting evidence
-- collect one short fresh bundle after recreate
-- inspect recent `noFeasibleRecovery` details, not only the cumulative top-skip table
-- decide whether `T-032` continues cleanly or needs one more same-ticket reachability slice
+- keep `T-032` as the sole active ticket
+- ingest the next fresh bundle after this patch is deployed
+- verify `noFeasibleRecovery.gateAttempted=true` when quote-pressure rejection stages recur
+- verify `pressureDetected=true` when the rejection trail is quote-spendable or quote-exposure-cap driven
+- confirm the next bundle shows either:
+  - a `no-feasible-liquidity-recovery` trade, or
+  - a non-null `attemptedReason` explaining why recovery still did not fire
 
 ## Out of scope
-- dashboard-only or reporting-only work
-- broad `T-032` strategy redesign
-- reopening `T-031` or `T-034`
-- AI-lane or auth/UI work
+- reopening any DONE ticket
+- broad exit-manager redesign outside this gate slice
+- strategy retuning unrelated to no-feasible recovery
+- a new ticket unless fresh evidence proves this patch hypothesis wrong
 
 ## Acceptance criteria
-- the runtime emits fresh decisions after clean recreate
-- repeated no-feasible skips across the live cadence now make `noFeasibleRecovery` eligible
-- low spendable quote after reserve now uses the same funding floor for recovery as for candidate feasibility
-- at least one of:
-  - `no-feasible-liquidity-recovery`
-  - `noFeasibleRecovery.enabled=true`
-  - materially changed recent decision mix away from pure post-restart idling
-- no dominant funding or churn regression returns
+- focused bot-engine tests stay green
+- next fresh bundle no longer reports the old combination `enabled=true` with `attemptedSymbol=null` and no gate context
+- runtime remains `T-032` same-ticket work rather than a new `P0/P1` incident
 
 ## Rollback condition
-- this amendment introduces validation failure, repeated unnecessary recovery sells, or a fresh funding regression
-- do not broad-rollback before `3a6a14f` only because the cumulative guard-pause counts remain high; require fresh post-patch evidence of over-fire or regression first
+- the next bundle shows this patch triggers harmful churn or unnecessary recovery sells in healthy-liquidity conditions
+- the next bundle still proves the bot is boxed in while `gateAttempted=false`
+- fresh evidence reveals a different root cause outside `T-032`
 
 ## What capability this moves forward
-Moves `Lane A — Runtime stability` forward by aligning the engine’s starvation-recovery trigger with the production funding floor and production decision cadence.
+Moves `Lane A — Runtime stability` directly and sets up `Lane B — Deterministic validation` on the next live bundle.

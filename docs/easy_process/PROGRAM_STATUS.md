@@ -1,6 +1,6 @@
 # PROGRAM_STATUS
 
-Last updated: 2026-03-26 18:47 EET  
+Last updated: 2026-03-27 12:46 EET  
 Owner: PM/BA + Codex
 
 ## North Star
@@ -18,21 +18,23 @@ Build a **professional Binance autobot** that:
 - `Lane E — State/process hygiene`
 
 ## Current program decision
-- Active lane: `Lane A — Runtime stability`
+- Active lane for this batch: `Lane A — Runtime stability`
+- Next validation lane: `Lane B — Deterministic validation`
+- Active ticket: `T-032` (Exit manager v2)
 - Why:
-  - the latest fresh bundle on `3a6a14f` still showed a non-credible live `T-032` runtime
-  - the previous no-feasible patch deployed, but the recovery trigger still stayed below live funding floors and below live cadence needs
-  - restart/recovery continuity still matters, but it is a secondary overlay rather than the primary code surface
+  - normalization is already complete enough to resume same-ticket code work
+  - the latest fresh bundle still says `continue active ticket`
+  - the remaining defect is a bounded runtime-recovery gate mismatch inside `T-032`
 
 ## Current batch priority order
-1. `Lane A` — deploy and confirm the no-feasible recovery threshold/window amendment in one short fresh bundle
-2. `Lane B` — use the post-patch bundle to decide whether another same-ticket recovery slice is needed
-3. `Lane C` — only after runtime credibility is restored
-4. `Lane E` — preserve clean recreate and state hygiene, but do not widen to full reseed without proof
-5. `Lane D` — still out of scope
+1. `Lane A` — patch no-feasible recovery gating from the March 27 fresh evidence
+2. `Lane B` — validate the patch on the next fresh live bundle
+3. `Lane C` — defer broader strategy work until the gate behavior is proved
+4. `Lane D` — still out of scope
+5. `Lane E` — keep process memory aligned, but do not let it dominate the active lane again
 
 ## Program-level hard rules
-1. Do not treat UI/reporting improvements as runtime recovery.
-2. Do not trust the cumulative top-skip table alone when the run is long-lived.
-3. Do not wipe state before the fresh post-patch recreate unless corruption is proven.
-4. Keep one active ticket.
+1. Do not reopen or redefine DONE tickets.
+2. Keep one active ticket.
+3. Do not treat one post-patch bundle as promotion proof.
+4. If the next bundle disproves the same-ticket hypothesis, create a follow-up ticket instead of rewriting history.

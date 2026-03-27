@@ -2972,20 +2972,30 @@ export class BotEngineService implements OnModuleInit {
     return Math.max(1, configuredMinTopUpTarget * (risk >= 80 ? 0.6 : risk >= 50 ? 0.8 : 1));
   }
 
+  private isNoFeasibleRecoveryPressureStage(stage: string | undefined): boolean {
+    const normalized = (stage ?? "").trim().toLowerCase();
+    return normalized === "quote-spendable" || normalized === "quote-spendable-floor" || normalized === "quote-exposure-cap";
+  }
+
   private shouldAttemptNoFeasibleRecovery(params: {
     policyEnabled: boolean;
     maxExecutionQuoteSpendableHome: number;
     quoteLiquidityThresholdHome: number;
-  }): { attempt: boolean; thresholdHome: number } {
+    rejectionSamples?: Array<{ stage?: string }>;
+  }): { attempt: boolean; thresholdHome: number; pressureDetected: boolean } {
     const thresholdHome = Number.isFinite(params.quoteLiquidityThresholdHome)
       ? Math.max(0, params.quoteLiquidityThresholdHome)
       : 0;
     const spendableHome = Number.isFinite(params.maxExecutionQuoteSpendableHome)
       ? Math.max(0, params.maxExecutionQuoteSpendableHome)
       : 0;
+    const pressureDetected = (params.rejectionSamples ?? []).some((sample) =>
+      this.isNoFeasibleRecoveryPressureStage(sample.stage)
+    );
     return {
-      attempt: params.policyEnabled && spendableHome <= thresholdHome + 1e-8,
-      thresholdHome
+      attempt: params.policyEnabled && (spendableHome <= thresholdHome + 1e-8 || pressureDetected),
+      thresholdHome,
+      pressureDetected
     };
   }
 
@@ -5446,7 +5456,8 @@ export class BotEngineService implements OnModuleInit {
             const noFeasibleRecoveryGate = this.shouldAttemptNoFeasibleRecovery({
               policyEnabled: noFeasibleRecoveryPolicy.enabled,
               maxExecutionQuoteSpendableHome,
-              quoteLiquidityThresholdHome: minQuoteLiquidityHome
+              quoteLiquidityThresholdHome: minQuoteLiquidityHome,
+              rejectionSamples: feasibleCandidateSelection.rejectionSamples
             });
             let noFeasibleRecoveryAttempt:
               | {
@@ -5462,6 +5473,11 @@ export class BotEngineService implements OnModuleInit {
                   return this.isSymbolBlocked(position.symbol, current) === null;
                 })
                 .sort((left, right) => right.costQuote - left.costQuote);
+              if (managedPositions.length === 0) {
+                noFeasibleRecoveryAttempt = {
+                  reason: "No eligible managed positions available for recovery sell"
+                };
+              }
               const recoverySellFraction = this.deriveNoFeasibleRecoverySellFraction(risk);
               for (const position of managedPositions) {
                 const baseAsset = getExecutionBaseFromSymbol(position.symbol);
@@ -5475,7 +5491,13 @@ export class BotEngineService implements OnModuleInit {
                   continue;
                 }
                 const desiredQty = Math.min(position.netQty, baseFree) * recoverySellFraction;
-                if (!Number.isFinite(desiredQty) || desiredQty <= 0) continue;
+                if (!Number.isFinite(desiredQty) || desiredQty <= 0) {
+                  noFeasibleRecoveryAttempt = {
+                    symbol: position.symbol,
+                    reason: "Recovery sell qty is non-positive after free-balance clamp"
+                  };
+                  continue;
+                }
                 const sellCheck = await this.marketData.validateMarketOrderQty(position.symbol, desiredQty);
                 let sellQtyStr = sellCheck.ok ? sellCheck.normalizedQty : undefined;
                 if (!sellQtyStr && sellCheck.requiredQty) {
@@ -5593,6 +5615,8 @@ export class BotEngineService implements OnModuleInit {
                           threshold: noFeasibleRecoveryPolicy.threshold,
                           cooldownMs: noFeasibleRecoveryPolicy.cooldownMs,
                           windowMs: noFeasibleRecoveryPolicy.windowMs,
+                          gateAttempted: noFeasibleRecoveryGate.attempt,
+                          pressureDetected: noFeasibleRecoveryGate.pressureDetected,
                           quoteLiquidityThreshold: Number(noFeasibleRecoveryGate.thresholdHome.toFixed(6)),
                           maxExecutionQuoteSpendableHome: Number(maxExecutionQuoteSpendableHome.toFixed(6)),
                           attemptedSymbol: noFeasibleRecoveryAttempt?.symbol ?? null,
