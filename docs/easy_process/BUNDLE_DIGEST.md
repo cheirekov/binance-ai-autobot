@@ -1,44 +1,41 @@
 # BUNDLE_DIGEST
 
-Last updated: 2026-03-27 12:46 EET  
+Last updated: 2026-03-27 14:40 EET  
 Owner: PM/BA + Runtime Analyst
 
 Use this file instead of pasting large bundle narratives into chat.
 
 ## Latest reviewed bundle
-- Bundle: `autobot-feedback-20260327-102432.tgz`
-- Ingest decision: `continue active ticket`
+- Bundle: `autobot-feedback-20260327-123604.tgz`
+- Ingest decision: `patch_required`
 - Fresh runtime evidence: `yes`
 - Evidence class: `fresh`
 
 ## Why this matters
-This bundle is fresh enough to justify a bounded `T-032` patch. It shows the no-feasible recovery policy already arming, but not actually attempting a recovery action because the gate is still suppressed by raw spendable quote on another family.
+This bundle is fresh enough to close the last `T-032` hypothesis and define the next one. It proves the no-feasible recovery patch can actually fire in live runtime, then shows the next dominant blocker as a global profit-giveback `CAUTION` pause on new symbols after the book has already been cut down to about `18%` exposure.
 
 ## Observed
-- latest skip signature remains `Skip: No feasible candidates after sizing/cap filters`
-- latest skip details include:
-  - `noFeasibleRecovery.enabled = true`
-  - `recentCount = 201`
-  - `threshold = 2`
-  - `quoteLiquidityThreshold = 3`
-  - `maxExecutionQuoteSpendableHome = 1588.033641`
-  - `attemptedSymbol = null`
-  - `attemptedReason = null`
-- rejection samples in the same bundle show active quote pressure:
-  - `quote-spendable-floor` on `USDC`
-  - `quote-spendable` on `BTC` and `ETH`
-- bundle-level runtime remains:
-  - `risk_state = NORMAL`
-  - `open_positions = 11`
-  - `total_alloc_pct = 97.85`
+- the bundle contains `Binance testnet SELL MARKET TAOUSDC qty 0.445 → FILLED ... no-feasible-liquidity-recovery`
+- the run then records multiple stop-loss / take-profit exits and finishes with:
+  - `risk_state = CAUTION`
+  - `open_positions = 7`
+  - `total_alloc_pct = 17.98`
+  - `quoteFree = 5889.612684`
+- latest risk-state reasons include:
+  - `trigger=PROFIT_GIVEBACK`
+  - `giveback=110.91USDC (66.7%)`
+  - `managedExposure=18.0%`
+  - `haltExposureFloor=8.0%`
+- dominant latest skips are now:
+  - `Skip: No feasible candidates: daily loss caution paused new symbols (59 filtered)`
+  - `Skip BTCUSDC: Daily loss caution paused GRID BUY leg`
 
 ## Inferred
-- the policy threshold logic is no longer the main defect
-- the current same-ticket mismatch is in the final recovery gate, not the earlier accumulation logic
-- raw spendable quote on a different execution-quote family can hide trapped-liquidity conditions in the active candidate pool
+- the prior recovery-gate patch is validated by real runtime evidence
+- the current same-ticket mismatch is the profit-giveback caution threshold staying global after material de-risking
+- the remaining risky symbol can keep its own BUY pause without forcing all new symbols to stay blocked
 
 ## Next proof required
-- next fresh bundle after this patch should show `gateAttempted=true` when quote-pressure rejection stages recur
-- the next bundle should also show either:
-  - a `no-feasible-liquidity-recovery` trade, or
-  - a non-null `attemptedReason`
+- the next fresh bundle should stop making `daily loss caution paused new symbols` the dominant latest loop
+- the next bundle should still preserve symbol-level bearish pause evidence where needed
+- the next bundle should not regress the earlier no-feasible recovery trade path

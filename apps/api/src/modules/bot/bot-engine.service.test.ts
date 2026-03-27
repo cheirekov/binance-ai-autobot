@@ -2224,7 +2224,7 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBeNull();
   });
 
-  it("uses halt exposure floor for PROFIT_GIVEBACK caution pause threshold", () => {
+  it("requires materially higher managed exposure before PROFIT_GIVEBACK caution pauses new symbols", () => {
     const helpers = service as unknown as {
       deriveCautionPauseNewSymbolsMinExposurePct: (params: {
         risk: number;
@@ -2239,7 +2239,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         trigger: "PROFIT_GIVEBACK",
         haltExposureFloorPct: 0.08
       })
-    ).toBe(0.08);
+    ).toBe(0.2);
     expect(
       helpers.deriveCautionPauseNewSymbolsMinExposurePct({
         risk: 100,
@@ -2254,6 +2254,37 @@ describe("bot-engine insufficient-balance helpers", () => {
         haltExposureFloorPct: 0.08
       })
     ).toBe(0.03);
+  });
+
+  it("releases caution managed-symbol-only restriction after profit-giveback exposure de-risks below the trigger buffer", () => {
+    const helpers = service as unknown as {
+      shouldRestrictCautionToManagedSymbols: (params: {
+        tradeMode: "SPOT" | "SPOT_GRID" | "FUTURES";
+        riskState: "NORMAL" | "CAUTION" | "HALT";
+        openHomePositionCount: number;
+        managedExposurePct: number | null;
+        minManagedExposurePct: number;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldRestrictCautionToManagedSymbols({
+        tradeMode: "SPOT_GRID",
+        riskState: "CAUTION",
+        openHomePositionCount: 1,
+        managedExposurePct: 0.18,
+        minManagedExposurePct: 0.2
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldRestrictCautionToManagedSymbols({
+        tradeMode: "SPOT_GRID",
+        riskState: "CAUTION",
+        openHomePositionCount: 1,
+        managedExposurePct: 0.22,
+        minManagedExposurePct: 0.2
+      })
+    ).toBe(true);
   });
 
   it("suppresses stalled grid candidates when they cannot take action", () => {

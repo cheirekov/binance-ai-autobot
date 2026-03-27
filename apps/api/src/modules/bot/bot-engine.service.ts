@@ -594,7 +594,13 @@ export class BotEngineService implements OnModuleInit {
     if (params.haltExposureFloorPct === null || !Number.isFinite(params.haltExposureFloorPct)) {
       return base;
     }
-    return Math.max(base, Math.max(0, params.haltExposureFloorPct));
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const t = boundedRisk / 100;
+    // Profit-giveback CAUTION should keep pausing new symbols only while exposure is still materially high.
+    // Once the bot has already de-risked most of the book, keep symbol-level bear pauses but allow fresh candidates again.
+    const givebackBufferPct = Number((0.17 - t * 0.05).toFixed(4)); // 17% -> 12%
+    const givebackPauseFloorPct = Math.min(0.35, Math.max(0, params.haltExposureFloorPct + givebackBufferPct));
+    return Math.max(base, givebackPauseFloorPct);
   }
 
   private shouldRestrictCautionToManagedSymbols(params: {

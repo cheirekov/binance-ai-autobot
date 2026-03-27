@@ -1,6 +1,6 @@
 # VALIDATION_LEDGER
 
-Last updated: 2026-03-27 12:46 EET  
+Last updated: 2026-03-27 14:40 EET  
 Owner: PM/BA + Runtime Analyst + Trader
 
 Purpose:
@@ -50,18 +50,18 @@ Question:
 
 Status:
 - `running`
-- latest bundle is fresh, `risk_state=NORMAL`, and the current read is not a proved engine-dead incident
-- the next coding batch still needs an explicit same-ticket hypothesis, not stale emergency paperwork
+- latest bundle is fresh and not a proved engine-dead incident
+- the current same-ticket question is whether profit-giveback `CAUTION` is now too sticky after material de-risking
+- next proof needed: confirm whether low-to-moderate managed exposure can resume fresh candidates without churn
 
 ### S6 — No-feasible liquidity recovery under reserve starvation
 Question:
 - when spendable quote after reserve is too low, does the bot re-enable recovery sells instead of staying boxed into `No feasible` skips?
 
 Status:
-- `running`
-- the March 27 bundle directly proves `noFeasibleRecovery.enabled=true`
-- this batch patched the remaining gate mismatch so quote-pressure rejection stages can trigger recovery even when another quote family still has raw spendable balance
-- the next fresh bundle must prove whether the runtime now attempts recovery sells or emits a non-null attempt reason
+- `proved`
+- latest fresh bundle contains a real `no-feasible-liquidity-recovery` sell on `TAOUSDC`
+- the prior same-ticket gate patch now has live runtime evidence
 
 ## Validation result states
 Use only one:

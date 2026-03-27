@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-03-27 12:46 EET  
+Last updated: 2026-03-27 14:40 EET  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -11,7 +11,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The March 27 bundle keeps `T-032` active and shows a narrow same-ticket mismatch: `noFeasibleRecovery.enabled=true` is already reached, but the runtime can still skip recovery because the gate only considers raw spendable quote across execution-quote families. That lets liquidity on an unusable quote family suppress recovery even while the active candidate set is boxed in by `quote-spendable-floor`, `quote-spendable`, or `quote-exposure-cap` pressure.
+The newest March 27 bundle keeps `T-032` active and closes the prior recovery-gate hypothesis: the bot now shows a real `no-feasible-liquidity-recovery` sell and then de-risks the book heavily. The next same-ticket mismatch is that profit-giveback `CAUTION` still pauses all new symbols while managed exposure is only about `18%`, even though the remaining risky symbol already has its own bearish BUY pause.
 
 ## Current decision
 - Ticket decision: `patch_same_ticket`
@@ -22,14 +22,16 @@ The March 27 bundle keeps `T-032` active and shows a narrow same-ticket mismatch
   - treat `docs/easy_process/*` as current working memory only after it reflects this patch batch
 
 ## Hypothesis under test
-- if no-feasible recovery is re-enabled by repeated quote-pressure skips, the gate should attempt bounded recovery when rejection samples already prove trapped-liquidity conditions, even if another execution quote still shows raw spendable balance
+- once profit-giveback `CAUTION` has already de-risked the book to low-to-moderate managed exposure, the bot should stop globally pausing all new symbols and rely on symbol-level bearish pauses for the remaining risky managed position
 
 ## What counts as success
 - focused tests stay green
-- the next live bundle shows `gateAttempted=true` under renewed quote-pressure loops
-- the next live bundle produces either a bounded recovery sell or a non-null `attemptedReason`
+- the next live bundle no longer shows `daily loss caution paused new symbols` as the dominant loop
+- the next live bundle still preserves symbol-level bearish BUY pause evidence where warranted
+- the next live bundle does not regress the earlier no-feasible recovery sell path
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident
-- the next bundle shows harmful recovery churn
+- the next bundle shows harmful churn or premature re-risking
+- the next bundle regresses no-feasible recovery behavior
 - the next bundle proves the boxed-in behavior is caused by a different subsystem outside `T-032`

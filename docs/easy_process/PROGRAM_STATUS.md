@@ -1,6 +1,6 @@
 # PROGRAM_STATUS
 
-Last updated: 2026-03-27 12:46 EET  
+Last updated: 2026-03-27 14:40 EET  
 Owner: PM/BA + Codex
 
 ## North Star
@@ -22,12 +22,12 @@ Build a **professional Binance autobot** that:
 - Next validation lane: `Lane B — Deterministic validation`
 - Active ticket: `T-032` (Exit manager v2)
 - Why:
-  - normalization is already complete enough to resume same-ticket code work
-  - the latest fresh bundle still says `continue active ticket`
-  - the remaining defect is a bounded runtime-recovery gate mismatch inside `T-032`
+  - the latest fresh bundle still says `patch_required` on `T-032`
+  - the previous recovery-gate slice is now evidenced as working
+  - the remaining defect is a bounded profit-giveback caution-threshold mismatch inside `T-032`
 
 ## Current batch priority order
-1. `Lane A` — patch no-feasible recovery gating from the March 27 fresh evidence
+1. `Lane A` — patch profit-giveback caution release after material de-risking
 2. `Lane B` — validate the patch on the next fresh live bundle
 3. `Lane C` — defer broader strategy work until the gate behavior is proved
 4. `Lane D` — still out of scope

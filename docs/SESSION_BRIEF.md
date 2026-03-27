@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-27 10:25 UTC
+Last updated: 2026-03-27 14:40 EET
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,48 +9,50 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-032` (Exit manager v2)
-- Goal (single sentence): reduce profit giveback and improve downside control so wallet/equity stabilizes earlier under adverse conditions.
+- Goal (single sentence): release profit-giveback `CAUTION` from a global new-symbol pause once managed exposure has already de-risked materially, while preserving symbol-level bear-trend buy pauses and hard guards.
 - In scope:
-  - reduce profit giveback before `CAUTION` / `HALT` dominates the run.
-  - de-risk earlier when the bot is near full allocation and regime deteriorates.
-  - improve unwind / stable-coin reversion behavior without breaking current hard guards.
-  - preserve `T-034` funding stability and keep `T-031` candidate-hygiene gains intact.
+  - relax the `daily loss caution paused new symbols` threshold after material de-risking.
+  - preserve the existing per-symbol grid-guard / bear-trend BUY pause behavior.
+  - keep the prior no-feasible recovery patch intact and observable.
+  - preserve `T-034` funding stability and all closed guardrail tickets.
 - Out of scope:
   - quote-routing redesign (`T-034` is closed unless runtime regresses),
   - candidate-hygiene-only optimization (`T-031` is frozen unless runtime regresses back there),
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: the main program-level failure is late downside control, not only entry quality; reducing giveback and lowering adverse high-allocation persistence should improve wallet/equity behavior more than another short `T-031` slice.
+- Hypothesis: the previous recovery patch worked, but profit-giveback `CAUTION` is now staying too restrictive after the bot has already sold down to about `18%` managed exposure; allowing new symbols again below a materially higher caution threshold should reduce `59 filtered` loops without removing the existing bear-trend pause on `BTCUSDC`.
 - Target KPI delta:
-  - reduce profit giveback / loss persistence in multi-hour runs.
-  - reduce time spent near full allocation under adverse conditions.
-  - keep `T-034` funding behavior stable (no return of dominant `Insufficient spendable <quote>` loops).
+  - remove the dominant `No feasible candidates: daily loss caution paused new symbols` loop once exposure is already low-to-moderate.
+  - keep `Skip BTCUSDC: Daily loss caution paused GRID BUY leg` or `Grid guard paused BUY leg` available when the symbol itself still merits a pause.
+  - keep `T-034` funding behavior stable and preserve the working no-feasible recovery path.
 - Stop/rollback condition:
-  - if `T-034` funding loops return as dominant behavior, or unwind logic causes uncontrolled churn.
+  - if `T-034` funding loops return, the no-feasible recovery path regresses, or the relaxed caution threshold reintroduces churn after giveback.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
-  - repeated defensive bear-trend loops on concentrated home-quote inventory can escalate from passive sell-only handling to a throttled partial unwind.
+  - profit-giveback `CAUTION` no longer pauses all new symbols once managed exposure has already de-risked below the new trigger-aware threshold.
+  - symbol-level bear-trend/grid-guard BUY pauses still work on the risky managed symbol itself.
   - `T-034` funding/routing behavior remains unchanged.
   - `T-005` / `T-007` guard behavior remains unchanged.
 - Runtime evidence in decisions/logs:
-  - lower recurrence of `Grid guard paused BUY leg` and `Grid waiting for ladder slot or inventory` on the same high-allocation symbols.
-  - presence of `grid-guard-defensive-unwind` only when repeated bear-guard evidence exists.
+  - the dominant latest loop is no longer `No feasible candidates: daily loss caution paused new symbols (59 filtered)`.
+  - if `BTCUSDC` remains in bearish defensive handling, symbol-level BUY pause evidence still appears there instead of globally blocking all fresh entries.
   - no return of dominant `Insufficient spendable <quote>` loops.
-  - no guardrail regression from `T-005` / `T-007` / `T-034`.
+  - no regression of `no-feasible-liquidity-recovery`.
 - Risk slider impact:
-  - risk still bounds unwind policy; dynamic boosts must not bypass hard caps.
+  - risk still bounds the caution threshold and must not bypass hard caps.
 - Validation commands:
-  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./node_modules/.bin/vitest run --no-cache src/modules/bot/bot-engine.service.test.ts`
+  - `./scripts/validate-active-ticket.sh`
 - Runtime validation plan:
   - run duration: `1-3 hours`
   - expected bundle name pattern: `autobot-feedback-YYYYMMDD-HHMMSS.tgz`
 
 ## 3) Deployment handoff
 
-- Commit hash: `1156143`
+- Commit hash: `aaf532b`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -73,36 +75,36 @@ Use this file at the start and end of every batch.
 - Run context:
   - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `17.71`
-  - runtime uptime (hours): `908.337`
-  - run end: `Fri Mar 27 2026 12:24:30 GMT+0200 (Eastern European Standard Time)`
+  - bundle interval (hours): `2.186`
+  - runtime uptime (hours): `910.522`
+  - run end: `Fri Mar 27 2026 14:35:38 GMT+0200 (Eastern European Standard Time)`
   - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip: No feasible candidates after sizing/cap filters (5 rejected) (70))
+  - active ticket runtime signal: `observed` (Skip: No feasible candidates: daily loss caution paused new symbols (59 filtered) (48))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=113, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=43.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=106, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=47.0%)
   - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `continue`
+- Decision: `patch_required`
 - Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
-- Required action: `continue active ticket`
+- Required action: `same-ticket mitigation required before next long run`
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260327-102432.tgz`
-  - auto-updated at: `2026-03-27T10:25:01.181Z`
+  - bundle: `autobot-feedback-20260327-123604.tgz`
+  - auto-updated at: `2026-03-27T12:36:20.868Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-032
-Decision: continue
-Required action: continue active ticket
-Latest bundle: autobot-feedback-20260327-102432.tgz
+Decision: patch_required
+Required action: same-ticket mitigation required before next long run
+Latest bundle: autobot-feedback-20260327-123604.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
 In scope: exit-manager / de-risking behavior under adverse conditions.
