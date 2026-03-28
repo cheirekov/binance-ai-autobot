@@ -1,14 +1,14 @@
 # VALIDATION_LEDGER
 
-Last updated: 2026-03-28 10:47 EET  
+Last updated: 2026-03-28 23:10 EET  
 Owner: PM/BA + Runtime Analyst + Trader
 
 Purpose:
 track which runtime behaviors have real proof and which are still only hypotheses.
 
 ## Ticket currently under validation
-- `T-032`
-- Current batch action: `pivot_ticket`
+- `T-031`
+- Current batch action: `pivot_active_ticket`
 
 ## Required scenario classes
 
@@ -24,16 +24,16 @@ Question:
 - does the bot de-risk earlier instead of only waiting?
 
 Status:
-- not yet proven deterministically
+- preserved support lane
+- `T-032` remains live in runtime but is not the active development surface in this batch
 
-### S3 — Repeated grid-guard loop / bear-trend persistence
+### S3 — Regime-quality entry adaptation
 Question:
-- does the system escalate from passive waiting to bounded unwind?
+- does the regime engine classify stronger trend conditions earlier and feed a better entry-quality gate?
 
 Status:
-- `inconclusive`
-- the March 23 guard-pause loop is no longer the dominant latest signal in the 2026-03-27 bundle
-- keep the old guard-pause evidence as history, not as current batch authority
+- `running`
+- this is the new active validation surface for `T-031`
 
 ### S4 — Funding/routing pressure
 Question:
@@ -50,11 +50,18 @@ Question:
 
 Status:
 - `running`
-- latest bundle is fresh and not a proved engine-dead incident
-- the current question is whether `ABS_DAILY_LOSS` caution global new-symbol pause at `3.40%` exposure is intended healthy idle or over-restrictive policy
-- next proof needed: PM/BA lane decision, not another same-ticket patch
+- the latest bundle is fresh and clearly not engine-dead (`95` trades, `9` active orders)
+- the earlier March 28 low-exposure caution case stays as history, not current authority
 
-### S6 — No-feasible liquidity recovery under reserve starvation
+### S6 — Regime-aware fee floor
+Question:
+- in strong bull-trend conditions, can the bot avoid unnecessary fee-edge idling without weakening bear-side protection?
+
+Status:
+- `running`
+- first `T-031` slice implemented in this batch
+
+### S7 — No-feasible liquidity recovery under reserve starvation
 Question:
 - when spendable quote after reserve is too low, does the bot re-enable recovery sells instead of staying boxed into `No feasible` skips?
 
@@ -63,7 +70,7 @@ Status:
 - latest fresh bundle contains a real `no-feasible-liquidity-recovery` sell on `TAOUSDC`
 - the prior same-ticket gate patch now has live runtime evidence
 
-### S7 — Defensive BUY-order maintenance
+### S8 — Defensive BUY-order maintenance
 Question:
 - does `DEFENSIVE` cancel bot-owned BUY LIMIT orders only when a true buy pause is active?
 
@@ -72,14 +79,14 @@ Status:
 - latest fresh bundle runs the deployed fix on `5927bd9` and no longer shows the old defensive cancel signature
 - the same bundle is globally paused under `ABS_DAILY_LOSS`, so the resting-buy path is not fully exercised in the review window
 
-### S8 — Daily-loss caution re-entry policy
+### S9 — Daily-loss caution re-entry policy
 Question:
 - once managed exposure is already very low, should `ABS_DAILY_LOSS` caution still globally pause all new symbols?
 
 Status:
 - `running`
-- latest fresh bundle shows `200` skips, `0` trades, `0` active orders, and dominant `daily loss caution paused new symbols` at only `3.40%` exposure
-- next proof needed: PM/BA must decide whether this becomes a new follow-up / hardening ticket or is accepted as intended loss-protection behavior
+- this remains an open historical question from `autobot-feedback-20260328-084345.tgz`
+- it is not the dominant current blocker in `autobot-feedback-20260328-202730.tgz`
 
 ## Validation result states
 Use only one:
@@ -91,12 +98,13 @@ Use only one:
 - `inconclusive`
 
 ## Current validation evidence
+- `autobot-feedback-20260328-202730.tgz` ✅
 - `autobot-feedback-20260328-084345.tgz` ✅
 - raw bundle review (`last_run_summary.json`, `state.json`, `adaptive-shadow.tail.jsonl`) ✅
 - `./scripts/pmba-gate.sh start` ✅
 - `./scripts/pmba-gate.sh end` ✅
-- `./scripts/validate-active-ticket.sh` ✅
-- `./node_modules/.bin/vitest run --no-cache src/modules/bot/bot-engine.service.test.ts` ✅
+- `./scripts/pmba-gate.sh start` ✅
+- `docker compose -f docker-compose.ci.yml run --rm ci` ✅
 
 ## Promotion rule
 A runtime/strategy behavior is not "adaptive" just because it looked good in one recent market patch.

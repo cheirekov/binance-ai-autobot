@@ -1,6 +1,6 @@
 # Strategy Coverage (Source of Truth)
 
-Last updated: 2026-03-02
+Last updated: 2026-03-28
 Owner: PM/BA + Trader + Architect
 
 Purpose: prevent strategy drift/context loss by keeping one explicit list of:
@@ -38,6 +38,10 @@ These are execution behaviors currently active in runtime:
    - fee-aware summary math, bounded drawdown, executed-trade count consistency
    - ticket lineage: `T-007` (DONE)
 
+6. Adaptive regime routing (partial live)
+   - risk-linked regime classification and execution-lane selection
+   - first strategy-quality slice now active under `T-031`
+
 ---
 
 ## 2) Strategy sources we track
@@ -67,12 +71,17 @@ These are execution behaviors currently active in runtime:
 ## 3) Ticket ownership map for strategy evolution
 
 ## Active now
-- `T-030` — Universe filter-chain v2 (candidate actionability + staged reject reasons)
-
-## Next strategy core
-- `T-034` — Multi-quote execution policy v1 (remove home-quote lock assumptions; enable controlled cross-quote routing)
 - `T-031` — Regime engine v2
+  - current slices:
+    - risk-linked regime thresholds + regime-aware fee floor
+    - lane-aware candidate scoring so `SPOT_GRID` candidates are ranked by the execution lane the engine would actually use (`MARKET` / `GRID` / `DEFENSIVE`)
+  - objective: reduce fee/edge false idling in strong trends without weakening bear-side protection
+
+## Support / next strategy core
 - `T-032` — Exit manager v2
+  - remains live in runtime, but active development is paused unless downside-control evidence becomes dominant again
+- `T-034` — Multi-quote execution policy v1
+  - DONE; preserve funding/routing stability while `T-031` evolves strategy quality
 
 ## Learning / adaptation lane
 - `T-026` — Offline calibration runner

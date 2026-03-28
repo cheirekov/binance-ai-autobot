@@ -1,67 +1,62 @@
 # PM_TASK_SPLIT
 
-Last updated: 2026-03-28 10:47 EET  
+Last updated: 2026-03-28 23:10 EET  
 Owner: PM/BA + Codex
 
 ## PM/BA
-- Objective: convert the fresh March 28 bundle into an explicit next-lane decision
+- Objective: pivot active development to the higher-leverage strategy lane
 - Tasks:
-  - record `pivot_ticket`
-  - keep `T-032` as the authoritative current ticket until PM/BA approves a real switch
-  - close the prior defensive cancel-churn hypothesis
-  - define whether the next lane is `PM/BA-TRIAGE` only or a concrete new follow-up / hardening ticket
+  - record `pivot_active_ticket`
+  - freeze `T-032` as support/runtime-preserved work
+  - activate `T-031` cleanly in board/session/switch-retro docs
 - Deliverable: explicit pivot recommendation
 - Dependency: latest bundle evidence
 
 ## Architect
-- Objective: avoid another blind runtime patch
+- Objective: keep the strategy slice bounded
 - Tasks:
-  - confirm the `5927bd9` deployment removed the previous same-ticket defect
-  - isolate the remaining open question as `ABS_DAILY_LOSS` caution re-entry / healthy-idle policy
-  - defer code until PM/BA chooses the next lane
-- Deliverable: no-code architecture read
-- Dependency: direct bundle read
+  - confirm current code still uses simpler regime thresholds and a regime-agnostic fee floor
+  - keep the first `T-031` slice limited to those two surfaces
+- Deliverable: bounded strategy-slice definition
+- Dependency: direct bundle read + code audit
 
 ## Trader
-- Objective: classify whether the latest idle behavior is acceptable risk policy
+- Objective: move adaptation work toward strategy-quality, not more proof-only downside-control waiting
 - Tasks:
-  - review the fact pattern: `ABS_DAILY_LOSS`, `3.40%` exposure, high free quote, no active orders
-  - decide whether global new-symbol pause at this state is intended or too restrictive
-  - recommend whether this belongs in a new follow-up ticket
-- Deliverable: policy-vs-bug judgment
-- Dependency: live bundle facts
+  - review the fact pattern: current blockers are `Fee/edge filter` + parked-ladder waiting
+  - approve a regime-linked threshold / fee-floor strategy slice as the next most valuable move
+- Deliverable: strategy-lane approval
+- Dependency: live bundle facts + code audit
 
 ## Runtime Analyst
-- Objective: capture the pivot evidence cleanly
+- Objective: capture the reprioritization evidence cleanly
 - Tasks:
-  - document that the latest 200 decisions are all `SKIP`
-  - document that the prior defensive cancel signature is gone
-  - document that the remaining repeats are global new-symbol pause plus `BTCUSDC` fee/edge filter
-- Deliverable: pivot evidence summary
+  - document that the latest bundle is fresh and strategy-quality dominated
+  - document the switch trigger from `T-032` to `T-031`
+  - document the expected next proof after deployment
+- Deliverable: updated pivot digest
 - Dependency: raw bundle review
 
 ## AI Specialist
 - Objective: keep AI scope unchanged
 - Tasks:
-  - confirm this pivot batch does not change AI behavior or promotion scope
-  - keep the lane decision strictly around runtime/risk policy
+  - confirm this batch changes no AI behavior or promotion scope
 - Deliverable: AI scope freeze
 - Dependency: none
 
 ## State Steward
-- Objective: align process memory to the pivot review
+- Objective: realign easy-process memory
 - Tasks:
-  - update batch decision artifacts from `patch_same_ticket` to `pivot_ticket`
-  - keep auto-retro as the controlling batch decision
-  - do not switch the board until PM/BA explicitly approves a new active ticket
-- Deliverable: current docs aligned to `pivot_required`
+  - update working-memory docs from `continue_same_ticket` / `T-032` to `pivot_active_ticket` / `T-031`
+  - keep the manual PM/BA decision explicit
+- Deliverable: current docs aligned to `T-031`
 - Dependency: PM/BA decision
 
 ## Senior BE/UI
-- Objective: hold off on behavior changes until scope is credible
+- Objective: land the first bounded `T-031` slice
 - Tasks:
-  - make no runtime code patch in this batch
-  - add the March 28 triage note
-  - update the session/easy-process handoff docs for the new bundle
-- Deliverable: docs-only pivot package
-- Dependency: PM/BA review
+  - implement risk-linked regime thresholds
+  - implement regime-aware fee floor
+  - add regression tests and Docker validation
+- Deliverable: bounded strategy patch
+- Dependency: PM/BA review + architect scope freeze

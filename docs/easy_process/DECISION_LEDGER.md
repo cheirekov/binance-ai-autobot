@@ -30,6 +30,44 @@ preserve the reasoning trail across cycles in a compact append-only form.
 
 ## Ledger
 
+### 2026-03-28T23:10:00Z | cycle=POST_BUNDLE_STRATEGY_REPRIORITIZATION | decision=pivot_active_ticket
+- active_ticket: T-031
+- lane: Lane C — Strategy quality
+- evidence_class: fresh
+- observed:
+  - latest bundle is `autobot-feedback-20260328-202730.tgz`
+  - `risk_state=NORMAL`, `daily_net_usdt=+19.17`, `max_drawdown_pct=0.97`
+  - dominant repeats are `Fee/edge filter` and parked-ladder waiting, not a live `T-032` downside-control defect
+  - current regime code still used simpler fixed thresholds and a regime-agnostic fee floor
+- inferred:
+  - active development should move from `T-032` to `T-031`
+  - the highest-leverage next batch is a bounded regime-engine strategy slice
+- action:
+  - freeze `T-032` as a support lane
+  - activate `T-031`
+  - patch runtime with risk-linked regime thresholds and a regime-aware fee floor
+- rollback_or_revisit_when:
+  - the first fresh `T-031` bundle reopens a funding regression or materially weakens downside protection
+
+### 2026-03-28T20:27:10Z | cycle=NIGHT_RUN | decision=continue_same_ticket
+- active_ticket: T-032
+- lane: Lane A — Runtime stability
+- evidence_class: fresh
+- observed:
+  - latest bundle is `autobot-feedback-20260328-202730.tgz`
+  - `risk_state=NORMAL`, `daily_net_usdt=+19.17`, `max_drawdown_pct=0.97`
+  - `sizingRejectPressure=low`
+  - dominant repeats are `Fee/edge filter` on `BTCUSDC` / `SOLUSDC` plus parked-ladder waiting
+- inferred:
+  - the earlier March 28 pivot/no-code review is superseded by fresher evidence
+  - no ticket pivot is justified from this bundle alone
+- action:
+  - keep `T-032` active
+  - make no runtime patch in this batch
+  - require another fresh bundle or a new bounded same-ticket hypothesis before code changes
+- rollback_or_revisit_when:
+  - a new fresh bundle reintroduces the low-exposure caution pause as the dominant blocker, or a live `P0/P1` incident appears
+
 ### 2026-03-26T16:47:00Z | cycle=FOLLOWUP_P0_RUNTIME_RECOVERY_2 | decision=patch_now
 - active_ticket: T-032
 - lane: Lane A — Runtime stability

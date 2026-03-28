@@ -1,28 +1,28 @@
 # NEXT_ACTIVE_LANE_DECISION
 
-Last updated: 2026-03-27 12:33 EET  
+Last updated: 2026-03-28 23:10 EET  
 Owner: PM/BA + Codex
 
 ## Decision
-- Next active development lane: `Lane A — Runtime stability`
-- Active ticket: `T-032` (`Exit manager v2`)
-- Ticket decision: `continue_same_ticket`
-- `BATCH_ACTION_CLASS` for this normalization batch: `OPERATIONS_ADJUSTMENT`
+- Next active development lane: `Lane C — Strategy quality`
+- Active ticket: `T-031` (`Regime engine v2`)
+- Ticket decision: `pivot_active_ticket`
+- `BATCH_ACTION_CLASS` for this batch: `PATCH_NOW`
 
-## Why `T-032` remains active
-- `docs/DELIVERY_BOARD.md` still marks `T-032` as the only `IN_PROGRESS` ticket
-- `docs/TICKET_SWITCH_RETRO.md` still justifies `T-032` over `T-031`
-- the latest fresh runtime evidence on 2026-03-27 says `continue active ticket` and does not currently prove a live `P0/P1` incident
+## Why `T-031` is now active
+- `docs/DELIVERY_BOARD.md` now marks `T-031` as `IN_PROGRESS`
+- `docs/TICKET_SWITCH_RETRO.md` now justifies `T-031` over `T-032`
+- the latest fresh runtime evidence no longer points to downside control as the dominant blocker; current blockers are strategy-quality signals
 
 ## What is not chosen
-- no pivot to `T-031`
 - no reopening of DONE `T-034`
-- no split ticket now
+- no exit-manager rewrite in this batch
+- no AI/news lane activation
 
 ## Follow-up ticket rule
-- If future fresh evidence proves a closed-ticket regression or proves the current signal no longer belongs inside `T-032`, create a new follow-up / hardening / incident ticket.
+- If future fresh evidence proves a closed-ticket regression or proves the current signal no longer belongs inside `T-031`, create a new follow-up / hardening / incident ticket.
 - Do not rewrite the historical meaning of any DONE ticket.
 
 ## Development resume decision
-- Yes: development can resume in normal mode after this normalization batch.
-- Constraint: the next coding batch must rewrite the start-of-batch `T-032` contract before implementation.
+- Yes: development resumes immediately on `T-031`.
+- Constraint: preserve `T-032` downside controls and `T-034` funding stability while the first strategy slice lands.

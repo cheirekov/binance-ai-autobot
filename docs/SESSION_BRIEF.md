@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-28 08:44 UTC
+Last updated: 2026-03-28 23:45 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -8,46 +8,51 @@ Use this file at the start and end of every batch.
 ## 1) Batch contract (fill before coding)
 
 - Batch type: `SHORT (1-3h)`
-- Active ticket: `T-032` (Exit manager v2)
-- Goal (single sentence): review the fresh March 28 bundle and decide whether `T-032` should pivot, because the previous same-ticket patch deployed and the remaining repeat now looks like an `ABS_DAILY_LOSS` caution policy question rather than another safe runtime micro-fix.
+- Active ticket: `T-031` (Regime engine v2)
+- Goal (single sentence): move active development from prolonged `T-032` proof work to the first real `T-031` strategy slice so the bot adapts entries to regime quality instead of waiting on more downside-control-only evidence.
+- Goal (single sentence): continue `T-031` with a second bounded slice so `SPOT_GRID` candidate ranking follows the actual resolved execution lane (`MARKET` / `GRID` / `DEFENSIVE`) instead of mostly favoring grid-style candidates.
 - In scope:
-  - confirm the deployed `5927bd9` build closed the previous defensive cancel-churn hypothesis.
-  - classify the remaining `ABS_DAILY_LOSS` caution global new-symbol pause at low exposure.
-  - add the required triage note and explicit next-lane recommendation.
-  - preserve `T-034` funding stability and all closed guardrail tickets.
+  - freeze `T-032` as a support lane, not the active development lane.
+  - implement `T-031` first slice: risk-linked regime thresholds and regime-aware fee floor.
+  - implement the next `T-031` slice: lane-aware candidate scoring.
+  - preserve existing `T-032` downside controls and `T-034` funding stability.
+  - record the ticket switch cleanly in PM/BA artifacts.
 - Out of scope:
-  - another blind runtime patch on `T-032`,
   - quote-routing redesign (`T-034` is closed unless runtime regresses),
+  - exit-manager rewrite in this batch,
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: the latest bundle proves the previous `T-032` patch deployed and removed the old churn signature. The remaining repeat is likely a PM/BA scope question about daily-loss caution re-entry / healthy-idle policy, so the correct next move is pivot review, not another same-ticket patch.
+- Hypothesis: current fresh evidence says `T-032` is no longer the highest-leverage lane. The dominant repeats are now strategy-quality signals (`Fee/edge filter`, parked-ladder waiting), and the selector still scores `SPOT_GRID` candidates too much through the grid lens. The next meaningful improvement is to align candidate ranking with the resolved execution lane.
 - Target KPI delta:
-  - produce an explicit next-lane decision before more code lands.
-  - preserve `T-034` funding behavior and all closed-ticket guardrails.
-  - avoid another drift cycle on `T-032` without a new bounded hypothesis.
+  - reduce fee-edge idle churn in strong trend conditions.
+  - keep downside-control runtime intact while improving entry selection quality.
+  - stop spending more cycles on unproven `T-032`-only live-market waiting.
 - Stop/rollback condition:
-  - if fresh evidence proves a current `P0/P1` runtime incident, stop the pivot review and open the correct incident batch instead.
+  - if the strategy slice weakens bear-side protection or reopens quote-funding regressions, freeze `T-031` and revert to the last `T-032`/`T-034`-stable baseline.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
-  - no runtime behavior change is made in this batch.
-  - the output of this batch is a PM/BA pivot decision and next-lane recommendation.
+  - runtime behavior changes in a bounded way:
+    - regime classification becomes risk-linked,
+    - fee-edge floor becomes regime-aware.
+    - `SPOT_GRID` candidate scoring becomes lane-aware.
+  - active development lane becomes `T-031`; `T-032` remains paused/support only.
 - Runtime evidence in decisions/logs:
   - latest bundle runs `git.commit=5927bd9`.
-  - latest bundle no longer shows the old defensive cancel/recreate signature.
-  - dominant remaining repeat is `daily loss caution paused new symbols` under `ABS_DAILY_LOSS` with `BTCUSDC` fee/edge filter as the managed-symbol path.
+  - latest fresh bundle is dominated by `Fee/edge filter` and parked-ladder waiting, not quote-funding starvation.
+  - the next fresh bundle should show changed fee-edge behavior or changed candidate mix under strong bull-trend candidates without reopening funding regressions.
 - Risk slider impact:
-  - none in this `NO_CODE` pivot batch.
+  - risk slider now influences regime thresholds directly inside `T-031`.
 - Validation commands:
-  - raw bundle review only (`last_run_summary.json`, `state.json`, `adaptive-shadow.tail.jsonl`)
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
 - Runtime validation plan:
-  - no new runtime validation until PM/BA chooses the next lane
+  - deploy the current `T-031` slices and collect one fresh bundle before any further strategy reprioritization
 
 ## 3) Deployment handoff
 
-- Commit hash: `5927bd9`
+- Commit hash: `<set-after-commit>`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -68,42 +73,42 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `NIGHT (collection) / NIGHT (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `16.838`
-  - runtime uptime (hours): `930.656`
-  - run end: `Sat Mar 28 2026 10:43:41 GMT+0200 (Eastern European Standard Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - bundle interval (hours): `11.725`
+  - runtime uptime (hours): `942.381`
+  - run end: `Sat Mar 28 2026 22:27:10 GMT+0200 (Eastern European Standard Time)`
+  - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip: No feasible candidates: daily loss caution paused new symbols (59 filtered) (100))
+  - active ticket runtime signal: `observed` (Skip BTCUSDC: Fee/edge filter (net 0.040% < 0.052%) (15))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=137, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=33.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=9, historyLimitOrders=156, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=22.0%)
+  - sizing reject pressure: `low` (sizingRejectSkips=1, decisions=200, ratio=0.5%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `pivot_required`
-- Next ticket candidate: `PM/BA-TRIAGE` (triage required before lane change)
-- Required action: `PM/BA pivot review required before next long run`
+- Decision: `manual reprioritize`
+- Next ticket candidate: `T-031`
+- Required action: `deploy current T-031 slices`
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260328-084345.tgz`
-  - auto-updated at: `2026-03-28T08:44:12.719Z`
+  - bundle: `autobot-feedback-20260328-202730.tgz`
+  - auto-updated at: `2026-03-28T20:28:11.919Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
-Ticket: T-032
-Decision: pivot_required
-Required action: PM/BA pivot review required before next long run
-Latest bundle: autobot-feedback-20260328-084345.tgz
+Ticket: T-031
+Decision: pivot_to_T-031
+Required action: deploy first regime-engine slice
+Latest bundle: autobot-feedback-20260328-202730.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: decide whether T-032 should pivot after the deployed fix removed the old churn signature and the remaining repeat moved into ABS_DAILY_LOSS caution policy.
-In scope: PM/BA lane review, triage note, and next-ticket recommendation.
-Out of scope: quote-routing redesign, candidate-hygiene-only optimization, PnL schema changes, AI lane.
-Validation: raw bundle review only in this NO_CODE batch
-After decision: if switching lanes, update docs/DELIVERY_BOARD.md, docs/TICKET_SWITCH_RETRO.md, and docs/SESSION_BRIEF.md.
+Goal: improve strategy adaptation with risk-linked regime thresholds, regime-aware fee floor, and lane-aware candidate scoring while preserving T-032/T-034 protections.
+In scope: T-031 regime engine v2 bounded slices.
+Out of scope: quote-routing redesign, exit-manager rewrite, PnL schema changes, AI lane.
+Validation: docker compose -f docker-compose.ci.yml run --rm ci
+After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

@@ -1354,6 +1354,36 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.getBearPauseConfidenceThreshold(100)).toBe(0.7);
   });
 
+  it("classifies borderline bull trend earlier at higher risk", () => {
+    const helpers = service as unknown as {
+      buildRegimeSnapshot: (
+        candidate: UniverseCandidate | null,
+        risk: number
+      ) => {
+        label: "BULL_TREND" | "BEAR_TREND" | "RANGE" | "NEUTRAL" | "UNKNOWN";
+        confidence: number;
+        inputs: Record<string, unknown>;
+      };
+    };
+
+    const candidate: UniverseCandidate = {
+      symbol: "BTCUSDC",
+      baseAsset: "BTC",
+      quoteAsset: "USDC",
+      lastPrice: 100_000,
+      quoteVolume24h: 15_000_000,
+      priceChangePct24h: 0.72,
+      rsi14: 56,
+      adx14: 34,
+      atrPct14: 1.1,
+      score: 1,
+      reasons: []
+    };
+
+    expect(helpers.buildRegimeSnapshot(candidate, 0).label).toBe("NEUTRAL");
+    expect(helpers.buildRegimeSnapshot(candidate, 100).label).toBe("BULL_TREND");
+  });
+
   it("tightens stop-loss in confirmed bear regime", () => {
     const helpers = service as unknown as {
       getRegimeAdjustedStopLossPct: (params: {
@@ -1387,6 +1417,228 @@ describe("bot-engine insufficient-balance helpers", () => {
       regime: { label: "BULL_TREND", confidence: 0.95, inputs: {} }
     });
     expect(bullUnchanged).toBe(-2);
+  });
+
+  it("adjusts fee-edge floor by regime and strategy", () => {
+    const helpers = service as unknown as {
+      getRegimeAdjustedMinNetEdgePct: (params: {
+        risk: number;
+        baseMinNetEdgePct: number;
+        regime: {
+          label: "BULL_TREND" | "BEAR_TREND" | "RANGE" | "NEUTRAL" | "UNKNOWN";
+          confidence: number;
+          inputs: Record<string, unknown>;
+        };
+        strategy: {
+          trend: number;
+          meanReversion: number;
+          grid: number;
+          recommended: "TREND" | "MEAN_REVERSION" | "GRID";
+        };
+      }) => number;
+    };
+
+    const neutral = helpers.getRegimeAdjustedMinNetEdgePct({
+      risk: 100,
+      baseMinNetEdgePct: 0.15,
+      regime: { label: "NEUTRAL", confidence: 0.4, inputs: {} },
+      strategy: { trend: 0.45, meanReversion: 0.3, grid: 0.4, recommended: "TREND" }
+    });
+    const bull = helpers.getRegimeAdjustedMinNetEdgePct({
+      risk: 100,
+      baseMinNetEdgePct: 0.15,
+      regime: { label: "BULL_TREND", confidence: 0.82, inputs: {} },
+      strategy: { trend: 0.78, meanReversion: 0.2, grid: 0.46, recommended: "TREND" }
+    });
+    const bear = helpers.getRegimeAdjustedMinNetEdgePct({
+      risk: 100,
+      baseMinNetEdgePct: 0.15,
+      regime: { label: "BEAR_TREND", confidence: 0.84, inputs: {} },
+      strategy: { trend: 0.22, meanReversion: 0.51, grid: 0.33, recommended: "MEAN_REVERSION" }
+    });
+
+    expect(bull).toBeLessThan(neutral);
+    expect(bear).toBeGreaterThan(neutral);
+  });
+
+  it("prefers bull trend candidates in MARKET lane over grid-biased waiting candidates", () => {
+    const helpers = service as unknown as {
+      scoreAdaptiveExecutionCandidate: (params: {
+        executionLane: "GRID" | "MARKET" | "DEFENSIVE";
+        regime: {
+          label: "BULL_TREND" | "BEAR_TREND" | "RANGE" | "NEUTRAL" | "UNKNOWN";
+          confidence: number;
+          inputs: Record<string, unknown>;
+        };
+        strategy: {
+          trend: number;
+          meanReversion: number;
+          grid: number;
+          recommended: "TREND" | "MEAN_REVERSION" | "GRID";
+        };
+        risk: number;
+        canTakeAction: boolean;
+        waiting: boolean;
+        buyPaused: boolean;
+        hasInventory: boolean;
+        hasBuyLimit: boolean;
+        hasSellLimit: boolean;
+        missingBuyLeg: boolean;
+        missingSellLeg: boolean;
+        openLimitCount: number;
+        maxGridOrdersPerSymbol: number;
+        recentGridBuySizingRejects: number;
+        recentGridBuyQuoteInsufficient: number;
+        recentGridSellSizingRejects: number;
+        recentFeeEdgeRejects: number;
+        minOrderPressureActive: boolean;
+        recentInventoryWaitingSkips: number;
+        inventoryWaitingPressureActive: boolean;
+        sellLegLikelyFeasible: boolean;
+      }) => number;
+    };
+
+    const marketScore = helpers.scoreAdaptiveExecutionCandidate({
+      executionLane: "MARKET",
+      regime: { label: "BULL_TREND", confidence: 0.84, inputs: {} },
+      strategy: { trend: 0.82, meanReversion: 0.22, grid: 0.31, recommended: "TREND" },
+      risk: 100,
+      canTakeAction: true,
+      waiting: false,
+      buyPaused: false,
+      hasInventory: false,
+      hasBuyLimit: false,
+      hasSellLimit: false,
+      missingBuyLeg: true,
+      missingSellLeg: false,
+      openLimitCount: 0,
+      maxGridOrdersPerSymbol: 6,
+      recentGridBuySizingRejects: 0,
+      recentGridBuyQuoteInsufficient: 0,
+      recentGridSellSizingRejects: 0,
+      recentFeeEdgeRejects: 0,
+      minOrderPressureActive: false,
+      recentInventoryWaitingSkips: 0,
+      inventoryWaitingPressureActive: false,
+      sellLegLikelyFeasible: true
+    });
+
+    const gridWaitingScore = helpers.scoreAdaptiveExecutionCandidate({
+      executionLane: "GRID",
+      regime: { label: "RANGE", confidence: 0.58, inputs: {} },
+      strategy: { trend: 0.28, meanReversion: 0.41, grid: 0.64, recommended: "GRID" },
+      risk: 100,
+      canTakeAction: false,
+      waiting: true,
+      buyPaused: false,
+      hasInventory: true,
+      hasBuyLimit: true,
+      hasSellLimit: true,
+      missingBuyLeg: false,
+      missingSellLeg: false,
+      openLimitCount: 2,
+      maxGridOrdersPerSymbol: 6,
+      recentGridBuySizingRejects: 0,
+      recentGridBuyQuoteInsufficient: 0,
+      recentGridSellSizingRejects: 0,
+      recentFeeEdgeRejects: 0,
+      minOrderPressureActive: false,
+      recentInventoryWaitingSkips: 3,
+      inventoryWaitingPressureActive: true,
+      sellLegLikelyFeasible: true
+    });
+
+    expect(marketScore).toBeGreaterThan(gridWaitingScore);
+  });
+
+  it("prefers inventory-bearing defensive candidates over no-inventory defensive dead ends", () => {
+    const helpers = service as unknown as {
+      scoreAdaptiveExecutionCandidate: (params: {
+        executionLane: "GRID" | "MARKET" | "DEFENSIVE";
+        regime: {
+          label: "BULL_TREND" | "BEAR_TREND" | "RANGE" | "NEUTRAL" | "UNKNOWN";
+          confidence: number;
+          inputs: Record<string, unknown>;
+        };
+        strategy: {
+          trend: number;
+          meanReversion: number;
+          grid: number;
+          recommended: "TREND" | "MEAN_REVERSION" | "GRID";
+        };
+        risk: number;
+        canTakeAction: boolean;
+        waiting: boolean;
+        buyPaused: boolean;
+        hasInventory: boolean;
+        hasBuyLimit: boolean;
+        hasSellLimit: boolean;
+        missingBuyLeg: boolean;
+        missingSellLeg: boolean;
+        openLimitCount: number;
+        maxGridOrdersPerSymbol: number;
+        recentGridBuySizingRejects: number;
+        recentGridBuyQuoteInsufficient: number;
+        recentGridSellSizingRejects: number;
+        recentFeeEdgeRejects: number;
+        minOrderPressureActive: boolean;
+        recentInventoryWaitingSkips: number;
+        inventoryWaitingPressureActive: boolean;
+        sellLegLikelyFeasible: boolean;
+      }) => number;
+    };
+
+    const withInventory = helpers.scoreAdaptiveExecutionCandidate({
+      executionLane: "DEFENSIVE",
+      regime: { label: "BEAR_TREND", confidence: 0.82, inputs: {} },
+      strategy: { trend: 0.21, meanReversion: 0.46, grid: 0.27, recommended: "MEAN_REVERSION" },
+      risk: 100,
+      canTakeAction: true,
+      waiting: false,
+      buyPaused: true,
+      hasInventory: true,
+      hasBuyLimit: false,
+      hasSellLimit: false,
+      missingBuyLeg: false,
+      missingSellLeg: true,
+      openLimitCount: 0,
+      maxGridOrdersPerSymbol: 6,
+      recentGridBuySizingRejects: 0,
+      recentGridBuyQuoteInsufficient: 0,
+      recentGridSellSizingRejects: 0,
+      recentFeeEdgeRejects: 0,
+      minOrderPressureActive: false,
+      recentInventoryWaitingSkips: 0,
+      inventoryWaitingPressureActive: false,
+      sellLegLikelyFeasible: true
+    });
+
+    const noInventory = helpers.scoreAdaptiveExecutionCandidate({
+      executionLane: "DEFENSIVE",
+      regime: { label: "BEAR_TREND", confidence: 0.82, inputs: {} },
+      strategy: { trend: 0.21, meanReversion: 0.46, grid: 0.27, recommended: "MEAN_REVERSION" },
+      risk: 100,
+      canTakeAction: false,
+      waiting: false,
+      buyPaused: true,
+      hasInventory: false,
+      hasBuyLimit: false,
+      hasSellLimit: false,
+      missingBuyLeg: false,
+      missingSellLeg: false,
+      openLimitCount: 0,
+      maxGridOrdersPerSymbol: 6,
+      recentGridBuySizingRejects: 0,
+      recentGridBuyQuoteInsufficient: 0,
+      recentGridSellSizingRejects: 0,
+      recentFeeEdgeRejects: 0,
+      minOrderPressureActive: false,
+      recentInventoryWaitingSkips: 0,
+      inventoryWaitingPressureActive: false,
+      sellLegLikelyFeasible: false
+    });
+
+    expect(withInventory).toBeGreaterThan(noInventory);
   });
 
   it("applies post stop-loss entry cooldown per symbol", () => {

@@ -1,41 +1,36 @@
 # NEXT_CYCLE_HANDOFF
 
-Last updated: 2026-03-25  
+Last updated: 2026-03-28 23:10 EET  
 Owner: PM/BA
 
 Purpose:
 give the next model session a strict, low-noise handoff.
 
 ## What changed this cycle
-- the process was hardened against context loss and time ambiguity
-- `RUN_CONTEXT.md`, `DECISION_LEDGER.md`, and `NEXT_CYCLE_HANDOFF.md` became mandatory continuity files
-- the project is explicitly operating in `validation` mode for the current stuck case
+- the latest fresh bundle (`autobot-feedback-20260328-202730.tgz`) was reviewed together with the current runtime code
+- active development pivoted from `T-032` to `T-031`
+- the first `T-031` slice landed in code and the easy-process working memory was realigned to the switch
 
 ## What did NOT change this cycle
-- active ticket remains `T-032`
-- active lane remains `Lane B — Deterministic validation`
-- latest reviewed bundle remains `autobot-feedback-20260324-091829.tgz`
-- there is still no proved fresh runtime evidence for the patched behavior
+- `T-032` downside controls stay in runtime as a preserved support lane
+- `T-034` remains closed
+- no AI/news lane work was activated
 
 ## What is still unknown
-- whether the current `T-032` path is reachable but unexercised
-- whether the path is too weak or blocked by another runtime condition
-- whether further code change is needed after deterministic validation
+- whether the new `T-031` slice materially reduces fee-edge idling in strong trend conditions
+- whether parked-ladder waiting remains a secondary blocker after the regime/fee-floor change
 
 ## What the next cycle must do
-1. read the eight core easy-process files first
-2. confirm `RUN_CONTEXT.md` is current
-3. stay in `VALIDATION_ONLY` unless new fresh evidence justifies otherwise
-4. define or execute deterministic validation for `T-032`
-5. append the decision to `DECISION_LEDGER.md`
-6. leave a new handoff at cycle end
+1. read the current easy-process files first
+2. confirm the latest bundle is still `autobot-feedback-20260328-202730.tgz` or a newer fresh authority exists
+3. validate the first `T-031` slice on the next fresh bundle
+4. append the decision to `DECISION_LEDGER.md`
+5. leave a new handoff at cycle end
 
 ## What the next cycle must NOT do
-- do not treat the latest stale bundle as patch authority
+- do not reopen `T-032` as active without fresh evidence that it is again the dominant blocker
 - do not open a second active ticket
-- do not read raw `state.json` first
-- do not assume day/time/cycle from chat history
-- do not claim the bot is adaptive from one market window
+- do not patch `T-031` again without reading the first post-deploy bundle
 
 ## The smallest acceptable next output set
 - `LATEST_BATCH_DECISION.md`

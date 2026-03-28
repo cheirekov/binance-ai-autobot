@@ -16,6 +16,55 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-28 23:45 UTC — T-031 second slice: lane-aware candidate scoring
+- Scope:
+  - deliver the next real `T-031` strategy slice immediately after the ticket pivot by aligning candidate ranking with the execution lane the engine would actually use.
+- BA requirement mapping:
+  - latest fresh evidence (`autobot-feedback-20260328-202730.tgz`) shows current blockers are `Fee/edge filter` and parked-ladder waiting, not a live `T-032` downside-control defect.
+  - code audit showed that `SPOT_GRID` candidate selection still ranked candidates mostly by `grid` score even when regime/lane resolution pointed to `MARKET` or `DEFENSIVE`.
+- PM milestone mapping:
+  - continue `T-031` with a bounded same-ticket patch that improves strategy adaptation without reopening `T-032` or `T-034`.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `scoreAdaptiveExecutionCandidate(...)`.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: `SPOT_GRID` selection now resolves a per-candidate execution lane and scores the candidate according to that lane instead of using a mostly grid-weighted score for every candidate.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for market-lane preference in bull-trend conditions and defensive preference for inventory-bearing symbols.
+  - `docs/TRIAGE_NOTE_2026-03-28_T031_LANE_SCORING_AND_FEE_EDGE_ALIGNMENT.md`: recorded the same-ticket strategy-quality triage note.
+- Risk slider impact:
+  - risk already influenced regime thresholds from the first `T-031` slice; this batch extends that by letting lane-specific candidate ranking react to the same regime/risk context.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/pmba-gate.sh start`
+- Runtime test request:
+  - deploy this batch without resetting state and collect one fresh bundle.
+  - expected next proof: lower dominant `Fee/edge filter` idling or changed candidate mix in strong trend conditions, while keeping `T-032` downside control and `T-034` routing stability intact.
+- Follow-up:
+  - if the next fresh bundle still shows the same dominant fee-edge/parked-ladder profile, the next `T-031` slice should target candidate-level regime demotion / range promotion explicitly, not reopen `T-032`.
+
+## 2026-03-28 23:10 UTC — T-031 first slice: pivot from T-032 to regime-linked strategy thresholds
+- Scope:
+  - stop spending more live-market cycles on `T-032` proof as the active lane and activate the first real `T-031` strategy slice.
+- BA requirement mapping:
+  - latest fresh runtime evidence (`autobot-feedback-20260328-202730.tgz`) no longer shows `T-032` as the dominant blocker; current dominant repeats are `Fee/edge filter` and parked-ladder waiting.
+  - code audit confirms the regime engine is still using simpler fixed thresholds and a regime-agnostic fee floor.
+- PM milestone mapping:
+  - freeze `T-032` as support/runtime-preserved work and switch active development to `T-031`, because this is now the highest-leverage strategy lane.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added risk-linked regime thresholds and threaded risk into `buildRegimeSnapshot(...)`.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added regime-aware fee-floor adjustment so strong bull-trend / trend-dominant setups can use a tighter edge floor while confirmed bear regimes tighten it.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for risk-linked bull classification and regime-adjusted fee floors.
+  - `docs/DELIVERY_BOARD.md`, `docs/STRATEGY_COVERAGE.md`, `docs/SESSION_BRIEF.md`, `docs/TICKET_SWITCH_RETRO.md`: updated to reflect `T-031` as the active ticket.
+  - `docs/TRIAGE_NOTE_2026-03-28_T032_DIMINISHING_RETURNS_PIVOT_TO_T031.md`: added the explicit pivot note.
+- Risk slider impact:
+  - the risk slider now influences regime classification thresholds directly inside `T-031`.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/pmba-gate.sh start`
+- Runtime test request:
+  - deploy this batch without resetting state and collect one fresh bundle.
+  - expected next proof: changed fee-edge behavior under strong trend conditions while preserving `T-032` downside protections and `T-034` funding stability.
+- Follow-up:
+  - if the next fresh bundle still shows dominant fee-edge idling with no measurable improvement, keep `T-031` active but write a narrower same-ticket hypothesis before another patch.
+
 ## 2026-03-28 08:47 UTC — T-032 review: pivot_required after ABS_DAILY_LOSS caution global pause
 - Scope:
   - review `autobot-feedback-20260328-084345.tgz` after the deployed `5927bd9` build and decide whether the active lane should continue on `T-032` or pivot before the next long run.

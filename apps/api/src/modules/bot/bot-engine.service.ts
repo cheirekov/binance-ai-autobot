@@ -3444,7 +3444,32 @@ export class BotEngineService implements OnModuleInit {
     };
   }
 
-  private buildRegimeSnapshot(candidate: UniverseCandidate | null): AdaptiveRegimeSnapshot {
+  private deriveRegimeThresholds(params: { risk: number; adx: number; atr: number }) {
+    const riskNorm = Math.max(0, Math.min(1, Number.isFinite(params.risk) ? params.risk / 100 : 0.5));
+    const adx = Number.isFinite(params.adx) ? Math.max(0, params.adx) : 0;
+    const atr = Number.isFinite(params.atr) ? Math.max(0, params.atr) : 0;
+    const adxStrength = this.clamp01((adx - 18) / 22);
+    const atrStrength = this.clamp01((atr - 0.4) / 1.6);
+
+    const trendAdxMin = this.toRounded(Math.max(18, 24 - riskNorm * 2 - adxStrength * 1.5), 4);
+    const bullRsiMin = this.toRounded(Math.max(52, 58 - riskNorm * 3 - adxStrength * 2), 4);
+    const bearRsiMax = this.toRounded(Math.min(48, 42 + riskNorm * 3 + adxStrength * 2), 4);
+    const trendChangeMin = this.toRounded(Math.max(0.4, 0.9 - riskNorm * 0.25 - adxStrength * 0.25), 4);
+    const rangeAdxMax = this.toRounded(Math.max(14, 19 - riskNorm * 1.25 + (atrStrength <= 0.2 ? 1 : 0)), 4);
+    const rangeBand = this.toRounded(Math.max(6, 9 - adxStrength * 2 + (atrStrength <= 0.25 ? 1 : 0)), 4);
+
+    return {
+      trendAdxMin,
+      bullRsiMin,
+      bearRsiMax,
+      trendChangeMin,
+      rangeAdxMax,
+      rangeRsiLow: this.toRounded(50 - rangeBand, 4),
+      rangeRsiHigh: this.toRounded(50 + rangeBand, 4)
+    };
+  }
+
+  private buildRegimeSnapshot(candidate: UniverseCandidate | null, risk = 50): AdaptiveRegimeSnapshot {
     const inputs = {
       priceChangePct24h: candidate?.priceChangePct24h,
       rsi14: candidate?.rsi14,
@@ -3465,16 +3490,42 @@ export class BotEngineService implements OnModuleInit {
       };
     }
 
-    if (adx >= 25 && change <= -1 && rsi <= 45) {
-      const confidence = this.clamp01(0.55 + Math.min(0.35, ((adx - 25) / 40) + Math.abs(change) / 20));
+    const thresholds = this.deriveRegimeThresholds({ risk, adx, atr });
+
+    if (adx >= thresholds.trendAdxMin && change <= -thresholds.trendChangeMin && rsi <= thresholds.bearRsiMax) {
+      const confidence = this.clamp01(
+        0.5 +
+          Math.min(
+            0.4,
+            (adx - thresholds.trendAdxMin) / 35 +
+              Math.abs(change) / 14 +
+              Math.max(0, thresholds.bearRsiMax - rsi) / 18
+          )
+      );
       return { label: "BEAR_TREND", confidence: this.toRounded(confidence, 4), inputs };
     }
-    if (adx >= 25 && change >= 1 && rsi >= 55) {
-      const confidence = this.clamp01(0.55 + Math.min(0.35, ((adx - 25) / 40) + Math.abs(change) / 20));
+    if (adx >= thresholds.trendAdxMin && change >= thresholds.trendChangeMin && rsi >= thresholds.bullRsiMin) {
+      const confidence = this.clamp01(
+        0.5 +
+          Math.min(
+            0.4,
+            (adx - thresholds.trendAdxMin) / 35 +
+              Math.abs(change) / 14 +
+              Math.max(0, rsi - thresholds.bullRsiMin) / 18
+          )
+      );
       return { label: "BULL_TREND", confidence: this.toRounded(confidence, 4), inputs };
     }
-    if (adx < 20 && rsi >= 40 && rsi <= 60) {
-      const confidence = this.clamp01(0.45 + Math.min(0.3, (20 - adx) / 40 + (Number.isFinite(atr) ? atr / 20 : 0)));
+    if (adx <= thresholds.rangeAdxMax && rsi >= thresholds.rangeRsiLow && rsi <= thresholds.rangeRsiHigh) {
+      const confidence = this.clamp01(
+        0.42 +
+          Math.min(
+            0.32,
+            (thresholds.rangeAdxMax - adx) / 25 +
+              Math.max(0, thresholds.rangeRsiHigh - rsi) / 60 +
+              (Number.isFinite(atr) ? Math.max(0, 1.4 - atr) / 12 : 0)
+          )
+      );
       return { label: "RANGE", confidence: this.toRounded(confidence, 4), inputs };
     }
 
@@ -3581,6 +3632,170 @@ export class BotEngineService implements OnModuleInit {
       grid: this.toRounded(grid, 4),
       recommended: candidates[0]?.strategy ?? "TREND"
     };
+  }
+
+  private getRegimeAdjustedMinNetEdgePct(params: {
+    risk: number;
+    baseMinNetEdgePct: number;
+    regime: AdaptiveRegimeSnapshot;
+    strategy: AdaptiveStrategyScores;
+  }): number {
+    const riskNorm = Math.max(0, Math.min(1, Number.isFinite(params.risk) ? params.risk / 100 : 0.5));
+    const baseRiskAdjusted = Math.max(0.05, params.baseMinNetEdgePct * (1 - riskNorm * 0.65));
+    const strongBullThreshold = this.toRounded(0.62 + riskNorm * 0.1, 4);
+    const strongBull =
+      params.regime.label === "BULL_TREND" &&
+      params.regime.confidence >= strongBullThreshold &&
+      params.strategy.recommended === "TREND" &&
+      params.strategy.trend >= params.strategy.grid + 0.1;
+    const confirmedBear =
+      params.regime.label === "BEAR_TREND" &&
+      params.regime.confidence >= this.getBearPauseConfidenceThreshold(params.risk);
+
+    let multiplier = 1;
+    if (strongBull) {
+      multiplier = 0.88;
+    } else if (confirmedBear) {
+      multiplier = 1.15;
+    }
+
+    return this.toRounded(Math.max(0.05, baseRiskAdjusted * multiplier), 6);
+  }
+
+  private scoreAdaptiveExecutionCandidate(params: {
+    executionLane: AdaptiveExecutionLane;
+    regime: AdaptiveRegimeSnapshot;
+    strategy: AdaptiveStrategyScores;
+    risk: number;
+    canTakeAction: boolean;
+    waiting: boolean;
+    buyPaused: boolean;
+    hasInventory: boolean;
+    hasBuyLimit: boolean;
+    hasSellLimit: boolean;
+    missingBuyLeg: boolean;
+    missingSellLeg: boolean;
+    openLimitCount: number;
+    maxGridOrdersPerSymbol: number;
+    recentGridBuySizingRejects: number;
+    recentGridBuyQuoteInsufficient: number;
+    recentGridSellSizingRejects: number;
+    recentFeeEdgeRejects: number;
+    minOrderPressureActive: boolean;
+    recentInventoryWaitingSkips: number;
+    inventoryWaitingPressureActive: boolean;
+    sellLegLikelyFeasible: boolean;
+  }): number {
+    const {
+      executionLane,
+      regime,
+      strategy,
+      risk,
+      canTakeAction,
+      waiting,
+      buyPaused,
+      hasInventory,
+      hasSellLimit,
+      missingBuyLeg,
+      missingSellLeg,
+      openLimitCount,
+      maxGridOrdersPerSymbol,
+      recentGridBuySizingRejects,
+      recentGridBuyQuoteInsufficient,
+      recentGridSellSizingRejects,
+      recentFeeEdgeRejects,
+      minOrderPressureActive,
+      recentInventoryWaitingSkips,
+      inventoryWaitingPressureActive,
+      sellLegLikelyFeasible
+    } = params;
+
+    const waitingPenalty = waiting ? 0.3 : 0;
+    const guardNoInventoryPenalty = buyPaused && !hasInventory ? 0.45 : 0;
+    const bearTrendGridPenalty =
+      regime.label === "BEAR_TREND" ? this.toRounded(0.22 - (risk / 100) * 0.1, 4) : 0;
+    const openLimitPenalty = Math.min(0.2, (openLimitCount / Math.max(1, maxGridOrdersPerSymbol)) * 0.2);
+    const rejectPenalty = Math.min(
+      0.55,
+      recentGridBuySizingRejects * 0.06 +
+        recentGridBuyQuoteInsufficient * 0.05 +
+        recentGridSellSizingRejects * 0.08 +
+        recentFeeEdgeRejects * 0.04
+    );
+    const minOrderPressurePenalty =
+      minOrderPressureActive && recentGridBuySizingRejects > 0 && !hasInventory ? 0.18 : 0;
+    const inventoryWaitingPenalty = Math.min(
+      0.45,
+      recentInventoryWaitingSkips * 0.07 + (inventoryWaitingPressureActive && waiting ? 0.18 : 0)
+    );
+    const infeasibleSellPenalty = !sellLegLikelyFeasible && hasInventory ? 0.35 : 0;
+
+    if (executionLane === "MARKET") {
+      const strategyBase = strategy.trend * 1.35 + strategy.meanReversion * 0.08 + strategy.grid * 0.02;
+      const recommendedBonus =
+        strategy.recommended === "TREND" ? 0.18 : strategy.recommended === "MEAN_REVERSION" ? 0.03 : -0.08;
+      const actionability = missingBuyLeg ? 1 : canTakeAction ? 0.3 : waiting ? 0.02 : 0.08;
+      const bullBonus = regime.label === "BULL_TREND" ? regime.confidence * 0.12 : 0;
+      const marketWaitingPenalty = waiting ? 0.42 : 0;
+      const inventoryPenalty = hasInventory ? 0.12 : 0;
+      const sellLegPenalty = missingSellLeg ? 0.08 : 0;
+      const buyPausePenalty = buyPaused ? 0.6 : 0;
+
+      return (
+        strategyBase +
+        recommendedBonus +
+        bullBonus +
+        actionability * 0.85 -
+        marketWaitingPenalty -
+        inventoryPenalty -
+        sellLegPenalty -
+        buyPausePenalty -
+        openLimitPenalty -
+        rejectPenalty -
+        inventoryWaitingPenalty
+      );
+    }
+
+    if (executionLane === "DEFENSIVE") {
+      const strategyBase = strategy.meanReversion * 0.55 + strategy.grid * 0.2 + strategy.trend * 0.05;
+      const inventoryBias = hasInventory ? 0.24 : -0.14;
+      const defensiveActionability = missingSellLeg ? 1 : hasInventory ? 0.65 : 0.05;
+      const bearBonus = regime.label === "BEAR_TREND" ? regime.confidence * 0.08 : 0;
+      const defensiveWaitingPenalty = waiting ? 0.12 : 0;
+      const defensiveBuyPausePenalty = buyPaused && !hasInventory ? 0.2 : 0;
+      const noSellLegPenalty = hasInventory && !missingSellLeg && hasSellLimit ? 0.08 : 0;
+
+      return (
+        strategyBase +
+        inventoryBias +
+        bearBonus +
+        defensiveActionability * 0.9 -
+        defensiveWaitingPenalty -
+        defensiveBuyPausePenalty -
+        noSellLegPenalty -
+        openLimitPenalty -
+        rejectPenalty -
+        inventoryWaitingPenalty -
+        infeasibleSellPenalty
+      );
+    }
+
+    const actionability = canTakeAction ? 1 : waiting ? (inventoryWaitingPressureActive ? 0.01 : 0.05) : 0.3;
+    const recommendedBonus = strategy.recommended === "GRID" ? 0.15 : strategy.recommended === "MEAN_REVERSION" ? 0.05 : 0;
+
+    return (
+      strategy.grid * 1.2 +
+      actionability * 0.8 +
+      recommendedBonus -
+      waitingPenalty -
+      guardNoInventoryPenalty -
+      bearTrendGridPenalty -
+      openLimitPenalty -
+      rejectPenalty -
+      minOrderPressurePenalty -
+      inventoryWaitingPenalty -
+      infeasibleSellPenalty
+    );
   }
 
   private buildBaselineStats(state: BotState): BaselineRunStats {
@@ -3915,7 +4130,7 @@ export class BotEngineService implements OnModuleInit {
       ordersById.set(order.id, order);
     }
 
-    const regime = this.buildRegimeSnapshot(tickContext.candidate);
+    const regime = this.buildRegimeSnapshot(tickContext.candidate, tickContext.risk);
     const strategy = this.buildAdaptiveStrategyScores(tickContext.candidate, regime.label);
     const tickDurationMs = Math.max(0, Date.now() - tickStartedAtMs);
 
@@ -4517,8 +4732,21 @@ export class BotEngineService implements OnModuleInit {
               const hasSellLimit = symbolOpenLimits.some((order) => order.side === "SELL");
               const openLimitCount = symbolOpenLimits.length;
 
-              const regime = this.buildRegimeSnapshot(candidate);
+              const regime = this.buildRegimeSnapshot(candidate, risk);
               const scores = this.buildAdaptiveStrategyScores(candidate, regime.label);
+              const candidateExecutionLane = this.resolveExecutionLane({
+                tradeMode,
+                gridEnabled: true,
+                risk: boundedRisk,
+                riskState: selectionRiskState,
+                managedOpenPositions: openHomePositionCount,
+                managedExposurePct:
+                  typeof selectionManagedExposurePct === "number" && Number.isFinite(selectionManagedExposurePct)
+                    ? selectionManagedExposurePct
+                    : 0,
+                regime,
+                strategy: scores
+              });
 
               const existingBuyPauseLock = this.getActiveSymbolProtectionLock(current, symbol, { onlyTypes: ["GRID_GUARD_BUY_PAUSE"] });
               const pauseConfidenceThreshold = this.getBearPauseConfidenceThreshold(risk);
@@ -4697,40 +4925,30 @@ export class BotEngineService implements OnModuleInit {
                 continue;
               }
 
-              const waitingPenalty = waiting ? 0.3 : 0;
-              const guardNoInventoryPenalty = buyPaused && !hasInventory ? 0.45 : 0;
-              const bearTrendGridPenalty =
-                regime.label === "BEAR_TREND" ? this.toRounded(0.22 - (risk / 100) * 0.1, 4) : 0;
-              const openLimitPenalty = Math.min(0.2, (openLimitCount / Math.max(1, maxGridOrdersPerSymbol)) * 0.2);
-              const rejectPenalty = Math.min(
-                0.55,
-                recentGridBuySizingRejects * 0.06 +
-                  recentGridBuyQuoteInsufficient * 0.05 +
-                  recentGridSellSizingRejects * 0.08 +
-                  recentFeeEdgeRejects * 0.04
-              );
-              const minOrderPressurePenalty =
-                minOrderPressureActive && recentGridBuySizingRejects > 0 && !hasInventory ? 0.18 : 0;
-              const inventoryWaitingPenalty = Math.min(
-                0.45,
-                recentInventoryWaitingSkips * 0.07 + (inventoryWaitingPressureActive && waiting ? 0.18 : 0)
-              );
-              const infeasibleSellPenalty = !sellLegLikelyFeasible && hasInventory ? 0.35 : 0;
-
-              const actionability = canTakeAction ? 1 : waiting ? (inventoryWaitingPressureActive ? 0.01 : 0.05) : 0.3;
-              const recommendedBonus = scores.recommended === "GRID" ? 0.15 : scores.recommended === "MEAN_REVERSION" ? 0.05 : 0;
-              const score =
-                scores.grid * 1.2 +
-                actionability * 0.8 +
-                recommendedBonus -
-                waitingPenalty -
-                guardNoInventoryPenalty -
-                bearTrendGridPenalty -
-                openLimitPenalty -
-                rejectPenalty -
-                minOrderPressurePenalty -
-                inventoryWaitingPenalty -
-                infeasibleSellPenalty;
+              const score = this.scoreAdaptiveExecutionCandidate({
+                executionLane: candidateExecutionLane,
+                regime,
+                strategy: scores,
+                risk: boundedRisk,
+                canTakeAction,
+                waiting,
+                buyPaused,
+                hasInventory,
+                hasBuyLimit,
+                hasSellLimit,
+                missingBuyLeg,
+                missingSellLeg,
+                openLimitCount,
+                maxGridOrdersPerSymbol,
+                recentGridBuySizingRejects,
+                recentGridBuyQuoteInsufficient,
+                recentGridSellSizingRejects,
+                recentFeeEdgeRejects,
+                minOrderPressureActive,
+                recentInventoryWaitingSkips,
+                inventoryWaitingPressureActive,
+                sellLegLikelyFeasible
+              });
 
               if (canTakeAction && (!bestActionableGridCandidate || score > bestActionableGridCandidate.score)) {
                 bestActionableGridCandidate = { symbol, candidate, score };
@@ -5735,7 +5953,7 @@ export class BotEngineService implements OnModuleInit {
           const countableOpenHomePositions = managedOpenHomeSymbols.filter((position) =>
             this.isManagedPositionCountable(position, minCountableExposureHome)
           );
-          const selectedRegime = this.buildRegimeSnapshot(selectedCandidate ?? null);
+          const selectedRegime = this.buildRegimeSnapshot(selectedCandidate ?? null, risk);
           const selectedStrategy = this.buildAdaptiveStrategyScores(selectedCandidate ?? null, selectedRegime.label);
           const executionLane = this.resolveExecutionLane({
             tradeMode,
@@ -5838,7 +6056,7 @@ export class BotEngineService implements OnModuleInit {
               (universeSnapshot?.candidates ?? []).find(
                 (candidate) => candidate.symbol.trim().toUpperCase() === position.symbol.trim().toUpperCase()
               ) ?? null;
-            const positionRegime = this.buildRegimeSnapshot(positionCandidate);
+            const positionRegime = this.buildRegimeSnapshot(positionCandidate, risk);
             const adjustedStopLossPct = this.getRegimeAdjustedStopLossPct({
               risk,
               baseStopLossPct: stopLossPct,
@@ -6508,12 +6726,18 @@ export class BotEngineService implements OnModuleInit {
           const spreadBufferRate = Math.max(0, Number.parseFloat(process.env.ESTIMATED_SPREAD_BUFFER_RATE ?? "0.0006"));
           const roundTripCostPct = ((takerFeeRate * 2) + spreadBufferRate + Math.max(0, bufferFactor - 1)) * 100;
           const estimatedEdgePct = this.estimateCandidateEdgePct(selectedCandidate);
+          const regimeAdjustedMinNetEdgePct = this.getRegimeAdjustedMinNetEdgePct({
+            risk,
+            baseMinNetEdgePct: capitalProfile.minNetEdgePct,
+            regime: selectedRegime,
+            strategy: selectedStrategy
+          });
           const riskNormalized = Math.max(0, Math.min(1, risk / 100));
           const riskAdjustedMinNetEdgePct = Math.max(0.05, capitalProfile.minNetEdgePct * (1 - riskNormalized * 0.65));
           if (Number.isFinite(estimatedEdgePct)) {
             const netEdgePct = (estimatedEdgePct ?? 0) - roundTripCostPct;
-            if (!this.isFeeEdgeSufficient(netEdgePct, riskAdjustedMinNetEdgePct)) {
-              const summary = `Skip ${candidateSymbol}: Fee/edge filter (net ${netEdgePct.toFixed(3)}% < ${riskAdjustedMinNetEdgePct.toFixed(3)}%)`;
+            if (!this.isFeeEdgeSufficient(netEdgePct, regimeAdjustedMinNetEdgePct)) {
+              const summary = `Skip ${candidateSymbol}: Fee/edge filter (net ${netEdgePct.toFixed(3)}% < ${regimeAdjustedMinNetEdgePct.toFixed(3)}%)`;
               const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveFeeEdgeCooldownMs(risk));
               const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
               const cooldownMs = cooldown.cooldownMs;
@@ -6534,9 +6758,13 @@ export class BotEngineService implements OnModuleInit {
                           capitalTier: capitalProfile.tier,
                           estimatedEdgePct: Number((estimatedEdgePct ?? 0).toFixed(6)),
                           roundTripCostPct: Number(roundTripCostPct.toFixed(6)),
-                          minNetEdgePct: Number(riskAdjustedMinNetEdgePct.toFixed(6)),
+                          minNetEdgePct: Number(regimeAdjustedMinNetEdgePct.toFixed(6)),
+                          riskAdjustedMinNetEdgePct: Number(riskAdjustedMinNetEdgePct.toFixed(6)),
                           baseMinNetEdgePct: Number(capitalProfile.minNetEdgePct.toFixed(6)),
                           risk,
+                          regimeLabel: selectedRegime.label,
+                          regimeConfidence: Number(selectedRegime.confidence.toFixed(6)),
+                          strategyRecommended: selectedStrategy.recommended,
                           rsi14: selectedCandidate?.rsi14,
                           adx14: selectedCandidate?.adx14,
                           atrPct14: selectedCandidate?.atrPct14,
@@ -6561,7 +6789,11 @@ export class BotEngineService implements OnModuleInit {
                   category: "FEE_EDGE_FILTER",
                   cooldownMs,
                   netEdgePct: Number(netEdgePct.toFixed(6)),
-                  minNetEdgePct: Number(riskAdjustedMinNetEdgePct.toFixed(6)),
+                  minNetEdgePct: Number(regimeAdjustedMinNetEdgePct.toFixed(6)),
+                  riskAdjustedMinNetEdgePct: Number(riskAdjustedMinNetEdgePct.toFixed(6)),
+                  regimeLabel: selectedRegime.label,
+                  regimeConfidence: Number(selectedRegime.confidence.toFixed(6)),
+                  strategyRecommended: selectedStrategy.recommended,
                   ...(cooldown.storm ? { storm: cooldown.storm } : {})
                 }
               });
