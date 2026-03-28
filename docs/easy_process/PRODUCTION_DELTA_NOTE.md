@@ -1,19 +1,19 @@
 # PRODUCTION_DELTA_NOTE
 
-Last updated: 2026-03-27 18:03 EET  
+Last updated: 2026-03-28 10:47 EET  
 Owner: PM/BA + Codex
 
 ## How this batch moves the bot closer to production
-This batch converts an automatic `pivot_required` signal into a bounded same-ticket `T-032` patch by reading the raw bundle instead of relying only on the aggregate top skip. The latest live runtime is already placing BUY ladder orders; the current blocker is false defensive cleanup that cancels them even when buys are allowed. The patch keeps true caution/grid-guard pauses intact while removing that churn path.
+This batch makes no new production code change. Its value is decision quality: it confirms the previous `T-032` patch deployed on `5927bd9`, verifies the old defensive cancel-churn signature is gone, and prevents another blind patch by classifying the remaining repeat as a PM/BA scope/policy question.
 
 ## What is still missing before the next gate
-- fresh live evidence that defensive BUY-limit cancel/recreate churn disappears
-- confirmation that the preserved resting buys do not create harmful re-risking
-- confirmation that the earlier no-feasible recovery fix still holds
+- an explicit next active lane / follow-up ticket decision
+- acceptance criteria for daily-loss caution re-entry or healthy-idle behavior
+- fresh evidence on the chosen next lane after PM/BA review
 
 ## Whether this batch improves execution, risk, validation, event awareness, or learning
-- Execution: `yes`
+- Execution: `no`
 - Risk: `yes`
 - Validation: `yes`
-- Event awareness: `limited`
+- Event awareness: `yes`
 - Learning: `no`

@@ -1,6 +1,6 @@
 # VALIDATION_LEDGER
 
-Last updated: 2026-03-27 18:03 EET  
+Last updated: 2026-03-28 10:47 EET  
 Owner: PM/BA + Runtime Analyst + Trader
 
 Purpose:
@@ -8,7 +8,7 @@ track which runtime behaviors have real proof and which are still only hypothese
 
 ## Ticket currently under validation
 - `T-032`
-- Current batch action: `patch_same_ticket`
+- Current batch action: `pivot_ticket`
 
 ## Required scenario classes
 
@@ -51,8 +51,8 @@ Question:
 Status:
 - `running`
 - latest bundle is fresh and not a proved engine-dead incident
-- the current same-ticket question is whether defensive order maintenance is falsely canceling BUY limits that should be allowed to rest
-- next proof needed: confirm the next bundle no longer alternates `grid-ladder-buy` with defensive cancel cleanup while buys are allowed
+- the current question is whether `ABS_DAILY_LOSS` caution global new-symbol pause at `3.40%` exposure is intended healthy idle or over-restrictive policy
+- next proof needed: PM/BA lane decision, not another same-ticket patch
 
 ### S6 — No-feasible liquidity recovery under reserve starvation
 Question:
@@ -68,9 +68,18 @@ Question:
 - does `DEFENSIVE` cancel bot-owned BUY LIMIT orders only when a true buy pause is active?
 
 Status:
+- `inconclusive`
+- latest fresh bundle runs the deployed fix on `5927bd9` and no longer shows the old defensive cancel signature
+- the same bundle is globally paused under `ABS_DAILY_LOSS`, so the resting-buy path is not fully exercised in the review window
+
+### S8 — Daily-loss caution re-entry policy
+Question:
+- once managed exposure is already very low, should `ABS_DAILY_LOSS` caution still globally pause all new symbols?
+
+Status:
 - `running`
-- latest fresh bundle shows repeated defensive BUY-order cancel/recreate churn on `BTCUSDC` / `ETHUSDC` while regime is `NEUTRAL`
-- next proof needed: no repeated churn when `buyPaused=false`, and any remaining cancel should align with an active caution/grid-guard pause
+- latest fresh bundle shows `200` skips, `0` trades, `0` active orders, and dominant `daily loss caution paused new symbols` at only `3.40%` exposure
+- next proof needed: PM/BA must decide whether this becomes a new follow-up / hardening ticket or is accepted as intended loss-protection behavior
 
 ## Validation result states
 Use only one:
@@ -82,6 +91,8 @@ Use only one:
 - `inconclusive`
 
 ## Current validation evidence
+- `autobot-feedback-20260328-084345.tgz` ✅
+- raw bundle review (`last_run_summary.json`, `state.json`, `adaptive-shadow.tail.jsonl`) ✅
 - `./scripts/pmba-gate.sh start` ✅
 - `./scripts/pmba-gate.sh end` ✅
 - `./scripts/validate-active-ticket.sh` ✅

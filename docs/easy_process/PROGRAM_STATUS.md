@@ -1,6 +1,6 @@
 # PROGRAM_STATUS
 
-Last updated: 2026-03-27 18:03 EET  
+Last updated: 2026-03-28 10:47 EET  
 Owner: PM/BA + Codex
 
 ## North Star
@@ -19,19 +19,19 @@ Build a **professional Binance autobot** that:
 
 ## Current program decision
 - Active lane for this batch: `Lane A — Runtime stability`
-- Next validation lane: `Lane B — Deterministic validation`
-- Active ticket: `T-032` (Exit manager v2)
+- Next validation lane: `PM/BA pivot review`
+- Active ticket: `T-032` (pending pivot review)
 - Why:
-  - the latest fresh bundle auto-signaled `pivot_required`, but raw behavior changed materially
-  - the runtime is already placing BUY ladder orders; the current blocker is false defensive cancel cleanup inside `T-032`
-  - the next action is still a bounded same-ticket patch plus fresh-bundle validation, not a lane rewrite
+  - the latest fresh bundle auto-signaled `pivot_required`
+  - the previous same-ticket patch deployed and removed the old churn signature
+  - the remaining repeat is an `ABS_DAILY_LOSS` caution policy/scope question, so another same-ticket patch is not justified yet
 
 ## Current batch priority order
-1. `Lane A` — patch defensive BUY-limit cancel gating inside `T-032`
-2. `Lane B` — validate the patch on the next fresh live bundle
-3. `Lane C` — defer broader strategy work until the gate behavior is proved
+1. `Lane A` — decide whether to pivot from `T-032` to a new follow-up / hardening ticket on daily-loss caution re-entry policy
+2. `Lane B` — if the lane stays on `T-032`, define a new bounded hypothesis before code
+3. `Lane C` — defer broader strategy work until the correct runtime lane is chosen
 4. `Lane D` — still out of scope
-5. `Lane E` — keep process memory aligned, but do not let it dominate the active lane again
+5. `Lane E` — keep process memory aligned to the pivot review
 
 ## Program-level hard rules
 1. Do not reopen or redefine DONE tickets.

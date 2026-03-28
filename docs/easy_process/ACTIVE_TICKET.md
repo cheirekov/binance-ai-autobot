@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-03-27 18:03 EET  
+Last updated: 2026-03-28 10:47 EET  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -11,28 +11,26 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest March 27 bundle still keeps `T-032` active, but the automatic `pivot_required` result is too coarse on its own. Raw decisions show that the engine is already placing BUY ladder orders and then canceling them in `DEFENSIVE` mode even while regime is only `NEUTRAL`; this defensive cancel/recreate churn is the current same-ticket defect.
+The newest March 28 bundle proves the previous defensive cancel-churn patch deployed on `5927bd9` and no longer reproduces that old same-ticket defect. The remaining dominant repeat is now a global `daily loss caution paused new symbols` loop under `ABS_DAILY_LOSS`, with low remaining exposure and managed-symbol fee/edge rejects, which makes the next move a PM/BA scope decision rather than another safe `T-032` micro-patch.
 
 ## Current decision
-- Ticket decision: `patch_same_ticket`
-- Work mode: `PATCH_ALLOWED`
+- Ticket decision: `pivot_ticket`
+- Work mode: `NO_CODE`
 - Process rule:
   - treat `docs/DELIVERY_BOARD.md` and `docs/PM_BA_CHANGELOG.md` as authoritative for ticket status and history
-  - treat the March 27 session brief / retrospective as authoritative for current runtime evidence
-  - treat `docs/easy_process/*` as current working memory only after it reflects this patch batch
+  - treat the March 28 session brief / retrospective as authoritative for current runtime evidence
+  - treat `docs/easy_process/*` as current working memory only after it reflects this pivot batch
 
 ## Hypothesis under test
-- once defensive BUY-order cleanup is limited to true buy-pause states, `DEFENSIVE` can keep valid resting ladder orders on `BTCUSDC` / `ETHUSDC` instead of canceling and recreating them every tick
+- `T-032` may no longer be the correct active coding lane; the remaining question is whether `ABS_DAILY_LOSS` caution global new-symbol pause at low exposure should become a new follow-up / hardening ticket or remain intended policy
 
 ## What counts as success
-- focused tests stay green
-- the next live bundle no longer shows repeated defensive BUY-limit cancel/recreate churn while buys are allowed
-- the next live bundle still preserves actual caution/grid-guard BUY pause evidence where warranted
-- the next live bundle does not regress the earlier no-feasible recovery sell path
+- the previous defensive cancel-churn hypothesis is explicitly closed
+- the next active development lane is explicitly named before more code lands
+- no further runtime patch is proposed without a new bounded hypothesis
+- DONE tickets remain untouched during the pivot review
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident
-- the next bundle still shows the same defensive cancel/recreate churn
-- the next bundle shows harmful churn or premature re-risking
-- the next bundle regresses no-feasible recovery behavior
-- the next bundle proves the boxed-in behavior is caused by a different subsystem outside `T-032`
+- PM/BA explicitly chooses to keep `T-032`, but no new bounded hypothesis is written
+- a board switch is attempted without `docs/TICKET_SWITCH_RETRO.md`

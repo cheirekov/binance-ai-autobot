@@ -1,37 +1,31 @@
 # NEXT_BATCH_PLAN
 
-Last updated: 2026-03-27 18:03 EET  
+Last updated: 2026-03-28 10:47 EET  
 Owner: PM/BA + Codex
 
 ## Exact scope
-Validate the new defensive BUY-limit cancel gating patch against the next fresh live bundle. Confirm that `DEFENSIVE` no longer cancels resting BUY ladder orders when regime is only `NEUTRAL`/`RANGE` and buys are allowed, while keeping actual caution/grid-guard pauses and the proven no-feasible recovery behavior intact.
+Run a PM/BA pivot review before the next long run. Confirm that the deployed `5927bd9` build closed the prior defensive cancel-churn hypothesis, then decide whether the remaining `ABS_DAILY_LOSS` caution global new-symbol pause belongs in a new follow-up ticket or is intended healthy idle under loss protection.
 
 ## In scope
-- keep `T-032` as the sole active ticket
-- ingest the next fresh bundle after this patch is deployed
-- verify the bundle no longer alternates `grid-ladder-buy` with defensive cancel cleanup on `BTCUSDC` / `ETHUSDC` when buys are allowed
-- verify symbol-level or caution-driven BUY pause evidence can still appear when warranted
-- verify the prior `no-feasible-liquidity-recovery` path does not regress
-- confirm any remaining defensive BUY-order cancel is tied to an actual active buy pause
+- keep `docs/RETROSPECTIVE_AUTO.md` / `docs/SESSION_BRIEF.md` aligned on `pivot_required`
+- add the fresh March 28 triage note
+- define the correct next active development lane or follow-up ticket candidate
+- if PM/BA approves a real ticket switch, update `docs/DELIVERY_BOARD.md` and `docs/TICKET_SWITCH_RETRO.md` in that dedicated pivot batch
 
 ## Out of scope
+- another blind `T-032` runtime patch from this bundle alone
 - reopening any DONE ticket
-- broad exit-manager redesign outside this defensive cancel-gating slice
-- strategy retuning unrelated to defensive-entry release behavior
-- a new ticket unless fresh evidence proves this patch hypothesis wrong
+- quote-routing redesign (`T-034` remains closed)
+- broad strategy retuning before the next lane is explicitly chosen
 
 ## Acceptance criteria
-- focused bot-engine tests stay green
-- next fresh bundle no longer shows repeated defensive BUY-limit cancel/recreate churn while buys are allowed
-- next fresh bundle still preserves caution/grid-guard BUY pause evidence where appropriate
-- next fresh bundle still preserves the earlier no-feasible recovery fix
-- runtime remains `T-032` same-ticket work rather than a new `P0/P1` incident
+- the previous defensive cancel-churn hypothesis is explicitly closed
+- the next active lane is explicitly named (`PM/BA-TRIAGE` or a concrete follow-up ticket)
+- no further runtime patch is proposed without a new bounded hypothesis
+- the repo handoff reflects `pivot_ticket` and `NO_CODE`
 
 ## Rollback condition
-- the next bundle still shows the same defensive cancel/recreate churn
-- the next bundle shows this patch reintroduces harmful re-risking after giveback
-- the next bundle regresses the no-feasible recovery behavior
-- fresh evidence reveals a different root cause outside `T-032`
+- fresh evidence proves a current `P0/P1` runtime incident that requires an emergency batch instead of a pivot review
 
 ## What capability this moves forward
-Moves `Lane A — Runtime stability` directly and sets up `Lane B — Deterministic validation` on the next live bundle.
+Moves `Lane A — Runtime stability` by preventing another blind patch and forcing the correct next-lane decision before more live runtime changes.

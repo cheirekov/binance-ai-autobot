@@ -1,24 +1,21 @@
 # OPERATOR_NOTE
 
-Last updated: 2026-03-27 18:03 EET  
+Last updated: 2026-03-28 10:47 EET  
 Owner: PM/BA + Codex
 
 ## What to run next
-- run `./node_modules/.bin/vitest run --no-cache src/modules/bot/bot-engine.service.test.ts`
-- run `./scripts/validate-active-ticket.sh`
-- deploy this `T-032` patch in the normal operator flow
-- ingest the next fresh production bundle and inspect whether repeated `grid-ladder-buy` / defensive cancel churn is gone
-- confirm any remaining defensive BUY-order cancel now lines up with an actual caution/grid-guard pause
-- also confirm the prior `no-feasible-liquidity-recovery` behavior did not regress
+- do not deploy another behavior patch from this bundle alone
+- review [TRIAGE_NOTE_2026-03-28_T032_ABS_DAILY_LOSS_CAUTION_PIVOT.md](/home/yc/work/binance-ai-autobot/docs/TRIAGE_NOTE_2026-03-28_T032_ABS_DAILY_LOSS_CAUTION_PIVOT.md)
+- decide whether the next active lane is `PM/BA-TRIAGE` only or a concrete follow-up / hardening ticket
+- if PM/BA approves a real ticket switch, update `docs/DELIVERY_BOARD.md` and `docs/TICKET_SWITCH_RETRO.md` before the next long run
+- if PM/BA keeps `T-032` active, require a new explicit same-ticket hypothesis before any code change
 
 ## What not to do next
-- do not widen into unrelated strategy work before the next bundle lands
-- do not pivot tickets just because the coarse auto-retro summary stayed red once; use the raw next bundle evidence
+- do not keep micro-patching `T-032` from the repeated top-skip summary alone
 - do not reopen any DONE ticket
-- do not assume the patch is production-proved without fresh runtime evidence
+- do not switch the board without explicit PM/BA approval and switch-retro alignment
 
 ## What fresh evidence would change the decision
-- the next bundle still shows the same defensive BUY-limit cancel/recreate churn
-- the next bundle shows harmful churn or premature re-risking after giveback
-- the next bundle regresses no-feasible recovery behavior
-- a new bundle establishes a different runtime incident outside `T-032`
+- a new bundle shows a concrete `P0/P1` runtime regression instead of a policy/scope question
+- deterministic validation proves `ABS_DAILY_LOSS` caution is over-restrictive beyond intended loss protection
+- PM/BA approves a concrete follow-up ticket with bounded acceptance criteria

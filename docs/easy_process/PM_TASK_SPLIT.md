@@ -1,68 +1,67 @@
 # PM_TASK_SPLIT
 
-Last updated: 2026-03-27 18:03 EET  
+Last updated: 2026-03-28 10:47 EET  
 Owner: PM/BA + Codex
 
 ## PM/BA
-- Objective: keep the batch bounded to the fresh March 27 `T-032` defect
+- Objective: convert the fresh March 28 bundle into an explicit next-lane decision
 - Tasks:
-  - record `patch_same_ticket`
-  - keep `T-032` as the only active lane
-  - record that auto-retro raised `pivot_required`, but manual raw bundle review still supports a same-ticket fix
-  - require the next bundle before any broader lane change
-- Deliverable: bounded ticket decision
+  - record `pivot_ticket`
+  - keep `T-032` as the authoritative current ticket until PM/BA approves a real switch
+  - close the prior defensive cancel-churn hypothesis
+  - define whether the next lane is `PM/BA-TRIAGE` only or a concrete new follow-up / hardening ticket
+- Deliverable: explicit pivot recommendation
 - Dependency: latest bundle evidence
 
 ## Architect
-- Objective: patch the smallest runtime gate that matches the evidence
+- Objective: avoid another blind runtime patch
 - Tasks:
-  - gate defensive BUY-limit cancellation behind an actual buy-pause state
-  - preserve resting BUY ladder orders in `DEFENSIVE` when buys are allowed
-  - avoid widening into unrelated exit-manager refactors
-- Deliverable: defensive cancel-gating correction
-- Dependency: direct bundle read + bot-engine path review
+  - confirm the `5927bd9` deployment removed the previous same-ticket defect
+  - isolate the remaining open question as `ABS_DAILY_LOSS` caution re-entry / healthy-idle policy
+  - defer code until PM/BA chooses the next lane
+- Deliverable: no-code architecture read
+- Dependency: direct bundle read
 
 ## Trader
-- Objective: keep recovery sells bounded and capital-aware
+- Objective: classify whether the latest idle behavior is acceptable risk policy
 - Tasks:
-  - accept that the bot is still in `CAUTION`, so true buy pauses must remain enforceable
-  - avoid reopening aggressive buys just to suppress churn
-  - use the next bundle to judge whether preserving resting buys reduces idle churn without harming de-risking
-- Deliverable: defensive-order risk sanity check
+  - review the fact pattern: `ABS_DAILY_LOSS`, `3.40%` exposure, high free quote, no active orders
+  - decide whether global new-symbol pause at this state is intended or too restrictive
+  - recommend whether this belongs in a new follow-up ticket
+- Deliverable: policy-vs-bug judgment
 - Dependency: live bundle facts
 
 ## Runtime Analyst
-- Objective: prove or falsify the new gate behavior quickly
+- Objective: capture the pivot evidence cleanly
 - Tasks:
-  - inspect the next fresh bundle for loss of repeated `grid-ladder-buy` / defensive cancel alternation
-  - confirm defensive BUY-order cancels only happen when buy pauses are active
-  - confirm the prior `no-feasible-liquidity-recovery` trade path still appears when needed
-- Deliverable: next-bundle defensive-cancel validation read
-- Dependency: patched runtime + next ingestion
+  - document that the latest 200 decisions are all `SKIP`
+  - document that the prior defensive cancel signature is gone
+  - document that the remaining repeats are global new-symbol pause plus `BTCUSDC` fee/edge filter
+- Deliverable: pivot evidence summary
+- Dependency: raw bundle review
 
 ## AI Specialist
 - Objective: keep AI scope unchanged
 - Tasks:
-  - confirm this patch does not alter AI autonomy or learning claims
-  - keep the lane strictly deterministic runtime recovery hardening
+  - confirm this pivot batch does not change AI behavior or promotion scope
+  - keep the lane decision strictly around runtime/risk policy
 - Deliverable: AI scope freeze
 - Dependency: none
 
 ## State Steward
-- Objective: keep process memory aligned to the actual patch batch
+- Objective: align process memory to the pivot review
 - Tasks:
-  - update batch decision artifacts from caution-threshold mode to defensive cancel-gating mode
-  - keep DONE history untouched
-  - keep auto-retro intact while recording the manual same-ticket override in human-owned docs
-- Deliverable: current batch docs aligned to code state
+  - update batch decision artifacts from `patch_same_ticket` to `pivot_ticket`
+  - keep auto-retro as the controlling batch decision
+  - do not switch the board until PM/BA explicitly approves a new active ticket
+- Deliverable: current docs aligned to `pivot_required`
 - Dependency: PM/BA decision
 
 ## Senior BE/UI
-- Objective: implement and validate the bounded runtime fix
+- Objective: hold off on behavior changes until scope is credible
 - Tasks:
-  - patch `apps/api/src/modules/bot/bot-engine.service.ts`
-  - extend `apps/api/src/modules/bot/bot-engine.service.test.ts`
-  - add the March 27 triage note and update the session/easy-process handoff docs for the new bundle
-  - run focused bot-engine tests without cache
-- Deliverable: tested `T-032` code slice
-- Dependency: architected patch hypothesis
+  - make no runtime code patch in this batch
+  - add the March 28 triage note
+  - update the session/easy-process handoff docs for the new bundle
+- Deliverable: docs-only pivot package
+- Dependency: PM/BA review

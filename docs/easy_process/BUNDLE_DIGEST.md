@@ -1,48 +1,50 @@
 # BUNDLE_DIGEST
 
-Last updated: 2026-03-27 18:03 EET  
+Last updated: 2026-03-28 10:47 EET  
 Owner: PM/BA + Runtime Analyst
 
 Use this file instead of pasting large bundle narratives into chat.
 
 ## Latest reviewed bundle
-- Bundle: `autobot-feedback-20260327-155408.tgz`
+- Bundle: `autobot-feedback-20260328-084345.tgz`
 - Ingest decision: `pivot_required`
-- Manual PM/BA decision: `patch_same_ticket`
+- Manual PM/BA decision: `pivot_ticket`
 - Fresh runtime evidence: `yes`
 - Evidence class: `fresh`
 
 ## Why this matters
-This bundle is fresh enough to overrule a coarse automatic pivot with a narrower same-ticket diagnosis. The aggregate top skip still repeats, but the raw runtime has materially changed: the bot is placing BUY ladder orders and then canceling them in `DEFENSIVE` mode even while regime is only `NEUTRAL`.
+This bundle is fresh enough to close the previous same-ticket hypothesis. The deployed runtime now runs `5927bd9`, the old defensive cancel/recreate churn is gone, and the remaining repeat is a different policy/scope question: under `ABS_DAILY_LOSS` caution the bot spends the review window globally pausing new symbols while only a managed-symbol fee/edge path remains active.
 
 ## Observed
 - the bundle finishes with:
   - `risk_state = CAUTION`
-  - `managedExposure = 6.7%`
-  - `orders.submitted = 278`
-  - `orders.filled = 146`
-  - `orders.canceled = 129`
-  - `activeOrders = 3`
+  - `trigger = ABS_DAILY_LOSS`
+  - `open_positions = 4`
+  - `total_alloc_pct = 3.40`
+  - `quoteFree = 6930.325431`
+  - `decisions = 200`
+  - `trades = 0`
+  - `activeOrders = 0`
 - latest risk-state reasons include:
-  - `trigger=PROFIT_GIVEBACK`
-  - `giveback=135.02USDC (81.2%)`
-  - `managedExposure=6.7%`
-  - `haltExposureFloor=8.0%`
-- dominant aggregate skips are still:
+  - `trigger=ABS_DAILY_LOSS`
+  - `dailyRealized=-139.34USDC`
+  - `maxLoss=333.47USDC`
+- dominant aggregate skips are now:
   - `Skip: No feasible candidates: daily loss caution paused new symbols (59 filtered)`
-  - `Skip BTCUSDC: Daily loss caution paused GRID BUY leg`
+  - repeated `BTCUSDC` `Fee/edge filter` skips
 - raw state / adaptive-shadow evidence now shows:
-  - repeated `Binance testnet BUY LIMIT BTCUSDC ... grid-ladder-buy`
-  - repeated `Canceled 1 bot open order(s): defensive-bear-cancel-buy BTCUSDC`
-  - the same alternating pattern also appears on `ETHUSDC`
-  - the latest cancel events happen with `executionLane=DEFENSIVE`, `regime=NEUTRAL`, `confidence=0.4`
+  - no repeated `defensive-bear-cancel-buy` / `defensive-buy-pause-cancel-buy`
+  - alternating candidate selection between:
+    - `BNBBTC` / other non-managed symbols → global new-symbol pause
+    - `BTCUSDC` → fee/edge filter under `DEFENSIVE` / `RANGE`
+  - `noFeasibleRecovery.enabled=false` with `recentCount=0`, `threshold=0`
 
 ## Inferred
-- the raw runtime defect is no longer a pure global no-candidate loop
-- the current same-ticket mismatch is defensive BUY-order cleanup firing even when buys are allowed
-- the repeated aggregate skip summary is lagging the actual low-level runtime behavior in this bundle
+- the previous defensive cancel-churn hypothesis is closed
+- the current repeat is no longer clearly a `T-032` implementation bug
+- the next move should be PM/BA pivot review, not another blind runtime patch
 
 ## Next proof required
-- the next fresh bundle should stop alternating `grid-ladder-buy` with defensive BUY-order cancel cleanup while buys are allowed
-- the next bundle should still preserve explicit caution/grid-guard pause evidence where needed
-- the next bundle should not regress the earlier no-feasible recovery trade path
+- an explicit next active lane / follow-up ticket decision
+- if PM/BA keeps `T-032`, a new bounded same-ticket hypothesis with acceptance criteria
+- if PM/BA pivots, the dedicated board/switch-retro update in the next batch

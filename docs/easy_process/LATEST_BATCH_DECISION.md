@@ -1,46 +1,45 @@
 # LATEST_BATCH_DECISION
 
-Last updated: 2026-03-27 18:03 EET  
+Last updated: 2026-03-28 10:47 EET  
 Owner: PM/BA + Codex
 
 ## Production capability lane
 - Chosen: `Lane A — Runtime stability`
 - Why:
-  - `observed`: the latest fresh bundle is now `autobot-feedback-20260327-155408.tgz`
+  - `observed`: the latest fresh bundle is now `autobot-feedback-20260328-084345.tgz`
   - `observed`: auto-retro raised `pivot_required` because the aggregate top skip repeated across the latest 2 fresh bundles
-  - `observed`: the raw latest decisions are not a pure no-candidate stall; they repeatedly alternate `grid-ladder-buy` with `defensive-bear-cancel-buy` on `BTCUSDC` / `ETHUSDC`
-  - `inferred`: the current blocker is still a bounded `T-032` defensive order-maintenance bug, so a same-ticket patch remains justified before any lane pivot
+  - `observed`: the deployed runtime now runs `git.commit=5927bd9`, and the prior defensive cancel/recreate churn is gone from the raw bundle
+  - `inferred`: the remaining blocker is no longer a safe same-ticket micro-patch; it is a PM/BA policy/scope question around `ABS_DAILY_LOSS` caution and re-entry behavior
 - Evidence tags:
-  - `observed`: latest bundle runs `git.commit=aaf532b`
-  - `observed`: latest bundle risk state is `CAUTION` with trigger `PROFIT_GIVEBACK` and `managedExposure=6.7%`
-  - `observed`: latest bundle totals show `TRADE=84`, `ENGINE=75`, `SKIP=41`, `orders.canceled=129`, `activeOrders=3`
-  - `observed`: latest state/adaptive-shadow evidence shows repeated `BUY LIMIT ... grid-ladder-buy` immediately followed by `defensive-bear-cancel-buy` while regime is `NEUTRAL` with confidence `0.4`
-  - `observed`: the earlier `no-feasible-liquidity-recovery` path remains a previously validated `T-032` behavior and is not the dominant current blocker
-  - `inferred`: the aggregate skip summary is lagging the actual low-level runtime behavior in this bundle
+  - `observed`: latest bundle risk state is `CAUTION` with `trigger=ABS_DAILY_LOSS`
+  - `observed`: latest bundle snapshot says `open_positions=4`, `total_alloc_pct=3.40`, `quoteFree=6930.325431`
+  - `observed`: latest bundle totals show `decisions=200`, `trades=0`, `activeOrders=0`, `feeEdgeSkips=95`
+  - `observed`: latest top skip is `Skip: No feasible candidates: daily loss caution paused new symbols (59 filtered)` with count `100`
+  - `observed`: managed-symbol progress in the same window is mostly `BTCUSDC` fee/edge filter under `DEFENSIVE` / `RANGE`, not another cancel bug
+  - `inferred`: the previous same-ticket hypothesis is closed; the next move should define a new lane or follow-up ticket before more code
 
 ## Chosen active ticket
 - Current: `T-032` (Exit manager v2)
-- Decision: `patch_same_ticket`
+- Decision: `pivot_ticket`
 - Why:
-  - `observed`: board and changelog still keep `T-032` as the sole active lane
-  - `observed`: the raw latest bundle behavior still lands inside `T-032` downside-control / defensive-entry behavior
-  - `observed`: the auto `pivot_required` result came from a repeated coarse summary, not from unchanged low-level behavior
-  - `inferred`: no ticket pivot is needed unless the next bundle disproves this cancel-churn hypothesis
+  - `observed`: board still shows `T-032` as the active ticket, but this batch should not add another blind same-ticket patch
+  - `observed`: the raw latest bundle disproves the previous churn hypothesis by running the new commit without reproducing the old cancel signature
+  - `inferred`: the remaining repeat likely needs a new follow-up / hardening ticket on daily-loss caution re-entry policy or healthy-idle criteria
 
 ## Evidence class
 - Current: `fresh`
-- Latest bundle: `autobot-feedback-20260327-155408.tgz`
-- Compared bundle: `autobot-feedback-20260327-123604.tgz`
+- Latest bundle: `autobot-feedback-20260328-084345.tgz`
+- Compared bundle: `autobot-feedback-20260327-155408.tgz`
 
 ## Allowed work mode
-- Current batch: `PATCH_ALLOWED`
+- Current batch: `NO_CODE`
 
 ## Batch decision
-- Decision: `patch_same_ticket`
-- Patch slice:
-  - cancel defensive bot-owned BUY limits only when buys are actually paused
-  - preserve resting BUY ladder orders in `DEFENSIVE` when regime is `NEUTRAL`/`RANGE` and no pause is active
-  - keep the proven caution-release and no-feasible recovery paths unchanged
+- Decision: `pivot_ticket`
+- Next ticket candidate: `PM/BA-TRIAGE`
+- Review slice:
+  - confirm the `5927bd9` deployment closed the prior defensive cancel-churn hypothesis
+  - decide whether `ABS_DAILY_LOSS` caution at low remaining exposure belongs in a new follow-up / hardening ticket
+  - do not patch runtime again until PM/BA defines the next lane
 - Validation:
-  - `./node_modules/.bin/vitest run --no-cache src/modules/bot/bot-engine.service.test.ts` ✅
-  - `./scripts/validate-active-ticket.sh` ✅
+  - raw bundle review (`last_run_summary.json`, `state.json`, `adaptive-shadow.tail.jsonl`) ✅

@@ -16,6 +16,28 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-28 08:47 UTC — T-032 review: pivot_required after ABS_DAILY_LOSS caution global pause
+- Scope:
+  - review `autobot-feedback-20260328-084345.tgz` after the deployed `5927bd9` build and decide whether the active lane should continue on `T-032` or pivot before the next long run.
+- BA requirement mapping:
+  - latest fresh bundle still fails the repeated-loop rule, but the raw evidence changed materially: the previous defensive cancel-churn signature is gone, and the remaining dominant repeat is `daily loss caution paused new symbols` under `ABS_DAILY_LOSS` with low remaining exposure plus managed-symbol fee/edge filters.
+- PM milestone mapping:
+  - no safe same-ticket runtime patch is justified from this bundle alone; convert this batch into an explicit `pivot_ticket` / `NO_CODE` PM/BA review.
+- Technical changes:
+  - `docs/TRIAGE_NOTE_2026-03-28_T032_ABS_DAILY_LOSS_CAUTION_PIVOT.md`: added the required triage note for the fresh March 28 evidence.
+  - `docs/SESSION_BRIEF.md` and `docs/easy_process/*`: realigned the current batch contract and handoff layer to `pivot_required`, `pivot_ticket`, and `NO_CODE`.
+  - no bot-engine/runtime code changes in this batch.
+- Risk slider impact:
+  - none; docs/process-only pivot review.
+- Validation evidence:
+  - `autobot-feedback-20260328-084345.tgz`
+  - raw bundle review (`last_run_summary.json`, `state.json`, `adaptive-shadow.tail.jsonl`)
+- Runtime test request:
+  - none until PM/BA explicitly chooses the next active lane.
+- Follow-up:
+  - if PM/BA approves a real ticket switch, update `docs/DELIVERY_BOARD.md` and `docs/TICKET_SWITCH_RETRO.md` in the next batch.
+  - do not add another blind `T-032` runtime patch from the March 28 bundle alone.
+
 ## 2026-03-27 16:03 UTC — T-032 hotfix: stop defensive BUY-limit cancel/recreate churn
 - Scope:
   - respond to `autobot-feedback-20260327-155408.tgz`, which auto-retro marked `pivot_required`, by manually triaging the raw bundle and applying the smallest same-ticket fix that matches the actual runtime behavior.
