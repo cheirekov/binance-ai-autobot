@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-03-28 23:45 EET  
+Last updated: 2026-03-29 12:10 EET  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -11,10 +11,10 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260328-202730.tgz`) shows the runtime is no longer dominated by `T-032` failure modes. The current top blockers are strategy-quality signals (`Fee/edge filter`, parked-ladder waiting), while code audit shows the regime engine is still using simpler fixed thresholds and a regime-agnostic fee floor.
+The newest fresh bundle (`autobot-feedback-20260329-081616.tgz`) shows the active blocker is now inside viable candidate routing for `T-031`: the bot still revisits parked dual-ladder symbols and repeated no-inventory `Fee/edge filter` dead ends as if they were fresh opportunities.
 
 ## Current decision
-- Ticket decision: `pivot_active_ticket`
+- Ticket decision: `patch_same_ticket`
 - Work mode: `PATCH_NOW`
 - Process rule:
   - treat `docs/DELIVERY_BOARD.md` and `docs/PM_BA_CHANGELOG.md` as authoritative for ticket status and history
@@ -22,12 +22,12 @@ The newest fresh bundle (`autobot-feedback-20260328-202730.tgz`) shows the runti
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that scores `SPOT_GRID` candidates by the execution lane the engine would actually use will be more valuable than another `T-032` proof-only cycle, while preserving current downside-control runtime.
+- A bounded `T-031` slice that suppresses parked dual-ladder symbols and repeated no-inventory fee-edge retries during feasible live selection will reduce dead-end churn without reopening `T-032` downside-control or `T-034` funding regressions.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved as a support lane rather than being reworked blindly
-- the next fresh bundle reflects changed strategy behavior without reopening funding or downside-control regressions
+- the next fresh bundle reflects lower parked-ladder / fee-edge dead-end churn without reopening funding or downside-control regressions
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident

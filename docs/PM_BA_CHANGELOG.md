@@ -16,6 +16,28 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-29 09:10 UTC — T-031 third slice: suppress parked ladders and fee-edge dead ends in feasible live routing
+- Scope:
+  - apply the next bounded `T-031` strategy-quality slice from fresh March 29 evidence instead of waiting on more live drift.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260329-081616.tgz`) no longer shows funding starvation as dominant; the current blockers are parked dual-ladder symbols (`BTCUSDC` / `ETHUSDC` / `TAOUSDC`) plus repeated no-inventory fee-edge retries (`SOLUSDC`, `XRPUSDC`).
+  - bundle audit shows those symbols are still reaching execution-time skips even though they are not actionable opportunities.
+- PM milestone mapping:
+  - continue `T-031` with a bounded same-ticket patch that improves candidate viability filtering without reopening `T-032` downside controls or `T-034` routing stability.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added parked dual-ladder suppression and no-inventory fee-edge retry suppression inside `pickFeasibleLiveCandidate(...)`.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage proving feasible live selection rotates away from parked dual-ladder symbols and repeated fee-edge dead ends.
+  - `docs/SESSION_BRIEF.md`, `docs/STRATEGY_COVERAGE.md`, `docs/easy_process/LATEST_BATCH_DECISION.md`, `docs/easy_process/ACTIVE_TICKET.md`, `docs/easy_process/NEXT_BATCH_PLAN.md`: aligned working-memory docs to the current March 29 `T-031` slice.
+- Risk slider impact:
+  - no new hard guardrails; risk still modulates suppression thresholds so higher risk stays slightly less restrictive while dead-end retries are still filtered out.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected next proof: fewer `Grid waiting for ladder slot or inventory` skips on dual-ladder symbols and fewer repeated `Fee/edge filter` retries on no-inventory symbols.
+- Follow-up:
+  - if the next fresh bundle is still dominated by parked-ladder skips, the next `T-031` slice should promote proactive ladder parking/demotion rules rather than another generic score tweak.
+
 ## 2026-03-28 23:45 UTC — T-031 second slice: lane-aware candidate scoring
 - Scope:
   - deliver the next real `T-031` strategy slice immediately after the ticket pivot by aligning candidate ranking with the execution lane the engine would actually use.

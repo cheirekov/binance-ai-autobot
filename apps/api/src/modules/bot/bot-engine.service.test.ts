@@ -349,6 +349,246 @@ describe("bot-engine pickFeasibleLiveCandidate", () => {
     expect(result.candidate).toBeNull();
   });
 
+  it("skips parked dual-ladder candidates during feasible live selection", async () => {
+    const config = {
+      basic: {
+        homeStableCoin: "USDC",
+        traderRegion: "NON_EEA"
+      },
+      advanced: {
+        neverTradeSymbols: [],
+        symbolEntryCooldownMs: 0,
+        maxConsecutiveEntriesPerSymbol: 0
+      }
+    } as unknown as AppConfig;
+
+    const configService = { load: () => config };
+    const marketData = {
+      getSymbolRules: async (symbol: string) =>
+        ({
+          symbol,
+          status: "TRADING",
+          baseAsset: symbol === "BTCUSDC" ? "BTC" : "XRP",
+          quoteAsset: "USDC"
+        }) satisfies BinanceSymbolRules,
+      getTickerPrice: async (symbol: string) => (symbol === "BTCUSDC" ? "65000" : "1"),
+      validateMarketOrderQty: async () =>
+        ({
+          ok: true,
+          normalizedQty: "1"
+        }) satisfies MarketQtyValidation
+    };
+
+    const service = new BotEngineService(
+      configService as unknown as ConfigService,
+      marketData as unknown as BinanceMarketDataService,
+      {} as unknown as BinanceTradingService,
+      {} as unknown as ConversionRouterService,
+      {} as unknown as UniverseService
+    );
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      activeOrders: [
+        {
+          id: "btc-buy",
+          ts: new Date(now - 5 * 60_000).toISOString(),
+          symbol: "BTCUSDC",
+          side: "BUY",
+          type: "LIMIT",
+          status: "NEW",
+          qty: 0.001,
+          price: 64500
+        },
+        {
+          id: "btc-sell",
+          ts: new Date(now - 5 * 60_000).toISOString(),
+          symbol: "BTCUSDC",
+          side: "SELL",
+          type: "LIMIT",
+          status: "NEW",
+          qty: 0.001,
+          price: 65500
+        }
+      ],
+      decisions: [
+        {
+          id: "wait-1",
+          ts: new Date(now - 2 * 60_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip BTCUSDC: Grid waiting for ladder slot or inventory"
+        },
+        {
+          id: "wait-2",
+          ts: new Date(now - 6 * 60_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip BTCUSDC: Grid waiting for ladder slot or inventory"
+        }
+      ]
+    };
+
+    const parked: UniverseCandidate = {
+      symbol: "BTCUSDC",
+      baseAsset: "BTC",
+      quoteAsset: "USDC",
+      lastPrice: 65000,
+      quoteVolume24h: 2_000_000,
+      priceChangePct24h: 1.2,
+      score: 4,
+      reasons: []
+    };
+    const actionable: UniverseCandidate = {
+      symbol: "XRPUSDC",
+      baseAsset: "XRP",
+      quoteAsset: "USDC",
+      lastPrice: 1,
+      quoteVolume24h: 2_000_000,
+      priceChangePct24h: 1.5,
+      score: 3.9,
+      reasons: []
+    };
+
+    const balances: BinanceBalanceSnapshot[] = [
+      { asset: "USDC", free: 1000, locked: 0, total: 1000 }
+    ];
+
+    const result = await (
+      service as unknown as {
+        pickFeasibleLiveCandidate: (params: unknown) => Promise<{ candidate: UniverseCandidate | null }>;
+      }
+    ).pickFeasibleLiveCandidate({
+      preferredCandidate: parked,
+      snapshotCandidates: [actionable],
+      state,
+      homeStable: "USDC",
+      allowedExecutionQuotes: new Set(["USDC"]),
+      traderRegion: "NON_EEA",
+      neverTradeSymbols: [],
+      excludeStableStablePairs: true,
+      enforceRegionPolicy: true,
+      balances,
+      walletTotalHome: 1000,
+      risk: 100,
+      maxPositionPct: 20,
+      minQuoteLiquidityHome: 3,
+      notionalCap: 0,
+      capitalNotionalCapMultiplier: 1,
+      bufferFactor: 1.002
+    });
+
+    expect(result.candidate?.symbol).toBe("XRPUSDC");
+  });
+
+  it("skips repeated fee-edge dead-end candidates when they still have no inventory", async () => {
+    const config = {
+      basic: {
+        homeStableCoin: "USDC",
+        traderRegion: "NON_EEA"
+      },
+      advanced: {
+        neverTradeSymbols: [],
+        symbolEntryCooldownMs: 0,
+        maxConsecutiveEntriesPerSymbol: 0
+      }
+    } as unknown as AppConfig;
+
+    const configService = { load: () => config };
+    const marketData = {
+      getSymbolRules: async (symbol: string) =>
+        ({
+          symbol,
+          status: "TRADING",
+          baseAsset: symbol === "SOLUSDC" ? "SOL" : "ADA",
+          quoteAsset: "USDC"
+        }) satisfies BinanceSymbolRules,
+      getTickerPrice: async (symbol: string) => (symbol === "SOLUSDC" ? "120" : "1"),
+      validateMarketOrderQty: async () =>
+        ({
+          ok: true,
+          normalizedQty: "1"
+        }) satisfies MarketQtyValidation
+    };
+
+    const service = new BotEngineService(
+      configService as unknown as ConfigService,
+      marketData as unknown as BinanceMarketDataService,
+      {} as unknown as BinanceTradingService,
+      {} as unknown as ConversionRouterService,
+      {} as unknown as UniverseService
+    );
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "fee-1",
+          ts: new Date(now - 2 * 60_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip SOLUSDC: Fee/edge filter (net 0.006% < 0.052%)"
+        },
+        {
+          id: "fee-2",
+          ts: new Date(now - 5 * 60_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip SOLUSDC: Fee/edge filter (net 0.004% < 0.052%)"
+        }
+      ]
+    };
+
+    const deadEnd: UniverseCandidate = {
+      symbol: "SOLUSDC",
+      baseAsset: "SOL",
+      quoteAsset: "USDC",
+      lastPrice: 120,
+      quoteVolume24h: 2_000_000,
+      priceChangePct24h: 0.4,
+      score: 4.1,
+      reasons: []
+    };
+    const fallback: UniverseCandidate = {
+      symbol: "ADAUSDC",
+      baseAsset: "ADA",
+      quoteAsset: "USDC",
+      lastPrice: 1,
+      quoteVolume24h: 2_000_000,
+      priceChangePct24h: 0.8,
+      score: 3.6,
+      reasons: []
+    };
+
+    const balances: BinanceBalanceSnapshot[] = [
+      { asset: "USDC", free: 1000, locked: 0, total: 1000 }
+    ];
+
+    const result = await (
+      service as unknown as {
+        pickFeasibleLiveCandidate: (params: unknown) => Promise<{ candidate: UniverseCandidate | null }>;
+      }
+    ).pickFeasibleLiveCandidate({
+      preferredCandidate: deadEnd,
+      snapshotCandidates: [fallback],
+      state,
+      homeStable: "USDC",
+      allowedExecutionQuotes: new Set(["USDC"]),
+      traderRegion: "NON_EEA",
+      neverTradeSymbols: [],
+      excludeStableStablePairs: true,
+      enforceRegionPolicy: true,
+      balances,
+      walletTotalHome: 1000,
+      risk: 100,
+      maxPositionPct: 20,
+      minQuoteLiquidityHome: 3,
+      notionalCap: 0,
+      capitalNotionalCapMultiplier: 1,
+      bufferFactor: 1.002
+    });
+
+    expect(result.candidate?.symbol).toBe("ADAUSDC");
+  });
+
   it("filters to managed-open symbols when caution pauses new entries", async () => {
     const config = {
       basic: {

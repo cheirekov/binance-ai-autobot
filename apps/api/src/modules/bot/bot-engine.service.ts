@@ -707,6 +707,33 @@ export class BotEngineService implements OnModuleInit {
     return params.feeEdgeQuarantineActive;
   }
 
+  private shouldSuppressParkedGridLadderCandidate(params: {
+    recentInventoryWaitingSkips: number;
+    hasBuyLimit: boolean;
+    hasSellLimit: boolean;
+    risk: number;
+  }): boolean {
+    if (!(params.hasBuyLimit && params.hasSellLimit)) return false;
+    if (params.recentInventoryWaitingSkips <= 0) return false;
+
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const localThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
+    return params.recentInventoryWaitingSkips >= localThreshold;
+  }
+
+  private shouldSuppressFeeEdgeRetryCandidate(params: {
+    recentFeeEdgeRejects: number;
+    hasInventory: boolean;
+    risk: number;
+  }): boolean {
+    if (params.hasInventory) return false;
+    if (params.recentFeeEdgeRejects <= 0) return false;
+
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const localThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
+    return params.recentFeeEdgeRejects >= localThreshold;
+  }
+
   private shouldTreatGridBuySizingRejectAsQuoteInsufficient(params: {
     check: MarketQtyValidation;
     price: number;
@@ -2523,6 +2550,35 @@ export class BotEngineService implements OnModuleInit {
       if (!allowedExecutionQuotes.has(quoteAsset)) continue;
       if (this.isSymbolBlocked(symbol, state)) continue;
       if (this.getEntryGuard({ symbol, state })) continue;
+      const symbolOpenLimitOrders = state.activeOrders.filter((order) => {
+        if (order.symbol !== symbol) return false;
+        if (order.status !== "NEW") return false;
+        const type = order.type.trim().toUpperCase();
+        return type === "LIMIT" || type === "LIMIT_MAKER";
+      });
+      const hasBuyLimit = symbolOpenLimitOrders.some((order) => order.side === "BUY");
+      const hasSellLimit = symbolOpenLimitOrders.some((order) => order.side === "SELL");
+      const recentInventoryWaitingSkips = this.countRecentSymbolSkipMatches({
+        state,
+        symbol,
+        contains: "grid waiting for ladder slot or inventory",
+        windowMs: 20 * 60_000
+      });
+      if (
+        this.shouldSuppressParkedGridLadderCandidate({
+          recentInventoryWaitingSkips,
+          hasBuyLimit,
+          hasSellLimit,
+          risk
+        })
+      ) {
+        recordRejection({
+          symbol,
+          stage: "parked-grid-ladder",
+          reason: `Dual ladder already resting (${symbolOpenLimitOrders.length} open limits)`
+        });
+        continue;
+      }
       const quoteFree = balances.find((b) => b.asset.trim().toUpperCase() === quoteAsset)?.free ?? 0;
       if (!Number.isFinite(quoteFree) || quoteFree <= 0) continue;
       const quoteReserveTargets = await this.deriveQuoteReserveTargets({
@@ -2584,6 +2640,26 @@ export class BotEngineService implements OnModuleInit {
         const hasInventory =
           Number.isFinite(baseTotal) &&
           baseTotal > Number.EPSILON;
+        const recentFeeEdgeRejects = this.countRecentSymbolSkipMatches({
+          state,
+          symbol,
+          contains: "fee/edge filter",
+          windowMs: 15 * 60_000
+        });
+        if (
+          this.shouldSuppressFeeEdgeRetryCandidate({
+            recentFeeEdgeRejects,
+            hasInventory,
+            risk
+          })
+        ) {
+          recordRejection({
+            symbol,
+            stage: "fee-edge-retry",
+            reason: `Recent fee/edge rejects still active (${recentFeeEdgeRejects})`
+          });
+          continue;
+        }
         if (!hasInventory && quoteAsset !== normalizedHomeStable) {
           const quoteHomeValue = await this.estimateAssetValueInHome(
             quoteAsset,
