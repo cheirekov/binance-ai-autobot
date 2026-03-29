@@ -76,6 +76,7 @@ These are execution behaviors currently active in runtime:
     - risk-linked regime thresholds + regime-aware fee floor
     - lane-aware candidate scoring so `SPOT_GRID` candidates are ranked by the execution lane the engine would actually use (`MARKET` / `GRID` / `DEFENSIVE`)
     - feasible live routing suppression for parked dual-ladder symbols and repeated no-inventory fee-edge dead ends
+    - fee-edge bypass for already-open managed symbols when `DEFENSIVE` / daily-loss handling needs to stay reachable
   - objective: reduce fee/edge false idling and parked-ladder churn in strong trends without weakening bear-side protection
 
 ## Support / next strategy core

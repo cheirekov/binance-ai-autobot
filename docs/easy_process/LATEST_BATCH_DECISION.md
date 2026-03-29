@@ -1,16 +1,16 @@
 # LATEST_BATCH_DECISION
 
-Last updated: 2026-03-29 12:10 EET  
+Last updated: 2026-03-29 18:35 EET  
 Owner: PM/BA + Codex
 
 ## Production capability lane
 - Chosen: `Lane C — Strategy quality`
 - Why:
-  - `observed`: the latest fresh bundle is now `autobot-feedback-20260329-081616.tgz`
+  - `observed`: the latest fresh bundle is now `autobot-feedback-20260329-150750.tgz`
   - `observed`: auto-retro says `continue`, but the dominant blockers have moved to strategy-quality surfaces
-  - `observed`: the bundle ends `risk_state=HALT`, `daily_net_usdt=-166.45`, `max_drawdown_pct=2.99`, `sizingRejectPressure=low`
-  - `observed`: the dominant repeats are now parked dual-ladder waiting (`TAOUSDC` / `ETHUSDC` / `BTCUSDC`) plus no-inventory `Fee/edge filter` retries (`SOLUSDC`, `XRPUSDC`)
-  - `inferred`: the next leverage point is viable candidate filtering inside `T-031`, not another wait-only `T-032` proof cycle
+  - `observed`: the bundle ends `risk_state=CAUTION`, `daily_net_usdt=-299.30`, `max_drawdown_pct=4.80`, `sizingRejectPressure=low`
+  - `observed`: the dominant repeats are now `CAUTION` managed-symbol pressure plus repeated `BTCUSDC: Fee/edge filter (...)` on already-open inventory
+  - `inferred`: the next leverage point is to let downside-control handling run before fee-edge gating blocks managed symbols
 
 ## Chosen active ticket
 - Current: `T-031` (Regime engine v2)
@@ -33,10 +33,9 @@ Owner: PM/BA + Codex
 - Next ticket candidate: `T-031`
 - Review slice:
   - keep `T-031` active
-  - extend `T-031` with feasible live routing suppression for parked dual-ladder symbols
-  - extend `T-031` with no-inventory fee-edge retry suppression
+  - extend `T-031` with fee-edge bypass for already-open managed symbols in `DEFENSIVE` / loss-guard handling
   - preserve current `T-032` downside controls and `T-034` routing stability
 - Validation:
-  - fresh bundle review (`autobot-feedback-20260329-081616.tgz`) ✅
+  - fresh bundle review (`autobot-feedback-20260329-150750.tgz`) ✅
   - strategy source-of-truth + board/session docs aligned on current `T-031` slice ✅
   - same-ticket `T-031` slice landed in code/tests ✅

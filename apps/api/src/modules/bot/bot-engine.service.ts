@@ -734,6 +734,17 @@ export class BotEngineService implements OnModuleInit {
     return params.recentFeeEdgeRejects >= localThreshold;
   }
 
+  private shouldBypassFeeEdgeFilter(params: {
+    executionLane: AdaptiveExecutionLane;
+    candidateIsOpen: boolean;
+    dailyLossGuardActive: boolean;
+    cautionUnwindActive: boolean;
+  }): boolean {
+    if (!params.candidateIsOpen) return false;
+    if (params.dailyLossGuardActive || params.cautionUnwindActive) return true;
+    return params.executionLane === "DEFENSIVE";
+  }
+
   private shouldTreatGridBuySizingRejectAsQuoteInsufficient(params: {
     check: MarketQtyValidation;
     price: number;
@@ -6043,6 +6054,10 @@ export class BotEngineService implements OnModuleInit {
           });
           tickContext.executionLane = executionLane;
           const gridEnabled = configuredGridEnabled && executionLane !== "MARKET";
+          const cautionUnwindActive = this.shouldRunDailyLossCautionUnwind({
+            guard: dailyLossGuard,
+            risk
+          });
 
           const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
           tickContext.maxOpenPositions = maxOpenPositions;
@@ -6484,11 +6499,6 @@ export class BotEngineService implements OnModuleInit {
             }
           }
 
-          const cautionUnwindActive = this.shouldRunDailyLossCautionUnwind({
-            guard: dailyLossGuard,
-            risk
-          });
-
           if (dailyLossGuard.active || cautionUnwindActive) {
             if (config?.advanced.autoCancelBotOrdersOnGlobalProtectionLock && config) {
               if (dailyLossGuard.active) {
@@ -6810,9 +6820,15 @@ export class BotEngineService implements OnModuleInit {
           });
           const riskNormalized = Math.max(0, Math.min(1, risk / 100));
           const riskAdjustedMinNetEdgePct = Math.max(0.05, capitalProfile.minNetEdgePct * (1 - riskNormalized * 0.65));
+          const bypassFeeEdgeFilter = this.shouldBypassFeeEdgeFilter({
+            executionLane,
+            candidateIsOpen,
+            dailyLossGuardActive: dailyLossGuard.active,
+            cautionUnwindActive
+          });
           if (Number.isFinite(estimatedEdgePct)) {
             const netEdgePct = (estimatedEdgePct ?? 0) - roundTripCostPct;
-            if (!this.isFeeEdgeSufficient(netEdgePct, regimeAdjustedMinNetEdgePct)) {
+            if (!bypassFeeEdgeFilter && !this.isFeeEdgeSufficient(netEdgePct, regimeAdjustedMinNetEdgePct)) {
               const summary = `Skip ${candidateSymbol}: Fee/edge filter (net ${netEdgePct.toFixed(3)}% < ${regimeAdjustedMinNetEdgePct.toFixed(3)}%)`;
               const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveFeeEdgeCooldownMs(risk));
               const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });

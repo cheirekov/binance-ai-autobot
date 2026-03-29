@@ -16,6 +16,30 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-29 18:35 UTC — T-031 fourth slice: do not let fee-edge block defensive/caution unwind handling
+- Scope:
+  - respond to the fresh March 29 afternoon bundle where `T-031` remained active but managed symbols in `CAUTION` kept looping on `Fee/edge filter` before risk-state handling could run.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260329-150750.tgz`) shows the dominant pattern is `daily loss caution paused new symbols` plus repeated `BTCUSDC: Fee/edge filter (...)` while `risk_state=CAUTION`, `unwind_only=false`, and the candidate is already a managed open symbol.
+  - raw decision audit confirms the engine was returning early on fee-edge checks before the caution-unwind logic had a chance to execute.
+- PM milestone mapping:
+  - keep `T-031` active and patch the execution ordering defect instead of reopening `T-032` as the active lane; this preserves strategy-quality work while restoring downside-control reachability.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `shouldBypassFeeEdgeFilter(...)`.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: caution/halt unwind intent is now derived before the fee-edge gate, and fee-edge is bypassed for already-open managed symbols when the engine is in `DEFENSIVE`, `CAUTION` unwind, or `HALT`.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage proving fee-edge bypass is enabled for open inventory in defensive/loss-guard unwind states but not for fresh candidates.
+  - `docs/SESSION_BRIEF.md` and `docs/easy_process/*`: aligned working-memory docs to this March 29 same-ticket mitigation.
+- Risk slider impact:
+  - none on hard limits; this patch only ensures risk-handling paths are reachable before profit-edge gating on already-open inventory.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/pmba-gate.sh start`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected next proof: lower repeated `BTCUSDC: Fee/edge filter (...)` while `risk_state=CAUTION`, and visible caution-unwind or defensive management when managed positions remain exposed.
+- Follow-up:
+  - if the next fresh bundle still shows fee-edge domination on managed symbols in `CAUTION`, the next slice should promote explicit managed-symbol demotion / sell-priority scoring rather than another gate bypass.
+
 ## 2026-03-29 09:10 UTC — T-031 third slice: suppress parked ladders and fee-edge dead ends in feasible live routing
 - Scope:
   - apply the next bounded `T-031` strategy-quality slice from fresh March 29 evidence instead of waiting on more live drift.

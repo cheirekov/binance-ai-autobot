@@ -3367,6 +3367,53 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(false);
   });
 
+  it("bypasses fee-edge filter for open inventory in defensive or loss-guard unwind states", () => {
+    const helpers = service as unknown as {
+      shouldBypassFeeEdgeFilter: (params: {
+        executionLane: "GRID" | "MARKET" | "DEFENSIVE";
+        candidateIsOpen: boolean;
+        dailyLossGuardActive: boolean;
+        cautionUnwindActive: boolean;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldBypassFeeEdgeFilter({
+        executionLane: "DEFENSIVE",
+        candidateIsOpen: true,
+        dailyLossGuardActive: false,
+        cautionUnwindActive: false
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldBypassFeeEdgeFilter({
+        executionLane: "GRID",
+        candidateIsOpen: true,
+        dailyLossGuardActive: false,
+        cautionUnwindActive: true
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldBypassFeeEdgeFilter({
+        executionLane: "GRID",
+        candidateIsOpen: false,
+        dailyLossGuardActive: true,
+        cautionUnwindActive: true
+      })
+    ).toBe(false);
+
+    expect(
+      helpers.shouldBypassFeeEdgeFilter({
+        executionLane: "GRID",
+        candidateIsOpen: true,
+        dailyLossGuardActive: false,
+        cautionUnwindActive: false
+      })
+    ).toBe(false);
+  });
+
   it("derives tighter defensive grid-guard unwind policy for concentrated high-confidence bear loops", () => {
     const helpers = service as unknown as {
       deriveDefensiveGridGuardUnwindPolicy: (params: {
