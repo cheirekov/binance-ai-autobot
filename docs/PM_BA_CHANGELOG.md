@@ -16,6 +16,33 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-30 09:45 UTC — T-032 pivot + first slice: thaw flat-book ABS_DAILY_LOSS caution
+- Scope:
+  - stop treating `T-031` as the active lane because fresh March 29-30 evidence is dominated by flat-book `CAUTION` freeze, not strategy-quality candidate choice.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260330-082950.tgz`) shows `risk_state=CAUTION`, `daily_net_usdt=-170.99`, `total_alloc_pct=0.11`, `activeOrders=0`, and dominant repeats:
+    - `Skip: No feasible candidates: daily loss caution paused new symbols (58 filtered)` (`89`)
+    - `Skip BTCUSDC: Daily loss caution paused GRID BUY leg` (`75`)
+  - raw state audit confirms the latest decision is already `no managed inventory`, so the engine is boxed in by caution policy rather than strategy quality.
+- PM milestone mapping:
+  - freeze `T-031` as preserved runtime work and reactivate `T-032` with an immediate same-batch runtime slice.
+  - do not reopen `T-034`; keep routing/funding stability intact.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `shouldPauseNewSymbolsInCaution(...)` and wired runtime caution-pause derivation through it so `ABS_DAILY_LOSS` can thaw once the book is effectively flat.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage proving `ABS_DAILY_LOSS` caution releases after de-risking to a flat book while `PROFIT_GIVEBACK` caution stays stricter.
+  - `docs/DELIVERY_BOARD.md`, `docs/TICKET_SWITCH_RETRO.md`, `docs/STRATEGY_COVERAGE.md`, `docs/SESSION_BRIEF.md`: updated to reflect `T-032` as the active lane.
+  - `docs/TRIAGE_NOTE_2026-03-30_T031_CAUTION_FLAT_BOOK_PIVOT_TO_T032.md`: recorded the interrupt-level pivot rationale.
+- Risk slider impact:
+  - risk still shapes the exposure floor, but raw trigger type alone no longer keeps `ABS_DAILY_LOSS` caution frozen after exposure/orders are already near zero.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/pmba-gate.sh start`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected next proof: lower repeated `daily loss caution paused new symbols` / `Daily loss caution paused GRID BUY leg` while preserving stricter `PROFIT_GIVEBACK` caution behavior when exposure is still material.
+- Follow-up:
+  - if the next fresh bundle still shows flat-book `CAUTION` boxing with no new decision timestamps, the next `T-032` slice should move from thaw logic to explicit recovery/re-entry priority after caution de-risking.
+
 ## 2026-03-29 18:35 UTC — T-031 fourth slice: do not let fee-edge block defensive/caution unwind handling
 - Scope:
   - respond to the fresh March 29 afternoon bundle where `T-031` remained active but managed symbols in `CAUTION` kept looping on `Fee/edge filter` before risk-state handling could run.

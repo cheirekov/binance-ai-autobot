@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-29 15:08 UTC
+Last updated: 2026-03-30 08:30 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -8,40 +8,40 @@ Use this file at the start and end of every batch.
 ## 1) Batch contract (fill before coding)
 
 - Batch type: `SHORT (1-3h)`
-- Active ticket: `T-031` (Regime engine v2)
-- Goal (single sentence): continue `T-031` with a bounded March 29 slice so managed symbols in `CAUTION`/`DEFENSIVE` are no longer blocked by fee-edge gating before downside-control handling can run.
+- Active ticket: `T-032` (Exit manager v2)
+- Goal (single sentence): thaw `ABS_DAILY_LOSS` CAUTION once the book is effectively flat so the engine can re-enter instead of looping on global new-symbol pause.
 - In scope:
-  - keep `T-031` active as the strategy-quality lane.
-  - preserve the earlier parked-ladder / no-inventory fee-edge routing filters.
-  - allow defensive / caution-unwind handling to bypass fee-edge on already-open managed symbols.
-  - preserve existing `T-032` downside controls and `T-034` funding stability.
+  - reactivate `T-032` as the active lane.
+  - release `CAUTION` new-symbol pause for near-flat `ABS_DAILY_LOSS` books.
+  - preserve stricter `PROFIT_GIVEBACK` caution behavior while exposure is still material.
+  - preserve March 28-29 `T-031` strategy-quality slices and `T-034` funding stability.
 - Out of scope:
   - quote-routing redesign (`T-034` is closed unless runtime regresses),
-  - exit-manager rewrite in this batch,
+  - broader regime-engine rewrite (`T-031` is frozen, not discarded),
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: fresh March 29 afternoon evidence shows the engine is still returning early on fee-edge checks for already-open managed symbols while `risk_state=CAUTION`. Bypassing fee-edge only for defensive/loss-guard handling should let downside-control logic run without reopening fresh-entry risk.
+- Hypothesis: fresh March 29-30 evidence shows `ABS_DAILY_LOSS` CAUTION still pauses new symbols even when `activeOrders=0`, managed exposure is near zero, and the latest decision already says `no managed inventory`. Releasing that pause only once the book is effectively flat should stop the engine from boxing itself in.
 - Target KPI delta:
-  - reduce repeated `BTCUSDC: Fee/edge filter (...)` loops while `risk_state=CAUTION`.
-  - let caution/halt unwind handling reach managed symbols before fee-edge returns.
-  - keep downside-control runtime intact while improving entry selection quality.
+  - reduce repeated `No feasible candidates: daily loss caution paused new symbols (...)`.
+  - reduce repeated `BTCUSDC: Daily loss caution paused GRID BUY leg`.
+  - let the engine leave flat-book `CAUTION` deadlock without weakening downside-control while exposure is still real.
 - Stop/rollback condition:
-  - if the strategy slice weakens bear-side protection or reopens quote-funding regressions, freeze `T-031` and revert to the last `T-032`/`T-034`-stable baseline.
+  - if the thaw logic reopens new-symbol risk while exposure/orders are still material, freeze `T-032` and restore the stricter caution-pause baseline.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
   - runtime behavior changes in a bounded way:
-    - defensive / caution-unwind handling can bypass fee-edge for already-open managed symbols.
-    - fresh candidates still remain fee-edge gated.
-  - active development lane remains `T-031`; `T-032` stays support/runtime only.
+    - `ABS_DAILY_LOSS` CAUTION no longer pauses new symbols once managed exposure, countable managed positions, and active orders are effectively flat.
+    - `PROFIT_GIVEBACK` CAUTION still requires materially higher exposure before new-symbol pause releases.
+  - active development lane is `T-032`; March 28-29 `T-031` slices remain preserved in runtime.
 - Runtime evidence in decisions/logs:
-  - latest bundle runs `git.commit=6a151bd`.
-  - latest fresh bundle is dominated by `CAUTION` + repeated `BTCUSDC: Fee/edge filter (...)` on managed inventory.
-  - the next fresh bundle should show lower managed-symbol fee-edge repetition during `CAUTION` and evidence that caution/halt handling is still reachable.
+  - latest bundle runs `git.commit=cb38409`.
+  - latest fresh bundle is dominated by `CAUTION` + repeated `No feasible candidates: daily loss caution paused new symbols (...)` while the book is nearly flat.
+  - the next fresh bundle should show lower flat-book `CAUTION` pause repetition and new decision timestamps beyond the current stuck window.
 - Risk slider impact:
-  - risk slider modulates the suppression threshold for dead-end retries.
+  - risk slider still modulates the pause floor; higher risk remains slightly less restrictive, but flat-book thaw no longer depends only on raw trigger type.
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
 - Runtime validation plan:
@@ -49,7 +49,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `6a151bd`
+- Commit hash: `cb38409-dirty`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -70,42 +70,42 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `EVENING (collection) / EVENING (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `6.861`
-  - runtime uptime (hours): `961.057`
-  - run end: `Sun Mar 29 2026 18:07:42 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `NIGHT_RUN`
+  - bundle interval (hours): `17.362`
+  - runtime uptime (hours): `978.419`
+  - run end: `Mon Mar 30 2026 11:29:27 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip: No feasible candidates: daily loss caution paused new symbols (58 filtered) (77))
+  - active ticket runtime signal: `observed` (Skip: No feasible candidates: daily loss caution paused new symbols (58 filtered) (89))
 - Observed KPI delta:
   - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=103, activeMarketOrders=0)
   - market-only share reduced: `yes` (historyMarketShare=48.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=2, decisions=200, ratio=1.0%)
+  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `patch_required`
-- Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
-- Required action: `same-ticket mitigation required before next long run`
+- Decision: `pivot_required`
+- Next ticket candidate: `T-032` (pivot accepted; patch this lane before next long run)
+- Required action: `reactivate T-032 with first runtime slice before next long run`
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260329-150750.tgz`
-  - auto-updated at: `2026-03-29T15:08:18.424Z`
+  - bundle: `autobot-feedback-20260330-082950.tgz`
+  - auto-updated at: `2026-03-30T08:30:12.812Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
-Ticket: T-031
+Ticket: T-032
 Decision: patch_required
-Required action: same-ticket mitigation required before next long run
-Latest bundle: autobot-feedback-20260329-150750.tgz
+Required action: deploy the flat-book CAUTION thaw slice before the next long run
+Latest bundle: autobot-feedback-20260330-082950.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
-In scope: fee-edge bypass for already-open managed symbols during defensive / loss-guard handling.
-Out of scope: quote-routing redesign, fresh-entry fee-floor loosening, PnL schema changes, AI lane.
+Goal: release ABS_DAILY_LOSS CAUTION once the book is effectively flat, while preserving stricter profit-giveback caution behavior.
+In scope: exit-manager / downside-control release behavior under adverse conditions.
+Out of scope: quote-routing redesign, regime-engine rewrite, PnL schema changes, AI lane.
 Validation: docker compose -f docker-compose.ci.yml run --rm ci
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

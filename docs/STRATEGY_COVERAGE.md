@@ -1,6 +1,6 @@
 # Strategy Coverage (Source of Truth)
 
-Last updated: 2026-03-28
+Last updated: 2026-03-30
 Owner: PM/BA + Trader + Architect
 
 Purpose: prevent strategy drift/context loss by keeping one explicit list of:
@@ -71,17 +71,20 @@ These are execution behaviors currently active in runtime:
 ## 3) Ticket ownership map for strategy evolution
 
 ## Active now
-- `T-031` — Regime engine v2
+- `T-032` — Exit manager v2
   - current slices:
-    - risk-linked regime thresholds + regime-aware fee floor
-    - lane-aware candidate scoring so `SPOT_GRID` candidates are ranked by the execution lane the engine would actually use (`MARKET` / `GRID` / `DEFENSIVE`)
-    - feasible live routing suppression for parked dual-ladder symbols and repeated no-inventory fee-edge dead ends
-    - fee-edge bypass for already-open managed symbols when `DEFENSIVE` / daily-loss handling needs to stay reachable
-  - objective: reduce fee/edge false idling and parked-ladder churn in strong trends without weakening bear-side protection
+    - early downside-control / defensive unwind behavior remains live
+    - current March 30 slice: thaw `CAUTION` new-symbol pause once `ABS_DAILY_LOSS` has already de-risked the book to near-flat exposure/order state
+  - objective: stop flat-book `CAUTION` freezes from boxing the engine in after the loss event is already absorbed
 
 ## Support / next strategy core
-- `T-032` — Exit manager v2
-  - remains live in runtime, but active development is paused unless downside-control evidence becomes dominant again
+- `T-031` — Regime engine v2
+  - preserved live in runtime:
+    - risk-linked regime thresholds + regime-aware fee floor
+    - lane-aware candidate scoring
+    - feasible live routing suppression for parked dual-ladder symbols and repeated no-inventory fee-edge dead ends
+    - fee-edge bypass for already-open managed symbols when defensive / daily-loss handling needs to stay reachable
+  - resume after `T-032` removes flat-book `CAUTION` as the dominant runtime blocker
 - `T-034` — Multi-quote execution policy v1
   - DONE; preserve funding/routing stability while `T-031` evolves strategy quality
 

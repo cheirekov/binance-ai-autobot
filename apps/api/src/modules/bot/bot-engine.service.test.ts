@@ -2748,6 +2748,78 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(0.03);
   });
 
+  it("releases caution new-symbol pause after abs-daily-loss de-risks to a flat book", () => {
+    const helpers = service as unknown as {
+      shouldPauseNewSymbolsInCaution: (params: {
+        guard: {
+          state: "NORMAL" | "CAUTION" | "HALT";
+          trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK";
+          managedExposurePct: number;
+          profitGivebackHaltMinExposurePct: number | null;
+        };
+        risk: number;
+        countableManagedPositions: number;
+        activeOrderCount: number;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldPauseNewSymbolsInCaution({
+        guard: {
+          state: "CAUTION",
+          trigger: "ABS_DAILY_LOSS",
+          managedExposurePct: 0.0011,
+          profitGivebackHaltMinExposurePct: null
+        },
+        risk: 100,
+        countableManagedPositions: 0,
+        activeOrderCount: 0
+      })
+    ).toBe(false);
+
+    expect(
+      helpers.shouldPauseNewSymbolsInCaution({
+        guard: {
+          state: "CAUTION",
+          trigger: "ABS_DAILY_LOSS",
+          managedExposurePct: 0.0011,
+          profitGivebackHaltMinExposurePct: null
+        },
+        risk: 100,
+        countableManagedPositions: 1,
+        activeOrderCount: 0
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldPauseNewSymbolsInCaution({
+        guard: {
+          state: "CAUTION",
+          trigger: "PROFIT_GIVEBACK",
+          managedExposurePct: 0.18,
+          profitGivebackHaltMinExposurePct: 0.08
+        },
+        risk: 100,
+        countableManagedPositions: 0,
+        activeOrderCount: 0
+      })
+    ).toBe(false);
+
+    expect(
+      helpers.shouldPauseNewSymbolsInCaution({
+        guard: {
+          state: "CAUTION",
+          trigger: "PROFIT_GIVEBACK",
+          managedExposurePct: 0.22,
+          profitGivebackHaltMinExposurePct: 0.08
+        },
+        risk: 100,
+        countableManagedPositions: 0,
+        activeOrderCount: 0
+      })
+    ).toBe(true);
+  });
+
   it("releases caution managed-symbol-only restriction after profit-giveback exposure de-risks below the trigger buffer", () => {
     const helpers = service as unknown as {
       shouldRestrictCautionToManagedSymbols: (params: {

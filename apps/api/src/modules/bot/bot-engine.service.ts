@@ -617,6 +617,33 @@ export class BotEngineService implements OnModuleInit {
     return params.managedExposurePct >= params.minManagedExposurePct;
   }
 
+  private shouldPauseNewSymbolsInCaution(params: {
+    guard: DailyLossGuardSnapshot;
+    risk: number;
+    countableManagedPositions: number;
+    activeOrderCount: number;
+  }): boolean {
+    if (params.guard.state !== "CAUTION") return false;
+
+    const minManagedExposurePct = this.deriveCautionPauseNewSymbolsMinExposurePct({
+      risk: params.risk,
+      trigger: params.guard.trigger,
+      haltExposureFloorPct: params.guard.profitGivebackHaltMinExposurePct
+    });
+    const managedExposurePct =
+      Number.isFinite(params.guard.managedExposurePct) && params.guard.managedExposurePct > 0
+        ? params.guard.managedExposurePct
+        : 0;
+
+    if (params.guard.trigger === "PROFIT_GIVEBACK") {
+      return managedExposurePct >= minManagedExposurePct;
+    }
+
+    if (managedExposurePct >= minManagedExposurePct) return true;
+    if (params.countableManagedPositions > 0) return true;
+    return params.activeOrderCount > 0;
+  }
+
   private shouldCancelDefensiveGridBuyOrders(params: {
     executionLane: AdaptiveExecutionLane;
     hasBotBuyOrders: boolean;
@@ -5527,20 +5554,22 @@ export class BotEngineService implements OnModuleInit {
             trigger: dailyLossGuard.trigger,
             haltExposureFloorPct: dailyLossGuard.profitGivebackHaltMinExposurePct
           });
-          const cautionPauseNewSymbols =
-            dailyLossGuard.state === "CAUTION" &&
-            (dailyLossGuard.trigger !== "PROFIT_GIVEBACK" ||
-              dailyLossGuard.managedExposurePct >= cautionPauseNewSymbolsMinExposurePct);
+          const countableManagedOpenSymbolsForCaution = [...managedPositions.values()]
+            .filter(
+              (position) =>
+                isExecutionQuoteSymbol(position.symbol) &&
+                this.isManagedPositionCountable(position, cautionManagedMinExposureHome)
+            )
+            .map((position) => position.symbol.trim().toUpperCase())
+            .filter((symbol) => symbol.length > 0);
+          const cautionPauseNewSymbols = this.shouldPauseNewSymbolsInCaution({
+            guard: dailyLossGuard,
+            risk,
+            countableManagedPositions: countableManagedOpenSymbolsForCaution.length,
+            activeOrderCount: current.activeOrders.length
+          });
           const managedOpenSymbolsOnly = cautionPauseNewSymbols
-            ? new Set(
-                [...managedPositions.values()]
-                  .filter(
-                    (position) =>
-                      isExecutionQuoteSymbol(position.symbol) &&
-                      this.isManagedPositionCountable(position, cautionManagedMinExposureHome)
-                  )
-                  .map((position) => position.symbol.trim().toUpperCase())
-              )
+            ? new Set(countableManagedOpenSymbolsForCaution)
             : null;
           const cautionModeActive = dailyLossGuard.state === "CAUTION";
 
