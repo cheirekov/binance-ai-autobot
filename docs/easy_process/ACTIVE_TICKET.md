@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-03-30 12:45 EEST  
+Last updated: 2026-03-30 17:40 EEST  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -11,10 +11,10 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260330-082950.tgz`) shows the active blocker is now flat-book caution freeze under `T-032`: while `risk_state=CAUTION`, the book is already almost flat (`total_alloc_pct=0.11`, `activeOrders=0`) but the engine still repeats `daily loss caution paused new symbols` and cannot re-enter.
+The newest fresh bundle (`autobot-feedback-20260330-135922.tgz`) shows the active blocker is now materially exposed `ABS_DAILY_LOSS` caution under `T-032`: the flat-book thaw slice is no longer the main issue, but the engine still repeats `Daily loss caution paused GRID BUY leg` on managed symbols instead of reaching caution unwind.
 
 ## Current decision
-- Ticket decision: `pivot_and_patch`
+- Ticket decision: `patch_same_ticket`
 - Work mode: `PATCH_NOW`
 - Process rule:
   - treat `docs/DELIVERY_BOARD.md` and `docs/PM_BA_CHANGELOG.md` as authoritative for ticket status and history
@@ -22,12 +22,12 @@ The newest fresh bundle (`autobot-feedback-20260330-082950.tgz`) shows the activ
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-032` slice that releases `ABS_DAILY_LOSS` caution once managed exposure, countable managed positions, and active orders are effectively flat will stop the engine from boxing itself in without weakening stricter `PROFIT_GIVEBACK` caution behavior.
+- A bounded `T-032` slice that lets `ABS_DAILY_LOSS` caution trigger best-effort unwind once managed exposure is still materially high will reduce repeated managed-symbol buy-pause loops without weakening stricter `PROFIT_GIVEBACK` caution behavior or the earlier flat-book thaw.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-032`)
 - `T-031` remains preserved as a support lane rather than being rewritten blindly
-- the next fresh bundle reflects lower flat-book `CAUTION` pause churn without reopening funding or downside-control regressions
+- the next fresh bundle reflects lower managed-symbol `Daily loss caution paused GRID BUY leg` churn and visible caution-unwind reachability without reopening funding or downside-control regressions
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident

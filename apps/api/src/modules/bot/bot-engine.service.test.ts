@@ -3331,7 +3331,7 @@ describe("bot-engine insufficient-balance helpers", () => {
     });
   });
 
-  it("activates caution unwind only for profit-giveback caution with sufficiently high managed exposure", () => {
+  it("activates caution unwind for materially exposed caution books and stays stricter for profit-giveback", () => {
     const helpers = service as unknown as {
       shouldRunDailyLossCautionUnwind: (params: {
         guard: {
@@ -3357,10 +3357,22 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(false);
     expect(
       helpers.shouldRunDailyLossCautionUnwind({
-        guard: { state: "CAUTION", trigger: "ABS_DAILY_LOSS", managedExposurePct: 0.4 },
+        guard: { state: "CAUTION", trigger: "ABS_DAILY_LOSS", managedExposurePct: 0.18 },
+        risk: 100
+      })
+    ).toBe(true);
+    expect(
+      helpers.shouldRunDailyLossCautionUnwind({
+        guard: { state: "CAUTION", trigger: "ABS_DAILY_LOSS", managedExposurePct: 0.08 },
         risk: 100
       })
     ).toBe(false);
+    expect(
+      helpers.shouldRunDailyLossCautionUnwind({
+        guard: { state: "CAUTION", trigger: "ABS_DAILY_LOSS", managedExposurePct: 0.4 },
+        risk: 100
+      })
+    ).toBe(true);
   });
 
   it("derives lighter caution unwind policy before HALT", () => {

@@ -16,6 +16,34 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-30 14:40 UTC — T-032 second slice: let ABS_DAILY_LOSS caution unwind materially exposed managed books
+- Scope:
+  - respond to the first fresh post-pivot `T-032` bundle where flat-book thaw no longer dominates, but materially exposed `ABS_DAILY_LOSS` caution still loops on paused GRID buy legs.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260330-135922.tgz`) shows:
+    - `risk_state=CAUTION`
+    - `daily_net_usdt=-144.52`
+    - `total_alloc_pct=32.69`
+    - top repeats: `Skip SUIUSDC: Daily loss caution paused GRID BUY leg` (`61`), `Skip NOMUSDC: Daily loss caution paused GRID BUY leg` (`16`)
+  - raw state audit confirms the engine is not flat anymore (`activeOrders=1`, `open_positions=5`), so the first thaw slice is no longer the right mitigation by itself.
+- PM milestone mapping:
+  - keep `T-032` active and add a same-ticket mitigation instead of reopening `T-031`.
+  - preserve March 28-29 `T-031` strategy-quality work and `T-034` routing stability.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: extended `shouldRunDailyLossCautionUnwind(...)` so `ABS_DAILY_LOSS` caution can trigger best-effort unwind once managed exposure is still materially high, instead of remaining profit-giveback-only.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: updated regression coverage for caution-unwind activation thresholds across both `PROFIT_GIVEBACK` and `ABS_DAILY_LOSS`.
+  - `docs/SESSION_BRIEF.md` and `docs/easy_process/*`: aligned handoff docs to the new same-ticket `T-032` slice.
+- Risk slider impact:
+  - risk now also affects when `ABS_DAILY_LOSS` caution starts unwind; higher risk can unwind earlier, but only on already-managed exposure.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/pmba-gate.sh start`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected next proof: lower repeated managed-symbol `Daily loss caution paused GRID BUY leg` and visible `daily-loss-caution-unwind` behavior while exposure remains material.
+- Follow-up:
+  - if the next fresh bundle still shows no `daily-loss-caution-unwind` reachability, the next `T-032` slice should promote managed sell-priority / ladder-demotion under caution instead of another threshold tweak.
+
 ## 2026-03-30 09:45 UTC — T-032 pivot + first slice: thaw flat-book ABS_DAILY_LOSS caution
 - Scope:
   - stop treating `T-031` as the active lane because fresh March 29-30 evidence is dominated by flat-book `CAUTION` freeze, not strategy-quality candidate choice.

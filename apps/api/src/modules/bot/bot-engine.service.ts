@@ -834,12 +834,18 @@ export class BotEngineService implements OnModuleInit {
     risk: number;
   }): boolean {
     if (params.guard.state !== "CAUTION") return false;
-    if (params.guard.trigger !== "PROFIT_GIVEBACK") return false;
 
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
     const t = boundedRisk / 100;
-    const minManagedExposurePct = Number((0.35 - t * 0.17).toFixed(4)); // 35% -> 18%
-    return params.guard.managedExposurePct >= minManagedExposurePct;
+    if (params.guard.trigger === "PROFIT_GIVEBACK") {
+      const minManagedExposurePct = Number((0.35 - t * 0.17).toFixed(4)); // 35% -> 18%
+      return params.guard.managedExposurePct >= minManagedExposurePct;
+    }
+    if (params.guard.trigger === "ABS_DAILY_LOSS") {
+      const minManagedExposurePct = Number((0.24 - t * 0.12).toFixed(4)); // 24% -> 12%
+      return params.guard.managedExposurePct >= minManagedExposurePct;
+    }
+    return false;
   }
 
   private deriveDailyLossCautionUnwindPolicy(params: {
