@@ -75,6 +75,7 @@ These are execution behaviors currently active in runtime:
   - current slices:
     - early downside-control / defensive unwind behavior remains live
     - current March 30 slice: thaw `CAUTION` new-symbol pause once `ABS_DAILY_LOSS` has already de-risked the book to near-flat exposure/order state
+    - current March 31 slice: stop-loss-cooled residual positions no longer anchor global `CAUTION` new-symbol pause once active orders are gone
   - objective: stop flat-book `CAUTION` freezes from boxing the engine in after the loss event is already absorbed
 
 ## Support / next strategy core

@@ -2759,6 +2759,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         };
         risk: number;
         countableManagedPositions: number;
+        countableManagedPositionsInStopLossCooldown: number;
         activeOrderCount: number;
       }) => boolean;
     };
@@ -2773,6 +2774,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         },
         risk: 100,
         countableManagedPositions: 0,
+        countableManagedPositionsInStopLossCooldown: 0,
         activeOrderCount: 0
       })
     ).toBe(false);
@@ -2787,6 +2789,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         },
         risk: 100,
         countableManagedPositions: 1,
+        countableManagedPositionsInStopLossCooldown: 0,
         activeOrderCount: 0
       })
     ).toBe(true);
@@ -2800,7 +2803,23 @@ describe("bot-engine insufficient-balance helpers", () => {
           profitGivebackHaltMinExposurePct: 0.08
         },
         risk: 100,
+        countableManagedPositions: 1,
+        countableManagedPositionsInStopLossCooldown: 1,
+        activeOrderCount: 0
+      })
+    ).toBe(false);
+
+    expect(
+      helpers.shouldPauseNewSymbolsInCaution({
+        guard: {
+          state: "CAUTION",
+          trigger: "PROFIT_GIVEBACK",
+          managedExposurePct: 0.18,
+          profitGivebackHaltMinExposurePct: 0.08
+        },
+        risk: 100,
         countableManagedPositions: 0,
+        countableManagedPositionsInStopLossCooldown: 0,
         activeOrderCount: 0
       })
     ).toBe(false);
@@ -2815,6 +2834,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         },
         risk: 100,
         countableManagedPositions: 0,
+        countableManagedPositionsInStopLossCooldown: 0,
         activeOrderCount: 0
       })
     ).toBe(true);

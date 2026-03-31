@@ -16,6 +16,36 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-03-31 08:55 UTC — T-032 third slice: stop-loss-cooled residuals no longer anchor global CAUTION
+- Scope:
+  - respond to the fresh March 31 `T-032` bundle where the March 30 caution-unwind slice reached the market, but the engine still stayed boxed in by a cooled residual symbol after active orders were already gone.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260331-084549.tgz`) shows:
+    - `risk_state=CAUTION`
+    - `daily_net_usdt=-155.28`
+    - `total_alloc_pct=0.25`
+    - `activeOrders=0`
+    - dominant repeats: `Skip NOMUSDC: Post stop-loss cooldown active` (`45`), `Skip NOMUSDC: Daily loss caution paused GRID BUY leg` (`21`)
+  - raw state audit confirms the March 30 slice produced `daily-loss-caution-unwind` trades, so the remaining blocker is not missing unwind reachability; it is that cooled residuals still count as anchors for global caution pause.
+- PM milestone mapping:
+  - keep `T-032` active and add a same-ticket mitigation instead of reopening `T-031`.
+  - preserve both the March 30 caution-unwind behavior and the earlier flat-book thaw.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: extended `shouldPauseNewSymbolsInCaution(...)` so non-`PROFIT_GIVEBACK` caution ignores countable managed positions that are themselves in active post-stop-loss cooldown once active orders are already gone.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: countable managed caution anchors now exclude symbols whose current entry guard is `Post stop-loss cooldown active`.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage proving stop-loss-cooled residuals no longer keep global caution paused by themselves.
+  - `docs/SESSION_BRIEF.md`, `docs/STRATEGY_COVERAGE.md`, and `docs/easy_process/*`: aligned handoff docs to this same-ticket mitigation.
+- Risk slider impact:
+  - risk still modulates pause floors and caution-unwind activation; this slice only changes whether cooled residuals can keep anchoring global `CAUTION`.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/pmba-gate.sh start`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected next proof: lower repeated `Post stop-loss cooldown active` / `daily loss caution paused new symbols` on the cooled residual case, with fresher decision timestamps after the cooled symbol stops anchoring the whole engine.
+- Follow-up:
+  - if the next fresh bundle still freezes on a cooled residual, the next `T-032` slice should explicitly demote cooled managed symbols out of the managed-only selection set instead of only changing pause anchoring.
+
 ## 2026-03-30 14:40 UTC — T-032 second slice: let ABS_DAILY_LOSS caution unwind materially exposed managed books
 - Scope:
   - respond to the first fresh post-pivot `T-032` bundle where flat-book thaw no longer dominates, but materially exposed `ABS_DAILY_LOSS` caution still loops on paused GRID buy legs.

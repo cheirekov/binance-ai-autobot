@@ -621,6 +621,7 @@ export class BotEngineService implements OnModuleInit {
     guard: DailyLossGuardSnapshot;
     risk: number;
     countableManagedPositions: number;
+    countableManagedPositionsInStopLossCooldown: number;
     activeOrderCount: number;
   }): boolean {
     if (params.guard.state !== "CAUTION") return false;
@@ -640,7 +641,11 @@ export class BotEngineService implements OnModuleInit {
     }
 
     if (managedExposurePct >= minManagedExposurePct) return true;
-    if (params.countableManagedPositions > 0) return true;
+    const anchoredManagedPositions = Math.max(
+      0,
+      params.countableManagedPositions - params.countableManagedPositionsInStopLossCooldown
+    );
+    if (anchoredManagedPositions > 0) return true;
     return params.activeOrderCount > 0;
   }
 
@@ -5568,10 +5573,15 @@ export class BotEngineService implements OnModuleInit {
             )
             .map((position) => position.symbol.trim().toUpperCase())
             .filter((symbol) => symbol.length > 0);
+          const countableManagedStopLossCooldownSymbolsForCaution = countableManagedOpenSymbolsForCaution.filter((symbol) => {
+            const entryGuard = this.getEntryGuard({ symbol, state: current });
+            return entryGuard?.summary === "Post stop-loss cooldown active";
+          });
           const cautionPauseNewSymbols = this.shouldPauseNewSymbolsInCaution({
             guard: dailyLossGuard,
             risk,
             countableManagedPositions: countableManagedOpenSymbolsForCaution.length,
+            countableManagedPositionsInStopLossCooldown: countableManagedStopLossCooldownSymbolsForCaution.length,
             activeOrderCount: current.activeOrders.length
           });
           const managedOpenSymbolsOnly = cautionPauseNewSymbols

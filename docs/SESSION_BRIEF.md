@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-30 14:24 UTC
+Last updated: 2026-03-31 08:46 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,10 +9,11 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-032` (Exit manager v2)
-- Goal (single sentence): add a bounded `T-032` caution-unwind slice so materially exposed `ABS_DAILY_LOSS` books can de-risk instead of only pausing GRID buy legs.
+- Goal (single sentence): keep `T-032` active and stop post-stop-loss cooldown residues from anchoring global `CAUTION` once active orders are already gone.
 - In scope:
   - reactivate `T-032` as the active lane.
-  - let `ABS_DAILY_LOSS` `CAUTION` run best-effort unwind while managed exposure is still material.
+  - keep the March 30 caution-unwind slice intact for materially exposed `ABS_DAILY_LOSS` books.
+  - stop stop-loss-cooled residual positions from anchoring global `CAUTION` when active orders are already gone.
   - preserve stricter `PROFIT_GIVEBACK` caution behavior while exposure is still material.
   - preserve the earlier flat-book thaw behavior once exposure/order state is already near zero.
   - preserve March 28-29 `T-031` strategy-quality slices and `T-034` funding stability.
@@ -22,11 +23,11 @@ Use this file at the start and end of every batch.
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: fresh March 30 evidence now shows the flat-book thaw slice landed, but the live blocker moved up one step: with `ABS_DAILY_LOSS` `CAUTION` and ~32.7% managed exposure, the engine mostly pauses GRID buy legs on managed symbols (`SUIUSDC`, `NOMUSDC`) instead of starting best-effort caution unwind. Allowing caution unwind for materially exposed `ABS_DAILY_LOSS` books should reduce that loop without reopening fresh-entry risk.
+- Hypothesis: fresh March 31 evidence shows the March 30 caution-unwind slice reached the market (`daily-loss-caution-unwind` trades happened), but after those sells the engine is left almost flat (`total_alloc_pct=0.25`, `activeOrders=0`) while a stop-loss-cooled residual symbol (`NOMUSDC`) still keeps global `CAUTION` paused. Excluding stop-loss-cooled residuals from the caution anchor count should let new symbols reopen once the book is effectively de-risked.
 - Target KPI delta:
-  - reduce repeated `Daily loss caution paused GRID BUY leg` on managed symbols.
-  - lower repeated `No feasible candidates: daily loss caution paused new symbols (...)` by de-risking existing exposure sooner.
-  - show reachable `daily-loss-caution-unwind` behavior before the engine falls through to passive waiting only.
+  - reduce repeated `Post stop-loss cooldown active` / `Daily loss caution paused GRID BUY leg` on the same cooled symbol.
+  - lower repeated `No feasible candidates: daily loss caution paused new symbols (...)` once active orders are gone and only cooled residuals remain.
+  - preserve reachable `daily-loss-caution-unwind` behavior for materially exposed books.
 - Stop/rollback condition:
   - if the thaw logic reopens new-symbol risk while exposure/orders are still material, freeze `T-032` and restore the stricter caution-pause baseline.
 
@@ -35,15 +36,16 @@ Use this file at the start and end of every batch.
 - API behavior:
   - runtime behavior changes in a bounded way:
     - `ABS_DAILY_LOSS` CAUTION still thaws once the book is effectively flat.
-    - `ABS_DAILY_LOSS` CAUTION can now also run best-effort unwind while managed exposure is still material.
+    - stop-loss-cooled residual positions no longer keep global `CAUTION` paused once active orders are gone.
+    - `ABS_DAILY_LOSS` CAUTION can still run best-effort unwind while managed exposure is still material.
     - `PROFIT_GIVEBACK` CAUTION still requires materially higher exposure before new-symbol pause releases.
   - active development lane is `T-032`; March 28-29 `T-031` slices remain preserved in runtime.
 - Runtime evidence in decisions/logs:
-  - latest bundle runs `git.commit=ffc245e`.
-  - latest fresh bundle is dominated by `CAUTION` + repeated managed-symbol `Daily loss caution paused GRID BUY leg` while exposure is still material (`32.69%`).
-  - the next fresh bundle should show lower managed-symbol caution-pause repetition and visible `daily-loss-caution-unwind` reachability when exposure remains material.
+  - latest bundle runs `git.commit=e1383fd`.
+  - latest fresh bundle is dominated by `Post stop-loss cooldown active` plus residual `daily loss caution paused new symbols` while total allocation is already only `0.25%`.
+  - the next fresh bundle should show lower cooled-symbol pause churn and fresher decision timestamps after the engine reopens beyond the cooled residual.
 - Risk slider impact:
-  - risk slider still modulates both the pause floor and the new caution-unwind activation threshold; higher risk can unwind earlier, but only on already-managed exposure.
+  - risk slider still modulates the pause floor and caution-unwind activation threshold; this slice only changes which residual positions are allowed to anchor global `CAUTION`.
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
 - Runtime validation plan:
@@ -51,7 +53,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `ffc245e-dirty`
+- Commit hash: `e1383fd-dirty`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -72,21 +74,21 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `DAY (collection) / DAY (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `5.498`
-  - runtime uptime (hours): `983.917`
-  - run end: `Mon Mar 30 2026 16:59:19 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `DAY_RUN`
+  - bundle interval (hours): `18.773`
+  - runtime uptime (hours): `1002.69`
+  - run end: `Tue Mar 31 2026 11:45:41 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip SUIUSDC: Daily loss caution paused GRID BUY leg (61))
+  - active ticket runtime signal: `observed` (Skip NOMUSDC: Post stop-loss cooldown active (45))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=107, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=46.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=4, decisions=200, ratio=2.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=112, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=44.0%)
+  - sizing reject pressure: `low` (sizingRejectSkips=6, decisions=200, ratio=3.0%)
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `patch_required`
 - Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
@@ -94,8 +96,8 @@ Use this file at the start and end of every batch.
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260330-135922.tgz`
-  - auto-updated at: `2026-03-30T14:24:30.917Z`
+  - bundle: `autobot-feedback-20260331-084549.tgz`
+  - auto-updated at: `2026-03-31T08:46:11.567Z`
 
 ## 5) Copy/paste prompt for next session
 
@@ -103,9 +105,9 @@ Use this file at the start and end of every batch.
 Ticket: T-032
 Decision: patch_required
 Required action: same-ticket mitigation required before next long run
-Latest bundle: autobot-feedback-20260330-135922.tgz
+Latest bundle: autobot-feedback-20260331-084549.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: let ABS_DAILY_LOSS caution run best-effort unwind on materially exposed managed books while preserving flat-book thaw and T-034 stability.
+Goal: stop stop-loss-cooled residual positions from anchoring global CAUTION once active orders are already gone.
 In scope: exit-manager / downside-control behavior under adverse conditions.
 Out of scope: quote-routing redesign, regime-engine rewrite, PnL schema changes, AI lane.
 Validation: docker compose -f docker-compose.ci.yml run --rm ci
