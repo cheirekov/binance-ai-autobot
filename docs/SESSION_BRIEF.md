@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-03-31 08:46 UTC
+Last updated: 2026-04-01 15:17 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -8,52 +8,49 @@ Use this file at the start and end of every batch.
 ## 1) Batch contract (fill before coding)
 
 - Batch type: `SHORT (1-3h)`
-- Active ticket: `T-032` (Exit manager v2)
-- Goal (single sentence): keep `T-032` active and stop post-stop-loss cooldown residues from anchoring global `CAUTION` once active orders are already gone.
+- Active ticket: `T-031` (Regime engine v2)
+- Goal (single sentence): reduce repeated guarded cross-quote sell-ladder churn now that `T-032` downside-control is stable again.
 - In scope:
-  - reactivate `T-032` as the active lane.
-  - keep the March 30 caution-unwind slice intact for materially exposed `ABS_DAILY_LOSS` books.
-  - stop stop-loss-cooled residual positions from anchoring global `CAUTION` when active orders are already gone.
-  - preserve stricter `PROFIT_GIVEBACK` caution behavior while exposure is still material.
-  - preserve the earlier flat-book thaw behavior once exposure/order state is already near zero.
-  - preserve March 28-29 `T-031` strategy-quality slices and `T-034` funding stability.
+  - reactivate `T-031` as the active lane.
+  - treat guarded cross-quote sell ladders as parked inventory that should rotate out after the sell leg is parked.
+  - preserve March 30-31 `T-032` downside-control behavior.
+  - preserve `T-034` funding / quote-routing stability.
 - Out of scope:
-  - quote-routing redesign (`T-034` is closed unless runtime regresses),
-  - broader regime-engine rewrite (`T-031` is frozen, not discarded),
+  - quote-routing redesign (`T-034` stays closed unless runtime regresses),
+  - reopening `T-032` as the active blocker without fresh evidence,
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: fresh March 31 evidence shows the March 30 caution-unwind slice reached the market (`daily-loss-caution-unwind` trades happened), but after those sells the engine is left almost flat (`total_alloc_pct=0.25`, `activeOrders=0`) while a stop-loss-cooled residual symbol (`NOMUSDC`) still keeps global `CAUTION` paused. Excluding stop-loss-cooled residuals from the caution anchor count should let new symbols reopen once the book is effectively de-risked.
+- Hypothesis: fresh April 1 evidence shows `T-032` is no longer the dominant blocker. The engine now wastes candidate budget on guarded cross-quote symbols (`BNBETH`, `SOLETH`, `TRXETH`) after their sell ladder is already parked. Applying a guarded sell-ladder cooldown should rotate the engine away from those parked symbols without weakening downside control.
 - Target KPI delta:
-  - reduce repeated `Post stop-loss cooldown active` / `Daily loss caution paused GRID BUY leg` on the same cooled symbol.
-  - lower repeated `No feasible candidates: daily loss caution paused new symbols (...)` once active orders are gone and only cooled residuals remain.
+  - reduce repeated `Grid guard paused BUY leg` / `Grid waiting for ladder slot or inventory` on guarded cross-quote symbols.
+  - lower repeated `Fee/edge filter` retries on no-action cross-quote symbols indirectly by rotating away from parked ladders first.
   - preserve reachable `daily-loss-caution-unwind` behavior for materially exposed books.
 - Stop/rollback condition:
-  - if the thaw logic reopens new-symbol risk while exposure/orders are still material, freeze `T-032` and restore the stricter caution-pause baseline.
+  - if the new cooldown suppresses valid high-conviction managed symbols or reopens any `T-032` caution freeze regression, freeze `T-031` and revert to the last stable `T-032` baseline.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
   - runtime behavior changes in a bounded way:
-    - `ABS_DAILY_LOSS` CAUTION still thaws once the book is effectively flat.
-    - stop-loss-cooled residual positions no longer keep global `CAUTION` paused once active orders are gone.
-    - `ABS_DAILY_LOSS` CAUTION can still run best-effort unwind while managed exposure is still material.
-    - `PROFIT_GIVEBACK` CAUTION still requires materially higher exposure before new-symbol pause releases.
-  - active development lane is `T-032`; March 28-29 `T-031` slices remain preserved in runtime.
+    - guarded sell ladders (`buyPaused && !hasBuyLimit && hasSellLimit`) get a symbol cooldown after placement instead of being reconsidered immediately.
+    - non-home-quote inventory is treated as actionable only when it has meaningful home-value, not raw qty alone.
+    - March 30-31 `T-032` caution-unwind / thaw behavior remains preserved.
+  - active development lane is `T-031`; `T-032` remains preserved as a support lane in runtime.
 - Runtime evidence in decisions/logs:
-  - latest bundle runs `git.commit=e1383fd`.
-  - latest fresh bundle is dominated by `Post stop-loss cooldown active` plus residual `daily loss caution paused new symbols` while total allocation is already only `0.25%`.
-  - the next fresh bundle should show lower cooled-symbol pause churn and fresher decision timestamps after the engine reopens beyond the cooled residual.
+  - latest fresh bundle runs `git.commit=c702bb0`.
+  - latest fresh bundle (`autobot-feedback-20260401-150741.tgz`) is dominated by guarded cross-quote churn (`BNBETH`, `SOLETH`, `TRXETH`) and some cross-quote fee-edge retries (`SOLBTC`, `XRPETH`).
+  - the next fresh bundle should show lower guarded sell-ladder repeats and fresher decision timestamps on alternative candidates.
 - Risk slider impact:
-  - risk slider still modulates the pause floor and caution-unwind activation threshold; this slice only changes which residual positions are allowed to anchor global `CAUTION`.
+  - risk slider still modulates cooldown duration and lane thresholds; this slice only changes how long parked guarded sell ladders stay out of rotation.
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
 - Runtime validation plan:
-  - deploy the current `T-032` slice and collect one fresh bundle before any further strategy reprioritization
+  - deploy the current `T-031` slice and collect one fresh bundle before any further reprioritization
 
 ## 3) Deployment handoff
 
-- Commit hash: `e1383fd-dirty`
+- Commit hash: `c702bb0`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -74,42 +71,42 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `EVENING (collection) / EVENING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `18.773`
-  - runtime uptime (hours): `1002.69`
-  - run end: `Tue Mar 31 2026 11:45:41 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - bundle interval (hours): `6.589`
+  - runtime uptime (hours): `1033.044`
+  - run end: `Wed Apr 01 2026 18:06:57 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
-  - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip NOMUSDC: Post stop-loss cooldown active (45))
+  - `T-032` support stability: `met` (`risk_state=NORMAL`, no dominant caution freeze)
+  - active ticket runtime signal: `observed` (Skip BNBETH: Grid guard paused BUY leg (10))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=112, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=44.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=10, historyLimitOrders=141, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=29.5%)
   - sizing reject pressure: `low` (sizingRejectSkips=6, decisions=200, ratio=3.0%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `patch_required`
-- Next ticket candidate: `T-032` (continue active lane unless PM/BA reprioritizes)
-- Required action: `same-ticket mitigation required before next long run`
+- Decision: `pivot_to_t031_with_patch`
+- Next ticket candidate: `T-031`
+- Required action: `deploy first real T-031 slice`
 - Open risks:
-  - none critical from automated checks.
+  - `T-032` is no longer the dominant blocker, but cross-quote candidate quality is still weak.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260331-084549.tgz`
-  - auto-updated at: `2026-03-31T08:46:11.567Z`
+  - bundle: `autobot-feedback-20260401-150741.tgz`
+  - auto-updated at: `2026-04-01T15:08:23.549Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
-Ticket: T-032
-Decision: patch_required
-Required action: same-ticket mitigation required before next long run
-Latest bundle: autobot-feedback-20260331-084549.tgz
+Ticket: T-031
+Decision: pivot_to_t031_with_patch
+Required action: deploy first real T-031 slice
+Latest bundle: autobot-feedback-20260401-150741.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: stop stop-loss-cooled residual positions from anchoring global CAUTION once active orders are already gone.
-In scope: exit-manager / downside-control behavior under adverse conditions.
-Out of scope: quote-routing redesign, regime-engine rewrite, PnL schema changes, AI lane.
+Goal: reduce guarded cross-quote sell-ladder churn while preserving T-032 downside-control and T-034 funding stability.
+In scope: strategy-quality / lane-rotation behavior for parked guarded sell ladders.
+Out of scope: quote-routing redesign, reopening T-032 without fresh evidence, PnL schema changes, AI lane.
 Validation: docker compose -f docker-compose.ci.yml run --rm ci
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

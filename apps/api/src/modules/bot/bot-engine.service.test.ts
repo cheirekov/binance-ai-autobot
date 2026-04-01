@@ -754,6 +754,89 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.shouldAttemptBalanceDeltaSellFallback(100, 0)).toBe(false);
   });
 
+  it("treats small non-home quote inventory as non-actionable for grid management", async () => {
+    const configuredService = new BotEngineService(
+      { load: () => null } as unknown as ConfigService,
+      {
+        getTickerPrice: async (symbol: string) => {
+          if (symbol === "ETHUSDC") return "2000";
+          if (symbol === "BNBETH") return "0.2892";
+          if (symbol === "BNBUSDC") return "578.4";
+          return "1";
+        }
+      } as unknown as BinanceMarketDataService,
+      {} as unknown as BinanceTradingService,
+      {} as unknown as ConversionRouterService,
+      {} as unknown as UniverseService
+    );
+    const helpers = configuredService as unknown as {
+      hasActionableGridInventory: (params: {
+        baseAsset: string;
+        quoteAsset: string;
+        qty: number;
+        homeStable: string;
+        bridgeAssets: string[];
+        minExposureHome: number;
+      }) => Promise<boolean>;
+    };
+
+    await expect(
+      helpers.hasActionableGridInventory({
+        baseAsset: "BNB",
+        quoteAsset: "ETH",
+        qty: 0.005,
+        homeStable: "USDC",
+        bridgeAssets: ["ETH", "BTC", "BNB"],
+        minExposureHome: 5
+      })
+    ).resolves.toBe(false);
+
+    await expect(
+      helpers.hasActionableGridInventory({
+        baseAsset: "BNB",
+        quoteAsset: "ETH",
+        qty: 0.05,
+        homeStable: "USDC",
+        bridgeAssets: ["ETH", "BTC", "BNB"],
+        minExposureHome: 5
+      })
+    ).resolves.toBe(true);
+  });
+
+  it("applies parked sell-ladder cooldown only when buy leg is paused behind a sell ladder", () => {
+    const helpers = service as unknown as {
+      shouldApplyParkedSellLadderCooldown: (params: {
+        buyPaused: boolean;
+        hasBuyLimit: boolean;
+        hasSellLimit: boolean;
+      }) => boolean;
+      deriveParkedSellLadderCooldownMs: (params: { risk: number; staleTtlMinutes: number }) => number;
+    };
+
+    expect(
+      helpers.shouldApplyParkedSellLadderCooldown({
+        buyPaused: true,
+        hasBuyLimit: false,
+        hasSellLimit: true
+      })
+    ).toBe(true);
+    expect(
+      helpers.shouldApplyParkedSellLadderCooldown({
+        buyPaused: true,
+        hasBuyLimit: true,
+        hasSellLimit: true
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldApplyParkedSellLadderCooldown({
+        buyPaused: false,
+        hasBuyLimit: false,
+        hasSellLimit: true
+      })
+    ).toBe(false);
+    expect(helpers.deriveParkedSellLadderCooldownMs({ risk: 100, staleTtlMinutes: 30 })).toBe(900000);
+  });
+
   it("picks largest managed symbol as caution fallback candidate", () => {
     const configuredService = new BotEngineService(
       {

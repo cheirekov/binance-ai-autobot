@@ -1,57 +1,65 @@
 # Ticket Switch Retrospective
 
-Last updated: 2026-03-30 09:45 UTC
-Previous ticket: `T-031`
-Current ticket: `T-032`
-Switch decision: `freeze previous / reactivate downside-control lane`
+Last updated: 2026-04-01 15:17 UTC
+Previous ticket: `T-032`
+Current ticket: `T-031`
+Switch decision: `freeze previous as support / reactivate strategy-quality lane`
 Decision source: `automatic retro + PM/BA review of fresh runtime evidence`
 
-## Why `T-031` was frozen
+## Why `T-032` is no longer the active lane
 
-- The March 28-29 `T-031` slices improved candidate quality, but the latest fresh evidence no longer shows strategy-quality dead ends as the dominant blocker.
-- The newest fresh bundles are dominated by `CAUTION` flat-book freezes:
-  - `Skip: No feasible candidates: daily loss caution paused new symbols (58 filtered)`
-  - `Skip BTCUSDC: Daily loss caution paused GRID BUY leg`
-- The engine is no longer primarily choosing the wrong symbols. It is globally boxed in by downside-control policy while almost flat.
+- The March 30-31 `T-032` slices are now holding in fresh runtime evidence:
+  - `risk_state=NORMAL`
+  - positive daily net on the latest two fresh bundles
+  - no dominant global `CAUTION` freeze / cooled-residual anchor loop
+- The newest fresh bundle (`autobot-feedback-20260401-150741.tgz`) is dominated by strategy-quality dead ends instead:
+  - `Skip BNBETH: Grid guard paused BUY leg`
+  - `Skip BNBETH: Grid waiting for ladder slot or inventory`
+  - `Skip SOLETH: Grid waiting for ladder slot or inventory`
+  - `Skip SOLBTC: Fee/edge filter (...)`
+- The engine is no longer primarily boxed in by downside-control policy. It is rotating too often through parked cross-quote ladders and weak fee-edge candidates.
 
 ## Evidence used for the switch
 
-- `autobot-feedback-20260330-082950.tgz`
-  - `risk_state=CAUTION`
-  - `daily_net_usdt=-170.99`
-  - `max_drawdown_pct=5.26`
-  - `total_alloc_pct=0.11`
-  - `open_positions=3`
-  - dominant repeats: `daily loss caution paused new symbols` (`89`), `BTCUSDC: Daily loss caution paused GRID BUY leg` (`75`)
-- `autobot-feedback-20260329-150750.tgz`
-  - same dominant `CAUTION` / new-symbol-pause pattern (`77`)
+- `autobot-feedback-20260331-170410.tgz`
+  - `risk_state=NORMAL`
+  - `daily_net_usdt=+74.14`
+  - dominant skips: sizing/cap filters, `SOLBTC` ladder waiting / fee-edge
+- `autobot-feedback-20260401-083229.tgz`
+  - `risk_state=NORMAL`
+  - `daily_net_usdt=+235.33`
+  - no dominant caution freeze, `T-032` support slices stable
+- `autobot-feedback-20260401-150741.tgz`
+  - `risk_state=NORMAL`
+  - `daily_net_usdt=+129.39`
+  - `total_alloc_pct=43.93`
+  - dominant repeats: `BNBETH`, `SOLETH`, `SOLBTC`, `TRXETH`, `XRPETH`
 - raw state audit
-  - `activeOrders=0`
-  - latest decision summary: `Skip: No feasible candidates: daily loss caution paused new symbols (no managed inventory)`
-  - runtime is effectively flat while `CAUTION` still blocks new symbols
+  - latest decision summary: `Binance testnet BUY MARKET XRPUSDC qty 934.1 → FILLED (orderId 362581741 · entry)`
+  - active orders include parked sell-only / dual ladders on cross-quote pairs
+  - downside-control is reachable and has already proven `daily-loss-caution-unwind` in the same runtime lineage
 
-## What `T-031` fixed and what it did not fix
+## What `T-032` fixed and what it did not fix
 
 ### Improved enough to preserve
-- risk-linked regime thresholds are live
-- lane-aware candidate scoring is live
-- parked-ladder and no-inventory fee-edge suppression are live
-- managed-symbol fee-edge bypass during defensive handling is live
+- `ABS_DAILY_LOSS` flat-book thaw is live
+- best-effort `daily-loss-caution-unwind` is live
+- stop-loss-cooled residual positions no longer anchor global `CAUTION`
 
 ### Still not fixed and now higher priority
-- `ABS_DAILY_LOSS` CAUTION keeps pausing new symbols even after the book is effectively flat
-- downside-control cannot prove adaptive recovery if the engine stays boxed in after exposure is already gone
-- fresh runtime evidence is dominated by guard-policy freeze, not strategy-quality opportunity selection
+- guarded cross-quote sell ladders keep getting reconsidered after the sell leg is already parked
+- cross-quote fee-edge dead ends still consume candidate budget
+- the current live blocker is strategy-quality / lane-rotation behavior, not downside-control reachability
 
-## Why `T-032` is the correct next lane
+## Why `T-031` is the correct next lane
 
-- The current live blocker is a downside-control policy defect:
-  - CAUTION does not thaw when managed exposure/order state is already near zero.
-- `T-032` owns:
-  - exit-manager / downside-control release behavior,
-  - de-risking and recovery logic after adverse moves,
-  - the policy boundary between preserving gains and letting the engine re-enter safely.
-- A bounded `T-032` slice can fix this without reopening `T-034` funding work or discarding the March 28-29 `T-031` strategy improvements.
+- The current live blocker is a strategy-quality defect:
+  - the engine keeps revisiting guarded / parked cross-quote symbols instead of rotating cleanly to better opportunities.
+- `T-031` owns:
+  - regime-aware candidate quality,
+  - execution-lane prioritization,
+  - bounded suppression of dead-end lanes without weakening risk guards.
+- A bounded `T-031` slice can fix this without reopening `T-032` downside-control work or `T-034` quote-routing work.
 
 ## Hard process correction
 
@@ -64,7 +72,7 @@ Decision source: `automatic retro + PM/BA review of fresh runtime evidence`
 
 ## Next expected outcome
 
-- `T-032` batches should:
-  - release `CAUTION` new-symbol pause once the book is effectively flat,
-  - preserve tighter `PROFIT_GIVEBACK` caution behavior while exposure is still material,
-  - keep the March 28-29 `T-031` strategy-quality gains and `T-034` routing stability intact.
+- `T-031` batches should:
+  - reduce repeated `Grid guard paused BUY leg` / `Grid waiting for ladder slot or inventory` on guarded cross-quote sell ladders,
+  - reduce repeated fee-edge retries on weak cross-quote candidates,
+  - preserve March 30-31 `T-032` downside-control behavior and `T-034` funding stability.

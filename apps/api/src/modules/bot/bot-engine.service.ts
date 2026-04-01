@@ -540,6 +540,31 @@ export class BotEngineService implements OnModuleInit {
     return Number((10 - t * 5).toFixed(2)); // 10 -> 5 (home-quote value)
   }
 
+  private async hasActionableGridInventory(params: {
+    baseAsset: string;
+    quoteAsset: string;
+    qty: number;
+    homeStable: string;
+    bridgeAssets: string[];
+    minExposureHome: number;
+  }): Promise<boolean> {
+    if (!Number.isFinite(params.qty) || params.qty <= 0) return false;
+
+    const quoteAsset = params.quoteAsset.trim().toUpperCase();
+    const homeStable = params.homeStable.trim().toUpperCase();
+    if (!quoteAsset || !homeStable) return false;
+    if (quoteAsset === homeStable) return true;
+
+    const exposureHome = await this.estimateAssetValueInHome(
+      params.baseAsset,
+      params.qty,
+      homeStable,
+      params.bridgeAssets
+    );
+    if (!Number.isFinite(exposureHome ?? Number.NaN) || (exposureHome ?? 0) <= 0) return false;
+    return (exposureHome ?? 0) + 1e-8 >= params.minExposureHome;
+  }
+
   private isManagedPositionCountable(position: ManagedPosition, minExposureHome: number): boolean {
     if (!Number.isFinite(position.netQty) || position.netQty <= 0) return false;
     if (!Number.isFinite(position.costQuote) || position.costQuote <= 0) return false;
@@ -1142,6 +1167,23 @@ export class BotEngineService implements OnModuleInit {
     // Used to avoid cycling on repeatedly infeasible symbols (quote shortfalls, dust sell constraints, etc.).
     // Lower risk = longer cooldown (less thrash), higher risk = shorter cooldown (more aggressive rotation).
     return Math.round(90_000 - t * 75_000); // 90s -> 15s
+  }
+
+  private deriveParkedSellLadderCooldownMs(params: { risk: number; staleTtlMinutes: number }): number {
+    const baseCooldownMs = this.deriveNoActionSymbolCooldownMs(params.risk);
+    const ttlMinutes = Number.isFinite(params.staleTtlMinutes) ? Math.max(1, params.staleTtlMinutes) : 30;
+    const ttlScaledCooldownMs = Math.round((ttlMinutes * 60_000) / 2);
+    return Math.max(baseCooldownMs, Math.min(20 * 60_000, ttlScaledCooldownMs));
+  }
+
+  private shouldApplyParkedSellLadderCooldown(params: {
+    buyPaused: boolean;
+    hasBuyLimit: boolean;
+    hasSellLimit: boolean;
+  }): boolean {
+    if (!params.buyPaused) return false;
+    if (params.hasBuyLimit) return false;
+    return params.hasSellLimit;
   }
 
   private deriveMaxSymbolConcentrationPct(risk: number): number {
@@ -2552,6 +2594,7 @@ export class BotEngineService implements OnModuleInit {
     const capForSizing = effectiveNotionalCap ? effectiveNotionalCap / bufferFactor : null;
     const rawTargetNotional = walletTotalHome * (maxPositionPct / 100);
     const normalizedHomeStable = homeStable.trim().toUpperCase();
+    const minCountableExposureHome = this.deriveManagedPositionMinCountableExposureHome(risk);
     const liveConfig = this.configService.load() ?? undefined;
     const quoteBridgeAssets = resolveRouteBridgeAssets(liveConfig ?? null, normalizedHomeStable);
     const capitalProfile = this.getCapitalProfile(walletTotalHome);
@@ -2686,9 +2729,14 @@ export class BotEngineService implements OnModuleInit {
 
         const baseAsset = rules.baseAsset.trim().toUpperCase();
         const baseTotal = balances.find((b) => b.asset.trim().toUpperCase() === baseAsset)?.total ?? 0;
-        const hasInventory =
-          Number.isFinite(baseTotal) &&
-          baseTotal > Number.EPSILON;
+        const hasInventory = await this.hasActionableGridInventory({
+          baseAsset,
+          quoteAsset,
+          qty: baseTotal,
+          homeStable: normalizedHomeStable,
+          bridgeAssets: quoteBridgeAssets,
+          minExposureHome: minCountableExposureHome
+        });
         const recentFeeEdgeRejects = this.countRecentSymbolSkipMatches({
           state,
           symbol,
@@ -4766,6 +4814,7 @@ export class BotEngineService implements OnModuleInit {
           const manageExternalOpenOrders = Boolean(config?.advanced.manageExternalOpenOrders);
           const botPrefix = config ? this.resolveBotOrderClientIdPrefix(config) : "ABOT";
           const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+          const selectionBridgeAssets = resolveRouteBridgeAssets(config, homeStable);
 
           const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(boundedRisk / 25)));
           const positions = tradeMode === "SPOT_GRID" ? this.getManagedPositions(current) : null;
@@ -4883,7 +4932,14 @@ export class BotEngineService implements OnModuleInit {
               const buyPaused = Boolean(existingBuyPauseLock) || shouldPauseBuys;
 
               const netQty = positions?.get(symbol)?.netQty ?? 0;
-              const hasInventory = Number.isFinite(netQty) && netQty > 0;
+              const hasInventory = await this.hasActionableGridInventory({
+                baseAsset: candidate.baseAsset,
+                quoteAsset: candidateQuote,
+                qty: netQty,
+                homeStable,
+                bridgeAssets: selectionBridgeAssets,
+                minExposureHome: minCountableExposureHome
+              });
               const hasEntryGuard = Boolean(entryGuard);
               if (restrictToManagedSymbolsInCaution && !hasInventory) {
                 continue;
@@ -8251,6 +8307,36 @@ export class BotEngineService implements OnModuleInit {
                         }
                       }
                     });
+                    if (
+                      config &&
+                      this.shouldApplyParkedSellLadderCooldown({
+                        buyPaused,
+                        hasBuyLimit,
+                        hasSellLimit: true
+                      })
+                    ) {
+                      const cooldownMs = this.deriveParkedSellLadderCooldownMs({
+                        risk,
+                        staleTtlMinutes: config.advanced.botOrderStaleTtlMinutes
+                      });
+                      current = this.upsertProtectionLock(current, {
+                        type: "COOLDOWN",
+                        scope: "SYMBOL",
+                        symbol: candidateSymbol,
+                        reason: `Cooldown after guarded sell ladder (${Math.round(cooldownMs / 1000)}s)`,
+                        expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                        details: {
+                          category: "GRID_GUARD_SELL_LADDER",
+                          cooldownMs,
+                          executionLane,
+                          buyPaused,
+                          buyPausedByCaution,
+                          limitPrice: sellPriceNorm.normalizedPrice,
+                          gridSpacingPct: Number(gridSpacingPct.toFixed(6))
+                        }
+                      });
+                      this.save(current);
+                    }
                     placedGridOrder = true;
                   }
                 } else if (sellCheck.reason) {

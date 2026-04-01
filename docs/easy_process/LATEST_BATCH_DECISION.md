@@ -1,41 +1,41 @@
 # LATEST_BATCH_DECISION
 
-Last updated: 2026-03-31 11:55 EEST  
+Last updated: 2026-04-01 18:17 EEST  
 Owner: PM/BA + Codex
 
 ## Production capability lane
-- Chosen: `Lane A — Exit manager / downside control`
+- Chosen: `Lane A — Strategy quality / regime routing`
 - Why:
-  - `observed`: the latest fresh bundle is `autobot-feedback-20260331-084549.tgz`
-  - `observed`: auto-retro says `patch_required`
-  - `observed`: the bundle ends `risk_state=CAUTION`, `daily_net_usdt=-155.28`, `total_alloc_pct=0.25`, `activeOrders=0`
-  - `observed`: the dominant repeats are `Post stop-loss cooldown active` plus residual global new-symbol pause on the same cooled symbol
-  - `inferred`: the March 30 caution-unwind slice worked, but the next leverage point is preventing cooled residuals from anchoring global caution
+  - `observed`: the latest fresh bundle is `autobot-feedback-20260401-150741.tgz`
+  - `observed`: auto-retro says `continue`
+  - `observed`: the bundle ends `risk_state=NORMAL`, `daily_net_usdt=+129.39`, `sizingRejectPressure=low`
+  - `observed`: the dominant repeats are guarded cross-quote sell-ladder churn (`BNBETH`, `SOLETH`, `TRXETH`) plus cross-quote fee-edge retries
+  - `inferred`: `T-032` is stable enough to freeze as support, and the next leverage point is `T-031` candidate quality
 
 ## Chosen active ticket
-- Current: `T-032` (Exit manager v2)
-- Decision: `patch_same_ticket`
+- Current: `T-031` (Regime engine v2)
+- Decision: `pivot_and_patch`
 - Why:
-  - `observed`: the active `T-032` evidence is still the correct lane
-  - `observed`: runtime now shows almost-flat exposure and no active orders, but a stop-loss-cooled residual symbol still anchors global caution
-  - `inferred`: the more valuable next batch is a bounded same-ticket `T-032` cooled-residual release slice
+  - `observed`: the active blocker is no longer downside-control policy
+  - `observed`: runtime now shows fresh normal-state trading with parked cross-quote ladder churn
+  - `inferred`: the more valuable next batch is a bounded `T-031` guarded-sell-ladder rotation slice
 
 ## Evidence class
 - Current: `fresh`
-- Latest bundle: `autobot-feedback-20260331-084549.tgz`
-- Compared bundle: `autobot-feedback-20260330-135922.tgz`
+- Latest bundle: `autobot-feedback-20260401-150741.tgz`
+- Compared bundle: `autobot-feedback-20260401-083229.tgz`
 
 ## Allowed work mode
 - Current batch: `PATCH_NOW`
 
 ## Batch decision
-- Decision: `patch_same_ticket`
-- Next ticket candidate: `T-032`
+- Decision: `pivot_and_patch`
+- Next ticket candidate: `T-031`
 - Review slice:
-  - keep `T-032` active
-  - stop stop-loss-cooled residual positions from anchoring global caution once active orders are already gone
-  - preserve the March 30 caution-unwind behavior, the earlier flat-book thaw, March 28-29 `T-031` strategy-quality slices, and `T-034` routing stability
+  - switch active work back to `T-031`
+  - stop guarded cross-quote sell ladders from re-entering rotation immediately after the sell leg is parked
+  - preserve March 30-31 `T-032` downside-control behavior and `T-034` routing stability
 - Validation:
-  - fresh bundle review (`autobot-feedback-20260331-084549.tgz`) ✅
-  - current active lane still `T-032` ✅
-  - third `T-032` slice landed in code/tests ✅
+  - fresh bundle review (`autobot-feedback-20260401-150741.tgz`) ✅
+  - ticket switch retro updated ✅
+  - first real `T-031` slice landed in code/tests ✅

@@ -1,6 +1,6 @@
 # Strategy Coverage (Source of Truth)
 
-Last updated: 2026-03-30
+Last updated: 2026-04-01
 Owner: PM/BA + Trader + Architect
 
 Purpose: prevent strategy drift/context loss by keeping one explicit list of:
@@ -71,21 +71,22 @@ These are execution behaviors currently active in runtime:
 ## 3) Ticket ownership map for strategy evolution
 
 ## Active now
-- `T-032` — Exit manager v2
-  - current slices:
-    - early downside-control / defensive unwind behavior remains live
-    - current March 30 slice: thaw `CAUTION` new-symbol pause once `ABS_DAILY_LOSS` has already de-risked the book to near-flat exposure/order state
-    - current March 31 slice: stop-loss-cooled residual positions no longer anchor global `CAUTION` new-symbol pause once active orders are gone
-  - objective: stop flat-book `CAUTION` freezes from boxing the engine in after the loss event is already absorbed
-
-## Support / next strategy core
 - `T-031` — Regime engine v2
-  - preserved live in runtime:
+  - live slices:
     - risk-linked regime thresholds + regime-aware fee floor
     - lane-aware candidate scoring
     - feasible live routing suppression for parked dual-ladder symbols and repeated no-inventory fee-edge dead ends
     - fee-edge bypass for already-open managed symbols when defensive / daily-loss handling needs to stay reachable
-  - resume after `T-032` removes flat-book `CAUTION` as the dominant runtime blocker
+    - current April 1 slice: guarded sell-ladder cooldown for paused grid symbols so cross-quote pairs do not churn while only the sell leg is parked
+  - objective: improve candidate quality and rotation under real market regimes without reopening `T-032` or `T-034`
+
+## Support / next strategy core
+- `T-032` — Exit manager v2
+  - preserved live in runtime:
+    - early downside-control / defensive unwind behavior remains live
+    - March 30 slice: thaw `CAUTION` new-symbol pause once `ABS_DAILY_LOSS` has already de-risked the book to near-flat exposure/order state
+    - March 31 slice: stop-loss-cooled residual positions no longer anchor global `CAUTION` new-symbol pause once active orders are gone
+  - reopen only if downside-control policy becomes the dominant blocker again
 - `T-034` — Multi-quote execution policy v1
   - DONE; preserve funding/routing stability while `T-031` evolves strategy quality
 

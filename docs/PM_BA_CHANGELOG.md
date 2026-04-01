@@ -16,6 +16,39 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-01 15:17 UTC — T-031 pivot + guarded sell-ladder rotation slice
+- Scope:
+  - close `T-032` as the active blocker after fresh March 31 / April 1 evidence showed downside-control is stable again.
+  - reactivate `T-031` and land a bounded runtime slice for guarded cross-quote sell-ladder churn.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260401-150741.tgz`) shows:
+    - `risk_state=NORMAL`
+    - `daily_net_usdt=+129.39`
+    - `max_drawdown_pct=1.88`
+    - dominant repeats: `BNBETH`, `SOLETH`, `TRXETH`, `SOLBTC`, `XRPETH`
+  - raw state audit confirms `T-032` downside-control already reached the market (`daily-loss-caution-unwind` trades exist in the same runtime lineage), while current active orders are parked cross-quote ladders.
+- PM milestone mapping:
+  - freeze `T-032` as a preserved support lane, not the active blocker.
+  - reactivate `T-031` with a same-batch first runtime slice.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `hasActionableGridInventory(...)` so non-home-quote inventory is evaluated by home-value before it is treated as actionable grid inventory.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: candidate selection and feasible routing now use actionable-inventory classification for non-home-quote symbols instead of raw qty alone.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `deriveParkedSellLadderCooldownMs(...)` and `shouldApplyParkedSellLadderCooldown(...)`.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: after placing a guarded sell ladder (`buyPaused && !hasBuyLimit`), the engine now applies a symbol cooldown so parked cross-quote sell ladders stop being reselected immediately.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for actionable non-home inventory classification and guarded sell-ladder cooldown gating.
+  - `docs/DELIVERY_BOARD.md`, `docs/TICKET_SWITCH_RETRO.md`, `docs/STRATEGY_COVERAGE.md`, `docs/SESSION_BRIEF.md`, and `docs/easy_process/*`: updated to reflect the `T-032 -> T-031` switch.
+- Risk slider impact:
+  - no hard-limit change.
+  - risk still modulates cooldown duration; higher risk rotates faster, lower risk holds parked sell ladders longer before reselection.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/pmba-gate.sh start`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected next proof: lower repeated `Grid guard paused BUY leg` / `Grid waiting for ladder slot or inventory` on guarded cross-quote symbols, with `T-032` downside-control still stable.
+- Follow-up:
+  - if the next fresh bundle is still dominated by the same guarded cross-quote family, the next `T-031` slice should demote weak cross-quote fee-edge candidates at lane-scoring time, not reopen `T-032`.
+
 ## 2026-03-31 08:55 UTC — T-032 third slice: stop-loss-cooled residuals no longer anchor global CAUTION
 - Scope:
   - respond to the fresh March 31 `T-032` bundle where the March 30 caution-unwind slice reached the market, but the engine still stayed boxed in by a cooled residual symbol after active orders were already gone.

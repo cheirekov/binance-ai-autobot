@@ -1,20 +1,20 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-03-31 11:55 EEST  
+Last updated: 2026-04-01 18:17 EEST  
 Owner: PM/BA + Codex
 
 ## Ticket
-- ID: `T-032`
-- Title: `Exit manager v2`
+- ID: `T-031`
+- Title: `Regime engine v2`
 - Status: `IN_PROGRESS`
-- Current lane: `Lane A — Exit manager / downside control`
+- Current lane: `Lane A — Strategy quality / regime routing`
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260331-084549.tgz`) shows the March 30 caution-unwind slice reached the market, but the active blocker moved again: after those sells, a stop-loss-cooled residual symbol (`NOMUSDC`) still anchors global `CAUTION` even though `activeOrders=0` and total allocation is only `0.25%`.
+The newest fresh bundle (`autobot-feedback-20260401-150741.tgz`) shows `T-032` is no longer the dominant blocker. The active problem is repeated guarded cross-quote churn (`BNBETH`, `SOLETH`, `TRXETH`) after only the sell ladder is parked, plus residual cross-quote fee-edge retries.
 
 ## Current decision
-- Ticket decision: `patch_same_ticket`
+- Ticket decision: `pivot_and_patch`
 - Work mode: `PATCH_NOW`
 - Process rule:
   - treat `docs/DELIVERY_BOARD.md` and `docs/PM_BA_CHANGELOG.md` as authoritative for ticket status and history
@@ -22,12 +22,12 @@ The newest fresh bundle (`autobot-feedback-20260331-084549.tgz`) shows the March
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-032` slice that excludes stop-loss-cooled residual positions from the non-`PROFIT_GIVEBACK` caution anchor count will stop global `CAUTION` from staying paused after active orders are already gone, without weakening the March 30 caution-unwind behavior or the earlier flat-book thaw.
+- A bounded `T-031` slice that cools guarded sell-ladder symbols after the sell leg is already parked will stop the engine from reselecting those cross-quote dead ends, without weakening `T-032` downside control or `T-034` funding stability.
 
 ## What counts as success
-- current runtime blockers are addressed in the correct lane (`T-032`)
-- `T-031` remains preserved as a support lane rather than being rewritten blindly
-- the next fresh bundle reflects lower `Post stop-loss cooldown active` / `daily loss caution paused new symbols` churn and fresher decision timestamps without reopening funding or downside-control regressions
+- current runtime blockers are addressed in the correct lane (`T-031`)
+- `T-032` remains preserved as a support lane rather than being reopened blindly
+- the next fresh bundle reflects lower `Grid guard paused BUY leg` / `Grid waiting for ladder slot or inventory` churn on guarded cross-quote symbols without reopening funding or downside-control regressions
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident

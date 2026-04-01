@@ -1,6 +1,6 @@
 # DELIVERY BOARD (PM v2) — Binance AI Autobot
 
-Last updated: 2026-03-30  
+Last updated: 2026-04-01  
 Owner: PM/BA + Codex + User
 
 This board is structured to reduce scope drift and context-window churn.
@@ -105,8 +105,8 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-032 | IN_PROGRESS | Exit manager v2 | Flat-book CAUTION thaw + earlier downside-control release; no quote-routing redesign, no AI/news lane, no regime-engine rewrite in this batch |
-| T-031 | TODO | Regime engine v2 | Preserve March 28-29 strategy-quality slices; resume after CAUTION flat-book freeze no longer dominates runtime evidence |
+| T-031 | IN_PROGRESS | Regime engine v2 | Cross-quote candidate quality: stop guarded sell-ladder churn / repeated no-action loops while preserving `T-032` downside-control and `T-034` funding stability |
+| T-032 | TODO | Exit manager v2 | Preserve March 30-31 downside-control slices; reopen only if caution/unwind policy becomes the dominant blocker again |
 | T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
 
 `T-005` status: moved to DONE after overnight evidence (`autobot-feedback-20260225-100508.tgz`) showed guard transitions/recovery without deadlock.
@@ -119,7 +119,7 @@ Profit milestone rule:
 
 | Priority | ID | Status | Title | Acceptance focus |
 |---|---|---|---|---|
-| 1 | T-031 | TODO | Regime engine v2 | resume after T-032 removes flat-book CAUTION freeze as the dominant blocker |
+| 1 | T-032 | TODO | Exit manager v2 | keep downside-control support slices intact while `T-031` is active |
 | 2 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source |
 | 3 | T-028 | TODO | Compact advanced UX | improve operator readability without changing strategy behavior |
 
