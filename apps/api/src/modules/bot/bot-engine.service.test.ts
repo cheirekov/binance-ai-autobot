@@ -837,6 +837,69 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.deriveParkedSellLadderCooldownMs({ risk: 100, staleTtlMinutes: 30 })).toBe(900000);
   });
 
+  it("treats undersized sell legs as non-actionable before placing grid sell ladders", () => {
+    const helpers = service as unknown as {
+      assessGridSellLegFeasibility: (params: {
+        rules: BinanceSymbolRules;
+        qty: number;
+        price: number;
+      }) => { feasible: boolean; normalizedQty: number; reason?: string };
+    };
+
+    const notionalRules: BinanceSymbolRules = {
+      symbol: "ETHUSDC",
+      status: "TRADING",
+      baseAsset: "ETH",
+      quoteAsset: "USDC",
+      lotSize: {
+        filterType: "LOT_SIZE",
+        minQty: "0.00010000",
+        maxQty: "100000.00000000",
+        stepSize: "0.00010000"
+      },
+      notional: {
+        filterType: "MIN_NOTIONAL",
+        minNotional: "5.00000000",
+        applyToMarket: true
+      }
+    };
+
+    const dustAssessment = helpers.assessGridSellLegFeasibility({
+      rules: notionalRules,
+      qty: 0.001,
+      price: 1900
+    });
+    expect(dustAssessment.feasible).toBe(false);
+    expect(dustAssessment.reason).toContain("Below minNotional 5.00000000");
+
+    const feasibleAssessment = helpers.assessGridSellLegFeasibility({
+      rules: notionalRules,
+      qty: 0.01,
+      price: 1900
+    });
+    expect(feasibleAssessment.feasible).toBe(true);
+
+    const minQtyRules: BinanceSymbolRules = {
+      symbol: "BTCUSDC",
+      status: "TRADING",
+      baseAsset: "BTC",
+      quoteAsset: "USDC",
+      lotSize: {
+        filterType: "LOT_SIZE",
+        minQty: "0.00001000",
+        maxQty: "100000.00000000",
+        stepSize: "0.00001000"
+      }
+    };
+    const minQtyAssessment = helpers.assessGridSellLegFeasibility({
+      rules: minQtyRules,
+      qty: 0.000009,
+      price: 65000
+    });
+    expect(minQtyAssessment.feasible).toBe(false);
+    expect(minQtyAssessment.reason).toContain("Below minQty 0.00001000");
+  });
+
   it("picks largest managed symbol as caution fallback candidate", () => {
     const configuredService = new BotEngineService(
       {

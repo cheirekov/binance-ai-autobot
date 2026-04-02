@@ -16,6 +16,41 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-02 08:25 UTC — T-031 second slice: treat undersized sell legs as non-actionable
+- Scope:
+  - respond to the first fresh post-pivot `T-031` bundle where guarded cross-quote churn improved, but the live blocker moved to repeated sell-ladder sizing rejects on tiny residual home-quote inventory.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260402-081314.tgz`) shows:
+    - `risk_state=CAUTION`
+    - `daily_net_usdt=-250.94`
+    - `sizingRejectPressure=high`
+    - dominant repeats:
+      - `Skip ETHUSDC: Grid sell sizing rejected (...)`
+      - `Skip BTCUSDC: Grid sell sizing rejected (...)`
+      - `Skip STOUSDC: Grid sell sizing rejected (...)`
+      - paired `Grid guard paused BUY leg` on the same symbols
+  - raw state audit confirms the engine often places the buy leg or remains buy-paused, then immediately tries to place an impossible sell ladder against dust inventory.
+- PM milestone mapping:
+  - keep `T-031` active.
+  - preserve the April 1 guarded cross-quote rotation slice, March 30-31 `T-032` downside-control behavior, and `T-034` routing stability.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `assessGridSellLegFeasibility(...)` so sell-ladder actionability is evaluated explicitly before order placement.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: feasible live candidate selection now uses the same sell-leg feasibility helper instead of duplicating partial minQty/minNotional checks.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: runtime grid execution now treats undersized sell legs as `Grid sell leg not actionable yet`, applies symbol cooldown, and returns before generating repeated `Grid sell sizing rejected (...)` churn.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for undersized sell-leg feasibility classification.
+  - `docs/SESSION_BRIEF.md`, `docs/STRATEGY_COVERAGE.md`, and `docs/easy_process/*`: aligned current batch truth to this same-ticket mitigation.
+- Risk slider impact:
+  - no hard-limit change.
+  - risk continues to shape cooldown duration; this slice only changes when dust inventory is considered actionable enough to keep re-entering grid rotation.
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/pmba-gate.sh start`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected next proof: lower repeated `Grid sell sizing rejected (...)` on `ETHUSDC` / `BTCUSDC` / `STOUSDC` / `TAOUSDC` / `XRPUSDC`, with lower sizingRejectPressure and preserved downside-control behavior.
+- Follow-up:
+  - if the next fresh bundle still shows high min-order churn, the next `T-031` slice should demote dust-residual symbols earlier in candidate scoring, not only at execution time.
+
 ## 2026-04-01 15:17 UTC — T-031 pivot + guarded sell-ladder rotation slice
 - Scope:
   - close `T-032` as the active blocker after fresh March 31 / April 1 evidence showed downside-control is stable again.

@@ -1,6 +1,6 @@
 # Strategy Coverage (Source of Truth)
 
-Last updated: 2026-04-01
+Last updated: 2026-04-02
 Owner: PM/BA + Trader + Architect
 
 Purpose: prevent strategy drift/context loss by keeping one explicit list of:
@@ -78,6 +78,7 @@ These are execution behaviors currently active in runtime:
     - feasible live routing suppression for parked dual-ladder symbols and repeated no-inventory fee-edge dead ends
     - fee-edge bypass for already-open managed symbols when defensive / daily-loss handling needs to stay reachable
     - current April 1 slice: guarded sell-ladder cooldown for paused grid symbols so cross-quote pairs do not churn while only the sell leg is parked
+    - current April 2 slice: undersized managed sell legs are treated as non-actionable and cooled down before runtime can retry impossible grid sell ladders
   - objective: improve candidate quality and rotation under real market regimes without reopening `T-032` or `T-034`
 
 ## Support / next strategy core

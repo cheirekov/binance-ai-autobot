@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-04-01 15:17 UTC
+Last updated: 2026-04-02 08:29 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,10 +9,11 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-031` (Regime engine v2)
-- Goal (single sentence): reduce repeated guarded cross-quote sell-ladder churn now that `T-032` downside-control is stable again.
+- Goal (single sentence): reduce repeated home-quote dust sell-ladder churn so the engine stops retrying impossible residual sells on managed symbols.
 - In scope:
-  - reactivate `T-031` as the active lane.
-  - treat guarded cross-quote sell ladders as parked inventory that should rotate out after the sell leg is parked.
+  - keep `T-031` active as the strategy-quality lane.
+  - treat undersized sell legs as non-actionable before runtime attempts another grid sell ladder.
+  - demote dust-residual symbols with impossible sell legs out of repeated grid churn.
   - preserve March 30-31 `T-032` downside-control behavior.
   - preserve `T-034` funding / quote-routing stability.
 - Out of scope:
@@ -21,28 +22,29 @@ Use this file at the start and end of every batch.
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: fresh April 1 evidence shows `T-032` is no longer the dominant blocker. The engine now wastes candidate budget on guarded cross-quote symbols (`BNBETH`, `SOLETH`, `TRXETH`) after their sell ladder is already parked. Applying a guarded sell-ladder cooldown should rotate the engine away from those parked symbols without weakening downside control.
+- Hypothesis: fresh April 2 evidence shows the April 1 cross-quote slice held, but the live blocker moved to repeated `Grid sell sizing rejected (...)` churn on tiny residual home-quote inventory (`ETHUSDC`, `BTCUSDC`, `STOUSDC`, `TAOUSDC`, `XRPUSDC`). Treating those residual sell legs as non-actionable before order placement should rotate the engine away from dust sell retries without weakening downside control.
 - Target KPI delta:
-  - reduce repeated `Grid guard paused BUY leg` / `Grid waiting for ladder slot or inventory` on guarded cross-quote symbols.
-  - lower repeated `Fee/edge filter` retries on no-action cross-quote symbols indirectly by rotating away from parked ladders first.
-  - preserve reachable `daily-loss-caution-unwind` behavior for materially exposed books.
+  - reduce repeated `Grid sell sizing rejected (...)` on managed home-quote symbols with dust residual inventory.
+  - reduce paired `Grid guard paused BUY leg` loops that are only anchored by non-actionable sell legs.
+  - preserve reachable `daily-loss-caution-unwind` behavior for materially exposed books and keep `T-034` funding stability intact.
 - Stop/rollback condition:
-  - if the new cooldown suppresses valid high-conviction managed symbols or reopens any `T-032` caution freeze regression, freeze `T-031` and revert to the last stable `T-032` baseline.
+  - if dust sell-leg suppression hides materially actionable sell inventory or reopens any `T-032` caution freeze regression, freeze `T-031` and revert to the last stable April 1 baseline.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
   - runtime behavior changes in a bounded way:
-    - guarded sell ladders (`buyPaused && !hasBuyLimit && hasSellLimit`) get a symbol cooldown after placement instead of being reconsidered immediately.
-    - non-home-quote inventory is treated as actionable only when it has meaningful home-value, not raw qty alone.
+    - sell-leg feasibility is assessed explicitly before grid sell placement.
+    - undersized sell legs are treated as `Grid sell leg not actionable yet` instead of repeatedly failing on exchange minimums.
+    - sell-leg non-actionability can cool the symbol down before the next rotation.
     - March 30-31 `T-032` caution-unwind / thaw behavior remains preserved.
   - active development lane is `T-031`; `T-032` remains preserved as a support lane in runtime.
 - Runtime evidence in decisions/logs:
-  - latest fresh bundle runs `git.commit=c702bb0`.
-  - latest fresh bundle (`autobot-feedback-20260401-150741.tgz`) is dominated by guarded cross-quote churn (`BNBETH`, `SOLETH`, `TRXETH`) and some cross-quote fee-edge retries (`SOLBTC`, `XRPETH`).
-  - the next fresh bundle should show lower guarded sell-ladder repeats and fresher decision timestamps on alternative candidates.
+  - latest fresh bundle runs `git.commit=8e6711d`.
+  - latest fresh bundle (`autobot-feedback-20260402-081314.tgz`) is dominated by home-quote sell-ladder sizing churn (`ETHUSDC`, `BTCUSDC`, `STOUSDC`, `TAOUSDC`, `XRPUSDC`) plus paired `Grid guard paused BUY leg`.
+  - the next fresh bundle should show lower repeated `Grid sell sizing rejected (...)` and more `Grid sell leg not actionable yet` / cooldown rotation instead of exchange-minimum retries.
 - Risk slider impact:
-  - risk slider still modulates cooldown duration and lane thresholds; this slice only changes how long parked guarded sell ladders stay out of rotation.
+  - risk slider still modulates cooldown duration and lane thresholds; this slice only changes when dust sell legs are considered actionable enough to keep re-entering grid rotation.
 - Validation commands:
   - `docker compose -f docker-compose.ci.yml run --rm ci`
 - Runtime validation plan:
@@ -50,7 +52,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `c702bb0`
+- Commit hash: `<set-after-commit>`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -71,42 +73,42 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `EVENING (collection) / EVENING (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `6.589`
-  - runtime uptime (hours): `1033.044`
-  - run end: `Wed Apr 01 2026 18:06:57 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `NIGHT_RUN`
+  - bundle interval (hours): `17.096`
+  - runtime uptime (hours): `1050.14`
+  - run end: `Thu Apr 02 2026 11:12:43 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
-  - `T-032` support stability: `met` (`risk_state=NORMAL`, no dominant caution freeze)
-  - active ticket runtime signal: `observed` (Skip BNBETH: Grid guard paused BUY leg (10))
+  - funding regression absent: `met` (no dominant funding regression in latest top skips)
+  - active ticket runtime signal: `observed` (Skip: No feasible candidates after policy/exposure filters (9))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=10, historyLimitOrders=141, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=29.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=6, decisions=200, ratio=3.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=4, historyLimitOrders=99, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=50.5%)
+  - sizing reject pressure: `high` (sizingRejectSkips=63, decisions=200, ratio=31.5%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `pivot_to_t031_with_patch`
-- Next ticket candidate: `T-031`
-- Required action: `deploy first real T-031 slice`
+- Decision: `patch_required`
+- Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
+- Required action: `same-ticket mitigation required before next long run`
 - Open risks:
-  - `T-032` is no longer the dominant blocker, but cross-quote candidate quality is still weak.
+  - sizing reject pressure is high (31.5%).
 - Notes for next session:
-  - bundle: `autobot-feedback-20260401-150741.tgz`
-  - auto-updated at: `2026-04-01T15:08:23.549Z`
+  - bundle: `autobot-feedback-20260402-081314.tgz`
+  - auto-updated at: `2026-04-02T08:13:25.803Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-031
-Decision: pivot_to_t031_with_patch
-Required action: deploy first real T-031 slice
-Latest bundle: autobot-feedback-20260401-150741.tgz
+Decision: patch_required
+Required action: same-ticket mitigation required before next long run
+Latest bundle: autobot-feedback-20260402-081314.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: reduce guarded cross-quote sell-ladder churn while preserving T-032 downside-control and T-034 funding stability.
-In scope: strategy-quality / lane-rotation behavior for parked guarded sell ladders.
-Out of scope: quote-routing redesign, reopening T-032 without fresh evidence, PnL schema changes, AI lane.
+Goal: reduce repeated dust sell-ladder churn on managed symbols while preserving T-032 downside control and T-034 funding stability.
+In scope: grid sell-leg actionability and rotation for managed home-quote symbols.
+Out of scope: quote-routing redesign, reopening T-032 as the active blocker without fresh evidence, PnL schema changes, AI lane.
 Validation: docker compose -f docker-compose.ci.yml run --rm ci
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

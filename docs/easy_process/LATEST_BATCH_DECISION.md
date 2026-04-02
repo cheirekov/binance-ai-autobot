@@ -1,41 +1,41 @@
 # LATEST_BATCH_DECISION
 
-Last updated: 2026-04-01 18:17 EEST  
+Last updated: 2026-04-02 08:29 EEST  
 Owner: PM/BA + Codex
 
 ## Production capability lane
 - Chosen: `Lane A — Strategy quality / regime routing`
 - Why:
-  - `observed`: the latest fresh bundle is `autobot-feedback-20260401-150741.tgz`
-  - `observed`: auto-retro says `continue`
-  - `observed`: the bundle ends `risk_state=NORMAL`, `daily_net_usdt=+129.39`, `sizingRejectPressure=low`
-  - `observed`: the dominant repeats are guarded cross-quote sell-ladder churn (`BNBETH`, `SOLETH`, `TRXETH`) plus cross-quote fee-edge retries
-  - `inferred`: `T-032` is stable enough to freeze as support, and the next leverage point is `T-031` candidate quality
+  - `observed`: the latest fresh bundle is `autobot-feedback-20260402-081314.tgz`
+  - `observed`: auto-retro says `patch_required`
+  - `observed`: the bundle ends `risk_state=CAUTION`, `daily_net_usdt=-250.94`, `sizingRejectPressure=high`
+  - `observed`: the dominant repeats are managed home-quote sell-ladder sizing churn (`ETHUSDC`, `BTCUSDC`, `STOUSDC`, `TAOUSDC`, `XRPUSDC`) plus paired `Grid guard paused BUY leg`
+  - `inferred`: `T-032` is not the live blocker; the next leverage point is still `T-031` candidate/actionability quality
 
 ## Chosen active ticket
 - Current: `T-031` (Regime engine v2)
-- Decision: `pivot_and_patch`
+- Decision: `patch_required`
 - Why:
-  - `observed`: the active blocker is no longer downside-control policy
-  - `observed`: runtime now shows fresh normal-state trading with parked cross-quote ladder churn
-  - `inferred`: the more valuable next batch is a bounded `T-031` guarded-sell-ladder rotation slice
+  - `observed`: downside-control remains preserved, but fresh runtime is still burning cycles on impossible sell ladders
+  - `observed`: repeated sell-ladder sizing rejects now dominate on managed home-quote symbols
+  - `inferred`: the next bounded batch is a `T-031` sell-leg actionability slice, not a ticket pivot
 
 ## Evidence class
 - Current: `fresh`
-- Latest bundle: `autobot-feedback-20260401-150741.tgz`
-- Compared bundle: `autobot-feedback-20260401-083229.tgz`
+- Latest bundle: `autobot-feedback-20260402-081314.tgz`
+- Compared bundle: `autobot-feedback-20260401-150741.tgz`
 
 ## Allowed work mode
 - Current batch: `PATCH_NOW`
 
 ## Batch decision
-- Decision: `pivot_and_patch`
+- Decision: `patch_required`
 - Next ticket candidate: `T-031`
 - Review slice:
-  - switch active work back to `T-031`
-  - stop guarded cross-quote sell ladders from re-entering rotation immediately after the sell leg is parked
+  - keep `T-031` active
+  - stop undersized managed sell legs from re-entering runtime grid sell placement
   - preserve March 30-31 `T-032` downside-control behavior and `T-034` routing stability
 - Validation:
-  - fresh bundle review (`autobot-feedback-20260401-150741.tgz`) ✅
-  - ticket switch retro updated ✅
-  - first real `T-031` slice landed in code/tests ✅
+  - fresh bundle review (`autobot-feedback-20260402-081314.tgz`) ✅
+  - same-ticket mitigation landed in code/tests ✅
+  - PM/BA gate start + Docker CI pass ✅

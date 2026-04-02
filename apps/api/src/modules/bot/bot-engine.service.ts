@@ -8,7 +8,7 @@ import { BotStateSchema, defaultBotState } from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
 import { resolveRouteBridgeAssets, resolveUniverseDefaultQuoteAssets } from "../config/asset-routing";
-import { BinanceMarketDataService, type MarketQtyValidation } from "../integrations/binance-market-data.service";
+import { BinanceMarketDataService, type BinanceSymbolRules, type MarketQtyValidation } from "../integrations/binance-market-data.service";
 import {
   BinanceTradingService,
   type BinanceOrderSnapshot,
@@ -563,6 +563,49 @@ export class BotEngineService implements OnModuleInit {
     );
     if (!Number.isFinite(exposureHome ?? Number.NaN) || (exposureHome ?? 0) <= 0) return false;
     return (exposureHome ?? 0) + 1e-8 >= params.minExposureHome;
+  }
+
+  private assessGridSellLegFeasibility(params: {
+    rules: BinanceSymbolRules;
+    qty: number;
+    price: number;
+  }): { feasible: boolean; normalizedQty: number; reason?: string } {
+    const minQtyRaw = params.rules.lotSize?.minQty ?? params.rules.marketLotSize?.minQty;
+    const stepRaw = params.rules.lotSize?.stepSize ?? params.rules.marketLotSize?.stepSize;
+    const minQty = typeof minQtyRaw === "string" ? Number.parseFloat(minQtyRaw) : Number.NaN;
+    const step = typeof stepRaw === "string" ? Number.parseFloat(stepRaw) : Number.NaN;
+    let normalizedQty = Number.isFinite(params.qty) ? params.qty : Number.NaN;
+    if (Number.isFinite(step) && step > 0 && Number.isFinite(normalizedQty) && normalizedQty > 0) {
+      normalizedQty = Math.floor((normalizedQty + 1e-12) / step) * step;
+    }
+    if (Number.isFinite(minQty) && normalizedQty + 1e-12 < minQty) {
+      return {
+        feasible: false,
+        normalizedQty,
+        reason: `Below minQty ${minQtyRaw ?? minQty.toFixed(8)}`
+      };
+    }
+
+    if (!Number.isFinite(normalizedQty) || normalizedQty <= 0) {
+      return { feasible: false, normalizedQty: 0, reason: "Non-positive qty after step normalization" };
+    }
+
+    const minNotionalRaw = params.rules.notional?.minNotional;
+    const minNotional = typeof minNotionalRaw === "string" ? Number.parseFloat(minNotionalRaw) : Number.NaN;
+    const estimatedNotional =
+      Number.isFinite(params.price) && params.price > 0 ? normalizedQty * params.price : Number.NaN;
+    if (Number.isFinite(minNotional) && Number.isFinite(estimatedNotional) && estimatedNotional + 1e-8 < minNotional) {
+      const neededQty = params.price > 0 ? minNotional / params.price : Number.NaN;
+      return {
+        feasible: false,
+        normalizedQty,
+        reason: Number.isFinite(neededQty)
+          ? `Below minNotional ${minNotionalRaw ?? minNotional.toFixed(8)} at LIMIT price (need qty ≥ ${neededQty.toFixed(4)})`
+          : `Below minNotional ${minNotionalRaw ?? minNotional.toFixed(8)} at LIMIT price`
+      };
+    }
+
+    return { feasible: true, normalizedQty };
   }
 
   private isManagedPositionCountable(position: ManagedPosition, minExposureHome: number): boolean {
@@ -5000,29 +5043,14 @@ export class BotEngineService implements OnModuleInit {
 
               let sellLegLikelyFeasible = !hasInventory;
               if (!hasSellLimit && hasInventory) {
-                sellLegLikelyFeasible = true;
-                try {
-                  const rules = await this.marketData.getSymbolRules(symbol);
-                  const minQtyRaw = rules.lotSize?.minQty ?? rules.marketLotSize?.minQty;
-                  const stepRaw = rules.lotSize?.stepSize ?? rules.marketLotSize?.stepSize;
-                  const minQty = typeof minQtyRaw === "string" ? Number.parseFloat(minQtyRaw) : Number.NaN;
-                  const step = typeof stepRaw === "string" ? Number.parseFloat(stepRaw) : Number.NaN;
-                  let normalizedSellQty = netQty;
-                  if (Number.isFinite(step) && step > 0) {
-                    normalizedSellQty = Math.floor((normalizedSellQty + 1e-12) / step) * step;
-                  }
-                  const minNotional = typeof rules.notional?.minNotional === "string" ? Number.parseFloat(rules.notional.minNotional) : Number.NaN;
-                  const candidatePrice = Number.isFinite(candidate.lastPrice) ? candidate.lastPrice : Number.NaN;
-                  const estimatedNotional =
-                    Number.isFinite(candidatePrice) && candidatePrice > 0 ? normalizedSellQty * candidatePrice : Number.NaN;
-                  if (Number.isFinite(minQty) && normalizedSellQty + 1e-12 < minQty) {
-                    sellLegLikelyFeasible = false;
-                  } else if (Number.isFinite(minNotional) && Number.isFinite(estimatedNotional) && estimatedNotional + 1e-8 < minNotional) {
-                    sellLegLikelyFeasible = false;
-                  }
-                } catch {
-                  // keep current estimate if rules are temporarily unavailable
-                }
+                const rules = await this.marketData.getSymbolRules(symbol);
+                const price = Number.isFinite(candidate.lastPrice) ? candidate.lastPrice : Number.NaN;
+                const sellLegAssessment = this.assessGridSellLegFeasibility({
+                  rules,
+                  qty: netQty,
+                  price
+                });
+                sellLegLikelyFeasible = sellLegAssessment.feasible;
               }
 
               if (
@@ -7887,6 +7915,15 @@ export class BotEngineService implements OnModuleInit {
             const sellLimitPrice = Number((price * (1 + gridSpacingPct / 100)).toFixed(8));
             let placedGridOrder = false;
             let pendingNoActionState: BotState | null = null;
+            const desiredSellQty = Math.min(baseFree, qty);
+            const sellLegAssessment = !hasSellLimit
+              ? this.assessGridSellLegFeasibility({
+                  rules,
+                  qty: desiredSellQty,
+                  price: sellLimitPrice
+                })
+              : { feasible: true, normalizedQty: desiredSellQty };
+            const sellLegLikelyFeasible = hasSellLimit || sellLegAssessment.feasible;
 
             if (!hasBuyLimit && buyPaused) {
               const summary = buyPausedByCaution
@@ -7946,6 +7983,69 @@ export class BotEngineService implements OnModuleInit {
                   pendingNoActionState = nextWithCooldown;
                 }
               }
+            }
+
+            if (!hasSellLimit && !sellLegLikelyFeasible) {
+              if (placedGridOrder) {
+                return;
+              }
+              const summary = `Skip ${candidateSymbol}: Grid sell leg not actionable yet`;
+              const baseCooldownMs = Math.max(
+                this.deriveNoActionSymbolCooldownMs(risk),
+                this.deriveGridSizingRejectCooldownMs({ risk, side: "SELL", reason: sellLegAssessment.reason ?? "not actionable" })
+              );
+              const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
+              const cooldownMs = cooldown.cooldownMs;
+              const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+              const next = {
+                ...current,
+                activeOrders: current.activeOrders,
+                orderHistory: current.orderHistory,
+                decisions: alreadyLogged
+                  ? current.decisions
+                  : [
+                      {
+                        id: crypto.randomUUID(),
+                        ts: new Date().toISOString(),
+                        kind: "SKIP",
+                        summary,
+                        details: {
+                          desiredQty: Number(desiredSellQty.toFixed(8)),
+                          normalizedQty: Number(sellLegAssessment.normalizedQty.toFixed(8)),
+                          baseFree: Number(baseFree.toFixed(8)),
+                          limitPrice: sellLimitPrice,
+                          buyPaused,
+                          buyPausedByCaution,
+                          hasBuyLimit,
+                          hasSellLimit,
+                          reason: sellLegAssessment.reason ?? "Sell leg below exchange minimums",
+                          ...(cooldown.storm ? { storm: cooldown.storm } : {}),
+                          cooldownMs
+                        }
+                      },
+                      ...current.decisions
+                    ].slice(0, 200),
+                lastError: undefined
+              } satisfies BotState;
+              const nextWithCooldown = this.upsertProtectionLock(next, {
+                type: "COOLDOWN",
+                scope: "SYMBOL",
+                symbol: candidateSymbol,
+                reason: cooldown.storm
+                  ? `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`
+                  : `Cooldown after non-actionable sell leg (${Math.round(cooldownMs / 1000)}s)`,
+                expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                details: {
+                  category: "GRID_SELL_NOT_ACTIONABLE",
+                  cooldownMs,
+                  reason: sellLegAssessment.reason ?? "Sell leg below exchange minimums",
+                  buyPaused,
+                  buyPausedByCaution,
+                  hasBuyLimit
+                }
+              });
+              this.save(nextWithCooldown);
+              return;
             }
 
             if (!hasBuyLimit && !buyPaused && Number.isFinite(buyLimitPrice) && buyLimitPrice > 0) {
@@ -8220,7 +8320,6 @@ export class BotEngineService implements OnModuleInit {
             }
 
             if (!hasSellLimit && Number.isFinite(sellLimitPrice) && sellLimitPrice > 0) {
-              const desiredSellQty = Math.min(baseFree, qty);
               if (Number.isFinite(desiredSellQty) && desiredSellQty > 0) {
                 const sellPriceNorm = await this.marketData.normalizeLimitPrice(candidateSymbol, sellLimitPrice, "SELL");
                 if (!sellPriceNorm.ok) {
