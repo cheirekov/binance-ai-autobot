@@ -5321,7 +5321,30 @@ export class BotEngineService implements OnModuleInit {
 
       tickContext.candidateSymbol = candidateSymbol;
       tickContext.candidate = selectedCandidate;
-      const blockedReason = this.isSymbolBlocked(candidateSymbol, current);
+      const candidateBaseAsset =
+        selectedCandidate?.baseAsset?.trim().toUpperCase() || getExecutionBaseFromSymbol(candidateSymbol) || "";
+      const candidateQuoteAsset =
+        selectedCandidate?.quoteAsset?.trim().toUpperCase() || getExecutionQuoteFromSymbol(candidateSymbol) || "";
+      const candidateManagedPosition = this.getManagedPositions(current).get(candidateSymbol);
+      const candidateActiveOrderCount = current.activeOrders.filter(
+        (order) => order.symbol === candidateSymbol && order.status === "NEW"
+      ).length;
+      const configuredTradeMode = config?.basic.tradeMode ?? "SPOT";
+      const blockedReason =
+        configuredTradeMode === "SPOT_GRID" && candidateBaseAsset && candidateQuoteAsset
+          ? await this.getCandidateSelectionBlockReason({
+              symbol: candidateSymbol,
+              state: current,
+              baseAsset: candidateBaseAsset,
+              quoteAsset: candidateQuoteAsset,
+              qty: candidateManagedPosition?.netQty ?? 0,
+              lastPrice: selectedCandidate?.lastPrice,
+              homeStable,
+              bridgeAssets: resolveRouteBridgeAssets(config ?? null, homeStable),
+              minExposureHome: this.deriveManagedPositionMinCountableExposureHome(risk),
+              activeOrderCount: candidateActiveOrderCount
+            })
+          : this.isSymbolBlocked(candidateSymbol, current);
       if (blockedReason) {
         const summary = `Skip ${candidateSymbol}: ${blockedReason}`;
         const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;

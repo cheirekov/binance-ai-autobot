@@ -80,6 +80,7 @@ These are execution behaviors currently active in runtime:
     - current April 1 slice: guarded sell-ladder cooldown for paused grid symbols so cross-quote pairs do not churn while only the sell leg is parked
     - current April 2 slice: undersized managed sell legs are treated as non-actionable and cooled down before runtime can retry impossible grid sell ladders
     - current April 2 day slice: home-quote dust residuals in `GRID_SELL_NOT_ACTIONABLE` cooldown are allowed back into selection once they are effectively flat and orderless
+    - current April 2 evening slice: the same bounded dust-cooldown exception is now applied at the post-selection execution gate so cooled home-quote candidates are not re-blocked immediately after selection
   - objective: improve candidate quality and rotation under real market regimes without reopening `T-032` or `T-034`
 
 ## Support / next strategy core

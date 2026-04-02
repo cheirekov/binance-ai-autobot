@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-02 14:53 EEST  
+Last updated: 2026-04-02 19:36 EEST  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260402-113357.tgz`) shows `T-032` remains support-only. The active problem is a no-feasible deadlock: the remaining home-quote family is dust-sized and cooled by `GRID_SELL_NOT_ACTIONABLE`, while the cross-quote family is mostly unfundable after reserve.
+The newest fresh bundle (`autobot-feedback-20260402-162840.tgz`) shows `T-032` remains support-only. The active problem is no longer only selection deadlock: cooled home-quote dust residuals can re-enter selection, but they are still hard-blocked again by the raw post-selection protection-lock gate.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -23,12 +23,12 @@ The newest fresh bundle (`autobot-feedback-20260402-113357.tgz`) shows `T-032` r
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that ignores `GRID_SELL_NOT_ACTIONABLE` during selection for effectively flat home-quote dust residuals with no active orders will reopen feasible home-quote candidates, without weakening `T-032` downside control or `T-034` funding stability.
+- A bounded `T-031` slice that applies the same `GRID_SELL_NOT_ACTIONABLE` dust exception at the post-selection execution gate will let cooled home-quote candidates proceed consistently, without weakening `T-032` downside control or `T-034` funding stability.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved as a support lane rather than being reopened blindly
-- the next fresh bundle reflects lower `No feasible candidates after policy/exposure filters` churn and newer home-quote candidate activity without reopening funding or downside-control regressions
+- the next fresh bundle reflects lower `No feasible candidates after policy/exposure filters` churn and fewer immediate post-selection cooldown skips without reopening funding or downside-control regressions
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident

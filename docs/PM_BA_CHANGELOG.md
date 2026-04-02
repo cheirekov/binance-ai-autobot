@@ -16,6 +16,38 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-02 13:36 UTC — T-031 fourth slice: apply dust-cooldown exception at post-selection execution gate
+- Scope:
+  - respond to the fresh April 2 evening bundle where the April 2 day selection-time bypass was deployed, but cooled dust residuals were still being hard-blocked again by the raw post-selection lock gate.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260402-162840.tgz`) shows:
+    - `risk_state=CAUTION`
+    - `daily_net_usdt=-144.24`
+    - `sizingRejectPressure=low`
+    - dominant counter: `Skip: No feasible candidates after policy/exposure filters (31)`
+  - raw state audit shows the latest actual decisions are now:
+    - `Skip STOUSDC: Grid sell leg not actionable yet`
+    - `Skip STOUSDC: Protection lock COOLDOWN: Cooldown after non-actionable sell leg (900s)`
+  - inferred blocker: the April 2 day slice let cooled home-quote dust symbols re-enter selection, but the same symbols were still blocked again by the raw post-selection `isSymbolBlocked(...)` check before runtime could act on them.
+- PM milestone mapping:
+  - keep `T-031` active.
+  - preserve March 30-31 `T-032` downside-control behavior and `T-034` routing stability.
+  - resolve the execution-gate inconsistency without broadening the dust exception.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: post-selection candidate blocking now uses `getCandidateSelectionBlockReason(...)` for `SPOT_GRID`, so the bounded home-quote dust exception is applied consistently at execution entry.
+  - `docs/SESSION_BRIEF.md`, `docs/STRATEGY_COVERAGE.md`, `docs/easy_process/*`, and triage note `docs/TRIAGE_NOTE_2026-04-02_T031_POST_SELECTION_COOLDOWN_REBLOCK.md`: aligned to the new same-ticket slice.
+- Risk slider impact:
+  - no hard-limit change.
+  - risk still controls cooldown timing and `T-032` pause/unwind thresholds; this slice only removes an inconsistent post-selection reblock for effectively flat home-quote dust residuals.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected next proof: lower repeated `Skip: No feasible candidates after policy/exposure filters` and fewer `Protection lock COOLDOWN: Cooldown after non-actionable sell leg` skips immediately after selection.
+- Follow-up:
+  - if the next fresh bundle still remains boxed in, the next `T-031` slice should make the no-feasible recovery path dust-aware instead of relying only on candidate-entry consistency.
+
 ## 2026-04-02 11:52 UTC — T-031 third slice: reopen home-quote candidates after dust sell cooldown deadlock
 - Scope:
   - respond to the fresh April 2 day bundle where the April 2 morning sell-leg slice worked, but runtime still fell into `No feasible candidates after policy/exposure filters` because every remaining home-quote symbol was dust-sized and still cooled by `GRID_SELL_NOT_ACTIONABLE`.
