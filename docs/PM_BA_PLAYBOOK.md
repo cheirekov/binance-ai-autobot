@@ -2,6 +2,23 @@
 
 Purpose: make prioritization and Definition of Done deterministic so delivery does not depend on ad-hoc prompting.
 
+## Default working set (hard)
+
+Normal bundle-cycle work must stay inside this live document set unless the batch explicitly requires more:
+- `docs/DELIVERY_BOARD.md`
+- `docs/PM_BA_CHANGELOG.md`
+- `docs/SESSION_BRIEF.md`
+- `docs/RETROSPECTIVE_AUTO.md`
+- `docs/easy_process/LATEST_BATCH_DECISION.md`
+
+On-demand only:
+- `docs/RUN_LOGGING_P0.md`
+- `docs/easy_process/ACTIVE_TICKET.md`
+- `docs/easy_process/NEXT_BATCH_PLAN.md`
+- capability / production / AI reference docs in `docs/easy_process/*`
+
+Archive/history docs are valid, but they are not part of the normal bundle-cycle load.
+
 ## Priority policy (hard)
 
 Use this sequence for every new batch:
@@ -26,6 +43,22 @@ Use this sequence for every new batch:
 - Day batch (`2-4h`): prefer tickets with `learningSpeed >= 4`.
 - Night batch (`8-12h`): prefer tickets with `pnlRiskImpact >= 4` and measurable overnight behavior.
 - Never mix more than one `IN_PROGRESS` ticket.
+
+## Linked support slice rule (hard)
+
+We still keep exactly one `IN_PROGRESS` ticket.  
+However, one bounded linked support ticket is allowed when live evidence couples the two behaviors tightly enough that splitting them across separate market windows would slow validation.
+
+- Active ticket remains the only `IN_PROGRESS` ticket on the board.
+- At most one linked support ticket may be referenced in `docs/SESSION_BRIEF.md` as:
+  - `Linked support ticket: <ticket>`
+- A linked support slice is allowed only when all are true:
+  - the latest bundle has `fresh runtime evidence`,
+  - the active ticket and support ticket belong to the same capability lane,
+  - the support slice preserves the active ticket objective instead of replacing it,
+  - the changelog explicitly states which part belongs to the active ticket vs the linked support ticket.
+- A linked support slice does **not** count as a ticket switch.
+- If the support behavior becomes the dominant blocker across `2` fresh bundles, stop using support mode and pivot the active ticket formally.
 
 ## Definition of Done template (hard)
 

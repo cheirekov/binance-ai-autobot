@@ -6,6 +6,9 @@ Owner: PM/BA + Codex
 ## Exact scope
 Keep `T-031` active. Implement the next bounded `T-031` slice so undersized managed sell legs stop re-entering runtime grid sell placement. Preserve March 30-31 `T-032` downside-control behavior and `T-034` funding stability.
 
+Linked support mode:
+- `T-032` support slices are allowed in the same batch only when fresh evidence shows downside-control behavior is the immediate blocker to validating the active `T-031` strategy slice.
+
 ## In scope
 - implement the next `T-031` slice in runtime code + tests
 - collect the next fresh bundle to validate sell-leg actionability and cooldown rotation on managed home-quote symbols

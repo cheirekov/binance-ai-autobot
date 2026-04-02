@@ -14,6 +14,7 @@ Owner: PM/BA + Codex
 
 ## Chosen active ticket
 - Current: `T-031` (Regime engine v2)
+- Linked support: `T-032` (support slices allowed only when fresh evidence couples downside-control with strategy-quality validation)
 - Decision: `patch_required`
 - Why:
   - `observed`: downside-control remains preserved, but fresh runtime is still burning cycles on impossible sell ladders

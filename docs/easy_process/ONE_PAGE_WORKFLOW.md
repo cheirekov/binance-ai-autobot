@@ -3,22 +3,26 @@
 This is the simple operating model for Codex/Cline/Qwen.
 
 ## Files to read first
-Always read in this order:
-1. `docs/easy_process/PROGRAM_STATUS.md`
-2. `docs/easy_process/ACTIVE_TICKET.md`
-3. `docs/easy_process/RUN_CONTEXT.md`
-4. `docs/easy_process/BUNDLE_DIGEST.md`
-5. `docs/easy_process/STATE_DIGEST.md`
-6. `docs/easy_process/VALIDATION_LEDGER.md`
-7. `docs/easy_process/DECISION_LEDGER.md`
-8. `docs/easy_process/NEXT_CYCLE_HANDOFF.md`
-9. `docs/SESSION_BRIEF.md`
-10. `docs/DELIVERY_BOARD.md`
-11. `docs/PM_BA_PLAYBOOK.md`
-12. `docs/TEAM_OPERATING_RULES.md`
+Always read in this order for the normal bundle cycle:
+1. `docs/DELIVERY_BOARD.md`
+2. `docs/SESSION_BRIEF.md`
+3. `docs/RETROSPECTIVE_AUTO.md`
+4. `docs/PM_BA_CHANGELOG.md`
+5. `docs/easy_process/LATEST_BATCH_DECISION.md`
 
 Do not start from raw `state.json`.
 Do not assume the time from chat history.
+Do not load archive `docs/easy_process/*` files by default.
+
+## Read only when needed
+- `docs/PM_BA_PLAYBOOK.md`
+- `docs/RUN_LOGGING_P0.md`
+- `docs/easy_process/ACTIVE_TICKET.md`
+- `docs/easy_process/NEXT_BATCH_PLAN.md`
+- `docs/easy_process/CAPABILITY_ROADMAP.md`
+- `docs/easy_process/PRODUCTION_GATES.md`
+- `docs/easy_process/MARKET_INTELLIGENCE_LANE.md`
+- `docs/easy_process/README.md`
 
 ## The only 5 questions that matter at batch start
 1. What is the correct **lane**?
@@ -44,5 +48,5 @@ Do not assume the time from chat history.
 - Never stay on runtime waiting when validation is the real blocker.
 - Never treat one green or one red market window as adaptation proof.
 - Never let raw state become the primary onboarding surface.
-- Never trust previous chat memory over `RUN_CONTEXT.md`.
-- Every cycle must append to the ledger and leave a handoff.
+- Never trust previous chat memory over the authoritative live working set.
+- Do not expand the doc load unless the batch truly needs it.

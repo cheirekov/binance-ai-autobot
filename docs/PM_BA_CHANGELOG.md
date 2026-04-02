@@ -16,6 +16,32 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-02 09:10 UTC — PM/BA process hardening: linked support slices for adaptive execution
+- Scope:
+  - prevent ticket thrash between `T-031` and `T-032` when live market windows couple strategy-quality and downside-control behavior in the same runtime.
+- BA requirement mapping:
+  - recent bundle window (March 29 → April 2) shows both:
+    - `T-031` candidate/actionability defects,
+    - `T-032` downside-control effects that can still gate validation timing.
+  - waiting for a “perfect market window” to validate each ticket separately is too slow.
+- PM milestone mapping:
+  - keep one active ticket only.
+  - allow one explicitly declared linked support ticket inside the same adaptive-execution lane when fresh evidence couples the behaviors.
+- Technical changes:
+  - `docs/PM_BA_PLAYBOOK.md`: added the hard linked-support-slice rule.
+  - `docs/DELIVERY_BOARD.md`: clarified `T-031` active + `T-032` linked support mode.
+  - `docs/RUN_LOGGING_P0.md`: operator protocol now acknowledges linked support declarations.
+  - `scripts/pmba-gate.sh`: validates optional `Linked support ticket:` in `docs/SESSION_BRIEF.md` and prints it on pass.
+  - `docs/SESSION_BRIEF.md` and `docs/easy_process/*`: aligned current working memory to `T-031` active + `T-032` linked support.
+- Risk slider impact:
+  - none; this is process-only.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+- Runtime test request:
+  - none; process-only change.
+- Follow-up:
+  - if linked support mode starts hiding a real ticket switch, revert to formal pivoting and update `docs/TICKET_SWITCH_RETRO.md`.
+
 ## 2026-04-02 08:25 UTC — T-031 second slice: treat undersized sell legs as non-actionable
 - Scope:
   - respond to the first fresh post-pivot `T-031` bundle where guarded cross-quote churn improved, but the live blocker moved to repeated sell-ladder sizing rejects on tiny residual home-quote inventory.

@@ -105,8 +105,8 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-031 | IN_PROGRESS | Regime engine v2 | Cross-quote candidate quality: stop guarded sell-ladder churn / repeated no-action loops while preserving `T-032` downside-control and `T-034` funding stability |
-| T-032 | TODO | Exit manager v2 | Preserve March 30-31 downside-control slices; reopen only if caution/unwind policy becomes the dominant blocker again |
+| T-031 | IN_PROGRESS | Regime engine v2 | Candidate/actionability quality remains the active lane. A bounded linked support slice from `T-032` is allowed only when fresh evidence shows downside-control and regime-quality are coupled in the same runtime window. |
+| T-032 | TODO | Exit manager v2 | Linked support only while `T-031` is active: preserve March 30-31 downside-control slices and allow bounded same-batch support work when caution/unwind behavior blocks `T-031` validation. |
 | T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
 
 `T-005` status: moved to DONE after overnight evidence (`autobot-feedback-20260225-100508.tgz`) showed guard transitions/recovery without deadlock.

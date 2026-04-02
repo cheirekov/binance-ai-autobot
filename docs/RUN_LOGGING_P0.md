@@ -54,9 +54,17 @@ Post only:
 
 No extra manual edits before Codex review.
 
+Codex should review the next bundle from the normal live working set only:
+- `docs/DELIVERY_BOARD.md`
+- `docs/SESSION_BRIEF.md`
+- `docs/RETROSPECTIVE_AUTO.md`
+- `docs/PM_BA_CHANGELOG.md`
+- `docs/easy_process/LATEST_BATCH_DECISION.md`
+
 ## 5) Non-negotiable rules
 
 - Keep one active ticket only (`IN_PROGRESS`).
+- One linked support ticket is allowed only if `docs/SESSION_BRIEF.md` declares it explicitly and the active ticket stays unchanged.
 - No strategy scope change during ingestion.
 - No state reset unless ticket explicitly requires it.
 - If `pmba-gate.sh end` fails, create triage note first (`docs/TRIAGE_NOTE_TEMPLATE.md`).

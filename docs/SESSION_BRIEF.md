@@ -9,6 +9,7 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-031` (Regime engine v2)
+- Linked support ticket: `T-032` (allowed only when fresh evidence shows downside-control and candidate quality are coupled in the same runtime window)
 - Goal (single sentence): reduce repeated home-quote dust sell-ladder churn so the engine stops retrying impossible residual sells on managed symbols.
 - In scope:
   - keep `T-031` active as the strategy-quality lane.

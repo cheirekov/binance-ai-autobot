@@ -1,22 +1,21 @@
 # ONE_PAGE_WORKFLOW_PRODUCTION
 
 ## Read order for any new LLM
-1. `docs/easy_process/NORTH_STAR_PRODUCTION.md`
-2. `docs/easy_process/CAPABILITY_ROADMAP.md`
-3. `docs/easy_process/PRODUCTION_GATES.md`
-4. `docs/easy_process/PROMOTION_LADDER.md`
-5. `docs/easy_process/MARKET_INTELLIGENCE_LANE.md`
-6. `docs/easy_process/LEARNING_AND_MODEL_RISK.md`
-7. `docs/easy_process/RISK_AND_AUTONOMY_CONTRACT.md`
-8. `docs/easy_process/PROGRAM_STATUS.md`
-9. `docs/easy_process/ACTIVE_TICKET.md`
-10. `docs/easy_process/BUNDLE_DIGEST.md`
-11. `docs/easy_process/STATE_DIGEST.md`
-12. `docs/easy_process/VALIDATION_LEDGER.md`
-13. `docs/SESSION_BRIEF.md`
-14. `docs/DELIVERY_BOARD.md`
-15. `docs/PM_BA_PLAYBOOK.md`
-16. `docs/TEAM_OPERATING_RULES.md`
+1. `docs/DELIVERY_BOARD.md`
+2. `docs/SESSION_BRIEF.md`
+3. `docs/RETROSPECTIVE_AUTO.md`
+4. `docs/PM_BA_CHANGELOG.md`
+5. `docs/easy_process/LATEST_BATCH_DECISION.md`
+
+## Production-reference docs (on demand only)
+- `docs/easy_process/NORTH_STAR_PRODUCTION.md`
+- `docs/easy_process/CAPABILITY_ROADMAP.md`
+- `docs/easy_process/PRODUCTION_GATES.md`
+- `docs/easy_process/PROMOTION_LADDER.md`
+- `docs/easy_process/MARKET_INTELLIGENCE_LANE.md`
+- `docs/easy_process/LEARNING_AND_MODEL_RISK.md`
+- `docs/easy_process/RISK_AND_AUTONOMY_CONTRACT.md`
+- `docs/easy_process/README.md`
 
 ## The first 5 questions at batch start
 1. Which production capability lane matters most now?

@@ -7,6 +7,7 @@ Owner: PM/BA + Codex
 - ID: `T-031`
 - Title: `Regime engine v2`
 - Status: `IN_PROGRESS`
+- Linked support ticket: `T-032`
 - Current lane: `Lane A — Strategy quality / regime routing`
 - Current incident override: `none active`
 

@@ -42,6 +42,30 @@ if ! grep -q "Active ticket: \`$ACTIVE_TICKET\`" "$SESSION_FILE"; then
   exit 1
 fi
 
+mapfile -t LINKED_SUPPORT_TICKETS < <(
+  grep -E '^- Linked support ticket:\s*`T-[0-9]{3}`' "$SESSION_FILE" \
+    | sed -E 's/^- Linked support ticket:\s*`(T-[0-9]{3})`.*/\1/'
+)
+
+if [[ "${#LINKED_SUPPORT_TICKETS[@]}" -gt 1 ]]; then
+  echo "FAIL: expected at most one linked support ticket in SESSION_BRIEF, found ${#LINKED_SUPPORT_TICKETS[@]}." >&2
+  printf 'Linked support tickets: %s\n' "${LINKED_SUPPORT_TICKETS[*]}" >&2
+  exit 1
+fi
+
+LINKED_SUPPORT_TICKET=""
+if [[ "${#LINKED_SUPPORT_TICKETS[@]}" -eq 1 ]]; then
+  LINKED_SUPPORT_TICKET="${LINKED_SUPPORT_TICKETS[0]}"
+  if [[ "$LINKED_SUPPORT_TICKET" == "$ACTIVE_TICKET" ]]; then
+    echo "FAIL: linked support ticket cannot equal active ticket ($ACTIVE_TICKET)." >&2
+    exit 1
+  fi
+  if ! grep -q "^\| $LINKED_SUPPORT_TICKET \|" "$BOARD_FILE"; then
+    echo "FAIL: linked support ticket $LINKED_SUPPORT_TICKET is not present on the delivery board." >&2
+    exit 1
+  fi
+fi
+
 if ! grep -q "Current ticket: \`$ACTIVE_TICKET\`" "$SWITCH_RETRO_FILE"; then
   echo "FAIL: TICKET_SWITCH_RETRO current ticket does not match board IN_PROGRESS ticket ($ACTIVE_TICKET)." >&2
   exit 1
@@ -135,4 +159,7 @@ fi
 
 echo "PASS: PM/BA gate ($PHASE)"
 echo "- active ticket: $ACTIVE_TICKET"
+if [[ -n "$LINKED_SUPPORT_TICKET" ]]; then
+  echo "- linked support ticket: $LINKED_SUPPORT_TICKET"
+fi
 echo "- session brief aligned: yes"

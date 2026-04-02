@@ -1,13 +1,25 @@
 # AUTHORITATIVE_SOURCE_DECISION
 
-Last updated: 2026-03-27 12:33 EET  
+Last updated: 2026-04-02 09:35 EEST  
 Owner: PM/BA + Codex
 
 ## Source priority
 1. Ticket status and active lane: `docs/DELIVERY_BOARD.md`
 2. Historical delivery evidence and ratified batch decisions: `docs/PM_BA_CHANGELOG.md`
-3. Latest runtime evidence: `docs/SESSION_BRIEF.md` Section 4 plus `docs/RETROSPECTIVE_AUTO.md` dated 2026-03-27
-4. Derived working memory: `docs/easy_process/*`
+3. Latest runtime evidence: `docs/SESSION_BRIEF.md` Section 4 plus `docs/RETROSPECTIVE_AUTO.md`
+4. Current derived working memory: `docs/easy_process/LATEST_BATCH_DECISION.md`
+5. All other `docs/easy_process/*`: on-demand reference or archive only
+
+## Default live working set
+
+Only these files should be loaded in the normal bundle cycle:
+- `docs/DELIVERY_BOARD.md`
+- `docs/PM_BA_CHANGELOG.md`
+- `docs/SESSION_BRIEF.md`
+- `docs/RETROSPECTIVE_AUTO.md`
+- `docs/easy_process/LATEST_BATCH_DECISION.md`
+
+Everything else in `docs/easy_process/*` is reference-only unless the batch explicitly needs it.
 
 ## Explicit authority by topic
 - Closed / DONE ticket history:
@@ -26,7 +38,8 @@ Owner: PM/BA + Codex
 - If `docs/easy_process/*` conflicts with board/changelog/runtime evidence, update `docs/easy_process/*`.
 - Do not normalize board/changelog history to match stale derived files.
 - Do not use derived files to reopen or redefine a DONE ticket.
+- Do not load archive/reference `docs/easy_process/*` files by default during routine bundle handling.
 
 ## Current normalization decision
-- The March 26 `P0_INCIDENT_SUMMARY` / `PATCH_RESULT` artifacts remain valid history for that batch, but they are not the current batch authority after the March 27 fresh bundle.
-- The March 27 `continue active ticket` result is now ratified through `docs/PM_BA_CHANGELOG.md` and mirrored into the easy-process layer.
+- `docs/easy_process/README.md` is now the compact index for what stays live vs what is archive/reference.
+- Historical `easy_process` files remain valid, but they are no longer part of the default working-memory load for normal bundle cycles.
