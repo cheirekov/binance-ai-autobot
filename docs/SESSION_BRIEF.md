@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-04-02 08:29 UTC
+Last updated: 2026-04-02 11:52 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -10,11 +10,12 @@ Use this file at the start and end of every batch.
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-031` (Regime engine v2)
 - Linked support ticket: `T-032` (allowed only when fresh evidence shows downside-control and candidate quality are coupled in the same runtime window)
-- Goal (single sentence): reduce repeated home-quote dust sell-ladder churn so the engine stops retrying impossible residual sells on managed symbols.
+- Goal (single sentence): reopen feasible home-quote candidates by ignoring stale dust-residual sell cooldowns once those symbols are effectively flat and orderless.
 - In scope:
   - keep `T-031` active as the strategy-quality lane.
-  - treat undersized sell legs as non-actionable before runtime attempts another grid sell ladder.
-  - demote dust-residual symbols with impossible sell legs out of repeated grid churn.
+  - keep undersized sell legs non-actionable before runtime attempts another grid sell ladder.
+  - ignore `GRID_SELL_NOT_ACTIONABLE` symbol cooldowns during selection only when a home-quote symbol is effectively dust-sized and has no active orders.
+  - stop the engine from falling through to repeated `No feasible candidates after policy/exposure filters` when only cooled dust residuals remain on home-quote symbols.
   - preserve March 30-31 `T-032` downside-control behavior.
   - preserve `T-034` funding / quote-routing stability.
 - Out of scope:
@@ -23,27 +24,27 @@ Use this file at the start and end of every batch.
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: fresh April 2 evidence shows the April 1 cross-quote slice held, but the live blocker moved to repeated `Grid sell sizing rejected (...)` churn on tiny residual home-quote inventory (`ETHUSDC`, `BTCUSDC`, `STOUSDC`, `TAOUSDC`, `XRPUSDC`). Treating those residual sell legs as non-actionable before order placement should rotate the engine away from dust sell retries without weakening downside control.
+- Hypothesis: fresh April 2 evidence shows the April 2 morning sell-leg slice worked, but the live blocker moved one step later: all remaining `USDC` candidates were residual dust symbols still blocked by `GRID_SELL_NOT_ACTIONABLE` cooldown, while cross-quote candidates were unfundable. Re-allowing those effectively flat home-quote symbols into selection should reduce repeated `No feasible candidates after policy/exposure filters` without weakening downside control.
 - Target KPI delta:
-  - reduce repeated `Grid sell sizing rejected (...)` on managed home-quote symbols with dust residual inventory.
-  - reduce paired `Grid guard paused BUY leg` loops that are only anchored by non-actionable sell legs.
-  - preserve reachable `daily-loss-caution-unwind` behavior for materially exposed books and keep `T-034` funding stability intact.
+  - reduce repeated `No feasible candidates after policy/exposure filters`.
+  - reduce stalled windows where all home-quote symbols are dust residuals cooled by `GRID_SELL_NOT_ACTIONABLE`.
+  - preserve low sizing reject pressure and preserve reachable `daily-loss-caution-unwind` behavior.
 - Stop/rollback condition:
-  - if dust sell-leg suppression hides materially actionable sell inventory or reopens any `T-032` caution freeze regression, freeze `T-031` and revert to the last stable April 1 baseline.
+  - if the selection exception reopens materially actionable sell inventory too early, or reopens any `T-032` caution freeze regression, freeze `T-031` and revert to the last stable April 2 morning baseline.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
   - runtime behavior changes in a bounded way:
-    - sell-leg feasibility is assessed explicitly before grid sell placement.
-    - undersized sell legs are treated as `Grid sell leg not actionable yet` instead of repeatedly failing on exchange minimums.
-    - sell-leg non-actionability can cool the symbol down before the next rotation.
+    - sell-leg feasibility remains assessed explicitly before grid sell placement.
+    - undersized sell legs remain `Grid sell leg not actionable yet` instead of repeatedly failing on exchange minimums.
+    - `GRID_SELL_NOT_ACTIONABLE` cooldown no longer blocks home-quote dust residuals from candidate selection once they have no active orders and no countable exposure.
     - March 30-31 `T-032` caution-unwind / thaw behavior remains preserved.
   - active development lane is `T-031`; `T-032` remains preserved as a support lane in runtime.
 - Runtime evidence in decisions/logs:
-  - latest fresh bundle runs `git.commit=8e6711d`.
-  - latest fresh bundle (`autobot-feedback-20260402-081314.tgz`) is dominated by home-quote sell-ladder sizing churn (`ETHUSDC`, `BTCUSDC`, `STOUSDC`, `TAOUSDC`, `XRPUSDC`) plus paired `Grid guard paused BUY leg`.
-  - the next fresh bundle should show lower repeated `Grid sell sizing rejected (...)` and more `Grid sell leg not actionable yet` / cooldown rotation instead of exchange-minimum retries.
+  - latest fresh bundle runs `git.commit=787f371`.
+  - latest fresh bundle (`autobot-feedback-20260402-113357.tgz`) is dominated by `Skip: No feasible candidates after policy/exposure filters (21)` while the cooled home-quote dust family includes `ETHUSDC`, `BTCUSDC`, `TAOUSDC`, `BNBUSDC`, `XRPUSDC`, `SOLUSDC`, `XPLUSDC`, `NOMUSDC`, `STOUSDC`, `SOLVUSDC`, `ONTUSDC`, `SUIUSDC`.
+  - the next fresh bundle should show lower repeated `No feasible candidates after policy/exposure filters` and newer actionable home-quote decisions instead of all-home-quote cooldown deadlock.
 - Risk slider impact:
   - risk slider still modulates cooldown duration and lane thresholds; this slice only changes when dust sell legs are considered actionable enough to keep re-entering grid rotation.
 - Validation commands:
@@ -74,30 +75,30 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `17.096`
-  - runtime uptime (hours): `1050.14`
-  - run end: `Thu Apr 02 2026 11:12:43 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - bundle interval (hours): `3.348`
+  - runtime uptime (hours): `1053.488`
+  - run end: `Thu Apr 02 2026 14:33:37 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip: No feasible candidates after policy/exposure filters (9))
+  - active ticket runtime signal: `observed` (Skip: No feasible candidates after policy/exposure filters (21))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=4, historyLimitOrders=99, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=50.5%)
-  - sizing reject pressure: `high` (sizingRejectSkips=63, decisions=200, ratio=31.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=85, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=57.9%)
+  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `patch_required`
 - Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
 - Required action: `same-ticket mitigation required before next long run`
 - Open risks:
-  - sizing reject pressure is high (31.5%).
+  - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260402-081314.tgz`
-  - auto-updated at: `2026-04-02T08:13:25.803Z`
+  - bundle: `autobot-feedback-20260402-113357.tgz`
+  - auto-updated at: `2026-04-02T11:34:30.157Z`
 
 ## 5) Copy/paste prompt for next session
 
@@ -105,11 +106,11 @@ Use this file at the start and end of every batch.
 Ticket: T-031
 Decision: patch_required
 Required action: same-ticket mitigation required before next long run
-Latest bundle: autobot-feedback-20260402-081314.tgz
+Latest bundle: autobot-feedback-20260402-113357.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: reduce repeated dust sell-ladder churn on managed symbols while preserving T-032 downside control and T-034 funding stability.
-In scope: grid sell-leg actionability and rotation for managed home-quote symbols.
+Goal: reopen feasible home-quote candidates by ignoring stale dust-residual sell cooldowns once those symbols are effectively flat and orderless.
+In scope: T-031 candidate/actionability logic for cooled home-quote dust residuals, while preserving T-032 downside control and T-034 routing stability.
 Out of scope: quote-routing redesign, reopening T-032 as the active blocker without fresh evidence, PnL schema changes, AI lane.
 Validation: docker compose -f docker-compose.ci.yml run --rm ci
-After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
+After patch: update docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md, docs/STRATEGY_COVERAGE.md, docs/easy_process/*.
 ```

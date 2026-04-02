@@ -474,6 +474,55 @@ export class BotEngineService implements OnModuleInit {
     return details?.buyPausedByCaution !== true;
   }
 
+  private async getCandidateSelectionBlockReason(params: {
+    symbol: string;
+    state: BotState;
+    baseAsset: string;
+    quoteAsset: string;
+    qty: number;
+    lastPrice?: number;
+    homeStable: string;
+    bridgeAssets: string[];
+    minExposureHome: number;
+    activeOrderCount: number;
+  }): Promise<string | null> {
+    const blockedReason = this.isSymbolBlocked(params.symbol, params.state);
+    if (!blockedReason) return null;
+
+    const activeLock = this.getActiveSymbolProtectionLock(params.state, params.symbol);
+    if (!activeLock) return blockedReason;
+    if (activeLock.type.trim().toUpperCase() !== "COOLDOWN") return blockedReason;
+
+    const details = this.readLockDetails(activeLock);
+    const category = typeof details?.category === "string" ? details.category.trim().toUpperCase() : "";
+    if (category !== "GRID_SELL_NOT_ACTIONABLE") return blockedReason;
+
+    const normalizedQuote = params.quoteAsset.trim().toUpperCase();
+    const normalizedHome = params.homeStable.trim().toUpperCase();
+    if (!normalizedQuote || normalizedQuote !== normalizedHome) return blockedReason;
+    if (params.activeOrderCount > 0) return blockedReason;
+
+    let homeQuoteExposure = Number.NaN;
+    if (Number.isFinite(params.lastPrice) && (params.lastPrice ?? 0) > 0 && Number.isFinite(params.qty) && params.qty > 0) {
+      homeQuoteExposure = params.qty * (params.lastPrice as number);
+    } else {
+      const estimatedExposure = await this.estimateAssetValueInHome(
+        params.baseAsset,
+        params.qty,
+        params.homeStable,
+        params.bridgeAssets
+      );
+      if (Number.isFinite(estimatedExposure ?? Number.NaN)) {
+        homeQuoteExposure = estimatedExposure ?? Number.NaN;
+      }
+    }
+    if (Number.isFinite(homeQuoteExposure) && homeQuoteExposure + 1e-8 >= params.minExposureHome) {
+      return blockedReason;
+    }
+
+    return null;
+  }
+
   private deriveProtectionPolicy(risk: number): ProtectionPolicy {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
     const t = boundedRisk / 100;
@@ -2683,7 +2732,6 @@ export class BotEngineService implements OnModuleInit {
 
       const quoteAsset = candidate.quoteAsset.trim().toUpperCase();
       if (!allowedExecutionQuotes.has(quoteAsset)) continue;
-      if (this.isSymbolBlocked(symbol, state)) continue;
       if (this.getEntryGuard({ symbol, state })) continue;
       const symbolOpenLimitOrders = state.activeOrders.filter((order) => {
         if (order.symbol !== symbol) return false;
@@ -2691,6 +2739,21 @@ export class BotEngineService implements OnModuleInit {
         const type = order.type.trim().toUpperCase();
         return type === "LIMIT" || type === "LIMIT_MAKER";
       });
+      const baseAsset = candidate.baseAsset.trim().toUpperCase();
+      const baseTotal = balances.find((b) => b.asset.trim().toUpperCase() === baseAsset)?.total ?? 0;
+      const blockedReason = await this.getCandidateSelectionBlockReason({
+        symbol,
+        state,
+        baseAsset,
+        quoteAsset,
+        qty: baseTotal,
+        lastPrice: candidate.lastPrice,
+        homeStable: normalizedHomeStable,
+        bridgeAssets: quoteBridgeAssets,
+        minExposureHome: minCountableExposureHome,
+        activeOrderCount: symbolOpenLimitOrders.length
+      });
+      if (blockedReason) continue;
       const hasBuyLimit = symbolOpenLimitOrders.some((order) => order.side === "BUY");
       const hasSellLimit = symbolOpenLimitOrders.some((order) => order.side === "SELL");
       const recentInventoryWaitingSkips = this.countRecentSymbolSkipMatches({
@@ -4915,7 +4978,7 @@ export class BotEngineService implements OnModuleInit {
             const symbol = candidate.symbol.trim().toUpperCase();
             if (!symbol || seenSymbols.has(symbol)) continue;
             seenSymbols.add(symbol);
-            if (this.isSymbolBlocked(symbol, current)) continue;
+            if (tradeMode !== "SPOT_GRID" && this.isSymbolBlocked(symbol, current)) continue;
 
             const policyReason = getPairPolicyBlockReason({
               symbol,
@@ -4951,6 +5014,21 @@ export class BotEngineService implements OnModuleInit {
 
               const regime = this.buildRegimeSnapshot(candidate, risk);
               const scores = this.buildAdaptiveStrategyScores(candidate, regime.label);
+              const blockedReason = await this.getCandidateSelectionBlockReason({
+                symbol,
+                state: current,
+                baseAsset: candidate.baseAsset,
+                quoteAsset: candidateQuote,
+                qty: positions?.get(symbol)?.netQty ?? 0,
+                lastPrice: candidate.lastPrice,
+                homeStable,
+                bridgeAssets: selectionBridgeAssets,
+                minExposureHome: minCountableExposureHome,
+                activeOrderCount: symbolOpenLimitOrdersAll.length
+              });
+              if (blockedReason) {
+                continue;
+              }
               const candidateExecutionLane = this.resolveExecutionLane({
                 tradeMode,
                 gridEnabled: true,

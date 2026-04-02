@@ -16,6 +16,42 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-02 11:52 UTC — T-031 third slice: reopen home-quote candidates after dust sell cooldown deadlock
+- Scope:
+  - respond to the fresh April 2 day bundle where the April 2 morning sell-leg slice worked, but runtime still fell into `No feasible candidates after policy/exposure filters` because every remaining home-quote symbol was dust-sized and still cooled by `GRID_SELL_NOT_ACTIONABLE`.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260402-113357.tgz`) shows:
+    - `risk_state=CAUTION`
+    - `daily_net_usdt=-158.18`
+    - `sizingRejectPressure=low`
+    - dominant repeat: `Skip: No feasible candidates after policy/exposure filters (21)`
+  - raw state audit confirms:
+    - `quoteFree≈6959 USDC`, `activeOrders=0`
+    - twelve symbol cooldown locks in category `GRID_SELL_NOT_ACTIONABLE`
+    - rejection samples inside the latest no-feasible skip are almost entirely unfundable non-home quotes after reserve
+  - inferred blocker: cooled dust residuals were still blocking every home-quote candidate, so the engine had no feasible home-quote path left despite ample `USDC`.
+- PM milestone mapping:
+  - keep `T-031` active.
+  - preserve March 30-31 `T-032` downside-control behavior and `T-034` routing stability.
+  - resolve the new selection deadlock without reopening the earlier sell-leg retry churn.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added `getCandidateSelectionBlockReason(...)` to allow bounded selection-time exceptions for symbol cooldowns.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: home-quote `GRID_SELL_NOT_ACTIONABLE` cooldowns are now ignored during selection only when the symbol has no active orders and the remaining inventory is below countable exposure.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: wired the new helper into `pickFeasibleLiveCandidate(...)` and the main `SPOT_GRID` candidate selection path.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for dust home-quote cooldown bypass and preserved blocking when home-quote inventory is still countable.
+  - `docs/SESSION_BRIEF.md`, `docs/STRATEGY_COVERAGE.md`, `docs/easy_process/*`, and triage note `docs/TRIAGE_NOTE_2026-04-02_T031_NO_FEASIBLE_AFTER_DUST_COOLDOWNS.md`: aligned to the new same-ticket slice.
+- Risk slider impact:
+  - no hard-limit change.
+  - risk still controls cooldown timing and `T-032` pause/unwind thresholds; this slice only changes whether dust residuals are allowed back into home-quote candidate selection.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected next proof: lower repeated `Skip: No feasible candidates after policy/exposure filters`, plus newer home-quote candidate activity instead of an all-home-quote cooldown deadlock.
+- Follow-up:
+  - if the next fresh bundle still boxes out all home-quote candidates, the next `T-031` slice should make the no-feasible recovery path explicitly dust-aware instead of relying only on selection-time bypass.
+
 ## 2026-04-02 09:10 UTC — PM/BA process hardening: linked support slices for adaptive execution
 - Scope:
   - prevent ticket thrash between `T-031` and `T-032` when live market windows couple strategy-quality and downside-control behavior in the same runtime.

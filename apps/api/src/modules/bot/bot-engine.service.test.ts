@@ -589,6 +589,116 @@ describe("bot-engine pickFeasibleLiveCandidate", () => {
     expect(result.candidate?.symbol).toBe("ADAUSDC");
   });
 
+  it("re-allows dust home-quote candidates after sell-not-actionable cooldown when they have no active orders", async () => {
+    const config = {
+      basic: {
+        homeStableCoin: "USDC",
+        traderRegion: "NON_EEA"
+      },
+      advanced: {
+        neverTradeSymbols: [],
+        symbolEntryCooldownMs: 0,
+        maxConsecutiveEntriesPerSymbol: 0
+      }
+    } as unknown as AppConfig;
+
+    const configService = { load: () => config };
+    const marketData = {
+      getSymbolRules: async (symbol: string) =>
+        ({
+          symbol,
+          status: "TRADING",
+          baseAsset: symbol === "ETHUSDC" ? "ETH" : "ADA",
+          quoteAsset: "USDC"
+        }) satisfies BinanceSymbolRules,
+      getTickerPrice: async (symbol: string) => (symbol === "ETHUSDC" ? "1900" : "1"),
+      validateMarketOrderQty: async (symbol: string) =>
+        ({
+          ok: true,
+          normalizedQty: symbol === "ETHUSDC" ? "0.1" : "1"
+        }) satisfies MarketQtyValidation
+    };
+
+    const service = new BotEngineService(
+      configService as unknown as ConfigService,
+      marketData as unknown as BinanceMarketDataService,
+      {} as unknown as BinanceTradingService,
+      {} as unknown as ConversionRouterService,
+      {} as unknown as UniverseService
+    );
+
+    const state: BotState = {
+      ...defaultBotState(),
+      protectionLocks: [
+        {
+          id: "sell-not-actionable",
+          type: "COOLDOWN",
+          createdAt: "2026-04-02T11:00:00.000Z",
+          scope: "SYMBOL",
+          symbol: "ETHUSDC",
+          reason: "Grid sell leg not actionable yet",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "GRID_SELL_NOT_ACTIONABLE",
+            cooldownMs: 240000
+          }
+        }
+      ]
+    };
+
+    const cooledDust: UniverseCandidate = {
+      symbol: "ETHUSDC",
+      baseAsset: "ETH",
+      quoteAsset: "USDC",
+      lastPrice: 1900,
+      quoteVolume24h: 2_000_000,
+      priceChangePct24h: 0.5,
+      score: 4.1,
+      reasons: []
+    };
+    const fallback: UniverseCandidate = {
+      symbol: "ADAUSDC",
+      baseAsset: "ADA",
+      quoteAsset: "USDC",
+      lastPrice: 1,
+      quoteVolume24h: 2_000_000,
+      priceChangePct24h: 0.4,
+      score: 3.7,
+      reasons: []
+    };
+
+    const balances: BinanceBalanceSnapshot[] = [
+      { asset: "USDC", free: 1000, locked: 0, total: 1000 },
+      { asset: "ETH", free: 0.001, locked: 0, total: 0.001 }
+    ];
+
+    const result = await (
+      service as unknown as {
+        pickFeasibleLiveCandidate: (params: unknown) => Promise<{ candidate: UniverseCandidate | null }>;
+      }
+    ).pickFeasibleLiveCandidate({
+      preferredCandidate: cooledDust,
+      snapshotCandidates: [fallback],
+      state,
+      homeStable: "USDC",
+      allowedExecutionQuotes: new Set(["USDC"]),
+      traderRegion: "NON_EEA",
+      neverTradeSymbols: [],
+      excludeStableStablePairs: true,
+      enforceRegionPolicy: true,
+      balances,
+      walletTotalHome: 1000,
+      risk: 100,
+      maxPositionPct: 20,
+      minQuoteLiquidityHome: 3,
+      notionalCap: 0,
+      capitalNotionalCapMultiplier: 1,
+      bufferFactor: 1.002
+    });
+
+    expect(result.candidate?.symbol).toBe("ETHUSDC");
+  });
+
   it("filters to managed-open symbols when caution pauses new entries", async () => {
     const config = {
       basic: {
@@ -4042,6 +4152,72 @@ describe("bot-engine symbol lock checks", () => {
     };
 
     expect(helpers.isSymbolBlocked("BTCUSDC", state)).toContain("Grid sell sizing reject");
+  });
+
+  it("ignores grid-sell-not-actionable cooldown for dust home-quote candidates without active orders", async () => {
+    const helpers = service as unknown as {
+      getCandidateSelectionBlockReason: (params: {
+        symbol: string;
+        state: BotState;
+        baseAsset: string;
+        quoteAsset: string;
+        qty: number;
+        lastPrice?: number;
+        homeStable: string;
+        bridgeAssets: string[];
+        minExposureHome: number;
+        activeOrderCount: number;
+      }) => Promise<string | null>;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      protectionLocks: [
+        {
+          id: "lock-dust",
+          type: "COOLDOWN",
+          createdAt: "2026-04-02T11:00:00.000Z",
+          scope: "SYMBOL",
+          symbol: "BTCUSDC",
+          reason: "Grid sell leg not actionable yet",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "GRID_SELL_NOT_ACTIONABLE",
+            cooldownMs: 240000
+          }
+        }
+      ]
+    };
+
+    await expect(
+      helpers.getCandidateSelectionBlockReason({
+        symbol: "BTCUSDC",
+        state,
+        baseAsset: "BTC",
+        quoteAsset: "USDC",
+        qty: 0.00001,
+        lastPrice: 65000,
+        homeStable: "USDC",
+        bridgeAssets: ["BTC"],
+        minExposureHome: 5,
+        activeOrderCount: 0
+      })
+    ).resolves.toBeNull();
+
+    await expect(
+      helpers.getCandidateSelectionBlockReason({
+        symbol: "BTCUSDC",
+        state,
+        baseAsset: "BTC",
+        quoteAsset: "USDC",
+        qty: 0.001,
+        lastPrice: 65000,
+        homeStable: "USDC",
+        bridgeAssets: ["BTC"],
+        minExposureHome: 5,
+        activeOrderCount: 0
+      })
+    ).resolves.toContain("Grid sell leg not actionable yet");
   });
 });
 
