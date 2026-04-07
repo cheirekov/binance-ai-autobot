@@ -4302,6 +4302,86 @@ describe("bot-engine symbol lock checks", () => {
       })
     ).resolves.toContain("Grid sell leg not actionable yet");
   });
+
+  it("re-blocks dust home-quote cooldowns after repeated solo non-actionable sell-leg loops", async () => {
+    const helpers = service as unknown as {
+      getCandidateSelectionBlockReason: (params: {
+        symbol: string;
+        state: BotState;
+        risk: number;
+        baseAsset: string;
+        quoteAsset: string;
+        qty: number;
+        lastPrice?: number;
+        homeStable: string;
+        bridgeAssets: string[];
+        minExposureHome: number;
+        activeOrderCount: number;
+      }) => Promise<string | null>;
+    };
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      protectionLocks: [
+        {
+          id: "lock-dust-solo",
+          type: "COOLDOWN",
+          createdAt: new Date(now - 60_000).toISOString(),
+          scope: "SYMBOL",
+          symbol: "ETHUSDC",
+          reason: "Grid sell leg not actionable yet",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "GRID_SELL_NOT_ACTIONABLE",
+            cooldownMs: 240000
+          }
+        }
+      ],
+      decisions: [
+        {
+          id: "s1",
+          ts: new Date(now - 30_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip ETHUSDC: Grid sell leg not actionable yet"
+        },
+        {
+          id: "s2",
+          ts: new Date(now - 60_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip ETHUSDC: Grid sell leg not actionable yet"
+        },
+        {
+          id: "s3",
+          ts: new Date(now - 90_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip ETHUSDC: Grid sell leg not actionable yet"
+        },
+        {
+          id: "s4",
+          ts: new Date(now - 120_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip ETHUSDC: Grid sell leg not actionable yet"
+        }
+      ]
+    };
+
+    await expect(
+      helpers.getCandidateSelectionBlockReason({
+        symbol: "ETHUSDC",
+        state,
+        risk: 100,
+        baseAsset: "ETH",
+        quoteAsset: "USDC",
+        qty: 0.001,
+        lastPrice: 1900,
+        homeStable: "USDC",
+        bridgeAssets: ["ETH"],
+        minExposureHome: 5,
+        activeOrderCount: 0
+      })
+    ).resolves.toContain("Grid sell leg not actionable yet");
+  });
 });
 
 describe("bot-engine live order sync", () => {

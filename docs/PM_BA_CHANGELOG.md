@@ -16,6 +16,36 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-07 18:20 UTC — T-031 sixth slice: re-block repeated solo dust sell-leg loops
+- Scope:
+  - respond to the fresh April 7 evening bundle where the April 7 morning patch reduced the paired `ETHUSDC` dead-end loop (`91 -> 31`), but the same residual family still repeated through solo `Grid sell leg not actionable yet` retries.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260407-181242.tgz`) shows:
+    - `risk_state=NORMAL`
+    - `daily_net_usdt=+153.19`
+    - `sizingRejectPressure=low`
+    - dominant residual loop remains `Skip ETHUSDC: Grid sell leg not actionable yet (31)`
+  - inferred blocker:
+    - the April 7 morning re-block threshold stopped the paired sell-not-actionable + buy-pause storm, but still allowed the same dust residual back into rotation after repeated solo non-actionable sell-leg retries.
+- PM milestone mapping:
+  - keep `T-031` active.
+  - keep `T-032` as linked support only.
+  - preserve April 2 deadlock recovery and April 7 morning paired-loop reduction.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: `getCandidateSelectionBlockReason(...)` now also re-applies the existing `GRID_SELL_NOT_ACTIONABLE` cooldown after a higher local threshold of repeated solo non-actionable sell-leg skips on the same home-quote dust residual.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: regression coverage added for repeated solo dust-loop reblocking.
+  - handoff docs aligned to the new same-ticket slice.
+- Risk slider impact:
+  - no hard-limit change.
+  - risk still influences the loop threshold; solo residual loops require a higher threshold than paired dead-end loops.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - deploy on top of the current `c809ce4` runtime without resetting state and collect one fresh bundle.
+- Follow-up:
+  - next fresh bundle should show lower repeated `Grid sell leg not actionable yet` churn on the same residual family without restoring the older no-feasible-candidate deadlock.
+
 ## 2026-04-07 06:05 UTC — T-031 fifth slice: re-block repeated dust residual dead-end loops
 - Scope:
   - respond to the fresh April 7 bundle where the broad deadlock remained fixed, but one home-quote dust family (`ETHUSDC`) repeatedly re-entered grid execution and produced paired `Grid sell leg not actionable yet` + `Grid guard paused BUY leg` loops.

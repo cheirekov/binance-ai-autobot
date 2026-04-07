@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-07 08:05 EEST  
+Last updated: 2026-04-07 21:20 EEST  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260407-055241.tgz`) shows `T-032` remains support-only. The broad deadlock recovery is holding, but one home-quote dust family now repeatedly re-enters runtime and consumes the decision window with paired `Grid sell leg not actionable yet` and `Grid guard paused BUY leg` skips.
+The newest fresh bundle (`autobot-feedback-20260407-181242.tgz`) shows `T-032` remains support-only. The April 7 morning patch reduced the paired `ETHUSDC` dead-end loop, but the same home-quote dust family still resurfaces through repeated solo `Grid sell leg not actionable yet` retries.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -23,12 +23,12 @@ The newest fresh bundle (`autobot-feedback-20260407-055241.tgz`) shows `T-032` r
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that re-applies the existing `GRID_SELL_NOT_ACTIONABLE` cooldown once the same residual symbol repeatedly hits both the non-actionable-sell and buy-pause paths will preserve the broad deadlock recovery while stopping one symbol from thrashing forever.
+- A bounded `T-031` slice that re-applies the existing `GRID_SELL_NOT_ACTIONABLE` cooldown after a higher threshold of repeated solo non-actionable sell-leg retries will preserve the earlier paired-loop reduction while stopping the same residual family from resurfacing forever.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved as a support lane rather than being reopened blindly
-- the next fresh bundle reflects lower paired `Grid sell leg not actionable yet` / `Grid guard paused BUY leg` churn on the same residual family without reopening funding or downside-control regressions
+- the next fresh bundle reflects lower repeated solo `Grid sell leg not actionable yet` churn on the same residual family without reopening funding or downside-control regressions
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident

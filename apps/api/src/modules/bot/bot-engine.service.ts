@@ -535,10 +535,14 @@ export class BotEngineService implements OnModuleInit {
     });
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
     const residualLoopThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
+    const soloResidualLoopThreshold = residualLoopThreshold + 2;
     if (
       recentNonActionableSellLegSkips >= residualLoopThreshold &&
       recentGridGuardBuyPauseSkips >= residualLoopThreshold
     ) {
+      return blockedReason;
+    }
+    if (recentNonActionableSellLegSkips >= soloResidualLoopThreshold) {
       return blockedReason;
     }
 
