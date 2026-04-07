@@ -4159,6 +4159,7 @@ describe("bot-engine symbol lock checks", () => {
       getCandidateSelectionBlockReason: (params: {
         symbol: string;
         state: BotState;
+        risk: number;
         baseAsset: string;
         quoteAsset: string;
         qty: number;
@@ -4193,6 +4194,7 @@ describe("bot-engine symbol lock checks", () => {
       helpers.getCandidateSelectionBlockReason({
         symbol: "BTCUSDC",
         state,
+        risk: 100,
         baseAsset: "BTC",
         quoteAsset: "USDC",
         qty: 0.00001,
@@ -4208,12 +4210,93 @@ describe("bot-engine symbol lock checks", () => {
       helpers.getCandidateSelectionBlockReason({
         symbol: "BTCUSDC",
         state,
+        risk: 100,
         baseAsset: "BTC",
         quoteAsset: "USDC",
         qty: 0.001,
         lastPrice: 65000,
         homeStable: "USDC",
         bridgeAssets: ["BTC"],
+        minExposureHome: 5,
+        activeOrderCount: 0
+      })
+    ).resolves.toContain("Grid sell leg not actionable yet");
+  });
+
+  it("re-blocks dust home-quote cooldowns after repeated non-actionable sell and buy-pause loops", async () => {
+    const helpers = service as unknown as {
+      getCandidateSelectionBlockReason: (params: {
+        symbol: string;
+        state: BotState;
+        risk: number;
+        baseAsset: string;
+        quoteAsset: string;
+        qty: number;
+        lastPrice?: number;
+        homeStable: string;
+        bridgeAssets: string[];
+        minExposureHome: number;
+        activeOrderCount: number;
+      }) => Promise<string | null>;
+    };
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      protectionLocks: [
+        {
+          id: "lock-dust-loop",
+          type: "COOLDOWN",
+          createdAt: new Date(now - 60_000).toISOString(),
+          scope: "SYMBOL",
+          symbol: "ETHUSDC",
+          reason: "Grid sell leg not actionable yet",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "GRID_SELL_NOT_ACTIONABLE",
+            cooldownMs: 240000
+          }
+        }
+      ],
+      decisions: [
+        {
+          id: "d1",
+          ts: new Date(now - 30_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip ETHUSDC: Grid sell leg not actionable yet"
+        },
+        {
+          id: "d2",
+          ts: new Date(now - 35_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip ETHUSDC: Grid guard paused BUY leg"
+        },
+        {
+          id: "d3",
+          ts: new Date(now - 70_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip ETHUSDC: Grid sell leg not actionable yet"
+        },
+        {
+          id: "d4",
+          ts: new Date(now - 75_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip ETHUSDC: Grid guard paused BUY leg"
+        }
+      ]
+    };
+
+    await expect(
+      helpers.getCandidateSelectionBlockReason({
+        symbol: "ETHUSDC",
+        state,
+        risk: 100,
+        baseAsset: "ETH",
+        quoteAsset: "USDC",
+        qty: 0.001,
+        lastPrice: 1900,
+        homeStable: "USDC",
+        bridgeAssets: ["ETH"],
         minExposureHome: 5,
         activeOrderCount: 0
       })

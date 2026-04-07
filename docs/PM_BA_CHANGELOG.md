@@ -16,6 +16,36 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-07 06:05 UTC — T-031 fifth slice: re-block repeated dust residual dead-end loops
+- Scope:
+  - respond to the fresh April 7 bundle where the broad deadlock remained fixed, but one home-quote dust family (`ETHUSDC`) repeatedly re-entered grid execution and produced paired `Grid sell leg not actionable yet` + `Grid guard paused BUY leg` loops.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260407-055241.tgz`) shows:
+    - `risk_state=NORMAL`
+    - `daily_net_usdt=-99.51`
+    - `sizingRejectPressure=low`
+    - dominant paired loop: `Skip ETHUSDC: Grid sell leg not actionable yet (91)` and `Skip ETHUSDC: Grid guard paused BUY leg (91)`
+  - inferred blocker:
+    - the April 2 dust-cooldown bypass is still useful for breaking broad deadlocks, but after repeated paired dead-end loops it becomes too permissive and keeps resurfacing the same non-actionable dust residual.
+- PM milestone mapping:
+  - keep `T-031` active.
+  - keep `T-032` as linked support only.
+  - preserve March 30-31 downside-control behavior and April 2 no-feasible-candidate recovery.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: `getCandidateSelectionBlockReason(...)` now re-applies the existing `GRID_SELL_NOT_ACTIONABLE` cooldown for home-quote dust residuals once repeated non-actionable-sell and grid-guard-buy-pause loops cross a local threshold.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: regression coverage added for repeated paired dust-loop reblocking.
+  - handoff docs aligned to the new same-ticket slice.
+- Risk slider impact:
+  - no hard-limit change.
+  - risk still influences the local loop threshold used before the dust bypass is revoked.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - deploy on top of the current `248ecb0` runtime without resetting state and collect one fresh bundle.
+- Follow-up:
+  - next fresh bundle should show lower paired `Grid sell leg not actionable yet` / `Grid guard paused BUY leg` churn on the same residual symbol family without reopening the older no-feasible-candidate deadlock.
+
 ## 2026-04-02 13:36 UTC — T-031 fourth slice: apply dust-cooldown exception at post-selection execution gate
 - Scope:
   - respond to the fresh April 2 evening bundle where the April 2 day selection-time bypass was deployed, but cooled dust residuals were still being hard-blocked again by the raw post-selection lock gate.

@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-02 19:36 EEST  
+Last updated: 2026-04-07 08:05 EEST  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260402-162840.tgz`) shows `T-032` remains support-only. The active problem is no longer only selection deadlock: cooled home-quote dust residuals can re-enter selection, but they are still hard-blocked again by the raw post-selection protection-lock gate.
+The newest fresh bundle (`autobot-feedback-20260407-055241.tgz`) shows `T-032` remains support-only. The broad deadlock recovery is holding, but one home-quote dust family now repeatedly re-enters runtime and consumes the decision window with paired `Grid sell leg not actionable yet` and `Grid guard paused BUY leg` skips.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -23,12 +23,12 @@ The newest fresh bundle (`autobot-feedback-20260402-162840.tgz`) shows `T-032` r
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that applies the same `GRID_SELL_NOT_ACTIONABLE` dust exception at the post-selection execution gate will let cooled home-quote candidates proceed consistently, without weakening `T-032` downside control or `T-034` funding stability.
+- A bounded `T-031` slice that re-applies the existing `GRID_SELL_NOT_ACTIONABLE` cooldown once the same residual symbol repeatedly hits both the non-actionable-sell and buy-pause paths will preserve the broad deadlock recovery while stopping one symbol from thrashing forever.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved as a support lane rather than being reopened blindly
-- the next fresh bundle reflects lower `No feasible candidates after policy/exposure filters` churn and fewer immediate post-selection cooldown skips without reopening funding or downside-control regressions
+- the next fresh bundle reflects lower paired `Grid sell leg not actionable yet` / `Grid guard paused BUY leg` churn on the same residual family without reopening funding or downside-control regressions
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident

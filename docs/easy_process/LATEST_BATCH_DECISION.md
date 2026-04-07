@@ -1,31 +1,33 @@
 # LATEST_BATCH_DECISION
 
-Last updated: 2026-04-02 19:36 EEST  
+Last updated: 2026-04-07 08:05 EEST  
 Owner: PM/BA + Codex
 
 ## Production capability lane
 - Chosen: `Lane A — Strategy quality / regime routing`
 - Why:
-  - `observed`: the latest fresh bundle is `autobot-feedback-20260402-162840.tgz`
-  - `observed`: auto-retro says `pivot_required`, but the fresh-state audit shows a narrower same-ticket blocker
-  - `observed`: the bundle ends `risk_state=CAUTION`, `daily_net_usdt=-144.24`, `sizingRejectPressure=low`
-  - `observed`: the dominant counter is still `Skip: No feasible candidates after policy/exposure filters (31)`
-  - `observed`: the newest live decisions are already per-symbol `Grid sell leg not actionable yet` / `Protection lock COOLDOWN` on `STOUSDC` / `XPLUSDC`
-  - `inferred`: the April 2 day selection bypass landed, but execution is still re-blocking the same dust family one step later
+- `observed`: the latest fresh bundle is `autobot-feedback-20260407-055241.tgz`
+- `observed`: auto-retro says `pivot_required`, but the fresh-state audit shows a narrower same-ticket blocker
+- `observed`: the bundle ends `risk_state=NORMAL`, `daily_net_usdt=-99.51`, `sizingRejectPressure=low`
+- `observed`: the broad `No feasible candidates after policy/exposure filters` deadlock stays fixed
+- `observed`: the dominant paired loop is now `ETHUSDC` residual churn:
+  - `Skip ETHUSDC: Grid sell leg not actionable yet (91)`
+  - `Skip ETHUSDC: Grid guard paused BUY leg (91)`
+- `inferred`: the dust cooldown bypass is now too permissive for one residual family and needs a bounded same-ticket re-block threshold
 
 ## Chosen active ticket
 - Current: `T-031` (Regime engine v2)
 - Linked support: `T-032` (support slices allowed only when fresh evidence couples downside-control with strategy-quality validation)
 - Decision: `patch_required`
 - Why:
-  - `observed`: downside-control remains preserved, but fresh runtime still re-blocks cooled home-quote dust symbols after selection
-  - `observed`: the repeated no-feasible counter is lagging the newer per-symbol cooldown behavior, not indicating a ticket pivot
-  - `inferred`: the next bounded batch is a `T-031` execution-gate consistency slice, not a ticket pivot
+  - `observed`: downside-control remains support-only; the live blocker is repeated paired residual-loop churn on one home-quote family
+  - `observed`: the bundle no longer supports a lane pivot because the deadlock recovery is holding
+  - `inferred`: the next bounded batch is a `T-031` residual-loop re-block slice, not a ticket switch
 
 ## Evidence class
 - Current: `fresh`
-- Latest bundle: `autobot-feedback-20260402-162840.tgz`
-- Compared bundle: `autobot-feedback-20260402-113357.tgz`
+- Latest bundle: `autobot-feedback-20260407-055241.tgz`
+- Compared bundle: `autobot-feedback-20260405-184019.tgz`
 
 ## Allowed work mode
 - Current batch: `PATCH_NOW`
@@ -35,9 +37,9 @@ Owner: PM/BA + Codex
 - Next ticket candidate: `T-031`
 - Review slice:
   - keep `T-031` active
-  - stop cooled home-quote dust residuals from being re-blocked at the post-selection execution gate
-  - preserve March 30-31 `T-032` downside-control behavior and `T-034` funding stability
+  - re-apply the existing dust cooldown after repeated paired dead-end loops on the same residual symbol
+  - preserve April 2 deadlock recovery and March 30-31 `T-032` downside-control behavior
 - Validation:
-  - fresh bundle review (`autobot-feedback-20260402-162840.tgz`) ✅
+  - fresh bundle review (`autobot-feedback-20260407-055241.tgz`) ✅
   - same-ticket mitigation landed in code/tests ✅
   - PM/BA gate start + Docker CI pass ✅

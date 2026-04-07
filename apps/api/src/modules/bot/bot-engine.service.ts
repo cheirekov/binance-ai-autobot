@@ -477,6 +477,7 @@ export class BotEngineService implements OnModuleInit {
   private async getCandidateSelectionBlockReason(params: {
     symbol: string;
     state: BotState;
+    risk: number;
     baseAsset: string;
     quoteAsset: string;
     qty: number;
@@ -517,6 +518,27 @@ export class BotEngineService implements OnModuleInit {
       }
     }
     if (Number.isFinite(homeQuoteExposure) && homeQuoteExposure + 1e-8 >= params.minExposureHome) {
+      return blockedReason;
+    }
+
+    const recentNonActionableSellLegSkips = this.countRecentSymbolSkipMatches({
+      state: params.state,
+      symbol: params.symbol,
+      contains: "grid sell leg not actionable yet",
+      windowMs: 15 * 60_000
+    });
+    const recentGridGuardBuyPauseSkips = this.countRecentSymbolSkipMatches({
+      state: params.state,
+      symbol: params.symbol,
+      contains: "grid guard paused buy leg",
+      windowMs: 15 * 60_000
+    });
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const residualLoopThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
+    if (
+      recentNonActionableSellLegSkips >= residualLoopThreshold &&
+      recentGridGuardBuyPauseSkips >= residualLoopThreshold
+    ) {
       return blockedReason;
     }
 
@@ -2744,6 +2766,7 @@ export class BotEngineService implements OnModuleInit {
       const blockedReason = await this.getCandidateSelectionBlockReason({
         symbol,
         state,
+        risk,
         baseAsset,
         quoteAsset,
         qty: baseTotal,
@@ -5017,6 +5040,7 @@ export class BotEngineService implements OnModuleInit {
               const blockedReason = await this.getCandidateSelectionBlockReason({
                 symbol,
                 state: current,
+                risk: boundedRisk,
                 baseAsset: candidate.baseAsset,
                 quoteAsset: candidateQuote,
                 qty: positions?.get(symbol)?.netQty ?? 0,
@@ -5335,6 +5359,7 @@ export class BotEngineService implements OnModuleInit {
           ? await this.getCandidateSelectionBlockReason({
               symbol: candidateSymbol,
               state: current,
+              risk,
               baseAsset: candidateBaseAsset,
               quoteAsset: candidateQuoteAsset,
               qty: candidateManagedPosition?.netQty ?? 0,
