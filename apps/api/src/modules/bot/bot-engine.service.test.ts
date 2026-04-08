@@ -4382,6 +4382,17 @@ describe("bot-engine symbol lock checks", () => {
       })
     ).resolves.toContain("Grid sell leg not actionable yet");
   });
+
+  it("uses a longer retry cooldown for repeated solo dust sell-leg loops", () => {
+    const helpers = service as unknown as {
+      deriveDustResidualRetryCooldownMs: (risk: number) => number;
+      getDustResidualLoopThresholds: (risk: number) => { paired: number; solo: number };
+    };
+
+    expect(helpers.getDustResidualLoopThresholds(100)).toEqual({ paired: 2, solo: 4 });
+    expect(helpers.deriveDustResidualRetryCooldownMs(100)).toBe(30 * 60_000);
+    expect(helpers.deriveDustResidualRetryCooldownMs(0)).toBe(45 * 60_000);
+  });
 });
 
 describe("bot-engine live order sync", () => {

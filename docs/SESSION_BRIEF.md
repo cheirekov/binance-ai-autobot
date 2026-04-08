@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-04-07 21:20 UTC
+Last updated: 2026-04-08 13:09 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -57,7 +57,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `<set-after-commit>`
+- Commit hash: `8a5e237`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -78,17 +78,17 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `EVENING (collection) / EVENING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `12.339`
-  - runtime uptime (hours): `1180.138`
-  - run end: `Tue Apr 07 2026 21:12:36 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `NIGHT_RUN`
+  - bundle interval (hours): `18.946`
+  - runtime uptime (hours): `1199.084`
+  - run end: `Wed Apr 08 2026 16:09:22 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (residual solo sell-leg loop on `ETHUSDC`)
+  - active ticket runtime signal: `observed` (Skip ETHUSDC: Grid sell leg not actionable yet (28))
 - Observed KPI delta:
   - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=71, activeMarketOrders=0)
   - market-only share reduced: `yes` (historyMarketShare=64.5%)
@@ -96,24 +96,24 @@ Use this file at the start and end of every batch.
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `patch_required`
 - Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
-- Required action: `continue active ticket with bounded solo residual-loop mitigation`
+- Required action: `same-ticket mitigation required before next long run`
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260407-181242.tgz`
-  - auto-updated at: `2026-04-07T18:13:01.102Z`
+  - bundle: `autobot-feedback-20260408-130935.tgz`
+  - auto-updated at: `2026-04-08T13:09:58.019Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-031
 Decision: patch_required
-Required action: continue active ticket with bounded solo residual-loop mitigation
-Latest bundle: autobot-feedback-20260407-181242.tgz
+Required action: same-ticket mitigation required before next long run
+Latest bundle: autobot-feedback-20260408-130935.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: stop repeated solo dust sell-leg loops while preserving the April 2 deadlock recovery and April 7 morning paired-loop reduction.
-In scope: bounded T-031 candidate-quality mitigation for repeated solo `Grid sell leg not actionable yet` loops on home-quote dust residuals.
-Out of scope: quote-routing redesign, reopening T-032 as active without fresh evidence, PnL schema changes, AI lane.
+Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
+In scope: exit-manager / de-risking behavior under adverse conditions.
+Out of scope: quote-routing redesign, candidate-hygiene-only optimization, PnL schema changes, AI lane.
 Validation: docker compose -f docker-compose.ci.yml run --rm ci
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

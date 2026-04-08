@@ -533,16 +533,14 @@ export class BotEngineService implements OnModuleInit {
       contains: "grid guard paused buy leg",
       windowMs: 15 * 60_000
     });
-    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
-    const residualLoopThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
-    const soloResidualLoopThreshold = residualLoopThreshold + 2;
+    const thresholds = this.getDustResidualLoopThresholds(params.risk);
     if (
-      recentNonActionableSellLegSkips >= residualLoopThreshold &&
-      recentGridGuardBuyPauseSkips >= residualLoopThreshold
+      recentNonActionableSellLegSkips >= thresholds.paired &&
+      recentGridGuardBuyPauseSkips >= thresholds.paired
     ) {
       return blockedReason;
     }
-    if (recentNonActionableSellLegSkips >= soloResidualLoopThreshold) {
+    if (recentNonActionableSellLegSkips >= thresholds.solo) {
       return blockedReason;
     }
 
@@ -607,6 +605,18 @@ export class BotEngineService implements OnModuleInit {
         : 30;
     const ttlScaledCooldownMs = Math.round((ttlMinutes * 60_000) / 3);
     return Math.max(baseCooldownMs, Math.min(15 * 60_000, ttlScaledCooldownMs));
+  }
+
+  private getDustResidualLoopThresholds(risk: number): { paired: number; solo: number } {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const paired = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
+    return { paired, solo: paired + 2 };
+  }
+
+  private deriveDustResidualRetryCooldownMs(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const t = boundedRisk / 100;
+    return Math.round((45 - t * 15) * 60_000); // 45m -> 30m
   }
 
   private deriveManagedPositionMinCountableExposureHome(risk: number): number {
@@ -8125,7 +8135,28 @@ export class BotEngineService implements OnModuleInit {
                 this.deriveGridSizingRejectCooldownMs({ risk, side: "SELL", reason: sellLegAssessment.reason ?? "not actionable" })
               );
               const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
-              const cooldownMs = cooldown.cooldownMs;
+              let cooldownMs = cooldown.cooldownMs;
+              const minCountableExposureHome = this.deriveManagedPositionMinCountableExposureHome(risk);
+              const dustResidualExposureHome =
+                Number.isFinite(sellLimitPrice) && sellLimitPrice > 0 && Number.isFinite(desiredSellQty) && desiredSellQty > 0
+                  ? desiredSellQty * sellLimitPrice
+                  : Number.NaN;
+              const isHomeQuoteDustResidual =
+                candidateQuoteAsset === homeStable &&
+                Number.isFinite(dustResidualExposureHome) &&
+                dustResidualExposureHome + 1e-8 < minCountableExposureHome;
+              if (isHomeQuoteDustResidual) {
+                const recentNonActionableSellLegSkips = this.countRecentSymbolSkipMatches({
+                  state: current,
+                  symbol: candidateSymbol,
+                  contains: "grid sell leg not actionable yet",
+                  windowMs: 30 * 60_000
+                });
+                const thresholds = this.getDustResidualLoopThresholds(risk);
+                if (recentNonActionableSellLegSkips + 1 >= thresholds.solo) {
+                  cooldownMs = Math.max(cooldownMs, this.deriveDustResidualRetryCooldownMs(risk));
+                }
+              }
               const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
               const next = {
                 ...current,
