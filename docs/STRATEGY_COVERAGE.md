@@ -83,6 +83,7 @@ These are execution behaviors currently active in runtime:
     - current April 2 evening slice: the same bounded dust-cooldown exception is now applied at the post-selection execution gate so cooled home-quote candidates are not re-blocked immediately after selection
     - current April 7 slice: the dust-cooldown exception is revoked again after repeated paired `Grid sell leg not actionable yet` + `Grid guard paused BUY leg` loops so one residual symbol cannot consume the whole decision window
     - current April 7 evening slice: the same cooldown is also re-applied after a higher threshold of repeated solo `Grid sell leg not actionable yet` retries on the same home-quote dust residual
+    - current April 9 slice: the longer retry cooldown now re-applies for repeated paired residual dead-end loops too, so a small family of home-quote dust symbols stays parked longer after cooldown expiry
   - objective: improve candidate quality and rotation under real market regimes without reopening `T-032` or `T-034`
 
 ## Support / next strategy core

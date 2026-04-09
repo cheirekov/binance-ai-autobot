@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-07 21:20 EEST  
+Last updated: 2026-04-09 10:35 EEST  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260407-181242.tgz`) shows `T-032` remains support-only. The April 7 morning patch reduced the paired `ETHUSDC` dead-end loop, but the same home-quote dust family still resurfaces through repeated solo `Grid sell leg not actionable yet` retries.
+The newest fresh bundle (`autobot-feedback-20260409-071715.tgz`) shows `T-032` remains support-only. The April 7 slices fixed the broad deadlock, but several home-quote dust residuals (`BTCUSDC`, `TAOUSDC`, `ZECUSDC`) still resurface after cooldown expiry through paired or solo `Grid sell leg not actionable yet` retries.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -23,12 +23,12 @@ The newest fresh bundle (`autobot-feedback-20260407-181242.tgz`) shows `T-032` r
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that re-applies the existing `GRID_SELL_NOT_ACTIONABLE` cooldown after a higher threshold of repeated solo non-actionable sell-leg retries will preserve the earlier paired-loop reduction while stopping the same residual family from resurfacing forever.
+- A bounded `T-031` slice that reuses the longer `GRID_SELL_NOT_ACTIONABLE` retry cooldown for repeated paired dead-end loops as well as the higher-threshold solo retries will preserve the earlier recovery while keeping the residual family parked longer.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved as a support lane rather than being reopened blindly
-- the next fresh bundle reflects lower repeated solo `Grid sell leg not actionable yet` churn on the same residual family without reopening funding or downside-control regressions
+- the next fresh bundle reflects lower repeated paired/solo `Grid sell leg not actionable yet` churn on the same residual family without reopening funding or downside-control regressions
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident

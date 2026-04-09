@@ -16,6 +16,39 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-09 07:35 UTC — T-031 seventh slice: extend dust retry cooldown for paired residual loops
+- Scope:
+  - respond to the fresh April 9 morning bundle where the broad deadlock stayed fixed, but multiple home-quote dust residuals (`BTCUSDC`, `TAOUSDC`, `ZECUSDC`) still resurfaced after cooldown expiry through paired or solo non-actionable sell-leg loops.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260409-071715.tgz`) shows:
+    - `risk_state=NORMAL`
+    - `daily_net_usdt=-0.89`
+    - `sizingRejectPressure=low`
+    - dominant residual loops:
+      - `Skip BTCUSDC: Grid sell leg not actionable yet (30)`
+      - `Skip TAOUSDC: Grid sell leg not actionable yet (29)`
+      - `Skip TAOUSDC: Protection lock COOLDOWN: Cooldown after non-actionable sell leg (900s) (25)`
+  - inferred blocker:
+    - the April 7 evening slice reduced single-symbol solo churn, but the same family can still re-enter after the first cooldown and repeat paired dead-end loops across several small residual symbols.
+- PM milestone mapping:
+  - keep `T-031` active.
+  - keep `T-032` as linked support only.
+  - preserve the April 2 deadlock recovery and the April 7 re-block logic.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: the longer dust retry cooldown now re-applies after repeated paired dead-end loops as well as the higher-threshold solo loops.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: helper regression coverage now proves paired and solo thresholds both trigger residual re-blocking.
+  - handoff docs aligned to the new same-ticket slice.
+- Risk slider impact:
+  - no hard-limit change.
+  - risk still controls both the paired/solo thresholds and the longer retry cooldown duration.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - deploy on top of the current `b64708e` runtime without resetting state and collect one fresh bundle.
+- Follow-up:
+  - next fresh bundle should show lower repeated `Grid sell leg not actionable yet` churn across the home-quote residual family without restoring the older no-feasible-candidate deadlock.
+
 ## 2026-04-07 18:20 UTC — T-031 sixth slice: re-block repeated solo dust sell-leg loops
 - Scope:
   - respond to the fresh April 7 evening bundle where the April 7 morning patch reduced the paired `ETHUSDC` dead-end loop (`91 -> 31`), but the same residual family still repeated through solo `Grid sell leg not actionable yet` retries.

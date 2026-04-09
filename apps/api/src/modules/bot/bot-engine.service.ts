@@ -533,14 +533,13 @@ export class BotEngineService implements OnModuleInit {
       contains: "grid guard paused buy leg",
       windowMs: 15 * 60_000
     });
-    const thresholds = this.getDustResidualLoopThresholds(params.risk);
     if (
-      recentNonActionableSellLegSkips >= thresholds.paired &&
-      recentGridGuardBuyPauseSkips >= thresholds.paired
+      this.shouldReblockDustResidualSelection({
+        risk: params.risk,
+        recentNonActionableSellLegSkips,
+        recentGridGuardBuyPauseSkips
+      })
     ) {
-      return blockedReason;
-    }
-    if (recentNonActionableSellLegSkips >= thresholds.solo) {
       return blockedReason;
     }
 
@@ -617,6 +616,19 @@ export class BotEngineService implements OnModuleInit {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
     const t = boundedRisk / 100;
     return Math.round((45 - t * 15) * 60_000); // 45m -> 30m
+  }
+
+  private shouldReblockDustResidualSelection(params: {
+    risk: number;
+    recentNonActionableSellLegSkips: number;
+    recentGridGuardBuyPauseSkips: number;
+  }): boolean {
+    const thresholds = this.getDustResidualLoopThresholds(params.risk);
+    return (
+      params.recentNonActionableSellLegSkips >= thresholds.solo ||
+      (params.recentNonActionableSellLegSkips >= thresholds.paired &&
+        params.recentGridGuardBuyPauseSkips >= thresholds.paired)
+    );
   }
 
   private deriveManagedPositionMinCountableExposureHome(risk: number): number {
@@ -8152,8 +8164,19 @@ export class BotEngineService implements OnModuleInit {
                   contains: "grid sell leg not actionable yet",
                   windowMs: 30 * 60_000
                 });
-                const thresholds = this.getDustResidualLoopThresholds(risk);
-                if (recentNonActionableSellLegSkips + 1 >= thresholds.solo) {
+                const recentGridGuardBuyPauseSkips = this.countRecentSymbolSkipMatches({
+                  state: current,
+                  symbol: candidateSymbol,
+                  contains: "grid guard paused buy leg",
+                  windowMs: 30 * 60_000
+                });
+                if (
+                  this.shouldReblockDustResidualSelection({
+                    risk,
+                    recentNonActionableSellLegSkips: recentNonActionableSellLegSkips + 1,
+                    recentGridGuardBuyPauseSkips
+                  })
+                ) {
                   cooldownMs = Math.max(cooldownMs, this.deriveDustResidualRetryCooldownMs(risk));
                 }
               }

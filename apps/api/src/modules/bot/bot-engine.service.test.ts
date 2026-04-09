@@ -4387,11 +4387,37 @@ describe("bot-engine symbol lock checks", () => {
     const helpers = service as unknown as {
       deriveDustResidualRetryCooldownMs: (risk: number) => number;
       getDustResidualLoopThresholds: (risk: number) => { paired: number; solo: number };
+      shouldReblockDustResidualSelection: (params: {
+        risk: number;
+        recentNonActionableSellLegSkips: number;
+        recentGridGuardBuyPauseSkips: number;
+      }) => boolean;
     };
 
     expect(helpers.getDustResidualLoopThresholds(100)).toEqual({ paired: 2, solo: 4 });
     expect(helpers.deriveDustResidualRetryCooldownMs(100)).toBe(30 * 60_000);
     expect(helpers.deriveDustResidualRetryCooldownMs(0)).toBe(45 * 60_000);
+    expect(
+      helpers.shouldReblockDustResidualSelection({
+        risk: 100,
+        recentNonActionableSellLegSkips: 2,
+        recentGridGuardBuyPauseSkips: 2
+      })
+    ).toBe(true);
+    expect(
+      helpers.shouldReblockDustResidualSelection({
+        risk: 100,
+        recentNonActionableSellLegSkips: 3,
+        recentGridGuardBuyPauseSkips: 0
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldReblockDustResidualSelection({
+        risk: 100,
+        recentNonActionableSellLegSkips: 4,
+        recentGridGuardBuyPauseSkips: 0
+      })
+    ).toBe(true);
   });
 });
 
