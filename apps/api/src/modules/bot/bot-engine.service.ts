@@ -527,6 +527,12 @@ export class BotEngineService implements OnModuleInit {
       contains: "grid sell leg not actionable yet",
       windowMs: 15 * 60_000
     });
+    const recentNonActionableSellLegSkipsLong = this.countRecentSymbolSkipMatches({
+      state: params.state,
+      symbol: params.symbol,
+      contains: "grid sell leg not actionable yet",
+      windowMs: this.deriveDustResidualSoloLoopLookbackMs(params.risk)
+    });
     const recentGridGuardBuyPauseSkips = this.countRecentSymbolSkipMatches({
       state: params.state,
       symbol: params.symbol,
@@ -537,6 +543,7 @@ export class BotEngineService implements OnModuleInit {
       this.shouldReblockDustResidualSelection({
         risk: params.risk,
         recentNonActionableSellLegSkips,
+        recentNonActionableSellLegSkipsLong,
         recentGridGuardBuyPauseSkips
       })
     ) {
@@ -618,14 +625,24 @@ export class BotEngineService implements OnModuleInit {
     return Math.round((45 - t * 15) * 60_000); // 45m -> 30m
   }
 
+  private deriveDustResidualSoloLoopLookbackMs(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const t = boundedRisk / 100;
+    return Math.round((90 - t * 30) * 60_000); // 90m -> 60m
+  }
+
   private shouldReblockDustResidualSelection(params: {
     risk: number;
     recentNonActionableSellLegSkips: number;
+    recentNonActionableSellLegSkipsLong?: number;
     recentGridGuardBuyPauseSkips: number;
   }): boolean {
     const thresholds = this.getDustResidualLoopThresholds(params.risk);
+    const recentNonActionableSellLegSkipsLong = Number.isFinite(params.recentNonActionableSellLegSkipsLong ?? Number.NaN)
+      ? (params.recentNonActionableSellLegSkipsLong as number)
+      : params.recentNonActionableSellLegSkips;
     return (
-      params.recentNonActionableSellLegSkips >= thresholds.solo ||
+      recentNonActionableSellLegSkipsLong >= thresholds.solo ||
       (params.recentNonActionableSellLegSkips >= thresholds.paired &&
         params.recentGridGuardBuyPauseSkips >= thresholds.paired)
     );
@@ -8164,6 +8181,12 @@ export class BotEngineService implements OnModuleInit {
                   contains: "grid sell leg not actionable yet",
                   windowMs: 30 * 60_000
                 });
+                const recentNonActionableSellLegSkipsLong = this.countRecentSymbolSkipMatches({
+                  state: current,
+                  symbol: candidateSymbol,
+                  contains: "grid sell leg not actionable yet",
+                  windowMs: this.deriveDustResidualSoloLoopLookbackMs(risk)
+                });
                 const recentGridGuardBuyPauseSkips = this.countRecentSymbolSkipMatches({
                   state: current,
                   symbol: candidateSymbol,
@@ -8174,6 +8197,7 @@ export class BotEngineService implements OnModuleInit {
                   this.shouldReblockDustResidualSelection({
                     risk,
                     recentNonActionableSellLegSkips: recentNonActionableSellLegSkips + 1,
+                    recentNonActionableSellLegSkipsLong: recentNonActionableSellLegSkipsLong + 1,
                     recentGridGuardBuyPauseSkips
                   })
                 ) {

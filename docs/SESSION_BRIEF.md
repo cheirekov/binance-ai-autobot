@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-04-09 07:35 UTC
+Last updated: 2026-04-10 07:35 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -10,13 +10,13 @@ Use this file at the start and end of every batch.
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-031` (Regime engine v2)
 - Linked support ticket: `T-032` (allowed only when fresh evidence shows downside-control and candidate quality are coupled in the same runtime window)
-- Goal (single sentence): keep repeated home-quote dust residuals parked longer once they prove they are still a paired or solo dead-end after cooldown expiry.
+- Goal (single sentence): stop one-symbol home-quote dust loops from resurfacing every 15 minutes after the broader family-level mitigation has already worked.
 - In scope:
   - keep `T-031` active as the strategy-quality lane.
   - keep undersized sell legs non-actionable before runtime attempts another grid sell ladder.
   - keep the April 2 selection-time and execution-gate dust-cooldown exceptions in place for first-pass recovery.
-  - re-apply the longer dust retry cooldown once the same home-quote residual repeatedly hits either the paired dead-end threshold or the higher solo `Grid sell leg not actionable yet` threshold.
-  - preserve the April 7 morning paired-loop mitigation while stopping the same residual family from resurfacing again after the first cooldown expires.
+  - re-apply the longer dust retry cooldown once the same home-quote residual repeatedly hits either the paired dead-end threshold or the solo threshold over a longer steady-loop lookback.
+  - preserve the April 9 family-level mitigation while stopping one remaining symbol from resurfacing again after the first cooldown expires.
   - preserve March 30-31 `T-032` downside-control behavior.
   - preserve `T-034` funding / quote-routing stability.
 - Out of scope:
@@ -25,9 +25,9 @@ Use this file at the start and end of every batch.
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: the April 7 evening slice solved one-symbol solo retries, but fresh April 9 evidence shows several home-quote dust residuals (`BTCUSDC`, `TAOUSDC`, `ZECUSDC`) can still re-enter after the initial cooldown and repeat paired or solo dead-end loops. Re-using the longer retry cooldown for both paired and solo residual loops should park that family longer without restoring the April 2 deadlock.
+- Hypothesis: the April 9 slice reduced the broader residual family, but fresh April 10 evidence shows the solo reblock still uses too short a lookback to ever trigger on a steady every-15-minute loop. Extending the solo lookback window should let the longer retry cooldown bite on symbols like `ETHUSDC` without reopening the April 2 deadlock.
 - Target KPI delta:
-  - reduce repeated solo `Grid sell leg not actionable yet` loops on the same residual symbol family.
+  - reduce repeated steady-state `Grid sell leg not actionable yet` loops on the same residual symbol family.
   - preserve the absence of the older `No feasible candidates after policy/exposure filters` deadlock.
   - preserve low sizing reject pressure and preserve reachable `daily-loss-caution-unwind` behavior.
 - Stop/rollback condition:
@@ -39,16 +39,16 @@ Use this file at the start and end of every batch.
   - runtime behavior changes in a bounded way:
     - sell-leg feasibility remains assessed explicitly before grid sell placement.
     - undersized sell legs remain `Grid sell leg not actionable yet` instead of repeatedly failing on exchange minimums.
-    - `GRID_SELL_NOT_ACTIONABLE` cooldown still allows first-pass dust recovery, but the longer retry cooldown is re-applied after repeated paired dead-end loops and, at a higher threshold, after repeated solo non-actionable sell-leg loops on the same residual symbol.
+    - `GRID_SELL_NOT_ACTIONABLE` cooldown still allows first-pass dust recovery, but the longer retry cooldown is re-applied after repeated paired dead-end loops and after repeated solo non-actionable sell-leg loops measured over a longer steady-loop lookback.
     - March 30-31 `T-032` caution-unwind / thaw behavior remains preserved.
   - active development lane is `T-031`; `T-032` remains preserved as a support lane in runtime.
 - Runtime evidence in decisions/logs:
-  - latest fresh bundle runs `git.commit=b64708e`.
-  - latest fresh bundle (`autobot-feedback-20260409-071715.tgz`) shows the broad deadlock is still gone, but several residual home-quote symbols still resurface after cooldown expiry:
-    - `Skip BTCUSDC: Grid sell leg not actionable yet (30)`
-    - `Skip TAOUSDC: Grid sell leg not actionable yet (29)`
-    - `Skip TAOUSDC: Protection lock COOLDOWN: Cooldown after non-actionable sell leg (900s) (25)`
-  - the next fresh bundle should show lower repeated paired or solo dead-end sell-leg churn on the same residual family without restoring `No feasible candidates after policy/exposure filters`.
+  - latest fresh bundle runs `git.commit=58d9e47`.
+  - latest fresh bundle (`autobot-feedback-20260410-072500.tgz`) shows the broader family shrank, but `ETHUSDC` is still looping every ~15 minutes:
+    - `Skip ETHUSDC: Grid sell leg not actionable yet (41)`
+    - `Skip ETHUSDC: Protection lock COOLDOWN: Cooldown after non-actionable sell leg (900s) (28)`
+    - latest decisions alternate the same sell-leg and cooldown entries over many hours
+  - the next fresh bundle should show lower repeated one-symbol residual churn without restoring `No feasible candidates after policy/exposure filters`.
 - Risk slider impact:
   - risk slider still modulates cooldown duration and lane thresholds; this slice only changes when dust sell legs are considered actionable enough to keep re-entering grid rotation.
 - Validation commands:
@@ -81,40 +81,40 @@ Use this file at the start and end of every batch.
 - Run context:
   - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `18.121`
-  - runtime uptime (hours): `1217.205`
-  - run end: `Thu Apr 09 2026 10:16:38 GMT+0300 (Eastern European Summer Time)`
+  - bundle interval (hours): `24.125`
+  - runtime uptime (hours): `1241.33`
+  - run end: `Fri Apr 10 2026 10:24:07 GMT+0300 (Eastern European Summer Time)`
   - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (paired/solo residual dust churn remains active on BTCUSDC / TAOUSDC / ZECUSDC)
+  - active ticket runtime signal: `observed` (Skip ETHUSDC: Grid sell leg not actionable yet (41))
 - Observed KPI delta:
   - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=71, activeMarketOrders=0)
   - market-only share reduced: `yes` (historyMarketShare=64.5%)
   - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `patch_required`
+- Decision: `continue`
 - Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
-- Required action: `same-ticket mitigation required before next long run`
+- Required action: `continue active ticket`
 - Open risks:
-  - repeated residual dust loops can still consume the decision window even while risk state stays NORMAL.
+  - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260409-071715.tgz`
-  - auto-updated at: `2026-04-09T07:17:34.629Z`
+  - bundle: `autobot-feedback-20260410-072500.tgz`
+  - auto-updated at: `2026-04-10T07:25:12.839Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-031
-Decision: patch_required
-Required action: same-ticket mitigation required before next long run
-Latest bundle: autobot-feedback-20260409-071715.tgz
+Decision: continue
+Required action: continue active ticket
+Latest bundle: autobot-feedback-20260410-072500.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: keep residual home-quote dust symbols parked longer once they prove they are still paired/solo sell-leg dead ends after cooldown expiry.
-In scope: candidate-quality/runtime rotation behavior for home-quote dust residuals while preserving T-032 downside-control behavior.
-Out of scope: quote-routing redesign, reopening T-032 as active lane without fresh evidence, PnL schema changes, AI lane.
+Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
+In scope: exit-manager / de-risking behavior under adverse conditions.
+Out of scope: quote-routing redesign, candidate-hygiene-only optimization, PnL schema changes, AI lane.
 Validation: docker compose -f docker-compose.ci.yml run --rm ci
-After patch: update docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md, docs/STRATEGY_COVERAGE.md.
+After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

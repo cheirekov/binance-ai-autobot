@@ -4386,10 +4386,12 @@ describe("bot-engine symbol lock checks", () => {
   it("uses a longer retry cooldown for repeated solo dust sell-leg loops", () => {
     const helpers = service as unknown as {
       deriveDustResidualRetryCooldownMs: (risk: number) => number;
+      deriveDustResidualSoloLoopLookbackMs: (risk: number) => number;
       getDustResidualLoopThresholds: (risk: number) => { paired: number; solo: number };
       shouldReblockDustResidualSelection: (params: {
         risk: number;
         recentNonActionableSellLegSkips: number;
+        recentNonActionableSellLegSkipsLong?: number;
         recentGridGuardBuyPauseSkips: number;
       }) => boolean;
     };
@@ -4397,6 +4399,8 @@ describe("bot-engine symbol lock checks", () => {
     expect(helpers.getDustResidualLoopThresholds(100)).toEqual({ paired: 2, solo: 4 });
     expect(helpers.deriveDustResidualRetryCooldownMs(100)).toBe(30 * 60_000);
     expect(helpers.deriveDustResidualRetryCooldownMs(0)).toBe(45 * 60_000);
+    expect(helpers.deriveDustResidualSoloLoopLookbackMs(100)).toBe(60 * 60_000);
+    expect(helpers.deriveDustResidualSoloLoopLookbackMs(0)).toBe(90 * 60_000);
     expect(
       helpers.shouldReblockDustResidualSelection({
         risk: 100,
@@ -4408,13 +4412,15 @@ describe("bot-engine symbol lock checks", () => {
       helpers.shouldReblockDustResidualSelection({
         risk: 100,
         recentNonActionableSellLegSkips: 3,
+        recentNonActionableSellLegSkipsLong: 3,
         recentGridGuardBuyPauseSkips: 0
       })
     ).toBe(false);
     expect(
       helpers.shouldReblockDustResidualSelection({
         risk: 100,
-        recentNonActionableSellLegSkips: 4,
+        recentNonActionableSellLegSkips: 3,
+        recentNonActionableSellLegSkipsLong: 4,
         recentGridGuardBuyPauseSkips: 0
       })
     ).toBe(true);

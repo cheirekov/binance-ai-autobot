@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-09 10:35 EEST  
+Last updated: 2026-04-10 10:35 EEST  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260409-071715.tgz`) shows `T-032` remains support-only. The April 7 slices fixed the broad deadlock, but several home-quote dust residuals (`BTCUSDC`, `TAOUSDC`, `ZECUSDC`) still resurface after cooldown expiry through paired or solo `Grid sell leg not actionable yet` retries.
+The newest fresh bundle (`autobot-feedback-20260410-072500.tgz`) shows `T-032` remains support-only. The April 9 slice reduced the broader residual family, but `ETHUSDC` still resurfaces through a steady every-15-minute `Grid sell leg not actionable yet` + cooldown loop.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -23,12 +23,12 @@ The newest fresh bundle (`autobot-feedback-20260409-071715.tgz`) shows `T-032` r
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that reuses the longer `GRID_SELL_NOT_ACTIONABLE` retry cooldown for repeated paired dead-end loops as well as the higher-threshold solo retries will preserve the earlier recovery while keeping the residual family parked longer.
+- A bounded `T-031` slice that extends the solo residual-loop lookback will let the existing longer retry cooldown trigger on steady every-15-minute loops, preserving the earlier family-level reduction while parking the last residual symbol longer.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved as a support lane rather than being reopened blindly
-- the next fresh bundle reflects lower repeated paired/solo `Grid sell leg not actionable yet` churn on the same residual family without reopening funding or downside-control regressions
+- the next fresh bundle reflects lower repeated `ETHUSDC: Grid sell leg not actionable yet` churn without reopening funding or downside-control regressions
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident

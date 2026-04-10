@@ -16,6 +16,38 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-10 07:35 UTC — T-031 eighth slice: extend solo dust-loop lookback
+- Scope:
+  - respond to the fresh April 10 morning bundle where the April 9 slice reduced the broader residual family, but `ETHUSDC` still repeated a `Grid sell leg not actionable yet` + cooldown loop roughly every 15 minutes for hours.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260410-072500.tgz`) shows:
+    - `risk_state=NORMAL`
+    - `daily_net_usdt=+0.75`
+    - `sizingRejectPressure=low`
+    - dominant loop:
+      - `Skip ETHUSDC: Grid sell leg not actionable yet (41)`
+      - `Skip ETHUSDC: Protection lock COOLDOWN: Cooldown after non-actionable sell leg (900s) (28)`
+  - inferred blocker:
+    - the solo reblock threshold exists, but its observation window was too short to ever trigger on a steady every-15-minute residual loop.
+- PM milestone mapping:
+  - keep `T-031` active.
+  - keep `T-032` as linked support only.
+  - preserve the April 2 deadlock recovery and the April 9 family-level reduction.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: added a longer solo-loop lookback and used it in both selection-time and runtime residual reblock checks.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: helper regression coverage now proves the longer lookback exists and that solo reblocking can trigger from long-window evidence, not only short bursts.
+  - handoff docs aligned to the new same-ticket slice.
+- Risk slider impact:
+  - no hard-limit change.
+  - risk still controls the longer retry cooldown duration and now also the solo-loop lookback window.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - deploy on top of the current `58d9e47` runtime without resetting state and collect one fresh bundle.
+- Follow-up:
+  - next fresh bundle should show fewer repeated `ETHUSDC: Grid sell leg not actionable yet` loops without restoring the older no-feasible-candidate deadlock.
+
 ## 2026-04-09 07:35 UTC — T-031 seventh slice: extend dust retry cooldown for paired residual loops
 - Scope:
   - respond to the fresh April 9 morning bundle where the broad deadlock stayed fixed, but multiple home-quote dust residuals (`BTCUSDC`, `TAOUSDC`, `ZECUSDC`) still resurfaced after cooldown expiry through paired or solo non-actionable sell-leg loops.
