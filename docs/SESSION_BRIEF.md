@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-04-10 07:35 UTC
+Last updated: 2026-04-11 07:41 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -58,7 +58,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `<set-after-commit>`
+- Commit hash: `e94c4dd`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -81,15 +81,15 @@ Use this file at the start and end of every batch.
 - Run context:
   - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `24.125`
-  - runtime uptime (hours): `1241.33`
-  - run end: `Fri Apr 10 2026 10:24:07 GMT+0300 (Eastern European Summer Time)`
+  - bundle interval (hours): `11.195`
+  - runtime uptime (hours): `1265.606`
+  - run end: `Sat Apr 11 2026 10:40:40 GMT+0300 (Eastern European Summer Time)`
   - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip ETHUSDC: Grid sell leg not actionable yet (41))
+  - active ticket runtime signal: `observed` (Skip BTCUSDC: Grid sell leg not actionable yet (12))
 - Observed KPI delta:
   - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=71, activeMarketOrders=0)
   - market-only share reduced: `yes` (historyMarketShare=64.5%)
@@ -101,8 +101,8 @@ Use this file at the start and end of every batch.
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260410-072500.tgz`
-  - auto-updated at: `2026-04-10T07:25:12.839Z`
+  - bundle: `autobot-feedback-20260411-074053.tgz`
+  - auto-updated at: `2026-04-11T07:41:08.497Z`
 
 ## 5) Copy/paste prompt for next session
 
@@ -110,7 +110,7 @@ Use this file at the start and end of every batch.
 Ticket: T-031
 Decision: continue
 Required action: continue active ticket
-Latest bundle: autobot-feedback-20260410-072500.tgz
+Latest bundle: autobot-feedback-20260411-074053.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
 In scope: exit-manager / de-risking behavior under adverse conditions.
