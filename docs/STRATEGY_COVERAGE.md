@@ -93,6 +93,7 @@ These are execution behaviors currently active in runtime:
     - early downside-control / defensive unwind behavior remains live
     - March 30 slice: thaw `CAUTION` new-symbol pause once `ABS_DAILY_LOSS` has already de-risked the book to near-flat exposure/order state
     - March 31 slice: stop-loss-cooled residual positions no longer anchor global `CAUTION` new-symbol pause once active orders are gone
+    - April 12 linked-support slice: near-flat residual managed positions no longer keep `ABS_DAILY_LOSS` `CAUTION` frozen once active orders are gone
   - reopen only if downside-control policy becomes the dominant blocker again
 - `T-034` — Multi-quote execution policy v1
   - DONE; preserve funding/routing stability while `T-031` evolves strategy quality

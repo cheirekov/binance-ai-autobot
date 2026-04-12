@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-10 10:35 EEST  
+Last updated: 2026-04-12 21:20 EEST  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260410-072500.tgz`) shows `T-032` remains support-only. The April 9 slice reduced the broader residual family, but `ETHUSDC` still resurfaces through a steady every-15-minute `Grid sell leg not actionable yet` + cooldown loop.
+The newest fresh bundle (`autobot-feedback-20260412-180152.tgz`) shows `T-031` remains the active lane, but a linked-support `T-032` edge case now blocks validation: after de-risking to ~0.3% managed exposure with zero active orders, `ABS_DAILY_LOSS` `CAUTION` still ends on `Skip: No feasible candidates: daily loss caution paused new symbols (60 filtered)`.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -23,12 +23,13 @@ The newest fresh bundle (`autobot-feedback-20260410-072500.tgz`) shows `T-032` r
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that extends the solo residual-loop lookback will let the existing longer retry cooldown trigger on steady every-15-minute loops, preserving the earlier family-level reduction while parking the last residual symbol longer.
+- A bounded linked-support `T-032` slice that releases `ABS_DAILY_LOSS` `CAUTION` once the book is already near-flat and orderless will let `T-031` resume candidate-quality validation without reopening downside-control regressions.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved as a support lane rather than being reopened blindly
-- the next fresh bundle reflects lower repeated `ETHUSDC: Grid sell leg not actionable yet` churn without reopening funding or downside-control regressions
+- the next fresh bundle reflects newer post-caution candidate activity instead of near-flat `daily loss caution paused new symbols`
+- `T-031` stays the active lane while `T-032` remains bounded support only
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident

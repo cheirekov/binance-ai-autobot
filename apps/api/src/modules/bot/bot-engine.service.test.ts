@@ -3048,6 +3048,21 @@ describe("bot-engine insufficient-balance helpers", () => {
         countableManagedPositionsInStopLossCooldown: 0,
         activeOrderCount: 0
       })
+    ).toBe(false);
+
+    expect(
+      helpers.shouldPauseNewSymbolsInCaution({
+        guard: {
+          state: "CAUTION",
+          trigger: "ABS_DAILY_LOSS",
+          managedExposurePct: 0.0011,
+          profitGivebackHaltMinExposurePct: null
+        },
+        risk: 100,
+        countableManagedPositions: 1,
+        countableManagedPositionsInStopLossCooldown: 0,
+        activeOrderCount: 1
+      })
     ).toBe(true);
 
     expect(

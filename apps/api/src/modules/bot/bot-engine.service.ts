@@ -822,6 +822,9 @@ export class BotEngineService implements OnModuleInit {
       return managedExposurePct >= minManagedExposurePct;
     }
 
+    if (managedExposurePct < minManagedExposurePct && params.activeOrderCount <= 0) {
+      return false;
+    }
     if (managedExposurePct >= minManagedExposurePct) return true;
     const anchoredManagedPositions = Math.max(
       0,

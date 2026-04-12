@@ -16,6 +16,36 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-12 18:20 UTC — T-031/T-032 linked slice: thaw near-flat ABS_DAILY_LOSS caution
+- Scope:
+  - respond to the fresh April 12 evening bundle where runtime stayed active, but after de-risking to ~0.3% managed exposure with zero active orders the bot still ended on `Skip: No feasible candidates: daily loss caution paused new symbols (60 filtered)`.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260412-180152.tgz`) shows:
+    - `risk_state=CAUTION`
+    - `trigger=ABS_DAILY_LOSS`
+    - `daily_net_usdt=-190.97`
+    - `managedExposure≈0.3%`
+    - `activeOrders=0`
+  - inferred blocker:
+    - tiny residual managed positions still anchor `CAUTION` new-symbol pause even after the book is effectively flat and orderless, so `T-031` candidate quality cannot be re-exercised.
+- PM milestone mapping:
+  - keep `T-031` active.
+  - use one bounded linked-support `T-032` slice because downside-control policy is directly blocking strategy-quality validation in the same runtime window.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: `shouldPauseNewSymbolsInCaution(...)` now releases `ABS_DAILY_LOSS` new-symbol pause once managed exposure is below the caution floor and there are no active orders, even if tiny residual managed positions remain.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: caution helper regression coverage updated for the near-flat/orderless thaw case and the still-anchored active-order case.
+  - handoff docs aligned to the linked support slice.
+- Risk slider impact:
+  - no hard-limit change.
+  - risk still controls the exposure floor; this slice only changes whether tiny residuals can keep global `CAUTION` pause active after the book is already near-flat.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - deploy on top of the current `40dfeec` runtime without resetting state and collect one fresh bundle.
+- Follow-up:
+  - next fresh bundle should show newer post-caution candidate activity instead of `daily loss caution paused new symbols` dominating after the bot is already near-flat.
+
 ## 2026-04-10 07:35 UTC — T-031 eighth slice: extend solo dust-loop lookback
 - Scope:
   - respond to the fresh April 10 morning bundle where the April 9 slice reduced the broader residual family, but `ETHUSDC` still repeated a `Grid sell leg not actionable yet` + cooldown loop roughly every 15 minutes for hours.
