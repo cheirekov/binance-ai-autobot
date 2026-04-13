@@ -1148,6 +1148,15 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(key).toBe("skip xrpusdc: grid guard paused buy leg");
   });
 
+  it("classifies grid sell-leg-not-actionable skips as family storm-eligible", () => {
+    const helpers = service as unknown as {
+      getSkipStormKey: (summary: string) => string | null;
+    };
+
+    const key = helpers.getSkipStormKey("Skip XRPUSDC: Grid sell leg not actionable yet");
+    expect(key).toBe("skip *: grid sell leg not actionable yet");
+  });
+
   it("uses gentler skip-storm trigger for grid waiting loops", () => {
     const helpers = service as unknown as {
       deriveInfeasibleSymbolCooldown: (params: {
@@ -1281,6 +1290,55 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(minQtyCooldown).toBeGreaterThan(genericCooldown);
     expect(minQtyCooldown).toBeGreaterThanOrEqual(900_000);
     expect(genericCooldown).toBeGreaterThanOrEqual(240_000);
+  });
+
+  it("uses family-level storm cooldown for repeated non-actionable sell-leg dust loops", () => {
+    const helpers = service as unknown as {
+      deriveInfeasibleSymbolCooldown: (params: {
+        state: BotState;
+        symbol: string;
+        risk: number;
+        baseCooldownMs: number;
+        summary: string;
+      }) => { cooldownMs: number; storm?: { threshold: number; count: number } };
+    };
+
+    const summary = "Skip ETHUSDC: Grid sell leg not actionable yet";
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "dust-1",
+          ts: new Date(now - 5 * 60_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip BTCUSDC: Grid sell leg not actionable yet"
+        },
+        {
+          id: "dust-2",
+          ts: new Date(now - 10 * 60_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip SOLUSDC: Grid sell leg not actionable yet"
+        },
+        {
+          id: "dust-3",
+          ts: new Date(now - 15 * 60_000).toISOString(),
+          kind: "SKIP",
+          summary: "Skip TAOUSDC: Grid sell leg not actionable yet"
+        }
+      ]
+    };
+
+    const cooldown = helpers.deriveInfeasibleSymbolCooldown({
+      state,
+      symbol: "ETHUSDC",
+      risk: 100,
+      baseCooldownMs: 900_000,
+      summary
+    });
+    expect(cooldown.storm?.threshold).toBe(4);
+    expect(cooldown.storm?.count).toBe(4);
+    expect(cooldown.cooldownMs).toBeGreaterThanOrEqual(2_700_000);
   });
 
   it("prioritizes concentrated losers for daily-loss HALT unwind", () => {

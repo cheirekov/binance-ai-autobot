@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-12 21:20 EEST  
+Last updated: 2026-04-13 11:45 EEST  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260412-180152.tgz`) shows `T-031` remains the active lane, but a linked-support `T-032` edge case now blocks validation: after de-risking to ~0.3% managed exposure with zero active orders, `ABS_DAILY_LOSS` `CAUTION` still ends on `Skip: No feasible candidates: daily loss caution paused new symbols (60 filtered)`.
+The newest fresh bundle (`autobot-feedback-20260413-082204.tgz`) shows the April 12 linked-support thaw worked later in the run, but the runtime now rotates across a small family of home-quote dust residuals (`GIGGLEUSDC`, `0GUSDC`, `币安人生USDC`, `BTCUSDC`, `ETHUSDC`) that all repeat `Grid sell leg not actionable yet`.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -23,12 +23,12 @@ The newest fresh bundle (`autobot-feedback-20260412-180152.tgz`) shows `T-031` r
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded linked-support `T-032` slice that releases `ABS_DAILY_LOSS` `CAUTION` once the book is already near-flat and orderless will let `T-031` resume candidate-quality validation without reopening downside-control regressions.
+- A bounded `T-031` slice that makes `Grid sell leg not actionable yet` storm-eligible across symbols will let the bot park that residual family as a cluster instead of rotating symbol by symbol.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved as a support lane rather than being reopened blindly
-- the next fresh bundle reflects newer post-caution candidate activity instead of near-flat `daily loss caution paused new symbols`
+- the next fresh bundle reflects lower repeated residual-family `Grid sell leg not actionable yet` churn
 - `T-031` stays the active lane while `T-032` remains bounded support only
 
 ## Stop / rollback conditions

@@ -85,6 +85,7 @@ These are execution behaviors currently active in runtime:
     - current April 7 evening slice: the same cooldown is also re-applied after a higher threshold of repeated solo `Grid sell leg not actionable yet` retries on the same home-quote dust residual
     - current April 9 slice: the longer retry cooldown now re-applies for repeated paired residual dead-end loops too, so a small family of home-quote dust symbols stays parked longer after cooldown expiry
     - current April 10 slice: the solo residual-loop lookback is longer, so a steady every-15-minute dust loop can actually trigger the longer retry cooldown instead of repeating forever
+    - current April 13 slice: repeated `Grid sell leg not actionable yet` skips now share a family-level storm key, so residual dust churn across multiple home-quote symbols can trigger a longer retry cooldown instead of just rotating
   - objective: improve candidate quality and rotation under real market regimes without reopening `T-032` or `T-034`
 
 ## Support / next strategy core

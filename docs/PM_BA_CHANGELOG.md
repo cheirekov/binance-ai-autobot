@@ -16,6 +16,39 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-13 08:45 UTC — T-031 ninth slice: family-level residual dust storm parking
+- Scope:
+  - respond to the fresh April 13 morning bundle where the April 12 linked-support thaw reopened runtime activity, but the bot then rotated across a family of tiny home-quote residuals (`0GUSDC`, `GIGGLEUSDC`, `币安人生USDC`, `BTCUSDC`, `ETHUSDC`) that all hit `Grid sell leg not actionable yet`.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260413-082204.tgz`) shows:
+    - `risk_state=CAUTION`
+    - `trigger=ABS_DAILY_LOSS`
+    - `activeOrders=0`
+    - dominant skips:
+      - `Skip: No feasible candidates: daily loss caution paused new symbols (58 filtered)`
+      - `Skip GIGGLEUSDC: Grid sell leg not actionable yet`
+      - `Skip 0GUSDC: Grid sell leg not actionable yet`
+      - `Skip 币安人生USDC: Grid sell leg not actionable yet`
+  - inferred blocker:
+    - the near-flat caution thaw worked later in the run, but residual dust churn shifted from one symbol to a broader family, and symbol-only cooldowns are not enough.
+- PM milestone mapping:
+  - keep `T-031` active.
+  - preserve April 12 linked-support `T-032` thaw as support-only.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: `Grid sell leg not actionable yet` now shares a family-level skip-storm key and can trigger a longer retry cooldown across symbols in the same residual cluster.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added coverage for the shared storm key and family-level cooldown trigger.
+  - handoff docs aligned to the new same-ticket slice.
+- Risk slider impact:
+  - no hard-limit change.
+  - risk still controls the threshold/window/cooldown; this slice only lets residual dust pressure accumulate across symbols instead of only per symbol.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - deploy on top of the current `527fc7b` runtime without resetting state and collect one fresh bundle.
+- Follow-up:
+  - next fresh bundle should show lower repeated residual-family `Grid sell leg not actionable yet` churn without restoring the old near-flat `daily loss caution paused new symbols` freeze.
+
 ## 2026-04-12 18:20 UTC — T-031/T-032 linked slice: thaw near-flat ABS_DAILY_LOSS caution
 - Scope:
   - respond to the fresh April 12 evening bundle where runtime stayed active, but after de-risking to ~0.3% managed exposure with zero active orders the bot still ended on `Skip: No feasible candidates: daily loss caution paused new symbols (60 filtered)`.
