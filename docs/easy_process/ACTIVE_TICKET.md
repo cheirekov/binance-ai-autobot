@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-13 11:45 EEST  
+Last updated: 2026-04-14 12:20 EEST  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260413-082204.tgz`) shows the April 12 linked-support thaw worked later in the run, but the runtime now rotates across a small family of home-quote dust residuals (`GIGGLEUSDC`, `0GUSDC`, `币安人生USDC`, `BTCUSDC`, `ETHUSDC`) that all repeat `Grid sell leg not actionable yet`.
+The newest fresh bundle (`autobot-feedback-20260414-090828.tgz`) shows the April 13 family-level storm key is live, but the runtime still rotates more slowly across a small family of home-quote dust residuals (`币安人生USDC`, `GIGGLEUSDC`, `SOLUSDC`, `ENJUSDC`, `ETHUSDC`) that repeat `Grid sell leg not actionable yet` and short `COOLDOWN` re-entries.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -23,12 +23,12 @@ The newest fresh bundle (`autobot-feedback-20260413-082204.tgz`) shows the April
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that makes `Grid sell leg not actionable yet` storm-eligible across symbols will let the bot park that residual family as a cluster instead of rotating symbol by symbol.
+- A bounded `T-031` slice that widens the family-level storm lookback, lowers the trigger threshold, and extends the cooldown for `Grid sell leg not actionable yet` will park the residual cluster longer instead of letting it re-enter every 15-30 minutes.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved as a support lane rather than being reopened blindly
-- the next fresh bundle reflects lower repeated residual-family `Grid sell leg not actionable yet` churn
+- the next fresh bundle reflects lower repeated residual-family `Grid sell leg not actionable yet` churn and fewer short `COOLDOWN` re-entries
 - `T-031` stays the active lane while `T-032` remains bounded support only
 
 ## Stop / rollback conditions

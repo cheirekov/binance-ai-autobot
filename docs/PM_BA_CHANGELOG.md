@@ -16,6 +16,39 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-14 09:20 UTC — T-031 tenth slice: widen residual family storm parking
+- Scope:
+  - respond to the fresh April 14 day bundle where the April 13 family-level storm key was live, but residual dust churn still rotated across `币安人生USDC`, `GIGGLEUSDC`, `SOLUSDC`, `ENJUSDC`, and `ETHUSDC`.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260414-090828.tgz`) shows:
+    - `risk_state=NORMAL`
+    - `daily_net_usdt≈-39.80`
+    - `total_alloc_pct≈40.65%`
+    - dominant skips:
+      - `Skip 币安人生USDC: Grid sell leg not actionable yet`
+      - `Skip GIGGLEUSDC: Protection lock COOLDOWN: Cooldown after non-actionable sell leg (900s)`
+      - `Skip GIGGLEUSDC: Grid sell leg not actionable yet`
+      - `Skip BTCUSDC: Daily loss caution paused GRID BUY leg`
+  - inferred blocker:
+    - the shared storm key is working, but the window/threshold are still too weak for a slower multi-symbol dust rotation over a longer live run.
+- PM milestone mapping:
+  - keep `T-031` active.
+  - preserve April 12 linked-support `T-032` thaw as support-only.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: wider lookback, lower threshold, and longer cooldown for family-level `Grid sell leg not actionable yet` storm handling.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: family-level dust storm regression now proves wider lookback behavior and longer cooldown.
+  - handoff docs aligned to the new same-ticket slice.
+- Risk slider impact:
+  - no hard-limit change.
+  - higher risk still allows earlier retry than low risk, but residual family storms now park for materially longer than before.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - deploy on top of the current `3e5fe01` runtime without resetting state and collect one fresh bundle.
+- Follow-up:
+  - next fresh bundle should show fewer repeated residual-family `Grid sell leg not actionable yet` skips and fewer 900s cooldown re-entries during the same long run.
+
 ## 2026-04-13 08:45 UTC — T-031 ninth slice: family-level residual dust storm parking
 - Scope:
   - respond to the fresh April 13 morning bundle where the April 12 linked-support thaw reopened runtime activity, but the bot then rotated across a family of tiny home-quote residuals (`0GUSDC`, `GIGGLEUSDC`, `币安人生USDC`, `BTCUSDC`, `ETHUSDC`) that all hit `Grid sell leg not actionable yet`.

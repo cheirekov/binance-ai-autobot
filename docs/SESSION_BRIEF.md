@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-04-13 08:45 UTC
+Last updated: 2026-04-14 09:20 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -10,13 +10,14 @@ Use this file at the start and end of every batch.
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-031` (Regime engine v2)
 - Linked support ticket: `T-032` (allowed only when fresh evidence shows downside-control and candidate quality are coupled in the same runtime window)
-- Goal (single sentence): park the post-thaw residual dust family at cluster level so fresh `T-031` validation does not fall back into multi-symbol `Grid sell leg not actionable yet` churn.
+- Goal (single sentence): widen residual-family dust storm parking so slower multi-symbol `Grid sell leg not actionable yet` rotation is parked before it re-enters every 15-30 minutes.
 - In scope:
   - keep `T-031` active as the strategy-quality lane.
   - keep undersized sell legs non-actionable before runtime attempts another grid sell ladder.
   - keep the April 2 and April 7-10 `T-031` dust-loop mitigations in place.
   - preserve the April 12 linked-support `T-032` thaw that reopens candidate evaluation after near-flat `ABS_DAILY_LOSS`.
-  - add one bounded `T-031` family-level storm control for repeated `Grid sell leg not actionable yet` residual loops across home-quote symbols.
+  - keep the April 13 family-level storm key in place for `Grid sell leg not actionable yet`.
+  - add one bounded `T-031` widening step for the residual-family storm window/threshold/cooldown so slower dust rotation is parked longer.
   - preserve March 30-31 `T-032` downside-control behavior.
   - preserve `T-034` funding / quote-routing stability.
 - Out of scope:
@@ -25,9 +26,9 @@ Use this file at the start and end of every batch.
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: the April 12 linked-support thaw worked later in the run, but fresh April 13 evidence shows the bot then rotates across a family of tiny home-quote residuals (`0GUSDC`, `GIGGLEUSDC`, `币安人生USDC`, `BTCUSDC`, `ETHUSDC`) that all hit non-actionable sell-leg skips. A family-level skip storm key for `Grid sell leg not actionable yet` should extend cooldowns across that cluster without reopening the earlier no-feasible deadlock.
+- Hypothesis: the April 13 family-level storm key is live, but fresh April 14 evidence shows the residual family still rotates more slowly across `币安人生USDC`, `GIGGLEUSDC`, `SOLUSDC`, `ENJUSDC`, and `ETHUSDC`, with repeated 900s re-entries. Widening the storm lookback, lowering the trigger threshold, and extending the family cooldown should park that cluster longer without reopening the earlier no-feasible deadlock.
 - Target KPI delta:
-  - reduce repeated steady-state `Grid sell leg not actionable yet` loops on the same residual symbol family.
+  - reduce repeated steady-state `Grid sell leg not actionable yet` loops across the residual symbol family over longer live windows.
   - preserve the absence of the older `No feasible candidates after policy/exposure filters` deadlock.
   - preserve low sizing reject pressure and preserve reachable `daily-loss-caution-unwind` behavior.
 - Stop/rollback condition:
@@ -64,7 +65,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `<set-after-commit>`
+- Commit hash: `3e5fe01`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -85,20 +86,20 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `14.335`
-  - runtime uptime (hours): `42.32`
-  - run end: `Mon Apr 13 2026 11:21:35 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - bundle interval (hours): `16.898`
+  - runtime uptime (hours): `67.088`
+  - run end: `Tue Apr 14 2026 12:07:40 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip GIGGLEUSDC: Grid sell leg not actionable yet (12))
+  - active ticket runtime signal: `observed` (Skip 币安人生USDC: Grid sell leg not actionable yet (32))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=32, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=65.2%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=44, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=60.4%)
   - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `patch_required`
@@ -107,8 +108,8 @@ Use this file at the start and end of every batch.
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260413-082204.tgz`
-  - auto-updated at: `2026-04-13T08:22:16.016Z`
+  - bundle: `autobot-feedback-20260414-090828.tgz`
+  - auto-updated at: `2026-04-14T09:08:38.652Z`
 
 ## 5) Copy/paste prompt for next session
 
@@ -116,11 +117,11 @@ Use this file at the start and end of every batch.
 Ticket: T-031
 Decision: patch_required
 Required action: same-ticket mitigation required before next long run
-Latest bundle: autobot-feedback-20260413-082204.tgz
+Latest bundle: autobot-feedback-20260414-090828.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: reduce post-thaw residual-family dust churn without reopening the earlier CAUTION freeze.
-In scope: one bounded T-031 slice for family-level `Grid sell leg not actionable yet` storm parking, preserving April 12 linked-support T-032 thaw and existing residual mitigations.
-Out of scope: quote-routing redesign, broad candidate-hygiene rewrites, PnL schema changes, AI lane.
+Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
+In scope: exit-manager / de-risking behavior under adverse conditions.
+Out of scope: quote-routing redesign, candidate-hygiene-only optimization, PnL schema changes, AI lane.
 Validation: docker compose -f docker-compose.ci.yml run --rm ci
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

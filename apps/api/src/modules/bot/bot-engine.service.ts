@@ -1643,14 +1643,18 @@ export class BotEngineService implements OnModuleInit {
     const nowMs = Date.now();
     const isDustSellLegKey = key.includes("grid sell leg not actionable yet");
     const isGridWaitKey = key.includes("grid waiting for ladder slot or inventory") || key.includes("grid guard paused buy leg");
-    const windowMs = isDustSellLegKey ? Math.round((25 - t * 10) * 60_000) : isGridWaitKey ? 3 * 60_000 : 2 * 60_000;
+    const windowMs = isDustSellLegKey
+      ? this.deriveDustResidualSoloLoopLookbackMs(params.risk)
+      : isGridWaitKey
+      ? 3 * 60_000
+      : 2 * 60_000;
     const threshold = isDustSellLegKey
-      ? Math.max(4, Math.round(6 - t * 2)) // risk 0 -> 6, risk 100 -> 4
+      ? Math.max(3, Math.round(5 - t * 2)) // risk 0 -> 5, risk 100 -> 3
       : isGridWaitKey
       ? Math.max(3, Math.round(5 - t * 2)) // risk 0 -> 5, risk 100 -> 3
       : Math.max(2, Math.round(4 - t * 2)); // risk 0 -> 4, risk 100 -> 2
     const stormCooldownMs = isDustSellLegKey
-      ? Math.max(this.deriveDustResidualRetryCooldownMs(params.risk), Math.round((30 + t * 15) * 60_000)) // 30m -> 45m
+      ? Math.max(this.deriveDustResidualRetryCooldownMs(params.risk), Math.round((75 - t * 15) * 60_000)) // 75m -> 60m
       : isGridWaitKey
       ? Math.round(90_000 + t * 60_000) // risk 0 -> 90s, risk 100 -> 150s
       : Math.round(60_000 + t * 180_000); // risk 0 -> 60s, risk 100 -> 240s

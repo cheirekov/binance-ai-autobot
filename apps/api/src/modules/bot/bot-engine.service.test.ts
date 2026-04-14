@@ -1316,13 +1316,13 @@ describe("bot-engine insufficient-balance helpers", () => {
         },
         {
           id: "dust-2",
-          ts: new Date(now - 10 * 60_000).toISOString(),
+          ts: new Date(now - 20 * 60_000).toISOString(),
           kind: "SKIP",
           summary: "Skip SOLUSDC: Grid sell leg not actionable yet"
         },
         {
           id: "dust-3",
-          ts: new Date(now - 15 * 60_000).toISOString(),
+          ts: new Date(now - 35 * 60_000).toISOString(),
           kind: "SKIP",
           summary: "Skip TAOUSDC: Grid sell leg not actionable yet"
         }
@@ -1336,9 +1336,9 @@ describe("bot-engine insufficient-balance helpers", () => {
       baseCooldownMs: 900_000,
       summary
     });
-    expect(cooldown.storm?.threshold).toBe(4);
+    expect(cooldown.storm?.threshold).toBe(3);
     expect(cooldown.storm?.count).toBe(4);
-    expect(cooldown.cooldownMs).toBeGreaterThanOrEqual(2_700_000);
+    expect(cooldown.cooldownMs).toBeGreaterThanOrEqual(3_600_000);
   });
 
   it("prioritizes concentrated losers for daily-loss HALT unwind", () => {
