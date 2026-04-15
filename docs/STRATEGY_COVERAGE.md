@@ -1,6 +1,6 @@
 # Strategy Coverage (Source of Truth)
 
-Last updated: 2026-04-02
+Last updated: 2026-04-15
 Owner: PM/BA + Trader + Architect
 
 Purpose: prevent strategy drift/context loss by keeping one explicit list of:
@@ -88,6 +88,7 @@ These are execution behaviors currently active in runtime:
     - current April 13 slice: repeated `Grid sell leg not actionable yet` skips now share a family-level storm key, so residual dust churn across multiple home-quote symbols can trigger a longer retry cooldown instead of just rotating
     - current April 14 slice: the family-level dust storm now uses a wider lookback, a lower trigger threshold, and a longer cooldown so slower multi-symbol residual rotation is parked longer instead of re-entering every 15-30 minutes
     - current April 15 slice: the first-pass dust-cooldown bypass now honors active skip-storm locks, so symbols already parked by `Grid sell leg not actionable yet` storm protection are not immediately reselected
+    - current April 15 evening slice: global `FEE_EDGE` quarantine now suppresses fresh non-home-quote grid candidates with no actionable sell leg, so cross-quote fee-edge churn cannot rotate around symbol-local history
   - objective: improve candidate quality and rotation under real market regimes without reopening `T-032` or `T-034`
 
 ## Support / next strategy core

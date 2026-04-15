@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-15 10:45 EEST  
+Last updated: 2026-04-15 19:55 EEST
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260415-072942.tgz`) shows the April 14 family-level storm locks are live, but the first-pass dust-cooldown bypass can still reselect symbols already protected by `Skip storm (...) Grid sell leg not actionable yet` locks.
+The newest fresh bundle (`autobot-feedback-20260415-164608.tgz`) shows the April 15 dust-storm mitigation moved the blocker, but global `FEE_EDGE` quarantine still lets fresh non-home-quote symbols rotate into repeated fee-edge skips because suppression is too symbol-local.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -23,15 +23,16 @@ The newest fresh bundle (`autobot-feedback-20260415-072942.tgz`) shows the April
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that keeps first-pass dust recovery but honors active skip-storm locks will prevent already-parked residual symbols from re-entering selection.
+- A bounded `T-031` slice that makes active global `FEE_EDGE` quarantine suppress fresh non-home-quote candidates with no actionable sell leg will reduce cross-quote fee-edge churn without weakening home-quote entries or managed sell legs.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved as a support lane rather than being reopened blindly
-- the next fresh bundle reflects lower storm-lock re-selection and fewer residual-family `Grid sell leg not actionable yet` loops
+- the next fresh bundle reflects lower rotating `XRPETH` / `BNBETH` / `TRXETH` fee-edge skips
+- home-quote candidates and actionable sell-leg candidates remain reachable
 - `T-031` stays the active lane while `T-032` remains bounded support only
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident
-- the new slice reopens repeated impossible sell-leg churn on materially actionable home-quote inventory
+- the new slice causes a new no-feasible deadlock or blocks actionable managed sell legs
 - a board switch is attempted without `docs/TICKET_SWITCH_RETRO.md`

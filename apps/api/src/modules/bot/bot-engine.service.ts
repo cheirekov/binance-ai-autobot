@@ -914,8 +914,10 @@ export class BotEngineService implements OnModuleInit {
     feeEdgeQuarantineActive: boolean;
     recentFeeEdgeRejects: number;
     missingSellLeg: boolean;
+    homeQuote: boolean;
     risk: number;
   }): boolean {
+    if (params.feeEdgeQuarantineActive && !params.missingSellLeg && !params.homeQuote) return true;
     if (params.recentFeeEdgeRejects <= 0) return false;
 
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
@@ -5196,10 +5198,6 @@ export class BotEngineService implements OnModuleInit {
                 contains: "fee/edge filter",
                 windowMs: 15 * 60_000
               });
-              const feeEdgeQuarantined = activeReasonQuarantineFamilies.has("FEE_EDGE") && recentFeeEdgeRejects > 0;
-              if (feeEdgeQuarantined) {
-                continue;
-              }
               const sizingRejectThreshold = Math.max(2, Math.round(4 - boundedRisk / 50)); // risk 0 -> 4, risk 100 -> 2
               const suppressBuyLegFromRejectStorm = recentGridBuySizingRejects >= sizingRejectThreshold;
               const suppressSellLegFromRejectStorm = recentGridSellSizingRejects >= sizingRejectThreshold;
@@ -5272,6 +5270,7 @@ export class BotEngineService implements OnModuleInit {
                   feeEdgeQuarantineActive: activeReasonQuarantineFamilies.has("FEE_EDGE"),
                   recentFeeEdgeRejects,
                   missingSellLeg,
+                  homeQuote: candidateQuote === homeStable.trim().toUpperCase(),
                   risk: boundedRisk
                 })
               ) {

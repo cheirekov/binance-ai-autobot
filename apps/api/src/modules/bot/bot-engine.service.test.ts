@@ -3527,21 +3527,43 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(false);
   });
 
-  it("suppresses repeated fee-edge grid candidates only when no sell leg is actionable", () => {
+  it("suppresses fee-edge grid candidates only when no sell leg is actionable", () => {
     const helpers = service as unknown as {
       shouldSuppressGridFeeEdgeCandidate: (params: {
         feeEdgeQuarantineActive: boolean;
         recentFeeEdgeRejects: number;
         missingSellLeg: boolean;
+        homeQuote: boolean;
         risk: number;
       }) => boolean;
     };
 
     expect(
       helpers.shouldSuppressGridFeeEdgeCandidate({
+        feeEdgeQuarantineActive: true,
+        recentFeeEdgeRejects: 0,
+        missingSellLeg: false,
+        homeQuote: false,
+        risk: 100
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldSuppressGridFeeEdgeCandidate({
+        feeEdgeQuarantineActive: true,
+        recentFeeEdgeRejects: 0,
+        missingSellLeg: false,
+        homeQuote: true,
+        risk: 100
+      })
+    ).toBe(false);
+
+    expect(
+      helpers.shouldSuppressGridFeeEdgeCandidate({
         feeEdgeQuarantineActive: false,
         recentFeeEdgeRejects: 2,
         missingSellLeg: false,
+        homeQuote: true,
         risk: 100
       })
     ).toBe(true);
@@ -3551,6 +3573,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         feeEdgeQuarantineActive: true,
         recentFeeEdgeRejects: 1,
         missingSellLeg: false,
+        homeQuote: true,
         risk: 100
       })
     ).toBe(true);
@@ -3560,6 +3583,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         feeEdgeQuarantineActive: false,
         recentFeeEdgeRejects: 1,
         missingSellLeg: false,
+        homeQuote: true,
         risk: 100
       })
     ).toBe(false);
@@ -3569,6 +3593,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         feeEdgeQuarantineActive: true,
         recentFeeEdgeRejects: 3,
         missingSellLeg: true,
+        homeQuote: false,
         risk: 100
       })
     ).toBe(true);
@@ -3578,6 +3603,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         feeEdgeQuarantineActive: false,
         recentFeeEdgeRejects: 2,
         missingSellLeg: true,
+        homeQuote: false,
         risk: 100
       })
     ).toBe(false);

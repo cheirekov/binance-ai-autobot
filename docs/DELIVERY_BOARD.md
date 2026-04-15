@@ -1,6 +1,6 @@
 # DELIVERY BOARD (PM v2) — Binance AI Autobot
 
-Last updated: 2026-04-01  
+Last updated: 2026-04-15
 Owner: PM/BA + Codex + User
 
 This board is structured to reduce scope drift and context-window churn.
@@ -105,7 +105,7 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-031 | IN_PROGRESS | Regime engine v2 | Candidate/actionability quality remains the active lane. A bounded linked support slice from `T-032` is allowed only when fresh evidence shows downside-control and regime-quality are coupled in the same runtime window. |
+| T-031 | IN_PROGRESS | Regime engine v2 | Candidate/actionability quality remains the active lane; current focus is fee-edge and residual-dust loop suppression without weakening fee floors. A bounded linked support slice from `T-032` is allowed only when fresh evidence shows downside-control and regime-quality are coupled in the same runtime window. |
 | T-032 | TODO | Exit manager v2 | Linked support only while `T-031` is active: preserve March 30-31 downside-control slices and allow bounded same-batch support work when caution/unwind behavior blocks `T-031` validation. |
 | T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
 

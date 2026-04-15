@@ -16,6 +16,41 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-15 16:55 UTC — T-031 twelfth slice: make global fee-edge quarantine cross-quote aware
+- Scope:
+  - respond to the fresh April 15 evening bundle where the April 15 morning dust-storm patch held, but candidate selection rotated across fresh non-home-quote fee-edge candidates while a global `FEE_EDGE` quarantine was already active.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260415-164608.tgz`) shows:
+    - `risk_state=NORMAL`
+    - `activeOrders=0`
+    - `sizingRejectPressure=low`
+    - dominant skips shifted to cross-quote fee-edge / quote-family churn:
+      - `Skip XRPETH: Fee/edge filter (net -0.075% < 0.052%)`
+      - `Skip XRPETH: Fee/edge filter (net -0.073% < 0.052%)`
+      - `Skip BNBETH: Fee/edge filter (net -0.061% < 0.052%)`
+      - `Skip: No feasible candidates after policy/exposure filters`
+  - inferred blocker:
+    - `REASON_QUARANTINE:FEE_EDGE` existed, but the selection suppression was still symbol-local, so fresh `ETH`/cross-quote pairs could keep entering the same failed fee-edge path.
+- PM milestone mapping:
+  - keep `T-031` active.
+  - keep `T-032` linked support only; latest bundle is not a downside-control blocker.
+  - do not weaken the fee floor or reopen `T-034` quote-routing.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: global `FEE_EDGE` quarantine now suppresses non-home-quote grid candidates that have no actionable sell leg even if that exact symbol has no local fee-edge history yet.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: removed the earlier pre-actionability fee-edge continue so actionable sell-leg candidates are evaluated through the bounded helper instead of being skipped before sell feasibility is known.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage for cross-quote global quarantine suppression while preserving home-quote and actionable-sell paths.
+  - `docs/TRIAGE_NOTE_2026-04-15_T031_GLOBAL_FEE_EDGE_QUARANTINE_ROTATION.md`: recorded the same-ticket quality triage.
+- Risk slider impact:
+  - fee-floor math is unchanged.
+  - risk still controls quarantine threshold/cooldown; this slice only makes an active global fee-edge quarantine effective across fresh non-home-quote candidates.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+- Follow-up:
+  - next fresh bundle should show fewer rotating `XRPETH` / `BNBETH` / `TRXETH` fee-edge skips while home-quote opportunities and managed sell legs remain reachable.
+
 ## 2026-04-15 07:45 UTC — T-031 eleventh slice: honor residual storm locks during dust bypass
 - Scope:
   - respond to the fresh April 15 morning bundle where widened residual-family storm locks are now firing, but selection still re-entered symbols protected by `Skip storm (...) Grid sell leg not actionable yet` locks through the dust-cooldown bypass.
