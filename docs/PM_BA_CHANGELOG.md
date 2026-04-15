@@ -16,6 +16,38 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-15 07:45 UTC — T-031 eleventh slice: honor residual storm locks during dust bypass
+- Scope:
+  - respond to the fresh April 15 morning bundle where widened residual-family storm locks are now firing, but selection still re-entered symbols protected by `Skip storm (...) Grid sell leg not actionable yet` locks through the dust-cooldown bypass.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260415-072942.tgz`) shows:
+    - `risk_state=HALT`, `trigger=PROFIT_GIVEBACK`, with `daily-loss-halt-unwind` actively firing
+    - `sizingRejectPressure=low`
+    - dominant skips still include residual family dust:
+      - `Skip ETHUSDC: Grid sell leg not actionable yet`
+      - `Skip 币安人生USDC: Grid sell leg not actionable yet`
+      - `Skip GIGGLEUSDC: Protection lock COOLDOWN: Skip storm (3/3): Grid sell leg not actionable yet (3600s)`
+      - `Skip ZAMAUSDC: Grid sell leg not actionable yet`
+  - inferred blocker:
+    - April 14 storm detection worked, but the selection-time dust bypass still ignored active storm locks; storm locks must be authoritative.
+- PM milestone mapping:
+  - keep `T-031` active.
+  - keep `T-032` linked support only; halt unwind is visible and firing, so no downside-control patch in this batch.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: `GRID_SELL_NOT_ACTIONABLE` dust cooldowns are still bypassable for first-pass tiny residual recovery, but not when the lock reason is an active skip storm.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: added regression coverage that storm locks remain blocking even for dust home-quote candidates.
+  - handoff docs aligned to the new same-ticket slice.
+- Risk slider impact:
+  - no hard-limit change.
+  - risk still controls storm threshold/window/cooldown; this slice only prevents the bypass from negating an already-triggered storm lock.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+- Runtime test request:
+  - deploy on top of the current `9bf1316` runtime without resetting state and collect one fresh bundle.
+- Follow-up:
+  - next fresh bundle should show fewer `Protection lock COOLDOWN: Skip storm (...) Grid sell leg not actionable yet` re-selection loops, while `daily-loss-halt-unwind` remains reachable when `T-032` support conditions require it.
+
 ## 2026-04-14 09:20 UTC — T-031 tenth slice: widen residual family storm parking
 - Scope:
   - respond to the fresh April 14 day bundle where the April 13 family-level storm key was live, but residual dust churn still rotated across `币安人生USDC`, `GIGGLEUSDC`, `SOLUSDC`, `ENJUSDC`, and `ETHUSDC`.

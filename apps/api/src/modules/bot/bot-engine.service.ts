@@ -497,6 +497,7 @@ export class BotEngineService implements OnModuleInit {
     const details = this.readLockDetails(activeLock);
     const category = typeof details?.category === "string" ? details.category.trim().toUpperCase() : "";
     if (category !== "GRID_SELL_NOT_ACTIONABLE") return blockedReason;
+    if (activeLock.reason.trim().toLowerCase().includes("skip storm")) return blockedReason;
 
     const normalizedQuote = params.quoteAsset.trim().toUpperCase();
     const normalizedHome = params.homeStable.trim().toUpperCase();

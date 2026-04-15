@@ -87,6 +87,7 @@ These are execution behaviors currently active in runtime:
     - current April 10 slice: the solo residual-loop lookback is longer, so a steady every-15-minute dust loop can actually trigger the longer retry cooldown instead of repeating forever
     - current April 13 slice: repeated `Grid sell leg not actionable yet` skips now share a family-level storm key, so residual dust churn across multiple home-quote symbols can trigger a longer retry cooldown instead of just rotating
     - current April 14 slice: the family-level dust storm now uses a wider lookback, a lower trigger threshold, and a longer cooldown so slower multi-symbol residual rotation is parked longer instead of re-entering every 15-30 minutes
+    - current April 15 slice: the first-pass dust-cooldown bypass now honors active skip-storm locks, so symbols already parked by `Grid sell leg not actionable yet` storm protection are not immediately reselected
   - objective: improve candidate quality and rotation under real market regimes without reopening `T-032` or `T-034`
 
 ## Support / next strategy core

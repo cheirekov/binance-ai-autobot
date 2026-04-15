@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-14 12:20 EEST  
+Last updated: 2026-04-15 10:45 EEST  
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260414-090828.tgz`) shows the April 13 family-level storm key is live, but the runtime still rotates more slowly across a small family of home-quote dust residuals (`币安人生USDC`, `GIGGLEUSDC`, `SOLUSDC`, `ENJUSDC`, `ETHUSDC`) that repeat `Grid sell leg not actionable yet` and short `COOLDOWN` re-entries.
+The newest fresh bundle (`autobot-feedback-20260415-072942.tgz`) shows the April 14 family-level storm locks are live, but the first-pass dust-cooldown bypass can still reselect symbols already protected by `Skip storm (...) Grid sell leg not actionable yet` locks.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -23,12 +23,12 @@ The newest fresh bundle (`autobot-feedback-20260414-090828.tgz`) shows the April
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that widens the family-level storm lookback, lowers the trigger threshold, and extends the cooldown for `Grid sell leg not actionable yet` will park the residual cluster longer instead of letting it re-enter every 15-30 minutes.
+- A bounded `T-031` slice that keeps first-pass dust recovery but honors active skip-storm locks will prevent already-parked residual symbols from re-entering selection.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved as a support lane rather than being reopened blindly
-- the next fresh bundle reflects lower repeated residual-family `Grid sell leg not actionable yet` churn and fewer short `COOLDOWN` re-entries
+- the next fresh bundle reflects lower storm-lock re-selection and fewer residual-family `Grid sell leg not actionable yet` loops
 - `T-031` stays the active lane while `T-032` remains bounded support only
 
 ## Stop / rollback conditions
