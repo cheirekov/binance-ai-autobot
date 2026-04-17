@@ -1,17 +1,17 @@
 # NEXT_BATCH_PLAN
 
-Last updated: 2026-04-15 19:55 EEST
+Last updated: 2026-04-17 20:15 EEST
 Owner: PM/BA + Codex
 
 ## Exact scope
-Keep `T-031` active. Implement one bounded correction so active global `FEE_EDGE` quarantine suppresses fresh non-home-quote grid candidates that have no actionable sell leg, without weakening the fee floor or blocking home-quote / managed sell-leg paths. Preserve the April 12 linked-support thaw, April 15 storm-lock bypass correction, March 30-31 `T-032` downside-control behavior, and `T-034` funding stability.
+Keep `T-031` active. Implement one bounded correction so near-flat `PROFIT_GIVEBACK` `CAUTION` books with `activeOrders=0` can park repeated no-feasible recovery attempts when the fallback sell is still below exchange minimums. Preserve the April 15 global fee-edge quarantine correction, April 13-15 residual storm behavior, April 12 linked-support thaw, March 30-31 `T-032` downside-control behavior, and `T-034` funding stability.
 
 Linked support mode:
 - `T-032` support slices are allowed in the same batch only when fresh evidence shows downside-control behavior is the immediate blocker to validating the active `T-031` strategy slice.
 
 ## In scope
-- make global fee-edge quarantine effective across fresh cross-quote candidates in runtime code + tests
-- collect the next fresh bundle to validate lower `ETH`/cross-quote fee-edge rotation without restoring the older no-feasible deadlock
+- add the bounded no-feasible dust recovery cooldown in runtime code + tests
+- collect the next fresh bundle to validate lower no-feasible churn without hiding actionable sells or caution unwind behavior
 
 ## Out of scope
 - reopening any DONE ticket
@@ -21,11 +21,11 @@ Linked support mode:
 
 ## Acceptance criteria
 - the repo handoff reflects the active `T-031` batch correctly
-- the global fee-edge quarantine correction lands with tests
-- the next fresh bundle can show lower cross-quote fee-edge rotation without reopening funding or downside-control regressions
+- the no-feasible dust recovery cooldown lands with tests
+- the next fresh bundle can show lower no-feasible churn without reopening funding or downside-control regressions
 
 ## Rollback condition
-- the first post-deploy `T-031` bundle reopens a `T-034` funding regression, materially weakens downside control, blocks actionable managed sell legs, or restores a no-feasible deadlock
+- the first post-deploy `T-031` bundle reopens a `T-034` funding regression, materially weakens downside control, blocks actionable managed sell legs, or still burns most decisions inside the same near-flat no-feasible loop
 
 ## What capability this moves forward
-Moves `Lane A — Strategy quality / regime routing` by making global fee-edge evidence affect candidate quality before the bot rotates through fresh cross-quote symbols.
+Moves `Lane A — Strategy quality / regime routing` by making near-flat no-feasible recovery behavior auditable and bounded instead of letting the bot hammer an exchange-infeasible dust recovery path every tick.

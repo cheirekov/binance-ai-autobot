@@ -1678,6 +1678,95 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(unrelatedGate.pressureDetected).toBe(false);
   });
 
+  it("parks near-flat profit-giveback no-feasible dust loops with a bounded global cooldown", () => {
+    const helpers = service as unknown as {
+      shouldApplyNoFeasibleDustCooldown: (params: {
+        guard: {
+          state: "NORMAL" | "CAUTION" | "HALT";
+          trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK";
+          managedExposurePct: number;
+          profitGivebackHaltMinExposurePct: number;
+        };
+        risk: number;
+        activeOrderCount: number;
+        attemptedReason: string | null | undefined;
+      }) => boolean;
+      deriveNoFeasibleDustCooldownMs: (risk: number) => number;
+    };
+
+    expect(
+      helpers.shouldApplyNoFeasibleDustCooldown({
+        guard: {
+          state: "CAUTION",
+          trigger: "PROFIT_GIVEBACK",
+          managedExposurePct: 0.002,
+          profitGivebackHaltMinExposurePct: 0.08
+        },
+        risk: 100,
+        activeOrderCount: 0,
+        attemptedReason: "Below minNotional 5.00000000 (need qty >= 155.3)"
+      })
+    ).toBe(true);
+    expect(helpers.deriveNoFeasibleDustCooldownMs(0)).toBe(2_700_000);
+    expect(helpers.deriveNoFeasibleDustCooldownMs(100)).toBe(1_200_000);
+  });
+
+  it("keeps no-feasible dust cooldown disabled when the book is still active or not min-order blocked", () => {
+    const helpers = service as unknown as {
+      shouldApplyNoFeasibleDustCooldown: (params: {
+        guard: {
+          state: "NORMAL" | "CAUTION" | "HALT";
+          trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK";
+          managedExposurePct: number;
+          profitGivebackHaltMinExposurePct: number;
+        };
+        risk: number;
+        activeOrderCount: number;
+        attemptedReason: string | null | undefined;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldApplyNoFeasibleDustCooldown({
+        guard: {
+          state: "CAUTION",
+          trigger: "PROFIT_GIVEBACK",
+          managedExposurePct: 0.002,
+          profitGivebackHaltMinExposurePct: 0.08
+        },
+        risk: 100,
+        activeOrderCount: 1,
+        attemptedReason: "Below minQty 1.00000000"
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldApplyNoFeasibleDustCooldown({
+        guard: {
+          state: "CAUTION",
+          trigger: "PROFIT_GIVEBACK",
+          managedExposurePct: 0.002,
+          profitGivebackHaltMinExposurePct: 0.08
+        },
+        risk: 100,
+        activeOrderCount: 0,
+        attemptedReason: "Spendable BTC exhausted after reserve"
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldApplyNoFeasibleDustCooldown({
+        guard: {
+          state: "CAUTION",
+          trigger: "PROFIT_GIVEBACK",
+          managedExposurePct: 0.25,
+          profitGivebackHaltMinExposurePct: 0.08
+        },
+        risk: 100,
+        activeOrderCount: 0,
+        attemptedReason: "Below minNotional 5.00000000"
+      })
+    ).toBe(false);
+  });
+
   it("classifies skip reason clusters for KPI counters", () => {
     const helpers = service as unknown as {
       classifySkipReasonCluster: (summary: string) => "FEE_EDGE" | "MIN_ORDER" | "INVENTORY_WAITING" | "OTHER";

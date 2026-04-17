@@ -16,6 +16,48 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-17 17:15 UTC — T-031 thirteenth slice: park near-flat no-feasible dust recovery loops
+- Scope:
+  - respond to the fresh April 17 evening bundle where the April 15 fee-edge patch held, but runtime stayed boxed in a near-flat `PROFIT_GIVEBACK` recovery loop that could not execute because the fallback recovery sell was below exchange minimums.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260417-164018.tgz`) shows:
+    - `risk_state=CAUTION`
+    - `trigger=PROFIT_GIVEBACK`
+    - `activeOrders=0`
+    - `open_positions=4`
+    - dominant skip `Skip: No feasible candidates after policy/exposure filters` (`61`)
+  - bundle state / decisions show:
+    - non-home-quote rejections are mostly `Spendable BTC/ETH/BNB exhausted after reserve`
+    - no-feasible recovery is already enabled, but the attempted recovery symbol (`BIOUSDC`) fails on `Below minNotional 5.00000000 ...`
+    - repeated residual `Grid sell leg not actionable yet` decisions follow, so runtime keeps burning cycles on a dust-only recovery path.
+- PM milestone mapping:
+  - keep `T-031` active as the strategy-quality lane.
+  - keep `T-032` linked support only; the live blocker is not an `ABS_DAILY_LOSS` thaw regression.
+  - preserve April 15 global fee-edge quarantine behavior, April 13-15 residual storm mitigations, April 12 near-flat `ABS_DAILY_LOSS` thaw, and March 30-31 downside-control behavior.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added dust/min-order failure detection for no-feasible recovery attempts.
+    - added a bounded risk-linked global cooldown (`45m -> 20m`) for near-flat `PROFIT_GIVEBACK` `CAUTION` books when no active orders remain and the recovery attempt fails only on exchange minimums.
+    - cooldown details are recorded under `category=NO_FEASIBLE_DUST_RECOVERY` so the next bundle can prove the loop changed.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression coverage for the new no-feasible dust cooldown gate and its risk-linked window.
+  - `docs/TRIAGE_NOTE_2026-04-17_T031_NO_FEASIBLE_DUST_RECOVERY_COOLDOWN.md`:
+    - recorded same-ticket triage for the latest loop.
+- Risk slider impact:
+  - this slice does not weaken entry filters or fee floors.
+  - risk now controls the no-feasible dust cooldown length only for the bounded near-flat `PROFIT_GIVEBACK` case (`45m` at low risk down to `20m` at high risk).
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/validate-active-ticket.sh`
+  - `./scripts/pmba-gate.sh end`
+  - `git diff --check`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected evidence: lower repeated `No feasible candidates after policy/exposure filters` churn, visible `NO_FEASIBLE_DUST_RECOVERY` cooldown details when the book is too small to recover, and preserved reachability for real managed sell legs / caution unwind behavior.
+- Follow-up:
+  - if the next fresh bundle still burns most decisions inside the same near-flat no-feasible loop after the cooldown expires, the next `T-031` slice should widen the recovery candidate ranking rather than extending cooldowns again.
+
 ## 2026-04-15 16:55 UTC — T-031 twelfth slice: make global fee-edge quarantine cross-quote aware
 - Scope:
   - respond to the fresh April 15 evening bundle where the April 15 morning dust-storm patch held, but candidate selection rotated across fresh non-home-quote fee-edge candidates while a global `FEE_EDGE` quarantine was already active.

@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-15 19:55 EEST
+Last updated: 2026-04-17 20:15 EEST
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260415-164608.tgz`) shows the April 15 dust-storm mitigation moved the blocker, but global `FEE_EDGE` quarantine still lets fresh non-home-quote symbols rotate into repeated fee-edge skips because suppression is too symbol-local.
+The newest fresh bundle (`autobot-feedback-20260417-164018.tgz`) shows the April 15 fee-edge mitigation held, but the engine is now boxed into a near-flat `PROFIT_GIVEBACK` no-feasible loop: non-home quotes are exhausted after reserve, no active orders remain, and the fallback recovery sell itself fails on exchange minimums.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -23,16 +23,17 @@ The newest fresh bundle (`autobot-feedback-20260415-164608.tgz`) shows the April
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that makes active global `FEE_EDGE` quarantine suppress fresh non-home-quote candidates with no actionable sell leg will reduce cross-quote fee-edge churn without weakening home-quote entries or managed sell legs.
+- A bounded `T-031` slice that parks no-feasible dust-only recovery loops behind a temporary global cooldown will reduce repeated `No feasible candidates after policy/exposure filters` churn without weakening actionable sells, caution unwind behavior, or the preserved `T-032` support path.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved as a support lane rather than being reopened blindly
-- the next fresh bundle reflects lower rotating `XRPETH` / `BNBETH` / `TRXETH` fee-edge skips
-- home-quote candidates and actionable sell-leg candidates remain reachable
+- the next fresh bundle reflects lower repeated `No feasible candidates after policy/exposure filters` churn
+- actionable sell-leg candidates and caution unwind remain reachable
+- runtime records a bounded `NO_FEASIBLE_DUST_RECOVERY` cooldown when the recovery attempt is too small to execute
 - `T-031` stays the active lane while `T-032` remains bounded support only
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident
-- the new slice causes a new no-feasible deadlock or blocks actionable managed sell legs
+- the new slice blocks actionable managed sell legs, hides real recovery opportunities, or weakens downside-control reachability
 - a board switch is attempted without `docs/TICKET_SWITCH_RETRO.md`

@@ -3380,6 +3380,42 @@ export class BotEngineService implements OnModuleInit {
     };
   }
 
+  private isDustMinOrderFailureReason(reason: string | null | undefined): boolean {
+    const normalized = (reason ?? "").trim().toLowerCase();
+    if (!normalized) return false;
+    return (
+      normalized.includes("below minqty") ||
+      normalized.includes("below minnotional") ||
+      normalized.includes("rounds below minqty")
+    );
+  }
+
+  private deriveNoFeasibleDustCooldownMs(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    return Math.round((45 - (boundedRisk / 100) * 25) * 60_000); // risk 0 -> 45m, risk 100 -> 20m
+  }
+
+  private shouldApplyNoFeasibleDustCooldown(params: {
+    guard: DailyLossGuardSnapshot;
+    risk: number;
+    activeOrderCount: number;
+    attemptedReason: string | null | undefined;
+  }): boolean {
+    if (params.guard.state !== "CAUTION") return false;
+    if (params.guard.trigger !== "PROFIT_GIVEBACK") return false;
+    if (params.activeOrderCount > 0) return false;
+    if (!this.isDustMinOrderFailureReason(params.attemptedReason)) return false;
+
+    const minManagedExposurePct = this.deriveCautionPauseNewSymbolsMinExposurePct({
+      risk: params.risk,
+      trigger: params.guard.trigger,
+      haltExposureFloorPct: params.guard.profitGivebackHaltMinExposurePct
+    });
+    const managedExposurePct =
+      Number.isFinite(params.guard.managedExposurePct) && params.guard.managedExposurePct > 0 ? params.guard.managedExposurePct : 0;
+    return managedExposurePct + 1e-8 < minManagedExposurePct;
+  }
+
   private async deriveMaxExecutionQuoteSpendableHome(params: {
     config: AppConfig | undefined;
     balances: BinanceBalanceSnapshot[];
@@ -6204,6 +6240,33 @@ export class BotEngineService implements OnModuleInit {
                 });
                 return;
               }
+            }
+
+            if (
+              this.shouldApplyNoFeasibleDustCooldown({
+                guard: dailyLossGuard,
+                risk,
+                activeOrderCount: current.activeOrders.length,
+                attemptedReason: noFeasibleRecoveryAttempt?.reason
+              })
+            ) {
+              const cooldownMs = this.deriveNoFeasibleDustCooldownMs(risk);
+              current = this.upsertProtectionLock(current, {
+                type: "COOLDOWN",
+                scope: "GLOBAL",
+                reason: `No-feasible dust recovery cooldown (${Math.round(cooldownMs / 60000)}m)`,
+                expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                details: {
+                  category: "NO_FEASIBLE_DUST_RECOVERY",
+                  trigger: dailyLossGuard.trigger,
+                  managedExposurePct: this.toRounded(dailyLossGuard.managedExposurePct ?? 0, 6),
+                  attemptedSymbol: noFeasibleRecoveryAttempt?.symbol ?? null,
+                  attemptedReason: noFeasibleRecoveryAttempt?.reason ?? null,
+                  recentCount: noFeasibleRecoveryPolicy.recentCount,
+                  threshold: noFeasibleRecoveryPolicy.threshold,
+                  cooldownMs
+                }
+              });
             }
 
             const primaryRejectionSample = feasibleCandidateSelection.rejectionSamples[0];
