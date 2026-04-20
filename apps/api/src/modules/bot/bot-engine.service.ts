@@ -1178,6 +1178,7 @@ export class BotEngineService implements OnModuleInit {
     risk: number;
     homeStable: string;
     allowedExecutionQuotes?: Iterable<string>;
+    balances?: BinanceBalanceSnapshot[];
     walletTotalHome: number;
     nowMs: number;
   }): DailyLossGuardSnapshot {
@@ -1220,13 +1221,11 @@ export class BotEngineService implements OnModuleInit {
     if (!exposureQuotes.has(homeStable)) {
       exposureQuotes.add(homeStable);
     }
-    const managedExposureHome = [...this.getManagedPositions(params.state).values()]
-      .filter(
-        (position) =>
-          position.netQty > 0 &&
-          this.getSymbolQuoteAssetByPriority(position.symbol, exposureQuotes) !== null
-      )
-      .reduce((sum, position) => sum + Math.max(0, position.costQuote), 0);
+    const managedExposureHome = this.deriveManagedExposureHomeForDailyLossGuard({
+      state: params.state,
+      exposureQuotes,
+      balances: params.balances
+    });
     const managedExposurePct = walletTotalHome > 0 ? managedExposureHome / walletTotalHome : 0;
     const cautionLossAbs = maxDailyLossAbs * 0.4;
     let state: "NORMAL" | "CAUTION" | "HALT" =
@@ -1270,6 +1269,63 @@ export class BotEngineService implements OnModuleInit {
       lookbackMs: policy.maxDailyLossLookbackMs,
       windowStartIso
     };
+  }
+
+  private deriveManagedExposureHomeForDailyLossGuard(params: {
+    state: BotState;
+    exposureQuotes: Set<string>;
+    balances?: BinanceBalanceSnapshot[];
+  }): number {
+    const managedPositions = [...this.getManagedPositions(params.state).values()]
+      .filter(
+        (position) =>
+          position.netQty > 0 &&
+          this.getSymbolQuoteAssetByPriority(position.symbol, params.exposureQuotes) !== null
+      )
+      .map((position) => ({
+        ...position,
+        baseAsset: this.getSymbolBaseAssetByPriority(position.symbol, params.exposureQuotes)
+      }));
+
+    if (!params.balances || params.balances.length === 0) {
+      return managedPositions.reduce((sum, position) => sum + Math.max(0, position.costQuote), 0);
+    }
+
+    const availableBaseByAsset = new Map<string, number>();
+    for (const balance of params.balances) {
+      const asset = balance.asset.trim().toUpperCase();
+      if (!asset) continue;
+      const free = Number.isFinite(balance.free) ? Math.max(0, balance.free) : 0;
+      const locked = Number.isFinite(balance.locked) ? Math.max(0, balance.locked) : 0;
+      const total = Number.isFinite(balance.total) ? Math.max(0, balance.total) : free + locked;
+      availableBaseByAsset.set(asset, total);
+    }
+
+    const managedByBaseAsset = new Map<string, { netQty: number; costQuote: number }>();
+    let fallbackExposureHome = 0;
+    for (const position of managedPositions) {
+      if (!position.baseAsset || position.netQty <= 0) {
+        fallbackExposureHome += Math.max(0, position.costQuote);
+        continue;
+      }
+
+      const current = managedByBaseAsset.get(position.baseAsset) ?? { netQty: 0, costQuote: 0 };
+      current.netQty += position.netQty;
+      current.costQuote += Math.max(0, position.costQuote);
+      managedByBaseAsset.set(position.baseAsset, current);
+    }
+
+    let managedExposureHome = 0;
+    for (const [baseAsset, totals] of managedByBaseAsset) {
+      if (!Number.isFinite(totals.netQty) || totals.netQty <= 0) continue;
+      const availableQty = availableBaseByAsset.get(baseAsset) ?? 0;
+      if (!Number.isFinite(availableQty) || availableQty <= 0) continue;
+      const unwindableRatio = Math.max(0, Math.min(1, availableQty / totals.netQty));
+      if (unwindableRatio <= 0) continue;
+      managedExposureHome += totals.costQuote * unwindableRatio;
+    }
+
+    return managedExposureHome + fallbackExposureHome;
   }
 
   private buildRuntimeRiskState(params: {
@@ -5865,6 +5921,7 @@ export class BotEngineService implements OnModuleInit {
             risk,
             homeStable,
             allowedExecutionQuotes,
+            balances,
             walletTotalHome,
             nowMs: Date.now()
           });

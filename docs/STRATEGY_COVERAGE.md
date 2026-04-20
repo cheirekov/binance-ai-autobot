@@ -100,6 +100,7 @@ These are execution behaviors currently active in runtime:
     - March 30 slice: thaw `CAUTION` new-symbol pause once `ABS_DAILY_LOSS` has already de-risked the book to near-flat exposure/order state
     - March 31 slice: stop-loss-cooled residual positions no longer anchor global `CAUTION` new-symbol pause once active orders are gone
     - April 12 linked-support slice: near-flat residual managed positions no longer keep `ABS_DAILY_LOSS` `CAUTION` frozen once active orders are gone
+    - current April 20 linked-support slice: `PROFIT_GIVEBACK` `HALT` now clips managed exposure to base inventory that still exists in balances, so home-quote exposure already spent as quote inventory elsewhere cannot keep downside-control frozen by itself
   - reopen only if downside-control policy becomes the dominant blocker again
 - `T-034` — Multi-quote execution policy v1
   - DONE; preserve funding/routing stability while `T-031` evolves strategy quality

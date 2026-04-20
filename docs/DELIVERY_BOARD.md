@@ -105,8 +105,8 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-031 | IN_PROGRESS | Regime engine v2 | Candidate/actionability quality remains the active lane; current focus is fee-edge and residual-dust loop suppression without weakening fee floors. A bounded linked support slice from `T-032` is allowed only when fresh evidence shows downside-control and regime-quality are coupled in the same runtime window. |
-| T-032 | TODO | Exit manager v2 | Linked support only while `T-031` is active: preserve March 30-31 downside-control slices and allow bounded same-batch support work when caution/unwind behavior blocks `T-031` validation. |
+| T-031 | IN_PROGRESS | Regime engine v2 | Candidate/actionability quality remains the active lane; the April 20 quote-pressure quarantine is deployed, and the current bounded linked-support need is to clear false `PROFIT_GIVEBACK` `HALT` persistence without weakening fee floors or reopening quote-routing work. |
+| T-032 | TODO | Exit manager v2 | Linked support only while `T-031` is active: preserve March 30-31 downside-control slices and allow bounded same-batch support work when false `HALT` / unwind-only behavior blocks `T-031` validation. |
 | T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
 
 `T-005` status: moved to DONE after overnight evidence (`autobot-feedback-20260225-100508.tgz`) showed guard transitions/recovery without deadlock.
@@ -119,7 +119,7 @@ Profit milestone rule:
 
 | Priority | ID | Status | Title | Acceptance focus |
 |---|---|---|---|---|
-| 1 | T-032 | TODO | Exit manager v2 | keep downside-control support slices intact while `T-031` is active |
+| 1 | T-032 | TODO | Exit manager v2 | keep downside-control support slices intact while `T-031` is active and clear false `PROFIT_GIVEBACK` `HALT` persistence when it blocks strategy validation |
 | 2 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source |
 | 3 | T-028 | TODO | Compact advanced UX | improve operator readability without changing strategy behavior |
 

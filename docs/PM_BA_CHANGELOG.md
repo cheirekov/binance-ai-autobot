@@ -16,6 +16,50 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-20 15:30 UTC — T-032 linked-support slice: clip profit-giveback HALT exposure to unwindable balances
+- Scope:
+  - respond to the fresh April 20 day bundle where the April 20 `T-031` quote-pressure quarantine is deployed (`git.commit=47693bb`), but runtime is still held in `PROFIT_GIVEBACK` `HALT` because managed exposure is slightly above the halt floor even though the quote assets needed for recovery are exhausted and no unwind trade fires.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260420-145411.tgz`) shows:
+    - `risk_state=HALT`
+    - `trigger=PROFIT_GIVEBACK`
+    - `unwind_only=true`
+    - `activeOrders=0`
+    - `managedExposure=9.2%`
+    - `haltExposureFloor=8.0%`
+    - dominant skip `Skip: No feasible candidates after policy/exposure filters` (`38`)
+  - latest no-feasible details show:
+    - rejection samples remain entirely non-home quote spendable exhaustion (`BTC`, `ETH`, `BNB`)
+    - recovery still attempts, but the recovery symbol fails on `Below minQty 1.00000000`
+    - no fresh `daily-loss-halt-unwind` trade fires in the latest deployed bundle
+- PM milestone mapping:
+  - keep `T-031` active as the strategy-quality lane.
+  - allow a bounded linked-support `T-032` slice because downside-control gating is now the immediate blocker to validating the active `T-031` slice.
+  - preserve April 20 quote-pressure quarantine, April 17 dust cooldown, April 15 fee-edge quarantine, April 12 linked-support thaw, March 30-31 downside-control behavior, and `T-034` funding stability.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - threaded live balances into `evaluateDailyLossGuard`.
+    - added a helper that clips `PROFIT_GIVEBACK` managed exposure to the portion of managed base inventory that is still present in balances, instead of treating already-spent base inventory as fully unwindable forever.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression coverage that the guard still stays in `HALT` when the managed base balance still exists.
+    - added regression coverage that the guard downgrades to `CAUTION` when the home-quote base asset was already spent into quote-funded inventory and only a dust remainder is still available.
+  - `docs/TRIAGE_NOTE_2026-04-20_T032_PROFIT_GIVEBACK_HALT_CONSUMED_BASE.md`:
+    - recorded the linked-support triage for the latest fresh bundle.
+- Risk slider impact:
+  - no threshold or fee-floor changes.
+  - this slice only corrects what the daily-loss guard counts as still unwindable managed exposure.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/validate-active-ticket.sh`
+  - `./scripts/pmba-gate.sh end`
+  - `git diff --check`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected evidence: if the old HALT was only anchored by consumed base inventory, runtime should downgrade out of false `PROFIT_GIVEBACK` `HALT` and either resume normal candidate evaluation or produce real unwind activity.
+- Follow-up:
+  - if the next fresh bundle is no longer trapped in false `HALT`, return immediately to the active `T-031` lane and continue quote-pressure / candidate-quality work from the new evidence.
+
 ## 2026-04-20 09:00 UTC — T-031 fourteenth slice: seed buy-quote quarantine from no-feasible quote-pressure loops
 - Scope:
   - respond to the fresh April 20 morning bundle where the April 17 dust cooldown is active, but runtime still repeats `No feasible candidates after policy/exposure filters` because only non-home quote families remain and the recovery attempt itself is below exchange minimums.

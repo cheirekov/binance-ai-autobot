@@ -2816,6 +2816,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         state: BotState;
         risk: number;
         homeStable: string;
+        balances?: BinanceBalanceSnapshot[];
         walletTotalHome: number;
         nowMs: number;
       }) => {
@@ -2888,6 +2889,14 @@ describe("bot-engine insufficient-balance helpers", () => {
       state,
       risk: 100,
       homeStable: "USDC",
+      balances: [
+        {
+          asset: "CCC",
+          free: 10,
+          locked: 0,
+          total: 10
+        }
+      ],
       walletTotalHome: 10_000,
       nowMs: now
     });
@@ -2895,6 +2904,119 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(guard.managedExposurePct).toBeGreaterThan(guard.profitGivebackHaltMinExposurePct);
     expect(guard.active).toBe(true);
     expect(guard.state).toBe("HALT");
+    expect(guard.trigger).toBe("PROFIT_GIVEBACK");
+  });
+
+  it("downgrades PROFIT_GIVEBACK HALT when the managed base asset was already spent as quote inventory", () => {
+    const helpers = service as unknown as {
+      evaluateDailyLossGuard: (params: {
+        state: BotState;
+        risk: number;
+        homeStable: string;
+        balances?: BinanceBalanceSnapshot[];
+        walletTotalHome: number;
+        nowMs: number;
+      }) => {
+        state: "NORMAL" | "CAUTION" | "HALT";
+        active: boolean;
+        trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK";
+        managedExposurePct: number;
+        profitGivebackHaltMinExposurePct: number;
+      };
+    };
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      orderHistory: [
+        {
+          id: "buy-1",
+          ts: new Date(now - 80 * 60_000).toISOString(),
+          symbol: "AAAUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          price: 100,
+          qty: 2
+        },
+        {
+          id: "sell-1",
+          ts: new Date(now - 70 * 60_000).toISOString(),
+          symbol: "AAAUSDC",
+          side: "SELL",
+          type: "MARKET",
+          status: "FILLED",
+          price: 130,
+          qty: 2
+        },
+        {
+          id: "buy-2",
+          ts: new Date(now - 60 * 60_000).toISOString(),
+          symbol: "BBBUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          price: 100,
+          qty: 2
+        },
+        {
+          id: "sell-2",
+          ts: new Date(now - 50 * 60_000).toISOString(),
+          symbol: "BBBUSDC",
+          side: "SELL",
+          type: "MARKET",
+          status: "FILLED",
+          price: 70,
+          qty: 2
+        },
+        {
+          id: "buy-3",
+          ts: new Date(now - 40 * 60_000).toISOString(),
+          symbol: "BTCUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          price: 60_000,
+          qty: 0.01
+        },
+        {
+          id: "buy-4",
+          ts: new Date(now - 30 * 60_000).toISOString(),
+          symbol: "TRXBTC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          price: 0.000004,
+          qty: 1_000
+        }
+      ]
+    };
+
+    const guard = helpers.evaluateDailyLossGuard({
+      state,
+      risk: 100,
+      homeStable: "USDC",
+      balances: [
+        {
+          asset: "BTC",
+          free: 0.00001,
+          locked: 0,
+          total: 0.00001
+        },
+        {
+          asset: "TRX",
+          free: 1_000,
+          locked: 0,
+          total: 1_000
+        }
+      ],
+      walletTotalHome: 6_500,
+      nowMs: now
+    });
+
+    expect(guard.managedExposurePct).toBeLessThan(guard.profitGivebackHaltMinExposurePct);
+    expect(guard.active).toBe(false);
+    expect(guard.state).toBe("CAUTION");
     expect(guard.trigger).toBe("PROFIT_GIVEBACK");
   });
 
