@@ -1,18 +1,17 @@
 # LATEST_BATCH_DECISION
 
-Last updated: 2026-04-17 20:15 EEST
+Last updated: 2026-04-20 11:00 EEST
 Owner: PM/BA + Codex
 
 ## Production capability lane
 - Chosen: `Lane A — Strategy quality / regime routing`
 - Why:
-- `observed`: the latest fresh bundle is `autobot-feedback-20260417-164018.tgz`
-- `observed`: auto-retro says `patch_required`
-- `observed`: the April 15 fee-edge blocker is no longer dominant
-- `observed`: runtime is `CAUTION(trigger=PROFIT_GIVEBACK)`, `activeOrders=0`, and `sizingRejectPressure=low`
-- `observed`: dominant skip is `Skip: No feasible candidates after policy/exposure filters` (`61`)
-- `observed`: recovery is already attempted, but the fallback sell fails on exchange minimums (`Below minNotional 5.00000000 ...`)
-- `inferred`: the immediate blocker is a dust-only near-flat recovery loop, not fee-edge routing or downside-control thaw
+- `observed`: the latest fresh bundle is `autobot-feedback-20260420-083837.tgz`
+- `observed`: auto-retro says `pivot_required`
+- `observed`: runtime is `CAUTION(trigger=PROFIT_GIVEBACK)` with active global dust cooldown
+- `observed`: dominant `Skip: No feasible candidates after policy/exposure filters` rose from `14` to `42`
+- `observed`: latest no-feasible rejection samples are entirely non-home quote pressure (`BTC`, `ETH`, `BNB`) and recovery fails on `Below minQty 1.00000000`
+- `inferred`: the blocker is still `T-031` routing under quote pressure; `T-032` remains support only
 
 ## Chosen active ticket
 - Current: `T-031` (Regime engine v2)
@@ -21,12 +20,13 @@ Owner: PM/BA + Codex
 - Why:
   - `observed`: the linked-support thaw and downside-control support path remain preserved
   - `observed`: the live blocker is `T-031` candidate-quality / recovery behavior, not quote-funding or downside-control
-  - `inferred`: the next bounded batch is to park near-flat dust-only recovery loops without weakening real sell / unwind paths
+  - `observed`: the April 17 patch remains active, but it is not enough on its own
+  - `inferred`: the next bounded batch should seed `GRID_BUY_QUOTE` quarantine from the no-feasible quote-pressure loop
 
 ## Evidence class
 - Current: `fresh`
-- Latest bundle: `autobot-feedback-20260417-164018.tgz`
-- Compared bundle: `autobot-feedback-20260417-074005.tgz`
+- Latest bundle: `autobot-feedback-20260420-083837.tgz`
+- Compared bundle: `autobot-feedback-20260419-123151.tgz`
 
 ## Allowed work mode
 - Current batch: `PATCH_NOW`
@@ -36,11 +36,10 @@ Owner: PM/BA + Codex
 - Next ticket candidate: `T-031`
 - Review slice:
   - keep `T-031` active
-  - preserve the April 15 global fee-edge quarantine behavior and April 13-15 residual storm mitigations
-  - add a bounded no-feasible dust recovery cooldown for near-flat `PROFIT_GIVEBACK` `CAUTION` books with `activeOrders=0`
-  - preserve the April 12 linked-support thaw and March 30-31 `T-032` downside-control behavior
+  - keep `T-031` active
+  - preserve the April 17 dust cooldown behavior, April 15 fee-edge quarantine behavior, and April 12 linked-support thaw
+  - seed `GRID_BUY_QUOTE` quarantine from no-feasible quote-pressure evidence
 - Validation:
-  - fresh bundle review (`autobot-feedback-20260417-164018.tgz`) ✅
-  - same-ticket mitigation landed in code/tests ✅
-  - PM/BA gate start + Docker CI pass ✅
-  - PM/BA gate end remains red until a fresh post-deploy bundle replaces the repeated pre-patch evidence ⚠️
+  - fresh bundle review (`autobot-feedback-20260420-083837.tgz`) ✅
+  - same-ticket mitigation landed in code/tests ⏳
+  - PM/BA gate start + Docker CI pass ⏳

@@ -1767,6 +1767,69 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(false);
   });
 
+  it("applies no-feasible quote quarantine when only non-home quote pressure remains and recovery still fails min-order", () => {
+    const helpers = service as unknown as {
+      shouldApplyNoFeasibleQuoteQuarantine: (params: {
+        homeStable: string;
+        activeOrderCount: number;
+        attemptedReason: string | null | undefined;
+        rejectionSamples: Array<{ stage?: string; quoteAsset?: string }>;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldApplyNoFeasibleQuoteQuarantine({
+        homeStable: "USDC",
+        activeOrderCount: 0,
+        attemptedReason: "Below minQty 1.00000000",
+        rejectionSamples: [
+          { stage: "quote-spendable", quoteAsset: "BTC" },
+          { stage: "quote-spendable", quoteAsset: "ETH" },
+          { stage: "quote-exposure-cap", quoteAsset: "BNB" }
+        ]
+      })
+    ).toBe(true);
+  });
+
+  it("keeps no-feasible quote quarantine off when orders remain, home quote is involved, or pressure is mixed", () => {
+    const helpers = service as unknown as {
+      shouldApplyNoFeasibleQuoteQuarantine: (params: {
+        homeStable: string;
+        activeOrderCount: number;
+        attemptedReason: string | null | undefined;
+        rejectionSamples: Array<{ stage?: string; quoteAsset?: string }>;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldApplyNoFeasibleQuoteQuarantine({
+        homeStable: "USDC",
+        activeOrderCount: 1,
+        attemptedReason: "Below minQty 1.00000000",
+        rejectionSamples: [{ stage: "quote-spendable", quoteAsset: "BTC" }]
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldApplyNoFeasibleQuoteQuarantine({
+        homeStable: "USDC",
+        activeOrderCount: 0,
+        attemptedReason: "Below minQty 1.00000000",
+        rejectionSamples: [{ stage: "quote-spendable", quoteAsset: "USDC" }]
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldApplyNoFeasibleQuoteQuarantine({
+        homeStable: "USDC",
+        activeOrderCount: 0,
+        attemptedReason: "Below minQty 1.00000000",
+        rejectionSamples: [
+          { stage: "quote-spendable", quoteAsset: "BTC" },
+          { stage: "validate-qty", quoteAsset: "ETH" }
+        ]
+      })
+    ).toBe(false);
+  });
+
   it("classifies skip reason clusters for KPI counters", () => {
     const helpers = service as unknown as {
       classifySkipReasonCluster: (summary: string) => "FEE_EDGE" | "MIN_ORDER" | "INVENTORY_WAITING" | "OTHER";

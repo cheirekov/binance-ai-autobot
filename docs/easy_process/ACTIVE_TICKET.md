@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-17 20:15 EEST
+Last updated: 2026-04-20 11:00 EEST
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260417-164018.tgz`) shows the April 15 fee-edge mitigation held, but the engine is now boxed into a near-flat `PROFIT_GIVEBACK` no-feasible loop: non-home quotes are exhausted after reserve, no active orders remain, and the fallback recovery sell itself fails on exchange minimums.
+The newest fresh bundle (`autobot-feedback-20260420-083837.tgz`) shows the April 17 dust cooldown is active, but repeated `No feasible candidates after policy/exposure filters` still dominates because only non-home quote families remain and the recovery attempt itself is too small to execute.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -23,17 +23,17 @@ The newest fresh bundle (`autobot-feedback-20260417-164018.tgz`) shows the April
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that parks no-feasible dust-only recovery loops behind a temporary global cooldown will reduce repeated `No feasible candidates after policy/exposure filters` churn without weakening actionable sells, caution unwind behavior, or the preserved `T-032` support path.
+- A bounded `T-031` slice that seeds `GRID_BUY_QUOTE` quarantine from no-feasible quote-pressure evidence will reduce repeated non-home quote loops without weakening home-quote or managed sell paths.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved as a support lane rather than being reopened blindly
-- the next fresh bundle reflects lower repeated `No feasible candidates after policy/exposure filters` churn
-- actionable sell-leg candidates and caution unwind remain reachable
-- runtime records a bounded `NO_FEASIBLE_DUST_RECOVERY` cooldown when the recovery attempt is too small to execute
+- the next fresh bundle shows lower repeated `No feasible candidates after policy/exposure filters` churn
+- non-home quote families under reserve starvation are visibly parked behind `GRID_BUY_QUOTE` quarantine
+- actionable sell-leg candidates and downside-control support remain reachable
 - `T-031` stays the active lane while `T-032` remains bounded support only
 
 ## Stop / rollback conditions
 - fresh evidence re-establishes a live `P0/P1` incident
-- the new slice blocks actionable managed sell legs, hides real recovery opportunities, or weakens downside-control reachability
+- the new slice blocks reachable home-quote / managed sell paths or weakens downside-control reachability
 - a board switch is attempted without `docs/TICKET_SWITCH_RETRO.md`

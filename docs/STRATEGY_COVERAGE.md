@@ -90,6 +90,7 @@ These are execution behaviors currently active in runtime:
     - current April 15 slice: the first-pass dust-cooldown bypass now honors active skip-storm locks, so symbols already parked by `Grid sell leg not actionable yet` storm protection are not immediately reselected
     - current April 15 evening slice: global `FEE_EDGE` quarantine now suppresses fresh non-home-quote grid candidates with no actionable sell leg, so cross-quote fee-edge churn cannot rotate around symbol-local history
     - current April 17 slice: near-flat `PROFIT_GIVEBACK` no-feasible recovery attempts that fail only on exchange minimums now trigger a bounded global cooldown when active orders are already gone, so the engine stops hammering the same dust-only recovery loop every tick
+    - current April 20 slice: repeated no-feasible loops driven entirely by non-home quote pressure now seed global `GRID_BUY_QUOTE` quarantine when the recovery attempt also fails on exchange minimums, so quote-starved cross-quote families stop re-entering selection through the no-feasible path
   - objective: improve candidate quality and rotation under real market regimes without reopening `T-032` or `T-034`
 
 ## Support / next strategy core

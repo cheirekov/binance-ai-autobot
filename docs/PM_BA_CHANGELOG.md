@@ -16,6 +16,78 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-20 09:00 UTC — T-031 fourteenth slice: seed buy-quote quarantine from no-feasible quote-pressure loops
+- Scope:
+  - respond to the fresh April 20 morning bundle where the April 17 dust cooldown is active, but runtime still repeats `No feasible candidates after policy/exposure filters` because only non-home quote families remain and the recovery attempt itself is below exchange minimums.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260420-083837.tgz`) shows:
+    - `git.commit=72d6068`
+    - `risk_state=CAUTION`
+    - `trigger=PROFIT_GIVEBACK`
+    - active global lock reason `No-feasible dust recovery cooldown (20m)`
+    - dominant skip `Skip: No feasible candidates after policy/exposure filters` (`42`)
+  - latest no-feasible details show:
+    - rejection samples are entirely non-home quote pressure (`BTC`, `ETH`, `BNB`)
+    - stages are `quote-spendable`
+    - recovery is enabled / attempted, but the recovery symbol (`TRXBTC`) fails on `Below minQty 1.00000000`
+- PM milestone mapping:
+  - keep `T-031` active.
+  - keep `T-032` linked support only; the blocker is still candidate routing under quote pressure, not downside-control thaw.
+  - preserve April 17 dust cooldown, April 15 fee-edge quarantine, April 12 linked-support thaw, and March 30-31 downside-control behavior.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added bounded detection for no-feasible loops driven entirely by non-home quote pressure plus min-order recovery failure.
+    - when detected, seed a global `REASON_QUARANTINE:GRID_BUY_QUOTE` lock so the existing quote-starved candidate suppression path becomes active even though the loop surfaced as a no-feasible summary.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression coverage for the new no-feasible quote-quarantine helper.
+  - `docs/TRIAGE_NOTE_2026-04-20_T031_NO_FEASIBLE_QUOTE_PRESSURE_QUARANTINE.md`:
+    - recorded the fresh same-ticket triage.
+- Risk slider impact:
+  - no cap or fee-floor changes.
+  - risk uses the existing `GRID_BUY_QUOTE` quarantine cooldown policy only; this slice just activates it from no-feasible quote-pressure evidence.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/validate-active-ticket.sh`
+  - `./scripts/pmba-gate.sh end`
+  - `git diff --check`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected evidence: lower repeated `No feasible candidates after policy/exposure filters` churn, more `Protection lock COOLDOWN: REASON_QUARANTINE:GRID_BUY_QUOTE` behavior on non-home quote families, and preserved reachable home-quote / managed sell paths.
+- Follow-up:
+  - if the next fresh bundle still repeats no-feasible at high count, the next `T-031` slice should promote quote-asset ranking changes rather than adding another quarantine path.
+
+## 2026-04-19 13:20 UTC — T-031 runtime triage after `autobot-feedback-20260419-123151.tgz`
+- Scope:
+  - review whether the latest post-patch bundle justifies reopening linked support `T-032`, or whether the active blocker remains inside `T-031`.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260419-123151.tgz`) shows:
+    - `git.commit=72d6068`
+    - `risk_state=NORMAL`
+    - `activeOrders=1`
+    - latest decision is `SELL MARKET TRXBTC ... no-feasible-liquidity-recovery`
+    - dominant `Skip: No feasible candidates after policy/exposure filters` reduced from `61` to `14`
+  - latest no-feasible details show:
+    - `BTC` quote exposure cap is binding
+    - `ETH` quote spendable is exhausted after reserve
+    - recovery pressure is still detected and can execute real trades
+- PM milestone mapping:
+  - keep `T-031` active.
+  - do not reopen `T-032`; latest bundle is not a downside-control freeze.
+  - treat the gate failure as a valid triage trigger, but not as proof that the old April 17 blocker is still the same severity.
+- Technical changes:
+  - no runtime code change in this triage step.
+  - added `docs/TRIAGE_NOTE_2026-04-19_T031_POST_PATCH_NORMAL_RUNTIME_NO_T032.md`.
+  - updated handoff / easy-process docs to keep `T-031` active and record why no `T-032` slice is justified.
+- Risk slider impact:
+  - none.
+- Validation evidence:
+  - `./scripts/feedback-evidence.js autobot-feedback-20260419-123151.tgz autobot-feedback-20260417-164018.tgz`
+- Runtime test request:
+  - collect one more fresh bundle on the same deployed commit before changing lanes.
+- Follow-up:
+  - if the next fresh bundle still repeats the smaller `No feasible candidates` loop and the rejection samples remain dominated by `BTC` quote-exposure-cap / `ETH` reserve starvation, the next code slice should stay in `T-031` and target quote-cap-aware candidate routing.
+
 ## 2026-04-17 17:15 UTC — T-031 thirteenth slice: park near-flat no-feasible dust recovery loops
 - Scope:
   - respond to the fresh April 17 evening bundle where the April 15 fee-edge patch held, but runtime stayed boxed in a near-flat `PROFIT_GIVEBACK` recovery loop that could not execute because the fallback recovery sell was below exchange minimums.

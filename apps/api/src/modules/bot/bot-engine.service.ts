@@ -3416,6 +3416,26 @@ export class BotEngineService implements OnModuleInit {
     return managedExposurePct + 1e-8 < minManagedExposurePct;
   }
 
+  private shouldApplyNoFeasibleQuoteQuarantine(params: {
+    homeStable: string;
+    activeOrderCount: number;
+    attemptedReason: string | null | undefined;
+    rejectionSamples: Array<{ stage?: string; quoteAsset?: string }>;
+  }): boolean {
+    if (params.activeOrderCount > 0) return false;
+    if (!this.isDustMinOrderFailureReason(params.attemptedReason)) return false;
+
+    const homeStable = params.homeStable.trim().toUpperCase();
+    const samples = Array.isArray(params.rejectionSamples) ? params.rejectionSamples : [];
+    if (samples.length === 0) return false;
+
+    return samples.every((sample) => {
+      if (!this.isNoFeasibleRecoveryPressureStage(sample.stage)) return false;
+      const quoteAsset = typeof sample.quoteAsset === "string" ? sample.quoteAsset.trim().toUpperCase() : "";
+      return quoteAsset.length > 0 && quoteAsset !== homeStable;
+    });
+  }
+
   private async deriveMaxExecutionQuoteSpendableHome(params: {
     config: AppConfig | undefined;
     balances: BinanceBalanceSnapshot[];
@@ -6265,6 +6285,43 @@ export class BotEngineService implements OnModuleInit {
                   recentCount: noFeasibleRecoveryPolicy.recentCount,
                   threshold: noFeasibleRecoveryPolicy.threshold,
                   cooldownMs
+                }
+              });
+            }
+
+            if (
+              this.shouldApplyNoFeasibleQuoteQuarantine({
+                homeStable,
+                activeOrderCount: current.activeOrders.length,
+                attemptedReason: noFeasibleRecoveryAttempt?.reason,
+                rejectionSamples: feasibleCandidateSelection.rejectionSamples
+              })
+            ) {
+              const quoteQuarantinePolicy = this.deriveReasonQuarantinePolicy({
+                family: "GRID_BUY_QUOTE",
+                risk
+              });
+              const quoteAssets = Array.from(
+                new Set(
+                  feasibleCandidateSelection.rejectionSamples
+                    .map((sample) => (typeof sample.quoteAsset === "string" ? sample.quoteAsset.trim().toUpperCase() : ""))
+                    .filter((quoteAsset) => quoteAsset.length > 0 && quoteAsset !== homeStable.trim().toUpperCase())
+                )
+              );
+              current = this.upsertProtectionLock(current, {
+                type: "COOLDOWN",
+                scope: "GLOBAL",
+                symbol: "REASON_QUARANTINE:GRID_BUY_QUOTE",
+                reason: `No-feasible quote quarantine (${quoteAssets.join("/") || "non-home"} · ${Math.round(quoteQuarantinePolicy.cooldownMs / 1000)}s)`,
+                expiresAt: new Date(Date.now() + quoteQuarantinePolicy.cooldownMs).toISOString(),
+                details: {
+                  category: "REASON_QUARANTINE",
+                  family: "GRID_BUY_QUOTE",
+                  source: "NO_FEASIBLE_QUOTE_PRESSURE",
+                  quoteAssets,
+                  sampleCount: feasibleCandidateSelection.rejectionSamples.length,
+                  attemptedReason: noFeasibleRecoveryAttempt?.reason ?? null,
+                  cooldownMs: quoteQuarantinePolicy.cooldownMs
                 }
               });
             }
