@@ -3760,15 +3760,27 @@ describe("bot-engine insufficient-balance helpers", () => {
         quoteQuarantineActive: boolean;
         recentQuoteAssetBuyQuoteInsufficient: number;
         missingSellLeg: boolean;
+        homeQuote: boolean;
         risk: number;
       }) => boolean;
     };
 
     expect(
       helpers.shouldSuppressGridQuoteAssetCandidate({
+        quoteQuarantineActive: true,
+        recentQuoteAssetBuyQuoteInsufficient: 0,
+        missingSellLeg: false,
+        homeQuote: false,
+        risk: 100
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldSuppressGridQuoteAssetCandidate({
         quoteQuarantineActive: false,
         recentQuoteAssetBuyQuoteInsufficient: 2,
         missingSellLeg: false,
+        homeQuote: false,
         risk: 100
       })
     ).toBe(true);
@@ -3778,6 +3790,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         quoteQuarantineActive: true,
         recentQuoteAssetBuyQuoteInsufficient: 1,
         missingSellLeg: false,
+        homeQuote: false,
         risk: 100
       })
     ).toBe(true);
@@ -3787,6 +3800,17 @@ describe("bot-engine insufficient-balance helpers", () => {
         quoteQuarantineActive: true,
         recentQuoteAssetBuyQuoteInsufficient: 3,
         missingSellLeg: true,
+        homeQuote: false,
+        risk: 100
+      })
+    ).toBe(false);
+
+    expect(
+      helpers.shouldSuppressGridQuoteAssetCandidate({
+        quoteQuarantineActive: true,
+        recentQuoteAssetBuyQuoteInsufficient: 0,
+        missingSellLeg: false,
+        homeQuote: true,
         risk: 100
       })
     ).toBe(false);
@@ -3796,6 +3820,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         quoteQuarantineActive: false,
         recentQuoteAssetBuyQuoteInsufficient: 1,
         missingSellLeg: false,
+        homeQuote: false,
         risk: 100
       })
     ).toBe(false);

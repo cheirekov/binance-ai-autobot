@@ -899,8 +899,10 @@ export class BotEngineService implements OnModuleInit {
     quoteQuarantineActive: boolean;
     recentQuoteAssetBuyQuoteInsufficient: number;
     missingSellLeg: boolean;
+    homeQuote: boolean;
     risk: number;
   }): boolean {
+    if (params.quoteQuarantineActive && !params.missingSellLeg && !params.homeQuote) return true;
     if (params.missingSellLeg) return false;
     if (params.recentQuoteAssetBuyQuoteInsufficient <= 0) return false;
 
@@ -5372,6 +5374,7 @@ export class BotEngineService implements OnModuleInit {
                   quoteQuarantineActive: activeReasonQuarantineFamilies.has("GRID_BUY_QUOTE"),
                   recentQuoteAssetBuyQuoteInsufficient,
                   missingSellLeg,
+                  homeQuote: candidateQuote === homeStable.trim().toUpperCase(),
                   risk: boundedRisk
                 })
               ) {

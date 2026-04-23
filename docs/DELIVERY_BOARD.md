@@ -105,8 +105,8 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-031 | IN_PROGRESS | Regime engine v2 | Candidate/actionability quality remains the active lane; the April 20 quote-pressure quarantine is deployed, and the current bounded linked-support need is to clear false `PROFIT_GIVEBACK` `HALT` persistence without weakening fee floors or reopening quote-routing work. |
-| T-032 | TODO | Exit manager v2 | Linked support only while `T-031` is active: preserve March 30-31 downside-control slices and allow bounded same-batch support work when false `HALT` / unwind-only behavior blocks `T-031` validation. |
+| T-031 | IN_PROGRESS | Regime engine v2 | Candidate/actionability quality remains the active lane; the April 20 `T-032` support fix is proven, and the current focus is to make active `GRID_BUY_QUOTE` quarantine effective across fresh non-home quote families so repeated no-feasible quote-pressure loops cannot re-enter selection. |
+| T-032 | TODO | Exit manager v2 | Linked support only while `T-031` is active: preserve March 30-31 downside-control slices and the April 20 `PROFIT_GIVEBACK` exposure fix; do not reopen unless a downside-control blocker returns. |
 | T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
 
 `T-005` status: moved to DONE after overnight evidence (`autobot-feedback-20260225-100508.tgz`) showed guard transitions/recovery without deadlock.
@@ -119,7 +119,7 @@ Profit milestone rule:
 
 | Priority | ID | Status | Title | Acceptance focus |
 |---|---|---|---|---|
-| 1 | T-032 | TODO | Exit manager v2 | keep downside-control support slices intact while `T-031` is active and clear false `PROFIT_GIVEBACK` `HALT` persistence when it blocks strategy validation |
+| 1 | T-032 | TODO | Exit manager v2 | keep downside-control support slices intact while `T-031` is active; reopen only if a real downside-control blocker returns |
 | 2 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source |
 | 3 | T-028 | TODO | Compact advanced UX | improve operator readability without changing strategy behavior |
 

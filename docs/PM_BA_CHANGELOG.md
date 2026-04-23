@@ -16,6 +16,48 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-23 08:45 UTC — T-031 fifteenth slice: make global buy-quote quarantine effective on fresh non-home quote families
+- Scope:
+  - respond to the fresh April 22/23 bundles where the April 20 `T-032` support fix held and runtime stayed `NORMAL`, but the same `No feasible candidates after policy/exposure filters` quote-pressure loop repeated across two fresh bundles.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260423-080554.tgz`) shows:
+    - `git.commit=530fcfa`
+    - `risk_state=NORMAL`
+    - `unwind_only=false`
+    - `activeOrders=0`
+    - dominant skip `Skip: No feasible candidates after policy/exposure filters` (`65`) after the previous fresh bundle already showed the same blocker (`75`)
+  - latest no-feasible details show:
+    - rejection samples are still entirely non-home quote spendable exhaustion (`BTC`, `ETH`)
+    - recovery is enabled / attempted
+    - recovery still targets `TRXBTC`
+    - recovery still fails on `Below minQty 1.00000000`
+- PM milestone mapping:
+  - keep `T-031` active as the strategy-quality lane.
+  - keep `T-032` linked support preserved only; the downside-control freeze is already cleared.
+  - preserve April 20 linked-support exposure fix, April 20 quote-pressure quarantine, April 17 dust cooldown, April 15 fee-edge quarantine, and `T-034` routing stability.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - active `GRID_BUY_QUOTE` quarantine now suppresses fresh non-home quote asset families that have no actionable sell leg even when they do not yet have local quote-insufficient skip history.
+    - this makes the existing global quarantine path effective for the exact repeated no-feasible loop seen in the latest fresh bundles.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression coverage that active buy-quote quarantine blocks fresh non-home quote families with zero local history while preserving home-quote paths.
+  - `docs/TRIAGE_NOTE_2026-04-23_T031_GLOBAL_QUOTE_QUARANTINE_FRESH_FAMILIES.md`:
+    - recorded same-ticket triage for the repeated April 22/23 loop.
+- Risk slider impact:
+  - no fee-floor or exposure-cap changes.
+  - this slice only makes the already-existing `GRID_BUY_QUOTE` quarantine effective across fresh non-home quote families.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/validate-active-ticket.sh`
+  - `./scripts/pmba-gate.sh end`
+  - `git diff --check`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected evidence: lower repeated `Skip: No feasible candidates after policy/exposure filters`, less fresh `BTC`/`ETH` quote-pressure churn, and preserved reachability for home-quote / actionable sell-leg paths.
+- Follow-up:
+  - if the next fresh bundle still repeats high no-feasible counts after this patch, the next `T-031` slice should change candidate ranking / recovery prioritization rather than adding another quarantine rule.
+
 ## 2026-04-20 15:30 UTC — T-032 linked-support slice: clip profit-giveback HALT exposure to unwindable balances
 - Scope:
   - respond to the fresh April 20 day bundle where the April 20 `T-031` quote-pressure quarantine is deployed (`git.commit=47693bb`), but runtime is still held in `PROFIT_GIVEBACK` `HALT` because managed exposure is slightly above the halt floor even though the quote assets needed for recovery are exhausted and no unwind trade fires.
