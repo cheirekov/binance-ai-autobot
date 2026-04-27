@@ -16,6 +16,46 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-27 12:15 UTC — T-031 sixteenth slice: prioritize reachable no-feasible recovery sells and park dust retries
+- Scope:
+  - respond to the April 27 fresh bundle where runtime is no longer in a hard downside-control freeze, but the bot still spends long windows holding only because no-feasible recovery repeatedly reselects a dust-size `TRXBTC` candidate.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260427-113318.tgz`) shows:
+    - `git.commit=61e0e46`
+    - `risk_state=NORMAL`
+    - `unwind_only=false`
+    - `activeOrders=0`
+    - dominant skip `Skip: No feasible candidates after policy/exposure filters` (`70`)
+    - no-feasible recovery is enabled/attempted, but attempted symbol `TRXBTC` fails on `Below minQty 1.00000000`
+    - no new fills or orders landed across the long run
+- PM milestone mapping:
+  - keep `T-031` active as the strategy-quality lane.
+  - keep `T-032` as linked support only; latest evidence is not a downside-control blocker.
+  - preserve April 20 `T-032` exposure clipping, April 23 buy-quote quarantine behavior, April 17 dust cooldown, April 15 fee-edge quarantine, and `T-034` funding stability.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - no-feasible recovery SELL selection now bypasses buy/quote/grid-wait symbol cooldowns that are not hard risk locks, so the engine can validate whether a managed position is actually sellable instead of excluding it before validation.
+    - recovery sell candidates are ranked home-stable first, then quote-pressure assets, then other execution quotes.
+    - recovery candidates that fail market-sell minimum validation now get a bounded symbol-level `NO_FEASIBLE_RECOVERY_MIN_ORDER` cooldown so the engine stops retrying the same dust residual.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression coverage for recovery-sell lock bypass, dust retry parking, and home-quote-first recovery ranking.
+  - `docs/TRIAGE_NOTE_2026-04-27_T031_NO_FEASIBLE_RECOVERY_RESELECTS_DUST.md`:
+    - recorded same-ticket triage for the repeated long-run no-feasible loop.
+- Risk slider impact:
+  - no exposure caps, fee floors, or daily-loss thresholds changed.
+  - the new min-order parking cooldown remains risk-linked (`60m` at risk `0`, `20m` at risk `100`).
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/validate-active-ticket.sh`
+  - `./scripts/pmba-gate.sh end`
+  - `git diff --check`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected evidence: no-feasible recovery should stop repeatedly selecting the same below-minimum `TRXBTC` dust candidate and should prefer reachable home-quote recovery sells when exchange filters allow them.
+- Follow-up:
+  - if the next fresh bundle still shows no orders and the same dominant no-feasible loop, the next `T-031` slice should instrument why no managed home-quote recovery sell passed exchange validation.
+
 ## 2026-04-23 08:45 UTC — T-031 fifteenth slice: make global buy-quote quarantine effective on fresh non-home quote families
 - Scope:
   - respond to the fresh April 22/23 bundles where the April 20 `T-032` support fix held and runtime stayed `NORMAL`, but the same `No feasible candidates after policy/exposure filters` quote-pressure loop repeated across two fresh bundles.

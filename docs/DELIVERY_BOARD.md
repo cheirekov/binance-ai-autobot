@@ -1,6 +1,6 @@
 # DELIVERY BOARD (PM v2) — Binance AI Autobot
 
-Last updated: 2026-04-15
+Last updated: 2026-04-27
 Owner: PM/BA + Codex + User
 
 This board is structured to reduce scope drift and context-window churn.
@@ -105,7 +105,7 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-031 | IN_PROGRESS | Regime engine v2 | Candidate/actionability quality remains the active lane; the April 20 `T-032` support fix is proven, and the current focus is to make active `GRID_BUY_QUOTE` quarantine effective across fresh non-home quote families so repeated no-feasible quote-pressure loops cannot re-enter selection. |
+| T-031 | IN_PROGRESS | Regime engine v2 | Candidate/actionability quality remains the active lane; the current focus is no-feasible recovery selection: prefer reachable home-stable managed sells, let recovery SELL validation bypass only soft buy/quote/grid-wait locks, and park below-minimum dust retries. |
 | T-032 | TODO | Exit manager v2 | Linked support only while `T-031` is active: preserve March 30-31 downside-control slices and the April 20 `PROFIT_GIVEBACK` exposure fix; do not reopen unless a downside-control blocker returns. |
 | T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
 

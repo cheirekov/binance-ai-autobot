@@ -1,6 +1,6 @@
 # Strategy Coverage (Source of Truth)
 
-Last updated: 2026-04-15
+Last updated: 2026-04-27
 Owner: PM/BA + Trader + Architect
 
 Purpose: prevent strategy drift/context loss by keeping one explicit list of:
@@ -92,6 +92,7 @@ These are execution behaviors currently active in runtime:
     - current April 17 slice: near-flat `PROFIT_GIVEBACK` no-feasible recovery attempts that fail only on exchange minimums now trigger a bounded global cooldown when active orders are already gone, so the engine stops hammering the same dust-only recovery loop every tick
     - current April 20 slice: repeated no-feasible loops driven entirely by non-home quote pressure now seed global `GRID_BUY_QUOTE` quarantine when the recovery attempt also fails on exchange minimums, so quote-starved cross-quote families stop re-entering selection through the no-feasible path
     - current April 23 slice: active `GRID_BUY_QUOTE` quarantine now also suppresses fresh non-home quote families with no actionable sell leg even when they do not yet have local quote-insufficient skip history, so the global lock is effective against repeated no-feasible quote-pressure loops
+    - current April 27 slice: no-feasible recovery SELL validation now bypasses only soft buy/quote/grid-wait symbol locks, ranks home-stable managed sells first, and parks below-minimum recovery dust under `NO_FEASIBLE_RECOVERY_MIN_ORDER` so recovery does not keep reselecting the same unsellable residual
   - objective: improve candidate quality and rotation under real market regimes without reopening `T-032` or `T-034`
 
 ## Support / next strategy core

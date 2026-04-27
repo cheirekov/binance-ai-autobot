@@ -474,6 +474,12 @@ export class BotEngineService implements OnModuleInit {
     return details?.buyPausedByCaution !== true;
   }
 
+  private getProtectionLockCategory(lock: ProtectionLockEntry | null): string {
+    if (!lock) return "";
+    const details = this.readLockDetails(lock);
+    return typeof details?.category === "string" ? details.category.trim().toUpperCase() : "";
+  }
+
   private async getCandidateSelectionBlockReason(params: {
     symbol: string;
     state: BotState;
@@ -1954,6 +1960,65 @@ export class BotEngineService implements OnModuleInit {
     return null;
   }
 
+  private isNoFeasibleRecoverySellBypassableSymbolLock(lock: ProtectionLockEntry | null): boolean {
+    if (!lock) return false;
+    if (lock.scope !== "SYMBOL") return false;
+    const type = lock.type.trim().toUpperCase();
+    if (type === "GRID_GUARD_BUY_PAUSE") return true;
+    if (this.isNonBlockingGridGuardPauseCooldownLock(lock)) return true;
+    if (type !== "COOLDOWN") return false;
+
+    const category = this.getProtectionLockCategory(lock);
+    return (
+      category === "ENTRY_GUARD_MAX_CONSECUTIVE" ||
+      category === "FEE_EDGE_FILTER" ||
+      category === "GRID_BUY_QUOTE_INSUFFICIENT" ||
+      category === "GRID_BUY_SIZING_REJECT" ||
+      category === "GRID_GUARD_BUY_PAUSE" ||
+      category === "GRID_GUARD_ROTATE" ||
+      category === "GRID_GUARD_SELL_LADDER" ||
+      category === "GRID_SELL_NOT_ACTIONABLE" ||
+      category === "GRID_SELL_SIZING_REJECT" ||
+      category === "GRID_WAIT_ROTATE" ||
+      category === "SKIP_QUOTE_INSUFFICIENT" ||
+      category === "SKIP_QUOTE_SHORTFALL"
+    );
+  }
+
+  private getNoFeasibleRecoverySellBlockReason(params: { symbol: string; state: BotState }): string | null {
+    const config = this.configService.load();
+    if (!config) return "Bot is not initialized";
+
+    const globalLock = this.getActiveGlobalProtectionLock(params.state);
+    if (globalLock) {
+      return `Protection lock ${globalLock.type}: ${globalLock.reason}`;
+    }
+
+    const normalized = params.symbol.trim().toUpperCase();
+    if ((config.advanced.neverTradeSymbols ?? []).map((symbol) => symbol.trim().toUpperCase()).includes(normalized)) {
+      return "Blocked by Advanced never-trade list";
+    }
+
+    const now = Date.now();
+    for (const lock of params.state.protectionLocks ?? []) {
+      if (lock.scope !== "SYMBOL") continue;
+      if (lock.symbol?.trim().toUpperCase() !== normalized) continue;
+      const expiresAt = Date.parse(lock.expiresAt);
+      if (!Number.isFinite(expiresAt) || expiresAt <= now) continue;
+      if (this.isNoFeasibleRecoverySellBypassableSymbolLock(lock)) continue;
+      return `Protection lock ${lock.type}: ${lock.reason}`;
+    }
+
+    const active = (params.state.symbolBlacklist ?? []).find(
+      (entry) => entry.symbol.trim().toUpperCase() === normalized && Date.parse(entry.expiresAt) > now
+    );
+    if (active) {
+      return `Temporarily blacklisted (${active.reason})`;
+    }
+
+    return null;
+  }
+
   private addSymbolBlacklist(state: BotState, entry: SymbolBlacklistEntry): BotState {
     const next = [entry, ...(state.symbolBlacklist ?? [])];
     return { ...state, symbolBlacklist: next.slice(0, 200) };
@@ -2528,6 +2593,32 @@ export class BotEngineService implements OnModuleInit {
     if (!quote) return null;
     const base = normalizedSymbol.slice(0, normalizedSymbol.length - quote.length).trim().toUpperCase();
     return base || null;
+  }
+
+  private sortNoFeasibleRecoverySellPositions(params: {
+    positions: ManagedPosition[];
+    homeStable: string;
+    allowedExecutionQuotes: Iterable<string>;
+    pressureQuoteAssets?: Iterable<string>;
+  }): ManagedPosition[] {
+    const homeStable = params.homeStable.trim().toUpperCase();
+    const quoteAssets = [...params.allowedExecutionQuotes].map((asset) => asset.trim().toUpperCase()).filter(Boolean);
+    const pressureQuoteAssets = new Set(
+      [...(params.pressureQuoteAssets ?? [])].map((asset) => asset.trim().toUpperCase()).filter(Boolean)
+    );
+    const quoteRank = (symbol: string): number => {
+      const quoteAsset = this.getSymbolQuoteAssetByPriority(symbol, quoteAssets);
+      if (!quoteAsset) return 3;
+      if (quoteAsset === homeStable) return 0;
+      if (pressureQuoteAssets.has(quoteAsset)) return 1;
+      return 2;
+    };
+
+    return [...params.positions].sort((left, right) => {
+      const rankDelta = quoteRank(left.symbol) - quoteRank(right.symbol);
+      if (rankDelta !== 0) return rankDelta;
+      return right.costQuote - left.costQuote;
+    });
   }
 
   private getCapitalProfile(walletTotalHome: number): CapitalProfile {
@@ -3451,6 +3542,11 @@ export class BotEngineService implements OnModuleInit {
   private deriveNoFeasibleDustCooldownMs(risk: number): number {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
     return Math.round((45 - (boundedRisk / 100) * 25) * 60_000); // risk 0 -> 45m, risk 100 -> 20m
+  }
+
+  private deriveNoFeasibleRecoveryMinOrderCooldownMs(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    return Math.round((60 - (boundedRisk / 100) * 40) * 60_000); // risk 0 -> 60m, risk 100 -> 20m
   }
 
   private shouldApplyNoFeasibleDustCooldown(params: {
@@ -6218,13 +6314,20 @@ export class BotEngineService implements OnModuleInit {
                 }
               | null = null;
             if (noFeasibleRecoveryGate.attempt) {
-              const managedPositions = [...this.getManagedPositions(current).values()]
-                .filter((position) => {
+              const pressureQuoteAssets = feasibleCandidateSelection.rejectionSamples
+                .filter((sample) => this.isNoFeasibleRecoveryPressureStage(sample.stage))
+                .map((sample) => (typeof sample.quoteAsset === "string" ? sample.quoteAsset.trim().toUpperCase() : ""))
+                .filter((quoteAsset) => quoteAsset.length > 0);
+              const managedPositions = this.sortNoFeasibleRecoverySellPositions({
+                positions: [...this.getManagedPositions(current).values()].filter((position) => {
                   if (position.netQty <= 0) return false;
                   if (!isExecutionQuoteSymbol(position.symbol)) return false;
-                  return this.isSymbolBlocked(position.symbol, current) === null;
-                })
-                .sort((left, right) => right.costQuote - left.costQuote);
+                  return this.getNoFeasibleRecoverySellBlockReason({ symbol: position.symbol, state: current }) === null;
+                }),
+                homeStable,
+                allowedExecutionQuotes,
+                pressureQuoteAssets
+              });
               if (managedPositions.length === 0) {
                 noFeasibleRecoveryAttempt = {
                   reason: "No eligible managed positions available for recovery sell"
@@ -6263,10 +6366,27 @@ export class BotEngineService implements OnModuleInit {
                   }
                 }
                 if (!sellQtyStr) {
+                  const attemptedReason = sellCheck.reason ?? "Recovery sell min-order validation failed";
                   noFeasibleRecoveryAttempt = {
                     symbol: position.symbol,
-                    reason: sellCheck.reason ?? "Recovery sell min-order validation failed"
+                    reason: attemptedReason
                   };
+                  if (this.isDustMinOrderFailureReason(attemptedReason)) {
+                    const minOrderCooldownMs = this.deriveNoFeasibleRecoveryMinOrderCooldownMs(risk);
+                    current = this.upsertProtectionLock(current, {
+                      type: "COOLDOWN",
+                      scope: "SYMBOL",
+                      symbol: position.symbol,
+                      reason: `No-feasible recovery min-order (${Math.round(minOrderCooldownMs / 60000)}m)`,
+                      expiresAt: new Date(Date.now() + minOrderCooldownMs).toISOString(),
+                      details: {
+                        category: "NO_FEASIBLE_RECOVERY_MIN_ORDER",
+                        source: "NO_FEASIBLE_RECOVERY",
+                        attemptedReason,
+                        cooldownMs: minOrderCooldownMs
+                      }
+                    });
+                  }
                   continue;
                 }
 

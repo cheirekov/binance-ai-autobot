@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-23 11:20 EEST
+Last updated: 2026-04-27 15:15 EEST
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundles (`autobot-feedback-20260422-100621.tgz`, `autobot-feedback-20260423-080554.tgz`) show the April 20 `T-032` support fix is holding, but repeated `No feasible candidates after policy/exposure filters` is back because active `GRID_BUY_QUOTE` quarantine is not fully suppressing fresh non-home quote families.
+The newest fresh bundle (`autobot-feedback-20260427-113318.tgz`) shows the bot is not in a hard downside-control freeze, but it is still effectively stuck: runtime is `NORMAL`, `activeOrders=0`, dominant no-feasible count is `70`, and no-feasible recovery keeps selecting `TRXBTC` even though exchange validation rejects it as below minQty.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -25,14 +25,14 @@ The newest fresh bundles (`autobot-feedback-20260422-100621.tgz`, `autobot-feedb
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that makes active `GRID_BUY_QUOTE` quarantine suppress fresh non-home quote families with no actionable sell leg will reduce the repeated no-feasible quote-pressure loop without reopening `T-032`.
+- A bounded `T-031` slice that lets no-feasible recovery SELL validation bypass only soft buy/quote/grid-wait locks, ranks home-stable recovery sells first, and parks below-minimum dust retries will restore adaptive action without reopening `T-032`.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved support only; the next slice stays in `T-031`
 - the next fresh bundle shows lower repeated `No feasible candidates after policy/exposure filters`
-- active `GRID_BUY_QUOTE` quarantine visibly suppresses fresh non-home quote families, not just symbols with local history
-- actionable sell-leg candidates and downside-control support remain reachable
+- no-feasible recovery no longer retries the same below-minimum `TRXBTC` dust candidate every cycle
+- actionable home-quote sell-leg candidates and downside-control support remain reachable
 - `T-031` stays the active lane while `T-032` remains bounded support only
 
 ## Stop / rollback conditions

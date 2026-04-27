@@ -1,10 +1,10 @@
 # PATCH_RESULT
 
-Last updated: 2026-03-26 18:47 EET  
+Last updated: 2026-04-27 15:15 EEST
 Owner: PM/BA + Codex
 
 ## Incident classification
-- `P0 runtime-boxed / incomplete no-feasible recovery incident`
+- `P1 long no-action recovery-selection loop`
 
 ## Chosen action class
 - `PATCH_NOW`
@@ -16,51 +16,46 @@ Owner: PM/BA + Codex
 - `apps/api/src/modules/bot/bot-engine.service.ts`
 - `apps/api/src/modules/bot/bot-engine.service.test.ts`
 - `docs/PM_BA_CHANGELOG.md`
-- `docs/TRIAGE_NOTE_2026-03-26_T032_NO_FEASIBLE_RECOVERY_THRESHOLD_MISMATCH.md`
+- `docs/TRIAGE_NOTE_2026-04-27_T031_NO_FEASIBLE_RECOVERY_RESELECTS_DUST.md`
+- `docs/SESSION_BRIEF.md`
+- `docs/DELIVERY_BOARD.md`
+- `docs/STRATEGY_COVERAGE.md`
+- `docs/easy_process/ACTIVE_TICKET.md`
 - `docs/easy_process/LATEST_BATCH_DECISION.md`
 - `docs/easy_process/NEXT_BATCH_PLAN.md`
-- `docs/easy_process/PM_TASK_SPLIT.md`
-- `docs/easy_process/OPERATOR_NOTE.md`
-- `docs/easy_process/PRODUCTION_DELTA_NOTE.md`
-- `docs/easy_process/P0_INCIDENT_SUMMARY.md`
-- `docs/easy_process/P0_ROOT_CAUSE_TREE.md`
-- `docs/easy_process/P0_RECOVERY_PLAN.md`
 - `docs/easy_process/PATCH_RESULT.md`
-- `docs/easy_process/PROGRAM_STATUS.md`
-- `docs/easy_process/ACTIVE_TICKET.md`
-- `docs/easy_process/RUN_CONTEXT.md`
-- `docs/easy_process/VALIDATION_LEDGER.md`
-- `docs/easy_process/DECISION_LEDGER.md`
 
 ## Exact behavior changed
-- no-feasible recovery now uses the same minimum quote-liquidity floor as candidate feasibility instead of a separate `1` home-unit threshold
-- no-feasible recovery now counts repeated starvation across the live production cadence, resetting after trades, instead of requiring a tight 10-minute skip cluster
+- no-feasible recovery SELL selection now bypasses soft buy/quote/grid-wait symbol cooldowns that are not hard risk locks.
+- no-feasible recovery SELL candidates now rank home-stable managed positions before non-home quote-pressure positions.
+- no-feasible recovery candidates that fail market-sell minimum validation now receive a bounded symbol-level `NO_FEASIBLE_RECOVERY_MIN_ORDER` cooldown.
 
 ## Why this is the minimum viable patch
-- it only touches the active live blocker shown in `autobot-feedback-20260326-164157.tgz`
-- it reuses the existing `no-feasible-liquidity-recovery` sell path instead of inventing a new behavior
-- it does not widen into a new ticket or change hard risk policy
+- it targets the active April 27 blocker: `TRXBTC` recovery repeatedly failed on `Below minQty 1.00000000` while no orders/fills landed.
+- it reuses the existing no-feasible liquidity recovery sell path instead of adding a new strategy lane.
+- it does not change exposure caps, fee floors, daily-loss thresholds, or `T-032` downside-control policy.
 
 ## Hypothesis addressed
-- the latest live runtime remains boxed because the previous no-feasible patch was incomplete: its repeat window and quote-liquidity threshold still prevented recovery activation even on the deployed fixed-matcher path
+- the bot was not adapting because recovery excluded better managed positions through soft symbol locks before exchange validation, then repeatedly retried a below-minimum dust candidate.
 
 ## Tests added/updated
-- added regression coverage for spaced policy/exposure starvation skips in `apps/api/src/modules/bot/bot-engine.service.test.ts`
-- added regression coverage that a normal intervening trade resets starvation accumulation in `apps/api/src/modules/bot/bot-engine.service.test.ts`
-- updated no-feasible liquidity-threshold coverage in `apps/api/src/modules/bot/bot-engine.service.test.ts`
+- added regression coverage that recovery SELL can bypass grid wait locks while `NO_FEASIBLE_RECOVERY_MIN_ORDER` still blocks dust retries.
+- added regression coverage that home-stable managed positions are prioritized before pressure-quote positions.
 
 ## Validation run
-- `./scripts/validate-active-ticket.sh` ✅
+- `./scripts/pmba-gate.sh start` ✅
 - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
+- `./scripts/validate-active-ticket.sh` ✅
+- `./scripts/pmba-gate.sh end` ✅
+- `git diff --check` ✅
 
 ## Remaining risk
-- the runtime still may only advance after restart if another sell-side execution reachability bug exists after recovery becomes eligible
-- the cumulative top-skip table may keep advertising the old Mar 23 guard-pause counts until new activity pushes them out
+- if every home-stable managed position is genuinely below exchange minimums, the next bundle may still show no trade; the difference should be explicit parking of each failed recovery candidate instead of retrying the same one.
 
 ## Rollback trigger
-- this patch introduces a fresh regression, unnecessary recovery churn, or validation failure
+- this patch bypasses a hard/global risk lock, weakens downside-control behavior, or creates recovery sell churn.
 
 ## What the next bundle must confirm
-- recent decisions keep advancing after recreate
-- `noFeasibleRecovery.enabled=true` or `no-feasible-liquidity-recovery` appears when quote remains starved
-- the new trigger math does not over-fire into churn
+- no repeated `TRXBTC` no-feasible recovery attempt on the same below-minimum dust balance.
+- recovery attempts prefer home-stable managed positions when exchange filters allow them.
+- repeated `Skip: No feasible candidates after policy/exposure filters` count drops or the remaining blocker becomes more specific than the current generic no-feasible loop.

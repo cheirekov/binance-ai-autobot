@@ -4511,6 +4511,79 @@ describe("bot-engine symbol lock checks", () => {
     expect(helpers.isSymbolBlocked("BTCUSDC", state)).toBeNull();
   });
 
+  it("lets no-feasible recovery sells bypass grid wait locks but keeps min-order dust parked", () => {
+    const helpers = service as unknown as {
+      getNoFeasibleRecoverySellBlockReason: (params: { symbol: string; state: BotState }) => string | null;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      protectionLocks: [
+        {
+          id: "lock-sell-wait",
+          type: "COOLDOWN",
+          createdAt: "2026-04-27T10:00:00.000Z",
+          scope: "SYMBOL",
+          symbol: "BTCUSDC",
+          reason: "Skip storm (4/3): Grid sell leg not actionable yet (3600s)",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "GRID_SELL_NOT_ACTIONABLE",
+            cooldownMs: 3_600_000
+          }
+        },
+        {
+          id: "lock-recovery-dust",
+          type: "COOLDOWN",
+          createdAt: "2026-04-27T10:00:00.000Z",
+          scope: "SYMBOL",
+          symbol: "TRXBTC",
+          reason: "No-feasible recovery min-order (20m)",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "NO_FEASIBLE_RECOVERY_MIN_ORDER",
+            cooldownMs: 1_200_000
+          }
+        }
+      ]
+    };
+
+    expect(helpers.getNoFeasibleRecoverySellBlockReason({ symbol: "BTCUSDC", state })).toBeNull();
+    expect(helpers.getNoFeasibleRecoverySellBlockReason({ symbol: "TRXBTC", state })).toContain(
+      "No-feasible recovery min-order"
+    );
+  });
+
+  it("prioritizes home-quote positions for no-feasible recovery sells before pressure quotes", () => {
+    type ManagedPositionLike = {
+      symbol: string;
+      netQty: number;
+      costQuote: number;
+    };
+    const helpers = service as unknown as {
+      sortNoFeasibleRecoverySellPositions: (params: {
+        positions: ManagedPositionLike[];
+        homeStable: string;
+        allowedExecutionQuotes: string[];
+        pressureQuoteAssets: string[];
+      }) => ManagedPositionLike[];
+    };
+
+    const sorted = helpers.sortNoFeasibleRecoverySellPositions({
+      positions: [
+        { symbol: "TRXBTC", netQty: 4310, costQuote: 0.04 },
+        { symbol: "SOLUSDC", netQty: 14, costQuote: 50 },
+        { symbol: "BNBETH", netQty: 2, costQuote: 0.3 },
+        { symbol: "BTCUSDC", netQty: 0.01, costQuote: 500 }
+      ],
+      homeStable: "USDC",
+      allowedExecutionQuotes: ["USDC", "BTC", "ETH"],
+      pressureQuoteAssets: ["BTC", "ETH"]
+    });
+
+    expect(sorted.map((position) => position.symbol)).toEqual(["BTCUSDC", "SOLUSDC", "BNBETH", "TRXBTC"]);
+  });
+
   it("still honors later hard symbol locks after skipping soft grid-guard cooldowns", () => {
     const helpers = service as unknown as {
       isSymbolBlocked: (symbol: string, state: BotState) => string | null;
