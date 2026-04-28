@@ -1711,6 +1711,15 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.deriveNoFeasibleDustCooldownMs(100)).toBe(1_200_000);
   });
 
+  it("keeps recovery min-order dust parked for hours, not minutes", () => {
+    const helpers = service as unknown as {
+      deriveNoFeasibleRecoveryMinOrderCooldownMs: (risk: number) => number;
+    };
+
+    expect(helpers.deriveNoFeasibleRecoveryMinOrderCooldownMs(0)).toBe(43_200_000);
+    expect(helpers.deriveNoFeasibleRecoveryMinOrderCooldownMs(100)).toBe(21_600_000);
+  });
+
   it("keeps no-feasible dust cooldown disabled when the book is still active or not min-order blocked", () => {
     const helpers = service as unknown as {
       shouldApplyNoFeasibleDustCooldown: (params: {
@@ -4694,7 +4703,7 @@ describe("bot-engine symbol lock checks", () => {
     ).resolves.toContain("Grid sell leg not actionable yet");
   });
 
-  it("keeps dust home-quote candidates blocked when non-actionable sell cooldown is a storm lock", async () => {
+  it("allows normal-mode dust home-quote candidates through non-actionable sell storm locks", async () => {
     const helpers = service as unknown as {
       getCandidateSelectionBlockReason: (params: {
         symbol: string;
@@ -4734,6 +4743,30 @@ describe("bot-engine symbol lock checks", () => {
       helpers.getCandidateSelectionBlockReason({
         symbol: "BTCUSDC",
         state,
+        risk: 100,
+        baseAsset: "BTC",
+        quoteAsset: "USDC",
+        qty: 0.000003,
+        lastPrice: 75000,
+        homeStable: "USDC",
+        bridgeAssets: ["BTC"],
+        minExposureHome: 5,
+        activeOrderCount: 0
+      })
+    ).resolves.toBeNull();
+
+    await expect(
+      helpers.getCandidateSelectionBlockReason({
+        symbol: "BTCUSDC",
+        state: {
+          ...state,
+          riskState: {
+            state: "CAUTION",
+            reason_codes: ["trigger=ABS_DAILY_LOSS"],
+            unwind_only: false,
+            resume_conditions: []
+          }
+        },
         risk: 100,
         baseAsset: "BTC",
         quoteAsset: "USDC",

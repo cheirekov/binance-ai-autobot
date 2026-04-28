@@ -1,6 +1,6 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-04-27 15:15 EEST
+Last updated: 2026-04-28 13:50 EEST
 Owner: PM/BA + Codex
 
 ## Ticket
@@ -12,7 +12,7 @@ Owner: PM/BA + Codex
 - Current incident override: `none active`
 
 ## Problem statement
-The newest fresh bundle (`autobot-feedback-20260427-113318.tgz`) shows the bot is not in a hard downside-control freeze, but it is still effectively stuck: runtime is `NORMAL`, `activeOrders=0`, dominant no-feasible count is `70`, and no-feasible recovery keeps selecting `TRXBTC` even though exchange validation rejects it as below minQty.
+The newest fresh bundle (`autobot-feedback-20260428-102858.tgz`) shows the April 27 patch reduced the dominant no-feasible loop (`70 -> 59`) but did not clear it. Runtime is `NORMAL`, `activeOrders=0`, recovery dust is below exchange minimums, and stale home-quote `GRID_SELL_NOT_ACTIONABLE` storm locks still block actionability while live base exposure is dust-sized.
 
 ## Current decision
 - Ticket decision: `patch_required`
@@ -25,14 +25,15 @@ The newest fresh bundle (`autobot-feedback-20260427-113318.tgz`) shows the bot i
   - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle
 
 ## Hypothesis under test
-- A bounded `T-031` slice that lets no-feasible recovery SELL validation bypass only soft buy/quote/grid-wait locks, ranks home-stable recovery sells first, and parks below-minimum dust retries will restore adaptive action without reopening `T-032`.
+- A bounded `T-031` slice that lets normal-mode dust home-quote candidates pass stale sell-storm locks, while parking recovery min-order dust for hours, will restore actionability without reopening `T-032`.
 
 ## What counts as success
 - current runtime blockers are addressed in the correct lane (`T-031`)
 - `T-032` remains preserved support only; the next slice stays in `T-031`
 - the next fresh bundle shows lower repeated `No feasible candidates after policy/exposure filters`
-- no-feasible recovery no longer retries the same below-minimum `TRXBTC` dust candidate every cycle
-- actionable home-quote sell-leg candidates and downside-control support remain reachable
+- no-feasible recovery no longer retries the same below-minimum `TRXBTC` dust candidate on a 20-minute cadence
+- home-quote candidates progress beyond stale dust sell-storm locks when risk is `NORMAL` and active orders are zero
+- downside-control support remains reachable
 - `T-031` stays the active lane while `T-032` remains bounded support only
 
 ## Stop / rollback conditions

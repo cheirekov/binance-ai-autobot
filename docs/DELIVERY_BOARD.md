@@ -105,7 +105,7 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-031 | IN_PROGRESS | Regime engine v2 | Candidate/actionability quality remains the active lane; the current focus is no-feasible recovery selection: prefer reachable home-stable managed sells, let recovery SELL validation bypass only soft buy/quote/grid-wait locks, and park below-minimum dust retries. |
+| T-031 | IN_PROGRESS | Regime engine v2 | Candidate/actionability quality remains the active lane; the current focus is no-feasible recovery and stale dust lock actionability: keep recovery dust parked for hours and let normal-mode home-quote candidates progress past stale sell-storm locks when live base exposure is below actionable minimums. |
 | T-032 | TODO | Exit manager v2 | Linked support only while `T-031` is active: preserve March 30-31 downside-control slices and the April 20 `PROFIT_GIVEBACK` exposure fix; do not reopen unless a downside-control blocker returns. |
 | T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
 

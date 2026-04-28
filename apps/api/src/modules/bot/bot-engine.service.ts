@@ -503,7 +503,6 @@ export class BotEngineService implements OnModuleInit {
     const details = this.readLockDetails(activeLock);
     const category = typeof details?.category === "string" ? details.category.trim().toUpperCase() : "";
     if (category !== "GRID_SELL_NOT_ACTIONABLE") return blockedReason;
-    if (activeLock.reason.trim().toLowerCase().includes("skip storm")) return blockedReason;
 
     const normalizedQuote = params.quoteAsset.trim().toUpperCase();
     const normalizedHome = params.homeStable.trim().toUpperCase();
@@ -527,6 +526,12 @@ export class BotEngineService implements OnModuleInit {
     if (Number.isFinite(homeQuoteExposure) && homeQuoteExposure + 1e-8 >= params.minExposureHome) {
       return blockedReason;
     }
+    const stormLock = activeLock.reason.trim().toLowerCase().includes("skip storm");
+    const runtimeRiskState = params.state.riskState?.state ?? "NORMAL";
+    if (stormLock && runtimeRiskState === "NORMAL") {
+      return null;
+    }
+    if (stormLock) return blockedReason;
 
     const recentNonActionableSellLegSkips = this.countRecentSymbolSkipMatches({
       state: params.state,
@@ -3546,7 +3551,7 @@ export class BotEngineService implements OnModuleInit {
 
   private deriveNoFeasibleRecoveryMinOrderCooldownMs(risk: number): number {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
-    return Math.round((60 - (boundedRisk / 100) * 40) * 60_000); // risk 0 -> 60m, risk 100 -> 20m
+    return Math.round((12 - (boundedRisk / 100) * 6) * 60 * 60_000); // risk 0 -> 12h, risk 100 -> 6h
   }
 
   private shouldApplyNoFeasibleDustCooldown(params: {

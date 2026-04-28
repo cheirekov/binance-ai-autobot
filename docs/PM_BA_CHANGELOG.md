@@ -16,6 +16,46 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-28 10:50 UTC — T-031 seventeenth slice: unblock dust-stormed home-quote candidates in NORMAL mode
+- Scope:
+  - respond to the April 28 fresh bundle where the April 27 recovery ranking patch reduced no-feasible churn (`70 -> 59`) and parked dust candidates, but runtime still remained mostly inactive because stale home-quote sell-storm locks continued to block action while all recovery inventory was below exchange minimums.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260428-102858.tgz`) shows:
+    - `git.commit=dde35f4`
+    - `risk_state=NORMAL`
+    - `unwind_only=false`
+    - `activeOrders=0`
+    - dominant skip `Skip: No feasible candidates after policy/exposure filters` (`59`)
+    - recovery alternates between `TRXBTC` below minQty and `No eligible managed positions available for recovery sell`
+    - state contains active home-quote `GRID_SELL_NOT_ACTIONABLE` storm locks while the live base balances are dust-sized.
+- PM milestone mapping:
+  - keep `T-031` active as the strategy-quality lane.
+  - keep `T-032` as linked support only; latest evidence is not a downside-control blocker.
+  - preserve April 20 `T-032` exposure clipping, April 23 buy-quote quarantine, April 17 dust cooldown, April 15 fee-edge quarantine, and `T-034` funding stability.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - `GRID_SELL_NOT_ACTIONABLE` storm locks no longer block home-quote candidates in `NORMAL` mode when there are no active orders and live base exposure is below the actionable minimum.
+    - `NO_FEASIBLE_RECOVERY_MIN_ORDER` symbol parking now lasts hours instead of minutes (`12h` at risk `0`, `6h` at risk `100`) because dust balances do not become sellable on a 20-minute cadence.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - updated storm-lock coverage to allow normal-mode dust home-quote candidates while keeping the same storm lock blocking in `CAUTION`.
+    - added coverage for the longer recovery min-order parking window.
+  - `docs/TRIAGE_NOTE_2026-04-28_T031_DUST_STORM_LOCKS_BLOCK_HOME_QUOTE_ACTION.md`:
+    - recorded same-ticket triage for the remaining no-feasible loop.
+- Risk slider impact:
+  - no exposure caps, fee floors, or daily-loss thresholds changed.
+  - the dust-storm bypass is limited to `NORMAL`, home-quote, zero-active-order, below-actionable-exposure cases.
+- Validation evidence:
+  - `./scripts/pmba-gate.sh start`
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/validate-active-ticket.sh`
+  - `git diff --check`
+  - `./scripts/pmba-gate.sh end` still fails on the already-ingested pre-patch bundle pair (`70 -> 59`); next fresh bundle is required to clear the dominant-loop gate.
+- Runtime test request:
+  - deploy without resetting state and collect one fresh bundle.
+  - expected evidence: lower `No feasible candidates after policy/exposure filters`, fewer repeated recovery min-order retries, and at least one home-quote candidate progressing beyond the stale dust sell-storm lock when risk remains `NORMAL`.
+- Follow-up:
+  - if home-quote candidates still fail after this patch, the next slice should instrument the first post-lock blocker in candidate selection rather than adding another cooldown.
+
 ## 2026-04-27 12:15 UTC — T-031 sixteenth slice: prioritize reachable no-feasible recovery sells and park dust retries
 - Scope:
   - respond to the April 27 fresh bundle where runtime is no longer in a hard downside-control freeze, but the bot still spends long windows holding only because no-feasible recovery repeatedly reselects a dust-size `TRXBTC` candidate.
