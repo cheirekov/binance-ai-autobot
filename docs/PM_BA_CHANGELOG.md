@@ -16,6 +16,46 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-04-30 08:45 UTC — T-031 eighteenth slice: stop dust sell legs from blocking reachable grid buys
+- Scope:
+  - respond to the April 30 fresh bundle where the April 28 no-feasible blocker cleared, but runtime still had no new orders because `Grid sell leg not actionable yet` became the dominant repeated loop (`63 -> 86`).
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260430-081918.tgz`) shows:
+    - `git.commit=1efbdae`
+    - `risk_state=NORMAL`
+    - `unwind_only=false`
+    - `activeOrders=0`
+    - unchanged trade/order totals (`trades=149`, `submitted=201`, `filled=149`)
+    - dominant skip `Skip BTCUSDC: Grid sell leg not actionable yet` (`86`)
+    - decision details show `BTCUSDC` dust below exchange `minQty` and `PENGUUSDC` zero base inventory.
+- PM milestone mapping:
+  - keep `T-031` active as the strategy-quality/actionability lane.
+  - keep `T-032` as linked support only; latest evidence is not a downside-control blocker.
+  - preserve April 28 stale-dust storm bypass, April 27 no-feasible recovery dust parking, April 20 `T-032` exposure clipping, and `T-034` funding stability.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - home-quote inventory is now considered actionable only when live quantity valued at the latest price reaches the risk-linked minimum countable exposure.
+    - feasible-live routing skips grid-guarded/bear-paused symbols when live inventory is below actionable sell size, so stale managed state cannot keep reselecting dust-only `BTCUSDC`.
+    - the grid executor no longer returns on a dust/zero SELL leg when a BUY leg can still be placed or is already working.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression coverage for home-quote dust inventory, grid-guarded dust rotation, and dust sell legs not blocking actionable buys.
+  - `docs/TRIAGE_NOTE_2026-04-30_T031_GRID_SELL_LEG_DUST_BLOCKS_BUY.md`:
+    - recorded same-ticket triage for the repeated April 30 sell-leg loop.
+- Risk slider impact:
+  - no exposure caps, daily-loss thresholds, or fee floors changed.
+  - the actionable-inventory floor uses the existing risk-linked `deriveManagedPositionMinCountableExposureHome` threshold (`10 -> 5` home value).
+- Validation evidence:
+  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./scripts/validate-active-ticket.sh`
+  - `git diff --check`
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/pmba-gate.sh end` still fails on the already-ingested pre-patch bundle pair (`63 -> 86`); next fresh bundle is required to clear the dominant-loop gate.
+- Runtime test request:
+  - deploy without resetting state and collect one fresh 1–3h bundle.
+  - expected evidence: `BTCUSDC Grid sell leg not actionable yet` should stop dominating, dust/zero-base candidates should rotate into reachable BUY attempts or explicit fee/edge/quote blockers, and active order count should become non-zero if fee/edge and quote checks pass.
+- Follow-up:
+  - if the next fresh bundle still has zero active orders, patch the next first concrete blocker shown after this dust/sell-leg fix; do not add another generic cooldown.
+
 ## 2026-04-28 10:50 UTC — T-031 seventeenth slice: unblock dust-stormed home-quote candidates in NORMAL mode
 - Scope:
   - respond to the April 28 fresh bundle where the April 27 recovery ranking patch reduced no-feasible churn (`70 -> 59`) and parked dust candidates, but runtime still remained mostly inactive because stale home-quote sell-storm locks continued to block action while all recovery inventory was below exchange minimums.

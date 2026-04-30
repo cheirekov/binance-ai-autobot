@@ -92,6 +92,123 @@ describe("bot-engine pickFeasibleLiveCandidate", () => {
     expect(result.reason).toBeUndefined();
   });
 
+  it("rotates away from grid-guarded home dust when live inventory cannot sell", async () => {
+    const config = {
+      advanced: {
+        neverTradeSymbols: [],
+        symbolEntryCooldownMs: 0,
+        maxConsecutiveEntriesPerSymbol: 0
+      }
+    } as unknown as AppConfig;
+
+    const configService = { load: () => config };
+    const rulesBySymbol: Record<string, BinanceSymbolRules> = {
+      BTCUSDC: {
+        symbol: "BTCUSDC",
+        status: "TRADING",
+        baseAsset: "BTC",
+        quoteAsset: "USDC"
+      },
+      PENGUUSDC: {
+        symbol: "PENGUUSDC",
+        status: "TRADING",
+        baseAsset: "PENGU",
+        quoteAsset: "USDC"
+      }
+    };
+    const marketData = {
+      getSymbolRules: async (symbol: string) => rulesBySymbol[symbol],
+      getTickerPrice: async (symbol: string) => (symbol === "BTCUSDC" ? "76000" : "0.01"),
+      validateMarketOrderQty: async () =>
+        ({
+          ok: true,
+          normalizedQty: "10"
+        }) satisfies MarketQtyValidation
+    };
+
+    const service = new BotEngineService(
+      configService as unknown as ConfigService,
+      marketData as unknown as BinanceMarketDataService,
+      {} as unknown as BinanceTradingService,
+      {} as unknown as ConversionRouterService,
+      {} as unknown as UniverseService
+    );
+
+    const btcCandidate: UniverseCandidate = {
+      symbol: "BTCUSDC",
+      baseAsset: "BTC",
+      quoteAsset: "USDC",
+      lastPrice: 76_000,
+      quoteVolume24h: 1_000_000,
+      priceChangePct24h: -0.8,
+      rsi14: 38,
+      adx14: 29,
+      atrPct14: 0.55,
+      score: 5,
+      reasons: []
+    };
+    const penguCandidate: UniverseCandidate = {
+      symbol: "PENGUUSDC",
+      baseAsset: "PENGU",
+      quoteAsset: "USDC",
+      lastPrice: 0.01,
+      quoteVolume24h: 1_000_000,
+      priceChangePct24h: 1.2,
+      score: 4,
+      reasons: []
+    };
+    const state: BotState = {
+      ...defaultBotState(),
+      protectionLocks: [
+        {
+          id: "btc-guard",
+          type: "GRID_GUARD_BUY_PAUSE",
+          createdAt: new Date().toISOString(),
+          scope: "SYMBOL",
+          symbol: "BTCUSDC",
+          reason: "Grid guard: pause BUY legs",
+          expiresAt: new Date(Date.now() + 60_000).toISOString()
+        }
+      ]
+    };
+
+    const result = await (
+      service as unknown as {
+        pickFeasibleLiveCandidate: (params: unknown) => Promise<{
+          candidate: UniverseCandidate | null;
+          rejectionSamples: Array<{ symbol: string; stage: string }>;
+        }>;
+      }
+    ).pickFeasibleLiveCandidate({
+      preferredCandidate: btcCandidate,
+      snapshotCandidates: [penguCandidate],
+      state,
+      homeStable: "USDC",
+      allowedExecutionQuotes: new Set(["USDC"]),
+      traderRegion: "EEA",
+      neverTradeSymbols: [],
+      excludeStableStablePairs: true,
+      enforceRegionPolicy: true,
+      balances: [
+        { asset: "USDC", free: 1_000, locked: 0, total: 1_000 },
+        { asset: "BTC", free: 0.00000334, locked: 0, total: 0.00000334 }
+      ],
+      walletTotalHome: 1_000,
+      risk: 100,
+      maxPositionPct: 20,
+      minQuoteLiquidityHome: 3,
+      notionalCap: 20,
+      capitalNotionalCapMultiplier: 1,
+      bufferFactor: 1
+    });
+
+    expect(result.candidate?.symbol).toBe("PENGUUSDC");
+    expect(result.rejectionSamples[0]).toMatchObject({
+      symbol: "BTCUSDC",
+      stage: "grid-guard-no-actionable-inventory"
+    });
+  });
+
   it("rejects non-home quote candidate when projected quote exposure exceeds cap", async () => {
     const config = {
       basic: {
@@ -884,6 +1001,7 @@ describe("bot-engine insufficient-balance helpers", () => {
         baseAsset: string;
         quoteAsset: string;
         qty: number;
+        lastPrice?: number;
         homeStable: string;
         bridgeAssets: string[];
         minExposureHome: number;
@@ -908,6 +1026,44 @@ describe("bot-engine insufficient-balance helpers", () => {
         qty: 0.05,
         homeStable: "USDC",
         bridgeAssets: ["ETH", "BTC", "BNB"],
+        minExposureHome: 5
+      })
+    ).resolves.toBe(true);
+  });
+
+  it("treats small home-quote dust as non-actionable grid inventory", async () => {
+    const helpers = service as unknown as {
+      hasActionableGridInventory: (params: {
+        baseAsset: string;
+        quoteAsset: string;
+        qty: number;
+        lastPrice?: number;
+        homeStable: string;
+        bridgeAssets: string[];
+        minExposureHome: number;
+      }) => Promise<boolean>;
+    };
+
+    await expect(
+      helpers.hasActionableGridInventory({
+        baseAsset: "BTC",
+        quoteAsset: "USDC",
+        qty: 0.00000334,
+        lastPrice: 76_000,
+        homeStable: "USDC",
+        bridgeAssets: ["BTC", "ETH"],
+        minExposureHome: 5
+      })
+    ).resolves.toBe(false);
+
+    await expect(
+      helpers.hasActionableGridInventory({
+        baseAsset: "BTC",
+        quoteAsset: "USDC",
+        qty: 0.0001,
+        lastPrice: 76_000,
+        homeStable: "USDC",
+        bridgeAssets: ["BTC", "ETH"],
         minExposureHome: 5
       })
     ).resolves.toBe(true);
@@ -4981,6 +5137,68 @@ describe("bot-engine symbol lock checks", () => {
         recentGridGuardBuyPauseSkips: 0
       })
     ).toBe(true);
+  });
+
+  it("does not let a dust sell leg block an actionable grid buy leg", () => {
+    const helpers = service as unknown as {
+      shouldBlockGridForNonActionableSellLeg: (params: {
+        hasSellLimit: boolean;
+        sellLegLikelyFeasible: boolean;
+        desiredSellQty: number;
+        dustResidualExposureHome: number;
+        minCountableExposureHome: number;
+        quoteAsset: string;
+        homeStable: string;
+        hasBuyLimit: boolean;
+        buyPaused: boolean;
+        buyLimitPrice: number;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldBlockGridForNonActionableSellLeg({
+        hasSellLimit: false,
+        sellLegLikelyFeasible: false,
+        desiredSellQty: 0.00000334,
+        dustResidualExposureHome: 0.25,
+        minCountableExposureHome: 5,
+        quoteAsset: "USDC",
+        homeStable: "USDC",
+        hasBuyLimit: false,
+        buyPaused: false,
+        buyLimitPrice: 75_000
+      })
+    ).toBe(false);
+
+    expect(
+      helpers.shouldBlockGridForNonActionableSellLeg({
+        hasSellLimit: false,
+        sellLegLikelyFeasible: false,
+        desiredSellQty: 0.00000334,
+        dustResidualExposureHome: 0.25,
+        minCountableExposureHome: 5,
+        quoteAsset: "USDC",
+        homeStable: "USDC",
+        hasBuyLimit: false,
+        buyPaused: true,
+        buyLimitPrice: 75_000
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldBlockGridForNonActionableSellLeg({
+        hasSellLimit: false,
+        sellLegLikelyFeasible: false,
+        desiredSellQty: 0,
+        dustResidualExposureHome: Number.NaN,
+        minCountableExposureHome: 5,
+        quoteAsset: "USDC",
+        homeStable: "USDC",
+        hasBuyLimit: false,
+        buyPaused: false,
+        buyLimitPrice: 0.0098
+      })
+    ).toBe(false);
   });
 });
 

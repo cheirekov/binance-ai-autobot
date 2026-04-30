@@ -670,6 +670,7 @@ export class BotEngineService implements OnModuleInit {
     baseAsset: string;
     quoteAsset: string;
     qty: number;
+    lastPrice?: number;
     homeStable: string;
     bridgeAssets: string[];
     minExposureHome: number;
@@ -679,7 +680,9 @@ export class BotEngineService implements OnModuleInit {
     const quoteAsset = params.quoteAsset.trim().toUpperCase();
     const homeStable = params.homeStable.trim().toUpperCase();
     if (!quoteAsset || !homeStable) return false;
-    if (quoteAsset === homeStable) return true;
+    if (quoteAsset === homeStable && Number.isFinite(params.lastPrice) && (params.lastPrice ?? 0) > 0) {
+      return params.qty * (params.lastPrice as number) + 1e-8 >= params.minExposureHome;
+    }
 
     const exposureHome = await this.estimateAssetValueInHome(
       params.baseAsset,
@@ -689,6 +692,41 @@ export class BotEngineService implements OnModuleInit {
     );
     if (!Number.isFinite(exposureHome ?? Number.NaN) || (exposureHome ?? 0) <= 0) return false;
     return (exposureHome ?? 0) + 1e-8 >= params.minExposureHome;
+  }
+
+  private shouldBlockGridForNonActionableSellLeg(params: {
+    hasSellLimit: boolean;
+    sellLegLikelyFeasible: boolean;
+    desiredSellQty: number;
+    dustResidualExposureHome: number;
+    minCountableExposureHome: number;
+    quoteAsset: string;
+    homeStable: string;
+    hasBuyLimit: boolean;
+    buyPaused: boolean;
+    buyLimitPrice: number;
+  }): boolean {
+    if (params.hasSellLimit || params.sellLegLikelyFeasible) return false;
+
+    const buyLegCanStillAct =
+      !params.hasBuyLimit &&
+      !params.buyPaused &&
+      Number.isFinite(params.buyLimitPrice) &&
+      params.buyLimitPrice > 0;
+    const buyLegAlreadyWorking = params.hasBuyLimit;
+    if (!buyLegCanStillAct && !buyLegAlreadyWorking) return true;
+
+    const hasPositiveSellQty = Number.isFinite(params.desiredSellQty) && params.desiredSellQty > 0;
+    if (!hasPositiveSellQty) return false;
+
+    const quoteAsset = params.quoteAsset.trim().toUpperCase();
+    const homeStable = params.homeStable.trim().toUpperCase();
+    const isHomeQuoteDustResidual =
+      quoteAsset === homeStable &&
+      Number.isFinite(params.dustResidualExposureHome) &&
+      params.dustResidualExposureHome + 1e-8 < params.minCountableExposureHome;
+
+    return !isHomeQuoteDustResidual;
   }
 
   private assessGridSellLegFeasibility(params: {
@@ -3079,10 +3117,31 @@ export class BotEngineService implements OnModuleInit {
           baseAsset,
           quoteAsset,
           qty: baseTotal,
+          lastPrice: price,
           homeStable: normalizedHomeStable,
           bridgeAssets: quoteBridgeAssets,
           minExposureHome: minCountableExposureHome
         });
+        const existingBuyPauseLock = this.getActiveSymbolProtectionLock(state, symbol, { onlyTypes: ["GRID_GUARD_BUY_PAUSE"] });
+        const regime = this.buildRegimeSnapshot(candidate, risk);
+        const pauseConfidenceThreshold = this.getBearPauseConfidenceThreshold(risk);
+        const shouldPauseBuys =
+          regime.label === "BEAR_TREND" &&
+          typeof regime.confidence === "number" &&
+          Number.isFinite(regime.confidence) &&
+          regime.confidence >= pauseConfidenceThreshold;
+        if ((existingBuyPauseLock || shouldPauseBuys) && !hasInventory && !hasSellLimit) {
+          recordRejection({
+            symbol,
+            stage: "grid-guard-no-actionable-inventory",
+            reason: existingBuyPauseLock
+              ? "Grid BUY leg already paused and live inventory is below actionable sell size"
+              : `Bear-trend BUY pause (${regime.label} ${Math.round(regime.confidence * 100)}%) with no actionable sell inventory`,
+            quoteAsset,
+            price: Number.isFinite(price) ? Number(price.toFixed(8)) : undefined
+          });
+          continue;
+        }
         const recentFeeEdgeRejects = this.countRecentSymbolSkipMatches({
           state,
           symbol,
@@ -5359,6 +5418,7 @@ export class BotEngineService implements OnModuleInit {
                 baseAsset: candidate.baseAsset,
                 quoteAsset: candidateQuote,
                 qty: netQty,
+                lastPrice: candidate.lastPrice,
                 homeStable,
                 bridgeAssets: selectionBridgeAssets,
                 minExposureHome: minCountableExposureHome
@@ -8415,6 +8475,11 @@ export class BotEngineService implements OnModuleInit {
                 })
               : { feasible: true, normalizedQty: desiredSellQty };
             const sellLegLikelyFeasible = hasSellLimit || sellLegAssessment.feasible;
+            const minCountableExposureHome = this.deriveManagedPositionMinCountableExposureHome(risk);
+            const dustResidualExposureHome =
+              Number.isFinite(sellLimitPrice) && sellLimitPrice > 0 && Number.isFinite(desiredSellQty) && desiredSellQty > 0
+                ? desiredSellQty * sellLimitPrice
+                : Number.NaN;
 
             if (!hasBuyLimit && buyPaused) {
               const summary = buyPausedByCaution
@@ -8476,7 +8541,20 @@ export class BotEngineService implements OnModuleInit {
               }
             }
 
-            if (!hasSellLimit && !sellLegLikelyFeasible) {
+            if (
+              this.shouldBlockGridForNonActionableSellLeg({
+                hasSellLimit,
+                sellLegLikelyFeasible,
+                desiredSellQty,
+                dustResidualExposureHome,
+                minCountableExposureHome,
+                quoteAsset: candidateQuoteAsset,
+                homeStable,
+                hasBuyLimit,
+                buyPaused,
+                buyLimitPrice
+              })
+            ) {
               if (placedGridOrder) {
                 return;
               }
@@ -8487,11 +8565,6 @@ export class BotEngineService implements OnModuleInit {
               );
               const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
               let cooldownMs = cooldown.cooldownMs;
-              const minCountableExposureHome = this.deriveManagedPositionMinCountableExposureHome(risk);
-              const dustResidualExposureHome =
-                Number.isFinite(sellLimitPrice) && sellLimitPrice > 0 && Number.isFinite(desiredSellQty) && desiredSellQty > 0
-                  ? desiredSellQty * sellLimitPrice
-                  : Number.NaN;
               const isHomeQuoteDustResidual =
                 candidateQuoteAsset === homeStable &&
                 Number.isFinite(dustResidualExposureHome) &&

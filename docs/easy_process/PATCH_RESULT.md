@@ -1,10 +1,10 @@
 # PATCH_RESULT
 
-Last updated: 2026-04-28 13:50 EEST
+Last updated: 2026-04-30 11:45 EEST
 Owner: PM/BA + Codex
 
 ## Incident classification
-- `P1 long no-action dust-storm lock loop`
+- `P1 long no-action dust sell-leg loop`
 
 ## Chosen action class
 - `PATCH_NOW`
@@ -16,7 +16,7 @@ Owner: PM/BA + Codex
 - `apps/api/src/modules/bot/bot-engine.service.ts`
 - `apps/api/src/modules/bot/bot-engine.service.test.ts`
 - `docs/PM_BA_CHANGELOG.md`
-- `docs/TRIAGE_NOTE_2026-04-28_T031_DUST_STORM_LOCKS_BLOCK_HOME_QUOTE_ACTION.md`
+- `docs/TRIAGE_NOTE_2026-04-30_T031_GRID_SELL_LEG_DUST_BLOCKS_BUY.md`
 - `docs/SESSION_BRIEF.md`
 - `docs/DELIVERY_BOARD.md`
 - `docs/STRATEGY_COVERAGE.md`
@@ -26,35 +26,37 @@ Owner: PM/BA + Codex
 - `docs/easy_process/PATCH_RESULT.md`
 
 ## Exact behavior changed
-- `GRID_SELL_NOT_ACTIONABLE` storm locks no longer block dust-sized home-quote candidates in `NORMAL` mode when there are no active orders.
-- the same storm locks still block outside that bounded case, including `CAUTION`.
-- `NO_FEASIBLE_RECOVERY_MIN_ORDER` parking now lasts `12h` at risk `0` and `6h` at risk `100`.
+- home-quote dust is not counted as actionable grid inventory unless latest price value reaches the risk-linked countable-exposure floor.
+- feasible-live routing skips buy-paused/grid-guarded symbols when live sell inventory is below actionable size.
+- grid execution does not return on a dust/zero SELL leg when a BUY leg can still act or is already working.
 
 ## Why this is the minimum viable patch
-- it targets the April 28 evidence: large spendable `USDC`, no active orders, `NORMAL` risk state, but stale home-quote sell-storm locks and below-minimum recovery dust kept the bot inactive.
+- it targets the April 30 evidence directly: `NORMAL`, `activeOrders=0`, no new trades, and repeated `Grid sell leg not actionable yet` on dust/zero base balances.
 - it does not change exposure caps, fee floors, daily-loss thresholds, quote routing, or `T-032` downside-control policy.
 
 ## Hypothesis addressed
-- the bot was still not adapting because stale dust sell-storm locks were treated like live actionable inventory blockers, and recovery dust was retried too frequently.
+- the bot was still not adapting because impossible SELL-leg checks preempted reachable BUY progression and stale/dust inventory was treated as actionable.
 
 ## Tests added/updated
-- updated storm-lock regression coverage to allow normal-mode dust home-quote candidates and keep the same storm lock blocking in `CAUTION`.
-- added regression coverage for multi-hour recovery min-order dust parking.
+- home-quote dust inventory is non-actionable until it reaches countable exposure.
+- feasible-live candidate selection rotates from grid-guarded BTC dust to a reachable alternative.
+- a dust/zero SELL leg does not block an actionable grid BUY leg.
 
 ## Validation run
-- `./scripts/pmba-gate.sh start` ✅
+- `pnpm -C apps/api test -- src/modules/bot/bot-engine.service.test.ts` unavailable locally (`pnpm` not installed).
 - `docker compose -f docker-compose.ci.yml run --rm ci` ✅
 - `./scripts/validate-active-ticket.sh` ✅
 - `git diff --check` ✅
-- `./scripts/pmba-gate.sh end` remains blocked by the already-ingested pre-patch fresh bundle pair (`70 -> 59`); this is expected until the next fresh bundle validates the patch.
+- `./scripts/pmba-gate.sh start` ✅
+- `./scripts/pmba-gate.sh end` remains blocked by the already-ingested pre-patch bundle pair (`63 -> 86`); this is expected until the next fresh bundle validates the patch.
 
 ## Remaining risk
-- if home-quote candidates progress beyond the stale lock but fail a later policy/edge filter, the next bundle should expose that blocker more specifically.
+- the next bundle may expose a different first blocker after BUY progression becomes reachable, likely fee/edge or quote spendability.
 
 ## Rollback trigger
-- the patch permits dust-storm bypass outside `NORMAL`, bypasses hard/global risk locks, or creates excessive new buy exposure.
+- the patch permits new BUY exposure under hard `CAUTION/HALT` constraints, bypasses hard/global risk locks, or suppresses reachable sell/unwind behavior.
 
 ## What the next bundle must confirm
-- reduced `Skip: No feasible candidates after policy/exposure filters`.
-- no repeated `TRXBTC` minQty recovery retries on a 20-minute cadence.
-- at least one home-quote candidate progresses beyond stale `GRID_SELL_NOT_ACTIONABLE` storm locks while risk remains `NORMAL`.
+- reduced `Skip BTCUSDC: Grid sell leg not actionable yet`.
+- no repeated zero-base `PENGUUSDC` sell-leg churn.
+- active grid orders appear if fee/edge and quote checks pass; otherwise the next blocker is specific and patchable.
