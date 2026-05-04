@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-04-30 08:45 UTC
+Last updated: 2026-05-04 08:50 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -9,44 +9,43 @@ Use this file at the start and end of every batch.
 
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-031` (Regime engine v2)
-- Linked support ticket: `T-032` (preserved only; not the current blocker)
-- Goal (single sentence): stop dust/zero SELL legs from blocking reachable grid BUY progression in normal-mode T-031 runtime.
+- Linked support ticket: `T-032` (bounded downside-control support)
+- Goal (single sentence): reduce restored-trading fee/giveback churn by making daily-loss protection fee-aware and preventing near-halt fresh-symbol reopening.
 - In scope:
   - keep `T-031` active as the strategy-quality lane.
-  - treat home-quote dust below risk-linked countable exposure as non-actionable inventory.
-  - rotate away from grid-guarded or bear-paused symbols when live inventory cannot place an actionable sell.
-  - allow grid BUY placement to proceed when the only missing SELL leg is dust-sized or zero and the BUY leg is otherwise actionable.
-  - preserve the April 28 `GRID_SELL_NOT_ACTIONABLE` storm-lock bypass and multi-hour `NO_FEASIBLE_RECOVERY_MIN_ORDER` parking.
-  - preserve no-feasible recovery SELL validation lock bypass and home-stable recovery ranking from the April 27 slice.
-  - preserve the April 20 linked-support `T-032` exposure fix.
-  - preserve the April 23 buy-quote quarantine, April 20 quote-pressure quarantine, April 17 no-feasible dust cooldown, April 15 fee-edge quarantine, and active-order behavior.
-  - keep the April 13-15 residual storm mitigations in place.
-  - preserve April 12 and March 30-31 `T-032` downside-control behavior.
+  - make closed-PnL events include buy-side and sell-side fees before daily-loss/profit-giveback evaluation.
+  - lower profit-giveback activation to preserve smaller net wins after fees.
+  - prevent severe near-halt daily-loss `CAUTION` from reopening fresh symbols solely because managed exposure is near-flat.
+  - preserve the April 30 dust/zero SELL-leg BUY progression behavior.
+  - preserve the April 28 dust-storm bypass, April 27 recovery dust parking, April 23/20 quote quarantine behavior, and April 15 fee-edge quarantine.
+  - preserve April 20 exposure clipping plus April 12 and March 30-31 `T-032` downside-control behavior.
   - preserve `T-034` funding / quote-routing stability.
 - Out of scope:
   - quote-routing redesign (`T-034` stays closed unless runtime regresses),
-  - reopening `T-032` as the active blocker without fresh evidence,
+  - promoting `T-032` to the active ticket beyond this bounded support fix,
   - weakening entry filters or fee-edge floors,
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: the April 28 slice cleared the generic no-feasible loop, but exposed a concrete T-031 actionability defect: stale managed inventory and dust/zero live balances make the grid executor return on an impossible SELL leg before a reachable BUY leg can be placed. Separating actionable inventory from dust should restore progression without weakening downside-control locks.
+- Hypothesis: the April 30 actionability fix restored trading, but daily-loss/profit-giveback protection still under-counted fee burn and could thaw fresh symbols too easily once exposure was near-flat. Fee-aware closed PnL plus severe-budget pause should reduce churn without weakening hard guardrails.
 - Target KPI delta:
-  - reduce repeated `Skip BTCUSDC: Grid sell leg not actionable yet` under dust/zero live inventory.
-  - route grid-guarded dust symbols away from feasible-live selection when they cannot buy or sell.
-  - increase reachable grid BUY progression when active orders are zero and risk is `NORMAL`.
-  - preserve the April 20 `T-032` support fix and avoid reopening the old April 17 freeze.
-  - preserve reachable home-quote / managed sell paths.
+  - daily-loss guard details reflect fee-aware realized PnL.
+  - no fresh-symbol entries when severe daily-loss caution has consumed most of the risk-linked daily budget.
+  - profit-giveback still protects smaller net wins after fees.
+  - preserve reachable home-quote / managed sell paths and April 30 BUY progression.
 - Stop/rollback condition:
-  - if the dust BUY-progression change weakens downside control, ignores a hard risk lock, buys while `CAUTION/HALT` requires no new risk, or reopens the old no-feasible quote-pressure loop, reopen PM/BA triage immediately.
+  - if the patch permits fresh entries during severe daily-loss protection, hides fees from realized guard math, blocks reachable unwind/sell paths, or reopens the old no-feasible quote-pressure loop, reopen PM/BA triage immediately.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
   - runtime behavior changes in a bounded way:
-    - home-quote dust below the risk-linked countable-exposure floor is not treated as actionable inventory.
-    - feasible-live routing skips buy-paused symbols with no actionable live sell inventory.
-    - dust/zero SELL legs do not block reachable grid BUY legs.
+    - daily-loss/profit-giveback closed PnL is fee-aware.
+    - buy-side fees increase cost basis before close.
+    - sell-side fees reduce closed PnL.
+    - severe near-halt daily-loss `CAUTION` pauses fresh symbols even when managed exposure is near-flat.
+    - profit-giveback hard `HALT` on near-flat books is reserved for severe daily-loss usage or material managed exposure.
+    - April 30 dust/zero SELL legs still do not block reachable grid BUY legs.
     - `GRID_SELL_NOT_ACTIONABLE` storm-lock behavior from April 28 remains preserved.
     - below-minimum recovery sell candidates receive a multi-hour symbol-level `NO_FEASIBLE_RECOVERY_MIN_ORDER` cooldown.
     - home-quote / actionable sell-leg candidates remain reachable.
@@ -58,27 +57,34 @@ Use this file at the start and end of every batch.
     - March 30-31 `T-032` caution-unwind / thaw behavior remains preserved.
   - active development lane is `T-031`; `T-032` remains preserved as a support lane in runtime.
 - Runtime evidence in decisions/logs:
-  - latest fresh bundle runs `git.commit=1efbdae`.
-  - latest fresh bundle (`autobot-feedback-20260430-081918.tgz`) shows:
-    - `risk_state=NORMAL`
+  - latest fresh bundle runs `git.commit=474b1ee`.
+  - latest fresh bundle (`autobot-feedback-20260504-084256.tgz`) shows:
+    - `risk_state=HALT`
+    - `trigger=PROFIT_GIVEBACK`
+    - `unwind_only=true`
     - `activeOrders=0`
-    - `unwind_only=false`
-    - `sizingRejectPressure=low`
-    - dominant skip `Skip BTCUSDC: Grid sell leg not actionable yet` (`86`)
-    - `BTCUSDC` live base free is below exchange `minQty`
-    - `PENGUUSDC` has zero base inventory yet still produced sell-leg-not-actionable skips
-  - the next fresh bundle should show lower repeated dust sell-leg churn and either active grid orders or a different first concrete blocker such as fee/edge or quote spendability.
+    - wallet/equity estimate `6247.63 USDC`
+    - `dailyRealized=-231.26 USDC`, `peakDaily=29.71 USDC`, `giveback=260.98 USDC`
+    - high churn: `submitted=200`, `filled=136`, `canceled=64`, `feesHome=42.19`
+  - the next fresh bundle should show fee-aware daily-loss/giveback details and no fresh-symbol entries while severe daily-loss caution is active.
 - Risk slider impact:
-  - no cap, fee-floor, or daily-loss threshold changes.
-  - this slice reuses the existing risk-linked minimum countable exposure (`10 -> 5` home value) to distinguish actionable inventory from dust.
+  - no exposure cap or fee-floor changes.
+  - daily-loss budget remains risk-linked and unchanged.
+  - severe caution pause is risk-linked (`65% -> 85%` of the daily-loss budget).
+  - profit-giveback activation now uses `5%` of the daily-loss budget so fee-aware smaller net wins are still protected.
 - Validation commands:
-  - `docker compose -f docker-compose.ci.yml run --rm ci`
+  - `./apps/api/node_modules/.bin/vitest run apps/api/src/modules/bot/bot-engine.service.test.ts --cache=false`
+  - `./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.build.json --noEmit`
+  - `./scripts/validate-active-ticket.sh`
+  - `git diff --check`
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/pmba-gate.sh end`
 - Runtime validation plan:
   - deploy the current `T-031` slice and collect one fresh bundle before any further reprioritization
 
 ## 3) Deployment handoff
 
-- Commit hash: `pending local patch after 1efbdae`
+- Commit hash: `pending local patch after 474b1ee`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -101,40 +107,40 @@ Use this file at the start and end of every batch.
 - Run context:
   - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `20.198`
-  - runtime uptime (hours): `450.281`
-  - run end: `Thu Apr 30 2026 11:19:14 GMT+0300 (Eastern European Summer Time)`
+  - bundle interval (hours): `96.384`
+  - runtime uptime (hours): `546.665`
+  - run end: `Mon May 04 2026 11:42:17 GMT+0300 (Eastern European Summer Time)`
   - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip BTCUSDC: Grid sell leg not actionable yet (86))
+  - active ticket runtime signal: `observed` (restored trading reached fee/giveback protection; top skip `Skip BTCUSDC: Fee/edge filter (net 0.040% < 0.050%)` (10))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=81, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=59.7%)
-  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=103, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=48.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=15, decisions=200, ratio=7.5%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `patch_ready`
+- Decision: `patch_required`
 - Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
-- Required action: `deploy same-ticket T-031 mitigation and collect one 1-3h bundle`
+- Required action: `same-ticket mitigation required before next long run`
 - Open risks:
-  - next bundle must prove the dust sell-leg loop no longer dominates and show either active orders or the next concrete blocker.
+  - next bundle may be intentionally paused by fee-aware daily-loss protection until the rolling loss window clears; that is safer than reopening fresh symbols into severe loss budget usage.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260430-081918.tgz`
-  - auto-updated at: `2026-04-30T08:21:10.530Z`
+  - bundle: `autobot-feedback-20260504-084256.tgz`
+  - auto-updated at: `2026-05-04T08:43:15.630Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-031
-Decision: patch_ready
-Required action: deploy same-ticket T-031 mitigation and collect one 1-3h bundle
-Latest bundle: autobot-feedback-20260430-081918.tgz
+Decision: patch_required
+Required action: same-ticket mitigation required before next long run
+Latest bundle: autobot-feedback-20260504-084256.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: stop dust/zero grid SELL legs from blocking reachable BUY progression while preserving T-032/T-034 safety.
-In scope: T-031 candidate/actionability logic for dust inventory and grid buy progression.
-Out of scope: quote-routing redesign, PnL schema changes, AI lane, fee-floor weakening.
-Validation: docker compose -f docker-compose.ci.yml run --rm ci
+Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
+In scope: fee-aware daily-loss/profit-giveback guardrails and severe near-halt fresh-symbol pause.
+Out of scope: quote-routing redesign, candidate-hygiene-only optimization, PnL schema changes, AI lane.
+Validation: ./apps/api/node_modules/.bin/vitest run apps/api/src/modules/bot/bot-engine.service.test.ts --cache=false; ./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.build.json --noEmit; ./scripts/validate-active-ticket.sh; git diff --check; ./scripts/pmba-gate.sh start; ./scripts/pmba-gate.sh end
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

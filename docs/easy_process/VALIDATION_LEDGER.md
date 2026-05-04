@@ -1,6 +1,6 @@
 # VALIDATION_LEDGER
 
-Last updated: 2026-03-28 23:10 EET  
+Last updated: 2026-05-04 11:50 EEST
 Owner: PM/BA + Runtime Analyst + Trader
 
 Purpose:
@@ -8,7 +8,7 @@ track which runtime behaviors have real proof and which are still only hypothese
 
 ## Ticket currently under validation
 - `T-031`
-- Current batch action: `pivot_active_ticket`
+- Current batch action: `patch_ready`
 
 ## Required scenario classes
 
@@ -25,7 +25,7 @@ Question:
 
 Status:
 - preserved support lane
-- `T-032` remains live in runtime but is not the active development surface in this batch
+- `T-032` remains linked support; May 4 adds fee-aware daily-loss/giveback protection and severe near-halt fresh-symbol pause
 
 ### S3 — Regime-quality entry adaptation
 Question:
@@ -33,7 +33,7 @@ Question:
 
 Status:
 - `running`
-- this is the new active validation surface for `T-031`
+- May 4 evidence proves actionability restored into orders; current validation focus is whether strategy activity stops fee/giveback churn before reopening entries
 
 ### S4 — Funding/routing pressure
 Question:
@@ -50,8 +50,8 @@ Question:
 
 Status:
 - `running`
-- the latest bundle is fresh and clearly not engine-dead (`95` trades, `9` active orders)
-- the earlier March 28 low-exposure caution case stays as history, not current authority
+- latest May 4 bundle is not engine-dead; it traded heavily, then entered daily-loss/giveback protection
+- next bundle must distinguish intentional severe-loss pause from a new execution deadlock
 
 ### S6 — Regime-aware fee floor
 Question:

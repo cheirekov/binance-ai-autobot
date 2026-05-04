@@ -1,13 +1,13 @@
 # OPERATOR_NOTE
 
-Last updated: 2026-03-28 23:10 EET  
+Last updated: 2026-05-04 11:50 EEST
 Owner: PM/BA + Codex
 
 ## What to run next
-- deploy the new `T-031` slice
+- deploy the new `T-031` fee-aware guardrail slice
 - keep state
-- collect the next fresh bundle normally
-- evaluate that bundle against the new `T-031` hypothesis before any second strategy patch
+- collect a short 1–3h fresh bundle before any night-long run
+- evaluate fee-aware daily-loss/giveback details before any second strategy patch
 
 ## What not to do next
 - do not reopen `T-032` as the active lane from habit
@@ -16,5 +16,5 @@ Owner: PM/BA + Codex
 
 ## What fresh evidence would change the decision
 - a new bundle shows a concrete `P0/P1` runtime regression
-- the first `T-031` post-deploy bundle still shows dominant fee-edge idling with no measurable improvement
-- downside-control regresses and makes `T-032` the dominant blocker again
+- the first post-deploy bundle opens fresh symbols while severe daily-loss protection is active
+- downside-control regresses or reachable unwind/sell behavior is blocked

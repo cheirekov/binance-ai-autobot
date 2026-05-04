@@ -95,6 +95,7 @@ These are execution behaviors currently active in runtime:
     - current April 27 slice: no-feasible recovery SELL validation now bypasses only soft buy/quote/grid-wait symbol locks, ranks home-stable managed sells first, and parks below-minimum recovery dust under `NO_FEASIBLE_RECOVERY_MIN_ORDER` so recovery does not keep reselecting the same unsellable residual
     - current April 28 slice: in `NORMAL` mode with no active orders, dust-sized home-quote candidates can progress past stale `GRID_SELL_NOT_ACTIONABLE` storm locks, while recovery min-order dust is parked for hours instead of minutes
     - current April 30 slice: home-quote dust is no longer treated as actionable inventory, feasible-live routing skips buy-paused dust symbols, and dust/zero SELL legs no longer block otherwise reachable grid BUY legs
+    - current May 4 slice: restored trading now feeds fee-aware closed-PnL into daily-loss/profit-giveback protection, and severe near-halt caution pauses fresh symbols instead of reusing daily loss budget just because exposure is near-flat
   - objective: improve candidate quality and rotation under real market regimes without reopening `T-032` or `T-034`
 
 ## Support / next strategy core
@@ -105,6 +106,7 @@ These are execution behaviors currently active in runtime:
     - March 31 slice: stop-loss-cooled residual positions no longer anchor global `CAUTION` new-symbol pause once active orders are gone
     - April 12 linked-support slice: near-flat residual managed positions no longer keep `ABS_DAILY_LOSS` `CAUTION` frozen once active orders are gone
     - current April 20 linked-support slice: `PROFIT_GIVEBACK` `HALT` now clips managed exposure to base inventory that still exists in balances, so home-quote exposure already spent as quote inventory elsewhere cannot keep downside-control frozen by itself
+    - current May 4 linked-support slice: severe daily-loss caution pauses fresh symbols at a risk-linked budget threshold, and near-flat profit-giveback hard `HALT` is reserved for severe loss usage or material managed exposure
   - reopen only if downside-control policy becomes the dominant blocker again
 - `T-034` — Multi-quote execution policy v1
   - DONE; preserve funding/routing stability while `T-031` evolves strategy quality

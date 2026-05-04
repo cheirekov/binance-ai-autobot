@@ -16,6 +16,52 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-04 08:50 UTC — T-031 nineteenth slice: fee-aware giveback guard after restored trading
+- Scope:
+  - respond to the May 4 fresh bundle where the April 30 dust sell-leg blocker cleared into real trading, but the run burned wallet value through high churn and ended in profit-giveback daily-loss protection.
+- BA requirement mapping:
+  - latest fresh bundle (`autobot-feedback-20260504-084256.tgz`) shows:
+    - `git.commit=474b1ee`
+    - `risk_state=HALT`
+    - `trigger=PROFIT_GIVEBACK`
+    - `unwind_only=true`
+    - `activeOrders=0`
+    - wallet/equity estimate `6247.63 USDC`
+    - `dailyRealized=-231.26 USDC`, `peakDaily=29.71 USDC`, `giveback=260.98 USDC`
+    - high churn: `submitted=200`, `filled=136`, `canceled=64`, `feesHome=42.19`.
+- PM milestone mapping:
+  - keep `T-031` active because the immediate issue is now strategy-quality/churn after actionability was restored.
+  - allow a bounded linked-support `T-032` guardrail adjustment because downside protection must use fee-aware realized evidence and must not reopen fresh symbols when the daily loss budget is near exhausted.
+  - preserve the April 30 dust/zero SELL-leg BUY progression, April 28 dust-storm bypass, April 27 recovery dust parking, April 20 exposure clipping, and `T-034` funding stability.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - closed-PnL events now include buy-side fees in cost basis and subtract sell-side fees from realized PnL.
+    - uncovered sell fees are recorded as negative realized events instead of being invisible to daily-loss protection.
+    - profit-giveback activation now uses `5%` of the daily-loss budget, preserving smaller net wins after fees.
+    - near-flat `CAUTION` can no longer reopen fresh symbols when realized loss has already consumed a severe risk-linked share of the daily-loss budget (`65% -> 85%` by risk).
+    - profit-giveback only stays in hard `HALT` for near-flat books when absolute loss is severe, instead of using the lower caution threshold as a hard-halt reason.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added coverage for fee-aware closed PnL and severe near-halt caution new-symbol pause.
+  - `docs/TRIAGE_NOTE_2026-05-04_T031_FEE_AWARE_GIVEBACK_CHURN.md`:
+    - recorded same-ticket triage for the May 4 fee/churn/giveback evidence.
+- Risk slider impact:
+  - daily-loss budget remains risk-linked and unchanged.
+  - profit-giveback activation is more fee-aware and earlier.
+  - severe daily-loss pause remains risk-linked: lower risk pauses earlier, higher risk still permits more loss budget before fresh symbols are paused.
+- Validation evidence:
+  - `./apps/api/node_modules/.bin/vitest run apps/api/src/modules/bot/bot-engine.service.test.ts --cache=false`
+  - `./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.build.json --noEmit`
+  - `./scripts/validate-active-ticket.sh`
+  - `git diff --check`
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/pmba-gate.sh end`
+  - note: direct `pnpm -C apps/api test -- bot-engine.service.test.ts` is unavailable in this environment because `pnpm` is not installed.
+- Runtime test request:
+  - deploy without resetting state and collect one fresh 1–3h bundle before any night-long run.
+  - expected evidence: daily-loss/giveback details should reflect fee-aware realized PnL, no new symbols should open when the daily-loss budget is near exhausted, and the next blocker should be explicit fee/edge, quote, or cooldown behavior rather than silent churn.
+- Follow-up:
+  - if fee-aware guardrails hold but the bot remains inactive after the loss window clears, continue `T-031` on candidate quality/ranking rather than weakening hard loss controls.
+
 ## 2026-04-30 08:45 UTC — T-031 eighteenth slice: stop dust sell legs from blocking reachable grid buys
 - Scope:
   - respond to the April 30 fresh bundle where the April 28 no-feasible blocker cleared, but runtime still had no new orders because `Grid sell leg not actionable yet` became the dominant repeated loop (`63 -> 86`).

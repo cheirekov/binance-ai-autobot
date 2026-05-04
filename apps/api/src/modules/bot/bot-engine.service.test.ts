@@ -2615,6 +2615,47 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(guard.maxDailyLossAbs).toBeCloseTo(10, 6);
   });
 
+  it("calculates closed PnL net of buy and sell fees", () => {
+    const helpers = service as unknown as {
+      getClosedPnlEvents: (state: BotState) => Array<{ symbol: string; pnlAbs: number; pnlPct: number }>;
+    };
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      orderHistory: [
+        {
+          id: "buy-1",
+          ts: new Date(now - 20 * 60_000).toISOString(),
+          symbol: "AAAUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          price: 100,
+          qty: 1,
+          feeHome: 0.5
+        },
+        {
+          id: "sell-1",
+          ts: new Date(now - 10 * 60_000).toISOString(),
+          symbol: "AAAUSDC",
+          side: "SELL",
+          type: "MARKET",
+          status: "FILLED",
+          price: 102,
+          qty: 1,
+          feeHome: 0.5
+        }
+      ]
+    };
+
+    const events = helpers.getClosedPnlEvents(state);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].pnlAbs).toBeCloseTo(1, 8);
+    expect(events[0].pnlPct).toBeCloseTo(0.99502488, 8);
+  });
+
   it("returns CAUTION before HALT threshold", () => {
     const helpers = service as unknown as {
       evaluateDailyLossGuard: (params: {
@@ -2836,7 +2877,7 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(guard.active).toBe(false);
     expect(guard.state).toBe("CAUTION");
     expect(guard.trigger).toBe("PROFIT_GIVEBACK");
-    expect(guard.profitGivebackActivationAbs).toBeCloseTo(45, 6);
+    expect(guard.profitGivebackActivationAbs).toBeCloseTo(22.5, 6);
     expect(guard.peakDailyRealizedPnl).toBeCloseTo(60, 6);
     expect(guard.dailyRealizedPnl).toBeCloseTo(30, 6);
     expect(guard.profitGivebackAbs).toBeCloseTo(30, 6);
@@ -4212,6 +4253,59 @@ describe("bot-engine insufficient-balance helpers", () => {
         risk: 100
       })
     ).toBe(true);
+  });
+
+  it("pauses new symbols during severe near-halt daily-loss caution", () => {
+    const helpers = service as unknown as {
+      shouldPauseNewSymbolsInCaution: (params: {
+        guard: {
+          state: "NORMAL" | "CAUTION" | "HALT";
+          trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK";
+          managedExposurePct: number;
+          profitGivebackHaltMinExposurePct: number;
+          dailyRealizedPnl: number;
+          maxDailyLossAbs: number;
+        };
+        risk: number;
+        countableManagedPositions: number;
+        countableManagedPositionsInStopLossCooldown: number;
+        activeOrderCount: number;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldPauseNewSymbolsInCaution({
+        guard: {
+          state: "CAUTION",
+          trigger: "ABS_DAILY_LOSS",
+          managedExposurePct: 0,
+          profitGivebackHaltMinExposurePct: 0.08,
+          dailyRealizedPnl: -86,
+          maxDailyLossAbs: 100
+        },
+        risk: 100,
+        countableManagedPositions: 0,
+        countableManagedPositionsInStopLossCooldown: 0,
+        activeOrderCount: 0
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldPauseNewSymbolsInCaution({
+        guard: {
+          state: "CAUTION",
+          trigger: "ABS_DAILY_LOSS",
+          managedExposurePct: 0,
+          profitGivebackHaltMinExposurePct: 0.08,
+          dailyRealizedPnl: -70,
+          maxDailyLossAbs: 100
+        },
+        risk: 100,
+        countableManagedPositions: 0,
+        countableManagedPositionsInStopLossCooldown: 0,
+        activeOrderCount: 0
+      })
+    ).toBe(false);
   });
 
   it("derives lighter caution unwind policy before HALT", () => {

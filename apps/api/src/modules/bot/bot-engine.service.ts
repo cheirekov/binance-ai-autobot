@@ -868,6 +868,10 @@ export class BotEngineService implements OnModuleInit {
         ? params.guard.managedExposurePct
         : 0;
 
+    if (this.isSevereDailyLossCaution(params.guard, params.risk)) {
+      return true;
+    }
+
     if (params.guard.trigger === "PROFIT_GIVEBACK") {
       return managedExposurePct >= minManagedExposurePct;
     }
@@ -882,6 +886,25 @@ export class BotEngineService implements OnModuleInit {
     );
     if (anchoredManagedPositions > 0) return true;
     return params.activeOrderCount > 0;
+  }
+
+  private deriveProfitGivebackActivationAbs(maxDailyLossAbs: number): number {
+    const boundedMaxDailyLossAbs = Number.isFinite(maxDailyLossAbs) ? Math.max(0, maxDailyLossAbs) : 0;
+    return Math.max(10, boundedMaxDailyLossAbs * 0.05);
+  }
+
+  private deriveSevereDailyLossCautionPausePct(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    const t = boundedRisk / 100;
+    return Number((0.65 + t * 0.2).toFixed(4));
+  }
+
+  private isSevereDailyLossCaution(guard: DailyLossGuardSnapshot, risk: number): boolean {
+    if (guard.state !== "CAUTION") return false;
+    if (!Number.isFinite(guard.maxDailyLossAbs) || guard.maxDailyLossAbs <= 0) return false;
+    if (!Number.isFinite(guard.dailyRealizedPnl) || guard.dailyRealizedPnl >= 0) return false;
+    const pausePct = this.deriveSevereDailyLossCautionPausePct(risk);
+    return Math.abs(guard.dailyRealizedPnl) >= guard.maxDailyLossAbs * pausePct;
   }
 
   private shouldCancelDefensiveGridBuyOrders(params: {
@@ -1258,7 +1281,7 @@ export class BotEngineService implements OnModuleInit {
     const t = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50)) / 100;
     const profitGivebackAbs = Math.max(0, peakDailyRealizedPnl - dailyRealizedPnl);
     const profitGivebackPct = peakDailyRealizedPnl > 0 ? profitGivebackAbs / peakDailyRealizedPnl : 0;
-    const profitGivebackActivationAbs = Math.max(10, maxDailyLossAbs * 0.1);
+    const profitGivebackActivationAbs = this.deriveProfitGivebackActivationAbs(maxDailyLossAbs);
     const profitGivebackCautionPct = Number((0.3 + t * 0.15).toFixed(4)); // 30% -> 45%
     const profitGivebackHaltPct = Number((0.55 + t * 0.15).toFixed(4)); // 55% -> 70%
     const profitGivebackHaltMinExposurePct = Number((0.2 - t * 0.12).toFixed(4)); // 20% -> 8%
@@ -1292,8 +1315,9 @@ export class BotEngineService implements OnModuleInit {
 
     if (profitGivebackActive) {
       if (profitGivebackPct >= profitGivebackHaltPct) {
+        const severeLossHaltAbs = maxDailyLossAbs * this.deriveSevereDailyLossCautionPausePct(params.risk);
         const shouldKeepHardHalt =
-          absLossHalt || managedExposurePct >= profitGivebackHaltMinExposurePct || dailyRealizedPnl <= -cautionLossAbs;
+          absLossHalt || managedExposurePct >= profitGivebackHaltMinExposurePct || dailyRealizedPnl <= -severeLossHaltAbs;
         state = shouldKeepHardHalt ? "HALT" : "CAUTION";
         trigger = "PROFIT_GIVEBACK";
       } else if (profitGivebackPct >= profitGivebackCautionPct && state === "NORMAL") {
@@ -1806,12 +1830,13 @@ export class BotEngineService implements OnModuleInit {
       if (!symbol) continue;
       const qty = Number.isFinite(order.qty) ? Math.max(0, order.qty) : 0;
       const price = Number.isFinite(order.price) ? Math.max(0, order.price ?? 0) : 0;
+      const orderFeeHome = Number.isFinite(order.feeHome) ? Math.max(0, order.feeHome ?? 0) : 0;
       if (qty <= 0 || price <= 0) continue;
 
       const current = positions.get(symbol) ?? { netQty: 0, costQuote: 0 };
       if (order.side === "BUY") {
         current.netQty += qty;
-        current.costQuote += qty * price;
+        current.costQuote += qty * price + orderFeeHome;
         positions.set(symbol, current);
         continue;
       }
@@ -1819,13 +1844,25 @@ export class BotEngineService implements OnModuleInit {
       const closeQty = Math.min(qty, current.netQty);
       const avgCost = current.netQty > 0 ? current.costQuote / current.netQty : 0;
       if (closeQty > 0 && avgCost > 0) {
-        const pnlAbs = (price - avgCost) * closeQty;
-        const pnlPct = ((price - avgCost) / avgCost) * 100;
+        const closeCost = avgCost * closeQty;
+        const closeFeeHome = orderFeeHome > 0 ? orderFeeHome * (closeQty / qty) : 0;
+        const pnlAbs = price * closeQty - closeCost - closeFeeHome;
+        const pnlPct = closeCost > 0 ? (pnlAbs / closeCost) * 100 : 0;
         events.push({
           symbol,
           ts: order.ts,
           pnlAbs: this.toRounded(pnlAbs, 8),
           pnlPct: this.toRounded(pnlPct, 8)
+        });
+      }
+      const uncoveredQty = Math.max(0, qty - closeQty);
+      const uncoveredFeeHome = orderFeeHome > 0 && uncoveredQty > 0 ? orderFeeHome * (uncoveredQty / qty) : 0;
+      if (uncoveredFeeHome > 0) {
+        events.push({
+          symbol,
+          ts: order.ts,
+          pnlAbs: this.toRounded(-uncoveredFeeHome, 8),
+          pnlPct: 0
         });
       }
 
