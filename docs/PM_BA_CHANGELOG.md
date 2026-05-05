@@ -16,6 +16,33 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-05 08:14 UTC — T-031 process gate correction: distinguish recovery from exchange backoff
+- Scope:
+  - respond to `autobot-feedback-20260505-080749.tgz`, where the deployed May 4 patch is present and runtime recovered from `daily_net_usdt=-301.36` to `-7.31`, but auto-retro still emitted `patch_required` from trailing historical negative daily-net evidence.
+- BA requirement mapping:
+  - latest bundle shows `git.commit=f09525f`, `risk_state=NORMAL`, `openLimitOrders=6`, low sizing reject pressure, and dominant skips `Transient exchange backoff active` / `Live order sync failed`.
+  - current blocker is operational Binance testnet/order-sync backoff, not a repeated strategy loop or missing T-031/T-032 code behavior.
+- PM milestone mapping:
+  - keep `T-031` active with linked `T-032`; avoid burning another implementation cycle from stale trailing-loss evidence while waiting for a clean exchange/order-sync bundle.
+- Technical changes:
+  - `scripts/auto-retro.sh` now suppresses the three-negative-daily-net trigger when the latest fresh bundle shows material daily-net recovery, current loss is small, and no repeated dominant loop or no-trend rule failed.
+  - `scripts/auto-retro.sh` now reports external exchange/order-sync backoff as a WARN and changes the continue action to collect the next bundle after backoff clears.
+  - `scripts/update-session-brief.sh` now carries that backoff into open risks so the next session does not misclassify an exchange outage as strategy failure.
+- Risk slider impact:
+  - no bot-engine or risk-slider behavior changed.
+- Validation evidence:
+  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh`
+  - `./scripts/auto-retro.sh autobot-feedback-20260505-080749.tgz`
+  - `./scripts/update-session-brief.sh autobot-feedback-20260505-080749.tgz`
+  - `git diff --check`
+  - `./scripts/validate-active-ticket.sh`
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/pmba-gate.sh end`
+- Runtime test request:
+  - continue the current runtime and collect the next bundle after Binance testnet order-sync backoff clears; do not reset state for this evidence.
+- Follow-up:
+  - if the next clean bundle repeats a non-external T-031 loop or daily-net deterioration resumes, patch bot-engine behavior; if backoff remains dominant, treat it as operational validation rather than strategy adaptation failure.
+
 ## 2026-05-04 08:50 UTC — T-031 nineteenth slice: fee-aware giveback guard after restored trading
 - Scope:
   - respond to the May 4 fresh bundle where the April 30 dust sell-leg blocker cleared into real trading, but the run burned wallet value through high churn and ended in profit-giveback daily-loss protection.

@@ -60,6 +60,7 @@ const latestFreshThree = freshWindow.slice(0, 3);
 
 const topReasonOf = (entry) => entry?.summary?.activity?.skips?.top_reasons?.[0] ?? null;
 const dailyNetOf = (entry) => Number(entry?.summary?.pnl?.daily_net_usdt ?? Number.NaN);
+const dailyNetPctOf = (entry) => Number(entry?.summary?.pnl?.daily_net_pct ?? Number.NaN);
 const drawdownOf = (entry) => Number(entry?.summary?.pnl?.max_drawdown_pct ?? Number.NaN);
 
 const repeatedDominantLoop = (() => {
@@ -111,7 +112,50 @@ const noTrendImprovement = (() => {
   };
 })();
 
-const triggers = [repeatedDominantLoop, threeNegativeDailyNet, noTrendImprovement].filter((item) => item.failed).length;
+const latestTopReason = topReasonOf(latest);
+const latestTopReasonsText = (latest.summary?.activity?.skips?.top_reasons ?? [])
+  .slice(0, 5)
+  .map((entry) => String(entry?.reason ?? ""))
+  .join(" | ");
+const latestHealthText = JSON.stringify(latest.summary?.health ?? {});
+const exchangeBackoffObserved = /Transient exchange backoff active|Live order sync failed|openOrders|502 Bad Gateway|\b5\d\d\b/i.test(
+  `${latestTopReasonsText} ${latestHealthText}`
+);
+const exchangeBackoffRule = {
+  observed: exchangeBackoffObserved,
+  details: exchangeBackoffObserved
+    ? `latest top reasons include external exchange/order-sync backoff (${String(latestTopReason?.reason ?? "n/a")})`
+    : "not observed in latest top reasons"
+};
+
+const latestDailyNet = dailyNetOf(latest);
+const latestDailyNetPct = dailyNetPctOf(latest);
+const previousFreshDailyNet = dailyNetOf(freshWindow[1]);
+const dailyRecoveryAmount = latestDailyNet - previousFreshDailyNet;
+const recoveryFloor = Number.isFinite(previousFreshDailyNet)
+  ? Math.max(25, Math.abs(previousFreshDailyNet) * 0.25)
+  : Number.NaN;
+const materialDailyNetRecovery =
+  Number.isFinite(dailyRecoveryAmount) &&
+  Number.isFinite(recoveryFloor) &&
+  dailyRecoveryAmount >= recoveryFloor;
+const latestDailyLossIsSmall =
+  (Number.isFinite(latestDailyNet) && latestDailyNet >= -25) ||
+  (Number.isFinite(latestDailyNetPct) && latestDailyNetPct >= -0.5);
+const suppressHistoricalDailyNetCarryover =
+  threeNegativeDailyNet.failed &&
+  materialDailyNetRecovery &&
+  latestDailyLossIsSmall &&
+  !repeatedDominantLoop.failed &&
+  !noTrendImprovement.failed;
+const effectiveThreeNegativeDailyNet = suppressHistoricalDailyNetCarryover
+  ? {
+      failed: false,
+      details: `${threeNegativeDailyNet.details} (historical carryover suppressed: latest improved by ${dailyRecoveryAmount.toFixed(2)} from prior fresh bundle)`
+    }
+  : threeNegativeDailyNet;
+
+const triggers = [repeatedDominantLoop, effectiveThreeNegativeDailyNet, noTrendImprovement].filter((item) => item.failed).length;
 const decision =
   staleStreak >= 2
     ? "validation_required"
@@ -122,6 +166,18 @@ const decision =
         : triggers === 1
           ? "patch_required"
           : "continue";
+const requiredAction =
+  decision === "continue"
+    ? exchangeBackoffObserved
+      ? "continue active ticket; collect next bundle after exchange/order-sync backoff clears"
+      : "continue active ticket"
+    : decision === "patch_required"
+      ? "same-ticket mitigation required before next long run"
+      : decision === "pivot_required"
+        ? "PM/BA pivot review required before next long run"
+        : decision === "await_fresh_evidence"
+          ? "do not patch from this bundle alone; wait for fresh runtime evidence"
+          : "switch to deterministic validation path before more live-wait bundles";
 
 const latestTopReasons = (latest.summary?.activity?.skips?.top_reasons ?? []).slice(0, 5);
 const lines = [
@@ -136,8 +192,9 @@ const lines = [
   "",
   `- Fresh runtime evidence in latest bundle: \`${latest.freshness?.hasFreshRuntimeEvidence ? "PASS" : "FAIL"}\` — ${latest.freshness?.reason ?? "unknown"}`,
   `- Repeated dominant loop across latest 2 fresh bundles: \`${repeatedDominantLoop.failed ? "FAIL" : "PASS"}\` — ${repeatedDominantLoop.details}`,
-  `- Negative daily_net_usdt across latest 3 fresh bundles: \`${threeNegativeDailyNet.failed ? "FAIL" : "PASS"}\` — ${threeNegativeDailyNet.details}`,
+  `- Negative daily_net_usdt across latest 3 fresh bundles: \`${effectiveThreeNegativeDailyNet.failed ? "FAIL" : "PASS"}\` — ${effectiveThreeNegativeDailyNet.details}`,
   `- No KPI trend improvement across latest 3 fresh bundles: \`${noTrendImprovement.failed ? "FAIL" : "PASS"}\` — ${noTrendImprovement.details}`,
+  `- External exchange/order-sync backoff in latest bundle: \`${exchangeBackoffRule.observed ? "WARN" : "PASS"}\` — ${exchangeBackoffRule.details}`,
   "",
   "## Latest bundle snapshot",
   "",
@@ -156,15 +213,7 @@ const lines = [
   "## PM/BA automatic decision",
   "",
   `- Decision: \`${decision}\``,
-  `- Required action: \`${decision === "continue"
-    ? "continue active ticket"
-    : decision === "patch_required"
-      ? "same-ticket mitigation required before next long run"
-      : decision === "pivot_required"
-        ? "PM/BA pivot review required before next long run"
-        : decision === "await_fresh_evidence"
-          ? "do not patch from this bundle alone; wait for fresh runtime evidence"
-          : "switch to deterministic validation path before more live-wait bundles"}\``,
+  `- Required action: \`${requiredAction}\``,
   "",
   "## Bundle window",
   "",

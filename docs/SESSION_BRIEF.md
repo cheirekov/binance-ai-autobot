@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-05-04 08:50 UTC
+Last updated: 2026-05-05 08:13 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -84,7 +84,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `pending local patch after 474b1ee`
+- Commit hash: `f09525f`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -107,40 +107,40 @@ Use this file at the start and end of every batch.
 - Run context:
   - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `96.384`
-  - runtime uptime (hours): `546.665`
-  - run end: `Mon May 04 2026 11:42:17 GMT+0300 (Eastern European Summer Time)`
+  - bundle interval (hours): `23.425`
+  - runtime uptime (hours): `570.09`
+  - run end: `Tue May 05 2026 11:07:47 GMT+0300 (Eastern European Summer Time)`
   - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (restored trading reached fee/giveback protection; top skip `Skip BTCUSDC: Fee/edge filter (net 0.040% < 0.050%)` (10))
+  - active ticket runtime signal: `observed` (Skip: Transient exchange backoff active (10))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=103, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=48.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=15, decisions=200, ratio=7.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=6, historyLimitOrders=119, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=40.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=7, decisions=200, ratio=3.5%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `patch_required`
+- Decision: `continue`
 - Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
-- Required action: `same-ticket mitigation required before next long run`
+- Required action: `continue active ticket; collect next bundle after exchange/order-sync backoff clears`
 - Open risks:
-  - next bundle may be intentionally paused by fee-aware daily-loss protection until the rolling loss window clears; that is safer than reopening fresh symbols into severe loss budget usage.
+  - exchange/order-sync backoff is the latest operational blocker; wait for a clean follow-up bundle before inferring strategy failure.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260504-084256.tgz`
-  - auto-updated at: `2026-05-04T08:43:15.630Z`
+  - bundle: `autobot-feedback-20260505-080749.tgz`
+  - auto-updated at: `2026-05-05T08:13:53.654Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-031
-Decision: patch_required
-Required action: same-ticket mitigation required before next long run
-Latest bundle: autobot-feedback-20260504-084256.tgz
+Decision: continue
+Required action: continue active ticket; collect next bundle after exchange/order-sync backoff clears
+Latest bundle: autobot-feedback-20260505-080749.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
-In scope: fee-aware daily-loss/profit-giveback guardrails and severe near-halt fresh-symbol pause.
+In scope: exit-manager / de-risking behavior under adverse conditions.
 Out of scope: quote-routing redesign, candidate-hygiene-only optimization, PnL schema changes, AI lane.
-Validation: ./apps/api/node_modules/.bin/vitest run apps/api/src/modules/bot/bot-engine.service.test.ts --cache=false; ./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.build.json --noEmit; ./scripts/validate-active-ticket.sh; git diff --check; ./scripts/pmba-gate.sh start; ./scripts/pmba-gate.sh end
+Validation: docker compose -f docker-compose.ci.yml run --rm ci
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

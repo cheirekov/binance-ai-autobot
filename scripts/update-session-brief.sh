@@ -168,6 +168,9 @@ const dominantTopReason = Array.isArray(bundleSummary?.activity?.skips?.top_reas
 const fundingRegression = Array.isArray(bundleSummary?.activity?.skips?.top_reasons)
   ? bundleSummary.activity.skips.top_reasons.some((entry) => /Insufficient spendable/i.test(String(entry?.reason ?? "")))
   : false;
+const exchangeBackoffRegression = Array.isArray(bundleSummary?.activity?.skips?.top_reasons)
+  ? bundleSummary.activity.skips.top_reasons.some((entry) => /Transient exchange backoff active|Live order sync failed|openOrders|502 Bad Gateway|\b5\d\d\b/i.test(String(entry?.reason ?? "")))
+  : false;
 const mapNextTicket = (decision) => {
   if (decision === "pivot_required") return "PM/BA-TRIAGE";
   if (decision === "validation_required") return "PM/BA-VALIDATION";
@@ -195,6 +198,9 @@ if (!freshRuntimeEvidence) {
 }
 if (fundingRegression) {
   risks.push("T-034 funding regression detected in latest top skip reasons.");
+}
+if (exchangeBackoffRegression) {
+  risks.push("exchange/order-sync backoff is the latest operational blocker; wait for a clean follow-up bundle before inferring strategy failure.");
 }
 if (risks.length === 0) {
   risks.push("none critical from automated checks.");

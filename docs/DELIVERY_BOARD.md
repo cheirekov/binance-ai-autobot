@@ -1,6 +1,6 @@
 # DELIVERY BOARD (PM v2) — Binance AI Autobot
 
-Last updated: 2026-05-04
+Last updated: 2026-05-05
 Owner: PM/BA + Codex + User
 
 This board is structured to reduce scope drift and context-window churn.
@@ -43,6 +43,7 @@ Hard rule: until Gate A passes, AI remains shadow-only for execution changes.
   - feedback bundle (`scripts/collect-feedback.sh`)
   - runtime summary artifact in telemetry bundle (`data/telemetry/last_run_summary.json`)
 - End-of-batch gate now includes loop persistence check across the latest 2 bundles (`./scripts/pmba-gate.sh end`) to prevent repeating closed-ticket failure patterns without triage.
+- Auto-retro must not demand a code patch from trailing historical daily loss alone when the latest fresh bundle shows material recovery and no repeated dominant loop; external exchange/order-sync backoff is an operational WARN requiring a clean follow-up bundle.
 - Runtime collection/ingestion procedure is fixed and centralized in `docs/RUN_LOGGING_P0.md` (remote collect + local ingest).
 
 AI message contract reference:
@@ -105,7 +106,7 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-031 | IN_PROGRESS | Regime engine v2 | Candidate/actionability remains active, now focused on post-actionability churn: fee-aware daily-loss/giveback protection must stop severe loss-budget reuse while preserving reachable grid progression. |
+| T-031 | IN_PROGRESS | Regime engine v2 | Continue active-lane evidence after the May 5 exchange/order-sync backoff clears; patch only on a clean repeated strategy blocker or renewed daily-net deterioration. |
 | T-032 | TODO | Exit manager v2 | Linked support only while `T-031` is active: preserve downside-control slices and the May 4 fee-aware/severe-caution guard; reopen as active only if downside-control becomes the dominant blocker. |
 | T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
 
