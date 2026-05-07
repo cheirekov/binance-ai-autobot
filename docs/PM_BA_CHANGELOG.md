@@ -16,6 +16,40 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-07 09:25 UTC — T-031 twentieth slice: keep daily-loss managed exits reachable through recovery locks
+- Scope:
+  - respond to `autobot-feedback-20260507-090740.tgz`, where exchange backoff cleared but the bot ended in `ABS_DAILY_LOSS` `CAUTION` with material managed exposure and no active orders.
+- BA requirement mapping:
+  - latest bundle shows `git.commit=0415b81`, `risk_state=CAUTION`, `daily_net_usdt=-151.90`, `total_alloc_pct=37.26`, `activeOrders=0`, and dominant skips `Max open positions reached`, `Daily loss caution: no eligible managed symbols`, and `Daily loss caution paused GRID BUY leg`.
+  - state audit shows countable `SOLUSDC`/`ZECUSDC` inventory remained exposed while `NO_FEASIBLE_RECOVERY_MIN_ORDER` cooldown locks made managed selection/fallback prefer tiny `IOUSDC`.
+- PM milestone mapping:
+  - keep `T-031` active with linked `T-032`; this is a bounded reachability fix for downside-control/exit behavior, not a quote-routing or AI-lane change.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added daily-loss risk-state detection for managed-symbol lock bypass.
+    - allows countable managed positions to bypass non-hard symbol cooldown categories during daily-loss `CAUTION`/`HALT`.
+    - applies the bypass to candidate selection, managed fallback selection, post-protection blocking, and position-exit scanning.
+    - fresh symbols remain blocked by the existing cooldowns; bypass requires existing countable managed exposure.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression coverage proving `NO_FEASIBLE_RECOVERY_MIN_ORDER` does not hide a countable managed position during daily-loss `CAUTION`, while normal mode still respects the lock.
+  - `docs/TRIAGE_NOTE_2026-05-07_T031_DAILY_LOSS_CAUTION_RECOVERY_LOCKS.md`:
+    - recorded the same-ticket triage decision and evidence.
+- Risk slider impact:
+  - no exposure cap, daily-loss budget, or fee-edge floor changed.
+  - risk protection becomes more enforceable because managed exits remain reachable when risk state is already active.
+- Validation evidence:
+  - `./apps/api/node_modules/.bin/vitest run apps/api/src/modules/bot/bot-engine.service.test.ts -t "managed daily-loss candidates|symbol lock checks" --cache=false`
+  - `./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.build.json --noEmit`
+  - `git diff --check`
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/pmba-gate.sh end`
+  - `./scripts/validate-active-ticket.sh`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh 1–3h bundle.
+  - expected evidence: lower `Daily loss caution: no eligible managed symbols` repeats, `SOLUSDC`/`ZECUSDC` managed sell/unwind evaluation is visible when still exposed, and no fresh-symbol reopening while daily-loss caution remains active.
+- Follow-up:
+  - if the next clean bundle still shows daily-loss `CAUTION` with material exposure and no managed sell/unwind action, move the next slice to explicit caution-unwind prioritization rather than another selection-bypass patch.
+
 ## 2026-05-05 08:14 UTC — T-031 process gate correction: distinguish recovery from exchange backoff
 - Scope:
   - respond to `autobot-feedback-20260505-080749.tgz`, where the deployed May 4 patch is present and runtime recovered from `daily_net_usdt=-301.36` to `-7.31`, but auto-retro still emitted `patch_required` from trailing historical negative daily-net evidence.

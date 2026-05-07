@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-05-05 08:13 UTC
+Last updated: 2026-05-07 09:07 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -10,12 +10,12 @@ Use this file at the start and end of every batch.
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-031` (Regime engine v2)
 - Linked support ticket: `T-032` (bounded downside-control support)
-- Goal (single sentence): reduce restored-trading fee/giveback churn by making daily-loss protection fee-aware and preventing near-halt fresh-symbol reopening.
+- Goal (single sentence): keep daily-loss managed exits reachable when recovery/min-order cooldown locks would otherwise hide material open inventory.
 - In scope:
   - keep `T-031` active as the strategy-quality lane.
-  - make closed-PnL events include buy-side and sell-side fees before daily-loss/profit-giveback evaluation.
-  - lower profit-giveback activation to preserve smaller net wins after fees.
-  - prevent severe near-halt daily-loss `CAUTION` from reopening fresh symbols solely because managed exposure is near-flat.
+  - let countable managed positions bypass non-hard no-feasible/min-order/max-position/grid-sell retry cooldown locks during daily-loss `CAUTION`/`HALT`.
+  - preserve existing fresh-symbol cooldown blocks; bypass requires current managed exposure.
+  - keep daily-loss/profit-giveback fee-aware guardrails from the May 4 slice.
   - preserve the April 30 dust/zero SELL-leg BUY progression behavior.
   - preserve the April 28 dust-storm bypass, April 27 recovery dust parking, April 23/20 quote quarantine behavior, and April 15 fee-edge quarantine.
   - preserve April 20 exposure clipping plus April 12 and March 30-31 `T-032` downside-control behavior.
@@ -27,24 +27,23 @@ Use this file at the start and end of every batch.
   - AI lane/promotion work (`T-025+`),
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: the April 30 actionability fix restored trading, but daily-loss/profit-giveback protection still under-counted fee burn and could thaw fresh symbols too easily once exposure was near-flat. Fee-aware closed PnL plus severe-budget pause should reduce churn without weakening hard guardrails.
+- Hypothesis: after exchange backoff cleared, daily-loss `CAUTION` was active but symbol-level no-feasible recovery locks hid the large managed `SOLUSDC`/`ZECUSDC` positions from managed fallback/exit evaluation. Allowing only countable managed positions to bypass those non-hard locks should restore downside-control reachability without reopening fresh-symbol churn.
 - Target KPI delta:
-  - daily-loss guard details reflect fee-aware realized PnL.
-  - no fresh-symbol entries when severe daily-loss caution has consumed most of the risk-linked daily budget.
-  - profit-giveback still protects smaller net wins after fees.
-  - preserve reachable home-quote / managed sell paths and April 30 BUY progression.
+  - lower repeated `Daily loss caution: no eligible managed symbols`.
+  - visible managed sell/unwind/exit evaluation for material `SOLUSDC`/`ZECUSDC` exposure while daily-loss caution remains active.
+  - no fresh-symbol reopening from the bypass.
+  - preserve fee-aware daily-loss/profit-giveback and April 30 BUY progression behavior.
 - Stop/rollback condition:
-  - if the patch permits fresh entries during severe daily-loss protection, hides fees from realized guard math, blocks reachable unwind/sell paths, or reopens the old no-feasible quote-pressure loop, reopen PM/BA triage immediately.
+  - if the patch lets unowned/fresh symbols bypass cooldowns, weakens never-trade/global locks, or still leaves material managed exposure boxed in daily-loss caution with no sell/unwind reachability, reopen PM/BA triage immediately.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
   - runtime behavior changes in a bounded way:
-    - daily-loss/profit-giveback closed PnL is fee-aware.
-    - buy-side fees increase cost basis before close.
-    - sell-side fees reduce closed PnL.
-    - severe near-halt daily-loss `CAUTION` pauses fresh symbols even when managed exposure is near-flat.
-    - profit-giveback hard `HALT` on near-flat books is reserved for severe daily-loss usage or material managed exposure.
+    - countable managed positions can bypass non-hard recovery/min-order/max-position/grid-sell cooldown locks during daily-loss `CAUTION`/`HALT`.
+    - fresh candidates still respect those cooldown locks.
+    - daily-loss/profit-giveback closed PnL remains fee-aware.
+    - severe near-halt daily-loss `CAUTION` still pauses fresh symbols even when managed exposure is near-flat.
     - April 30 dust/zero SELL legs still do not block reachable grid BUY legs.
     - `GRID_SELL_NOT_ACTIONABLE` storm-lock behavior from April 28 remains preserved.
     - below-minimum recovery sell candidates receive a multi-hour symbol-level `NO_FEASIBLE_RECOVERY_MIN_ORDER` cooldown.
@@ -57,21 +56,19 @@ Use this file at the start and end of every batch.
     - March 30-31 `T-032` caution-unwind / thaw behavior remains preserved.
   - active development lane is `T-031`; `T-032` remains preserved as a support lane in runtime.
 - Runtime evidence in decisions/logs:
-  - latest fresh bundle runs `git.commit=474b1ee`.
-  - latest fresh bundle (`autobot-feedback-20260504-084256.tgz`) shows:
-    - `risk_state=HALT`
-    - `trigger=PROFIT_GIVEBACK`
-    - `unwind_only=true`
+  - latest fresh bundle runs `git.commit=0415b81`.
+  - latest fresh bundle (`autobot-feedback-20260507-090740.tgz`) shows:
+    - `risk_state=CAUTION`
+    - `trigger=ABS_DAILY_LOSS`
     - `activeOrders=0`
-    - wallet/equity estimate `6247.63 USDC`
-    - `dailyRealized=-231.26 USDC`, `peakDaily=29.71 USDC`, `giveback=260.98 USDC`
-    - high churn: `submitted=200`, `filled=136`, `canceled=64`, `feesHome=42.19`
-  - the next fresh bundle should show fee-aware daily-loss/giveback details and no fresh-symbol entries while severe daily-loss caution is active.
+    - wallet/equity estimate `6217.83 USDC`
+    - `daily_net_usdt=-151.90`
+    - `total_alloc_pct=37.26`
+    - top skips: `Max open positions reached`, `Daily loss caution: no eligible managed symbols`, and `Daily loss caution paused GRID BUY leg`
+  - the next fresh bundle should show managed `SOLUSDC`/`ZECUSDC` exit/unwind/sell evaluation rather than tiny-position fallback loops.
 - Risk slider impact:
-  - no exposure cap or fee-floor changes.
-  - daily-loss budget remains risk-linked and unchanged.
-  - severe caution pause is risk-linked (`65% -> 85%` of the daily-loss budget).
-  - profit-giveback activation now uses `5%` of the daily-loss budget so fee-aware smaller net wins are still protected.
+  - no exposure cap, daily-loss budget, or fee-floor changes.
+  - risk-state protections remain hard; this only prevents non-hard symbol cooldowns from hiding already-managed risk inventory.
 - Validation commands:
   - `./apps/api/node_modules/.bin/vitest run apps/api/src/modules/bot/bot-engine.service.test.ts --cache=false`
   - `./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.build.json --noEmit`
@@ -84,7 +81,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `f09525f`
+- Commit hash: `pending local patch after 0415b81`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -105,38 +102,38 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `23.425`
-  - runtime uptime (hours): `570.09`
-  - run end: `Tue May 05 2026 11:07:47 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - bundle interval (hours): `48.998`
+  - runtime uptime (hours): `619.088`
+  - run end: `Thu May 07 2026 12:07:38 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip: Transient exchange backoff active (10))
+  - active ticket runtime signal: `observed` (Skip ZECBTC: Max open positions reached (10) (18))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=6, historyLimitOrders=119, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=40.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=7, decisions=200, ratio=3.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=113, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=43.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=13, decisions=200, ratio=6.5%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `continue`
+- Decision: `patch_required`
 - Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
-- Required action: `continue active ticket; collect next bundle after exchange/order-sync backoff clears`
+- Required action: `same-ticket mitigation required before next long run`
 - Open risks:
-  - exchange/order-sync backoff is the latest operational blocker; wait for a clean follow-up bundle before inferring strategy failure.
+  - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260505-080749.tgz`
-  - auto-updated at: `2026-05-05T08:13:53.654Z`
+  - bundle: `autobot-feedback-20260507-090740.tgz`
+  - auto-updated at: `2026-05-07T09:07:53.375Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-031
-Decision: continue
-Required action: continue active ticket; collect next bundle after exchange/order-sync backoff clears
-Latest bundle: autobot-feedback-20260505-080749.tgz
+Decision: patch_required
+Required action: same-ticket mitigation required before next long run
+Latest bundle: autobot-feedback-20260507-090740.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
 In scope: exit-manager / de-risking behavior under adverse conditions.

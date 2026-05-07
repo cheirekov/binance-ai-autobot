@@ -480,6 +480,80 @@ export class BotEngineService implements OnModuleInit {
     return typeof details?.category === "string" ? details.category.trim().toUpperCase() : "";
   }
 
+  private isDailyLossRiskState(riskState: BotState["riskState"] | undefined): boolean {
+    if (!riskState || riskState.state === "NORMAL") return false;
+    return riskState.reason_codes.some((reason) => reason.trim().toUpperCase() === "DAILY_LOSS_GUARD");
+  }
+
+  private isManagedRiskBypassableSymbolLock(lock: ProtectionLockEntry | null): boolean {
+    if (!lock) return false;
+    if (lock.scope !== "SYMBOL") return false;
+    const lockType = lock.type.trim().toUpperCase();
+    if (lockType !== "COOLDOWN" && lockType !== "GRID_GUARD_BUY_PAUSE") return false;
+
+    const bypassableCategories = new Set([
+      "DAILY_LOSS_CAUTION_NEW_SYMBOL",
+      "GRID_GUARD_BUY_PAUSE",
+      "GRID_SELL_NOT_ACTIONABLE",
+      "GRID_SELL_SIZING_REJECT",
+      "MAX_OPEN_POSITIONS",
+      "NO_FEASIBLE_DUST_RECOVERY",
+      "NO_FEASIBLE_RECOVERY_MIN_ORDER",
+      "NO_FEASIBLE_SIZING_REJECT"
+    ]);
+    return bypassableCategories.has(this.getProtectionLockCategory(lock));
+  }
+
+  private hasManagedRiskBypassExposure(params: {
+    position?: ManagedPosition | null;
+    qty?: number;
+    lastPrice?: number;
+    minExposureHome: number;
+  }): boolean {
+    if (params.position) {
+      return this.isManagedPositionCountable(params.position, params.minExposureHome);
+    }
+
+    const qty = Number.isFinite(params.qty) ? Math.max(0, params.qty ?? 0) : 0;
+    if (qty <= 0) return false;
+    if (params.minExposureHome <= 0) return true;
+    const lastPrice = Number.isFinite(params.lastPrice) ? Math.max(0, params.lastPrice ?? 0) : 0;
+    return lastPrice > 0 && qty * lastPrice >= params.minExposureHome;
+  }
+
+  private shouldBypassManagedRiskSymbolBlock(params: {
+    state: BotState;
+    symbol: string;
+    position?: ManagedPosition | null;
+    qty?: number;
+    lastPrice?: number;
+    minExposureHome: number;
+  }): boolean {
+    if (!this.isDailyLossRiskState(params.state.riskState)) return false;
+    const lock = this.getActiveSymbolProtectionLock(params.state, params.symbol);
+    if (!this.isManagedRiskBypassableSymbolLock(lock)) return false;
+    return this.hasManagedRiskBypassExposure({
+      position: params.position,
+      qty: params.qty,
+      lastPrice: params.lastPrice,
+      minExposureHome: params.minExposureHome
+    });
+  }
+
+  private getManagedRiskSymbolBlockReason(params: {
+    state: BotState;
+    symbol: string;
+    position?: ManagedPosition | null;
+    qty?: number;
+    lastPrice?: number;
+    minExposureHome: number;
+  }): string | null {
+    const blockedReason = this.isSymbolBlocked(params.symbol, params.state);
+    if (!blockedReason) return null;
+    if (!blockedReason.startsWith("Protection lock ")) return blockedReason;
+    return this.shouldBypassManagedRiskSymbolBlock(params) ? null : blockedReason;
+  }
+
   private async getCandidateSelectionBlockReason(params: {
     symbol: string;
     state: BotState;
@@ -495,6 +569,18 @@ export class BotEngineService implements OnModuleInit {
   }): Promise<string | null> {
     const blockedReason = this.isSymbolBlocked(params.symbol, params.state);
     if (!blockedReason) return null;
+    if (
+      blockedReason.startsWith("Protection lock ") &&
+      this.shouldBypassManagedRiskSymbolBlock({
+        state: params.state,
+        symbol: params.symbol,
+        qty: params.qty,
+        lastPrice: params.lastPrice,
+        minExposureHome: params.minExposureHome
+      })
+    ) {
+      return null;
+    }
 
     const activeLock = this.getActiveSymbolProtectionLock(params.state, params.symbol);
     if (!activeLock) return blockedReason;
@@ -2497,7 +2583,12 @@ export class BotEngineService implements OnModuleInit {
           (position) =>
             this.isManagedPositionCountable(position, minExposureHome) &&
             params.isExecutionQuoteSymbol(position.symbol) &&
-            this.isSymbolBlocked(position.symbol, params.state) === null
+            this.getManagedRiskSymbolBlockReason({
+              state: params.state,
+              symbol: position.symbol,
+              position,
+              minExposureHome
+            }) === null
         )
         .sort((left, right) => right.costQuote - left.costQuote)[0]?.symbol ?? null
     );
@@ -6325,8 +6416,16 @@ export class BotEngineService implements OnModuleInit {
           }
 
           const postProtectionBlockedReason = this.isSymbolBlocked(candidateSymbol, current);
-          if (postProtectionBlockedReason) {
-            const summary = `Skip ${candidateSymbol}: ${postProtectionBlockedReason}`;
+          const postProtectionManagedRiskBlockedReason = candidateManagedPosition
+            ? this.getManagedRiskSymbolBlockReason({
+                state: current,
+                symbol: candidateSymbol,
+                position: candidateManagedPosition,
+                minExposureHome: this.deriveManagedPositionMinCountableExposureHome(risk)
+              })
+            : postProtectionBlockedReason;
+          if (postProtectionManagedRiskBlockedReason) {
+            const summary = `Skip ${candidateSymbol}: ${postProtectionManagedRiskBlockedReason}`;
             const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
             const next = {
               ...current,
@@ -6842,7 +6941,16 @@ export class BotEngineService implements OnModuleInit {
           for (const position of managedOpenHomeSymbols) {
             const baseAsset = getExecutionBaseFromSymbol(position.symbol);
             if (!baseAsset) continue;
-            if (this.isSymbolBlocked(position.symbol, current)) continue;
+            if (
+              this.getManagedRiskSymbolBlockReason({
+                state: current,
+                symbol: position.symbol,
+                position,
+                minExposureHome: minCountableExposureHome
+              })
+            ) {
+              continue;
+            }
             const baseFree = balances.find((b) => b.asset.toUpperCase() === baseAsset.toUpperCase())?.free ?? 0;
             if (!Number.isFinite(baseFree) || baseFree <= 0) continue;
 

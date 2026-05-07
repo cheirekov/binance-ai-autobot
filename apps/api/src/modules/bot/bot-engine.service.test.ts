@@ -4813,6 +4813,133 @@ describe("bot-engine symbol lock checks", () => {
     );
   });
 
+  it("lets managed daily-loss candidates bypass recovery cooldown locks", async () => {
+    const helpers = service as unknown as {
+      getManagedRiskSymbolBlockReason: (params: {
+        state: BotState;
+        symbol: string;
+        position?: { symbol: string; netQty: number; costQuote: number };
+        minExposureHome: number;
+      }) => string | null;
+      getCandidateSelectionBlockReason: (params: {
+        symbol: string;
+        state: BotState;
+        risk: number;
+        baseAsset: string;
+        quoteAsset: string;
+        qty: number;
+        lastPrice?: number;
+        homeStable: string;
+        bridgeAssets: string[];
+        minExposureHome: number;
+        activeOrderCount: number;
+      }) => Promise<string | null>;
+      pickManagedFallbackSymbol: (params: {
+        state: BotState;
+        isExecutionQuoteSymbol: (symbol: string) => boolean;
+        minExposureHome?: number;
+      }) => string | null;
+    };
+
+    const lockedCautionState: BotState = {
+      ...defaultBotState(),
+      riskState: {
+        state: "CAUTION",
+        reason_codes: ["DAILY_LOSS_GUARD", "trigger=ABS_DAILY_LOSS"],
+        unwind_only: false,
+        resume_conditions: []
+      },
+      orderHistory: [
+        {
+          id: "sol-buy",
+          ts: "2026-05-07T03:00:00.000Z",
+          symbol: "SOLUSDC",
+          side: "BUY",
+          type: "LIMIT",
+          status: "FILLED",
+          price: 100,
+          qty: 10
+        },
+        {
+          id: "io-buy",
+          ts: "2026-05-07T03:01:00.000Z",
+          symbol: "IOUSDC",
+          side: "BUY",
+          type: "LIMIT",
+          status: "FILLED",
+          price: 0.15,
+          qty: 50
+        }
+      ],
+      protectionLocks: [
+        {
+          id: "lock-sol",
+          type: "COOLDOWN",
+          createdAt: "2026-05-07T04:00:00.000Z",
+          scope: "SYMBOL",
+          symbol: "SOLUSDC",
+          reason: "No-feasible recovery min-order (360m)",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "NO_FEASIBLE_RECOVERY_MIN_ORDER",
+            cooldownMs: 21_600_000
+          }
+        }
+      ]
+    };
+
+    expect(
+      helpers.getManagedRiskSymbolBlockReason({
+        state: lockedCautionState,
+        symbol: "SOLUSDC",
+        position: { symbol: "SOLUSDC", netQty: 10, costQuote: 1_000 },
+        minExposureHome: 5
+      })
+    ).toBeNull();
+
+    await expect(
+      helpers.getCandidateSelectionBlockReason({
+        symbol: "SOLUSDC",
+        state: lockedCautionState,
+        risk: 100,
+        baseAsset: "SOL",
+        quoteAsset: "USDC",
+        qty: 10,
+        lastPrice: 100,
+        homeStable: "USDC",
+        bridgeAssets: ["BTC"],
+        minExposureHome: 5,
+        activeOrderCount: 0
+      })
+    ).resolves.toBeNull();
+
+    expect(
+      helpers.pickManagedFallbackSymbol({
+        state: lockedCautionState,
+        isExecutionQuoteSymbol: (symbol) => symbol.endsWith("USDC"),
+        minExposureHome: 5
+      })
+    ).toBe("SOLUSDC");
+
+    const normalState: BotState = {
+      ...lockedCautionState,
+      riskState: {
+        state: "NORMAL",
+        reason_codes: [],
+        unwind_only: false,
+        resume_conditions: []
+      }
+    };
+    expect(
+      helpers.getManagedRiskSymbolBlockReason({
+        state: normalState,
+        symbol: "SOLUSDC",
+        position: { symbol: "SOLUSDC", netQty: 10, costQuote: 1_000 },
+        minExposureHome: 5
+      })
+    ).toContain("No-feasible recovery min-order");
+  });
+
   it("prioritizes home-quote positions for no-feasible recovery sells before pressure quotes", () => {
     type ManagedPositionLike = {
       symbol: string;
