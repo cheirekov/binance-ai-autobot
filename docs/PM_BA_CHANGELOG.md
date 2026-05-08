@@ -16,6 +16,37 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-08 08:17 UTC — T-031 twenty-first slice: freeze fresh re-entry during profit-giveback caution
+- Scope:
+  - respond to `autobot-feedback-20260508-081302.tgz`, where the May 7 managed-risk reachability patch was deployed and active but the bot re-entered fresh grid buys after profit-giveback de-risking.
+- BA requirement mapping:
+  - latest bundle shows `git.commit=525b6cd`, `risk_state=HALT`, `trigger=PROFIT_GIVEBACK`, `daily_net_usdt=-136.89`, `fees_usdt=17.23`, `trades=70`, `filledOrders=132`, `activeOrders=0`, and top skip `No feasible candidates after policy/exposure filters`.
+  - runtime tail confirms managed unwinds occurred, then fresh/reopened grid buys resumed while giveback protection was still active.
+- PM milestone mapping:
+  - keep `T-031` active with linked `T-032`; this is a strategy-quality/re-entry-control fix after downside-control reachability was proven.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - profit-giveback `CAUTION` now keeps fresh grid symbols paused while giveback remains above its caution threshold.
+    - profit-giveback `CAUTION` also blocks fresh symbols when daily realized PnL is negative.
+    - managed positions remain eligible for exit/unwind handling; hard locks and existing risk protections are unchanged.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added coverage proving low-exposure profit-giveback caution does not reopen fresh grid symbols while giveback is still active.
+- Risk slider impact:
+  - no exposure caps, max-loss budgets, or fee floors changed.
+  - at any risk level, profit-giveback protection now behaves as a re-entry freeze until the giveback condition clears.
+- Validation evidence:
+  - `./apps/api/node_modules/.bin/vitest run apps/api/src/modules/bot/bot-engine.service.test.ts -t "profit-giveback caution|daily-loss" --cache=false`
+  - `./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.build.json --noEmit`
+  - `git diff --check`
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/pmba-gate.sh end`
+  - `./scripts/validate-active-ticket.sh`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh 1–3h bundle.
+  - expected evidence: no fresh grid BUY reopen cycle while `trigger=PROFIT_GIVEBACK` and `state=CAUTION/HALT`; managed exits remain reachable.
+- Follow-up:
+  - if churn persists with profit-giveback inactive, next slice should target fee/churn candidate scoring rather than daily-loss guard logic.
+
 ## 2026-05-07 09:25 UTC — T-031 twentieth slice: keep daily-loss managed exits reachable through recovery locks
 - Scope:
   - respond to `autobot-feedback-20260507-090740.tgz`, where exchange backoff cleared but the bot ended in `ABS_DAILY_LOSS` `CAUTION` with material managed exposure and no active orders.

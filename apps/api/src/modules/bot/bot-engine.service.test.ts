@@ -4308,6 +4308,65 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(false);
   });
 
+  it("keeps profit-giveback caution from reopening fresh grid symbols", () => {
+    const helpers = service as unknown as {
+      shouldPauseNewSymbolsInCaution: (params: {
+        guard: {
+          state: "NORMAL" | "CAUTION" | "HALT";
+          trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK";
+          managedExposurePct: number;
+          profitGivebackHaltMinExposurePct: number;
+          dailyRealizedPnl: number;
+          maxDailyLossAbs: number;
+          profitGivebackPct: number;
+          profitGivebackCautionPct: number;
+        };
+        risk: number;
+        countableManagedPositions: number;
+        countableManagedPositionsInStopLossCooldown: number;
+        activeOrderCount: number;
+      }) => boolean;
+    };
+
+    expect(
+      helpers.shouldPauseNewSymbolsInCaution({
+        guard: {
+          state: "CAUTION",
+          trigger: "PROFIT_GIVEBACK",
+          managedExposurePct: 0.02,
+          profitGivebackHaltMinExposurePct: 0.08,
+          dailyRealizedPnl: -25,
+          maxDailyLossAbs: 250,
+          profitGivebackPct: 0.8,
+          profitGivebackCautionPct: 0.45
+        },
+        risk: 100,
+        countableManagedPositions: 0,
+        countableManagedPositionsInStopLossCooldown: 0,
+        activeOrderCount: 0
+      })
+    ).toBe(true);
+
+    expect(
+      helpers.shouldPauseNewSymbolsInCaution({
+        guard: {
+          state: "CAUTION",
+          trigger: "PROFIT_GIVEBACK",
+          managedExposurePct: 0.02,
+          profitGivebackHaltMinExposurePct: 0.08,
+          dailyRealizedPnl: 8,
+          maxDailyLossAbs: 250,
+          profitGivebackPct: 0.2,
+          profitGivebackCautionPct: 0.45
+        },
+        risk: 100,
+        countableManagedPositions: 0,
+        countableManagedPositionsInStopLossCooldown: 0,
+        activeOrderCount: 0
+      })
+    ).toBe(false);
+  });
+
   it("derives lighter caution unwind policy before HALT", () => {
     const helpers = service as unknown as {
       deriveDailyLossCautionUnwindPolicy: (params: { risk: number; trigger: "NONE" | "ABS_DAILY_LOSS" | "PROFIT_GIVEBACK" }) => {

@@ -959,6 +959,12 @@ export class BotEngineService implements OnModuleInit {
     }
 
     if (params.guard.trigger === "PROFIT_GIVEBACK") {
+      const givebackPct = Number.isFinite(params.guard.profitGivebackPct) ? params.guard.profitGivebackPct : 0;
+      const cautionPct = Number.isFinite(params.guard.profitGivebackCautionPct)
+        ? params.guard.profitGivebackCautionPct
+        : Number.POSITIVE_INFINITY;
+      if (givebackPct >= cautionPct) return true;
+      if (Number.isFinite(params.guard.dailyRealizedPnl) && params.guard.dailyRealizedPnl < 0) return true;
       return managedExposurePct >= minManagedExposurePct;
     }
 
