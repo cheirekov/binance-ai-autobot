@@ -3256,6 +3256,35 @@ export class BotEngineService implements OnModuleInit {
           bridgeAssets: quoteBridgeAssets,
           minExposureHome: minCountableExposureHome
         });
+        const missingSellLeg = hasInventory && !hasSellLimit;
+        const quoteReserveForBuy = this.deriveEffectiveQuoteReserveTargetForBuy({
+          state,
+          risk,
+          nowMs: Date.now(),
+          reserveHardTarget: quoteReserveTargets.reserveHardTarget,
+          reserveHighTarget: quoteReserveTargets.reserveHighTarget
+        });
+        const buyQuoteSpendable = Math.max(0, quoteFree - quoteReserveForBuy.target);
+        if (quoteReserveForBuy.recoveryReserveRebuildActive && !missingSellLeg) {
+          if (buyQuoteSpendable <= 1e-8) {
+            recordRejection({
+              symbol,
+              stage: "quote-recovery-reserve-rebuild",
+              reason: `Recovered quote held for reserve rebuild (${quoteFree.toFixed(8)} <= ${quoteReserveForBuy.target.toFixed(8)})`,
+              quoteAsset
+            });
+            continue;
+          }
+          if (buyQuoteSpendable + 1e-8 < quoteReserveTargets.floorTopUpTarget) {
+            recordRejection({
+              symbol,
+              stage: "quote-recovery-reserve-rebuild",
+              reason: `Recovered quote reserve rebuild leaves ${buyQuoteSpendable.toFixed(8)} ${quoteAsset} below funding floor ${quoteReserveTargets.floorTopUpTarget.toFixed(8)}`,
+              quoteAsset
+            });
+            continue;
+          }
+        }
         const existingBuyPauseLock = this.getActiveSymbolProtectionLock(state, symbol, { onlyTypes: ["GRID_GUARD_BUY_PAUSE"] });
         const regime = this.buildRegimeSnapshot(candidate, risk);
         const pauseConfidenceThreshold = this.getBearPauseConfidenceThreshold(risk);
@@ -3299,7 +3328,7 @@ export class BotEngineService implements OnModuleInit {
         if (!hasInventory && quoteAsset !== normalizedHomeStable) {
           const quoteHomeValue = await this.estimateAssetValueInHome(
             quoteAsset,
-            quoteSpendable,
+            buyQuoteSpendable,
             normalizedHomeStable,
             quoteBridgeAssets
           );
@@ -3320,8 +3349,13 @@ export class BotEngineService implements OnModuleInit {
         const remainingSymbolNotional = Math.max(0, maxSymbolNotional - currentNotional);
         if (remainingSymbolNotional <= 0) continue;
 
-        const targetNotional = Math.min(rawTargetNotional, capForSizing ?? rawTargetNotional, quoteSpendable, remainingSymbolNotional);
-        if (!Number.isFinite(targetNotional) || targetNotional <= 0) continue;
+        const targetNotional = Math.min(rawTargetNotional, capForSizing ?? rawTargetNotional, buyQuoteSpendable, remainingSymbolNotional);
+        if (!Number.isFinite(targetNotional) || targetNotional <= 0) {
+          if (missingSellLeg) {
+            return { candidate, sizingRejected, rejectionSamples };
+          }
+          continue;
+        }
         const quoteExposureCapPct = this.derivePerQuoteExposureCapPct({
           quoteAsset,
           homeStable: normalizedHomeStable,
@@ -3883,6 +3917,54 @@ export class BotEngineService implements OnModuleInit {
       threshold,
       cooldownMs,
       windowMs
+    };
+  }
+
+  private deriveNoFeasibleRecoveryReserveRebuildMs(risk: number): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
+    return Math.round((60 - (boundedRisk / 100) * 30) * 60_000); // risk 0 -> 60m, risk 100 -> 30m
+  }
+
+  private findRecentNoFeasibleRecoveryTradeMs(params: { state: BotState; nowMs: number; lookbackMs: number }): number | null {
+    let latest: number | null = null;
+    for (const decision of params.state.decisions) {
+      if (decision.kind !== "TRADE") continue;
+      const details = decision.details as Record<string, unknown> | undefined;
+      if (details?.reason !== "no-feasible-liquidity-recovery") continue;
+      const ts = Date.parse(decision.ts);
+      if (!Number.isFinite(ts) || ts > params.nowMs) continue;
+      if (params.nowMs - ts > params.lookbackMs) continue;
+      latest = latest === null ? ts : Math.max(latest, ts);
+    }
+    return latest;
+  }
+
+  private deriveEffectiveQuoteReserveTargetForBuy(params: {
+    state: BotState;
+    risk: number;
+    nowMs: number;
+    reserveHardTarget: number;
+    reserveHighTarget: number;
+  }): {
+    target: number;
+    recoveryReserveRebuildActive: boolean;
+    cooldownMs: number;
+    lastRecoveryAgeMs?: number;
+  } {
+    const reserveHardTarget = Number.isFinite(params.reserveHardTarget) ? Math.max(0, params.reserveHardTarget) : 0;
+    const reserveHighTarget = Number.isFinite(params.reserveHighTarget) ? Math.max(0, params.reserveHighTarget) : 0;
+    const cooldownMs = this.deriveNoFeasibleRecoveryReserveRebuildMs(params.risk);
+    const latestRecoveryMs = this.findRecentNoFeasibleRecoveryTradeMs({
+      state: params.state,
+      nowMs: params.nowMs,
+      lookbackMs: cooldownMs
+    });
+    const recoveryReserveRebuildActive = latestRecoveryMs !== null;
+    return {
+      target: recoveryReserveRebuildActive ? Math.max(reserveHardTarget, reserveHighTarget) : reserveHardTarget,
+      recoveryReserveRebuildActive,
+      cooldownMs,
+      ...(latestRecoveryMs !== null ? { lastRecoveryAgeMs: Math.max(0, params.nowMs - latestRecoveryMs) } : {})
     };
   }
 
@@ -8173,7 +8255,14 @@ export class BotEngineService implements OnModuleInit {
               homeStable,
               bridgeAssets: executionBridgeAssets
             });
-            const quoteSpendable = Math.max(0, quoteFree - reserveHardTarget);
+            const quoteReserveForBuy = this.deriveEffectiveQuoteReserveTargetForBuy({
+              state: current,
+              risk,
+              nowMs: Date.now(),
+              reserveHardTarget,
+              reserveHighTarget
+            });
+            const quoteSpendable = Math.max(0, quoteFree - quoteReserveForBuy.target);
 
             if (botOrderAutoCancelEnabled && config) {
               const ttlMs = Math.max(60_000, Math.round(config.advanced.botOrderStaleTtlMinutes * 60_000));
@@ -8579,6 +8668,8 @@ export class BotEngineService implements OnModuleInit {
                         reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
                         reserveHardTarget: Number(reserveHardTarget.toFixed(6)),
                         reserveHighTarget: Number(reserveHighTarget.toFixed(6)),
+                        effectiveBuyReserveTarget: Number(quoteReserveForBuy.target.toFixed(6)),
+                        noFeasibleRecoveryReserveRebuildActive: quoteReserveForBuy.recoveryReserveRebuildActive,
                         quoteFree: Number(quoteFree.toFixed(6)),
                         quoteSpendable: Number(quoteSpendable.toFixed(6)),
                         reserveMultiplier: conversionTopUpReserveMultiplier,
@@ -8856,6 +8947,8 @@ export class BotEngineService implements OnModuleInit {
                             quoteSpendable: Number(quoteSpendable.toFixed(6)),
                             reserveHardTarget: Number(reserveHardTarget.toFixed(6)),
                             reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
+                            effectiveBuyReserveTarget: Number(quoteReserveForBuy.target.toFixed(6)),
+                            noFeasibleRecoveryReserveRebuildActive: quoteReserveForBuy.recoveryReserveRebuildActive,
                             ...(cooldown.storm ? { storm: cooldown.storm } : {}),
                             cooldownMs
                           }
@@ -8916,6 +9009,8 @@ export class BotEngineService implements OnModuleInit {
                         limitPrice: buyPriceNorm.normalizedPrice,
                         quoteSpendable: Number(quoteSpendable.toFixed(8)),
                         reserveHardTarget: Number(reserveHardTarget.toFixed(8)),
+                        effectiveBuyReserveTarget: Number(quoteReserveForBuy.target.toFixed(8)),
+                        noFeasibleRecoveryReserveRebuildActive: quoteReserveForBuy.recoveryReserveRebuildActive,
                         refreshedBalances: buyFunds.refreshed
                       }
                     });
@@ -8987,6 +9082,8 @@ export class BotEngineService implements OnModuleInit {
                               quoteSpendable: Number(quoteSpendable.toFixed(6)),
                               reserveHardTarget: Number(reserveHardTarget.toFixed(6)),
                               reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
+                              effectiveBuyReserveTarget: Number(quoteReserveForBuy.target.toFixed(6)),
+                              noFeasibleRecoveryReserveRebuildActive: quoteReserveForBuy.recoveryReserveRebuildActive,
                               derivedFromSizingReject: true,
                               ...(cooldown.storm ? { storm: cooldown.storm } : {}),
                               cooldownMs
@@ -9043,6 +9140,8 @@ export class BotEngineService implements OnModuleInit {
                             quoteSpendable: Number(quoteSpendable.toFixed(6)),
                             reserveHardTarget: Number(reserveHardTarget.toFixed(6)),
                             reserveLowTarget: Number(reserveLowTarget.toFixed(6)),
+                            effectiveBuyReserveTarget: Number(quoteReserveForBuy.target.toFixed(6)),
+                            noFeasibleRecoveryReserveRebuildActive: quoteReserveForBuy.recoveryReserveRebuildActive,
                             ...(cooldown.storm ? { storm: cooldown.storm } : {}),
                             cooldownMs
                           }

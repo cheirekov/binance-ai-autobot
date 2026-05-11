@@ -92,6 +92,100 @@ describe("bot-engine pickFeasibleLiveCandidate", () => {
     expect(result.reason).toBeUndefined();
   });
 
+  it("keeps sell-leg candidates reachable while recovered quote reserve is rebuilding", async () => {
+    const config = {
+      advanced: {
+        neverTradeSymbols: [],
+        symbolEntryCooldownMs: 0,
+        maxConsecutiveEntriesPerSymbol: 0
+      }
+    } as unknown as AppConfig;
+
+    const configService = { load: () => config };
+    const rules: BinanceSymbolRules = {
+      symbol: "AAAUSDC",
+      status: "TRADING",
+      baseAsset: "AAA",
+      quoteAsset: "USDC"
+    };
+    const marketData = {
+      getSymbolRules: async () => rules,
+      getTickerPrice: async () => "1",
+      validateMarketOrderQty: async () =>
+        ({
+          ok: true,
+          normalizedQty: "10"
+        }) satisfies MarketQtyValidation
+    };
+
+    const service = new BotEngineService(
+      configService as unknown as ConfigService,
+      marketData as unknown as BinanceMarketDataService,
+      {} as unknown as BinanceTradingService,
+      {} as unknown as ConversionRouterService,
+      {} as unknown as UniverseService
+    );
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "trade-1",
+          ts: new Date(now - 5 * 60_000).toISOString(),
+          kind: "TRADE",
+          summary: "Recovery sell",
+          details: {
+            reason: "no-feasible-liquidity-recovery"
+          }
+        }
+      ]
+    };
+    const candidate: UniverseCandidate = {
+      symbol: "AAAUSDC",
+      baseAsset: "AAA",
+      quoteAsset: "USDC",
+      lastPrice: 1,
+      quoteVolume24h: 1_000_000,
+      priceChangePct24h: 0,
+      score: 1,
+      reasons: []
+    };
+
+    const result = await (
+      service as unknown as {
+        pickFeasibleLiveCandidate: (params: unknown) => Promise<{
+          candidate: UniverseCandidate | null;
+          rejectionSamples: Array<{ stage: string }>;
+        }>;
+      }
+    ).pickFeasibleLiveCandidate({
+      preferredCandidate: candidate,
+      snapshotCandidates: [],
+      state,
+      homeStable: "USDC",
+      allowedExecutionQuotes: new Set(["USDC"]),
+      traderRegion: "EEA",
+      neverTradeSymbols: [],
+      excludeStableStablePairs: true,
+      enforceRegionPolicy: true,
+      balances: [
+        { asset: "USDC", free: 10, locked: 0, total: 10 },
+        { asset: "AAA", free: 20, locked: 0, total: 20 }
+      ],
+      walletTotalHome: 1_000,
+      risk: 100,
+      maxPositionPct: 20,
+      minQuoteLiquidityHome: 3,
+      notionalCap: 20,
+      capitalNotionalCapMultiplier: 1,
+      bufferFactor: 1
+    });
+
+    expect(result.candidate?.symbol).toBe("AAAUSDC");
+    expect(result.rejectionSamples.map((sample) => sample.stage)).not.toContain("quote-recovery-reserve-rebuild");
+  });
+
   it("rotates away from grid-guarded home dust when live inventory cannot sell", async () => {
     const config = {
       advanced: {
@@ -1764,6 +1858,95 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(policy.threshold).toBe(2);
   });
 
+  it("holds recovered quote against the high reserve after no-feasible recovery", () => {
+    const helpers = service as unknown as {
+      deriveEffectiveQuoteReserveTargetForBuy: (params: {
+        state: BotState;
+        risk: number;
+        nowMs: number;
+        reserveHardTarget: number;
+        reserveHighTarget: number;
+      }) => {
+        target: number;
+        recoveryReserveRebuildActive: boolean;
+        cooldownMs: number;
+        lastRecoveryAgeMs?: number;
+      };
+    };
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "trade-1",
+          ts: new Date(now - 5 * 60_000).toISOString(),
+          kind: "TRADE",
+          summary: "Recovery sell",
+          details: {
+            reason: "no-feasible-liquidity-recovery"
+          }
+        }
+      ]
+    };
+
+    const target = helpers.deriveEffectiveQuoteReserveTargetForBuy({
+      state,
+      risk: 100,
+      nowMs: now,
+      reserveHardTarget: 5,
+      reserveHighTarget: 15
+    });
+
+    expect(target.recoveryReserveRebuildActive).toBe(true);
+    expect(target.target).toBe(15);
+    expect(target.cooldownMs).toBe(1_800_000);
+    expect(target.lastRecoveryAgeMs).toBe(300_000);
+  });
+
+  it("releases recovered quote reserve rebuild after its cooldown", () => {
+    const helpers = service as unknown as {
+      deriveEffectiveQuoteReserveTargetForBuy: (params: {
+        state: BotState;
+        risk: number;
+        nowMs: number;
+        reserveHardTarget: number;
+        reserveHighTarget: number;
+      }) => {
+        target: number;
+        recoveryReserveRebuildActive: boolean;
+        cooldownMs: number;
+      };
+    };
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      decisions: [
+        {
+          id: "trade-1",
+          ts: new Date(now - 31 * 60_000).toISOString(),
+          kind: "TRADE",
+          summary: "Recovery sell",
+          details: {
+            reason: "no-feasible-liquidity-recovery"
+          }
+        }
+      ]
+    };
+
+    const target = helpers.deriveEffectiveQuoteReserveTargetForBuy({
+      state,
+      risk: 100,
+      nowMs: now,
+      reserveHardTarget: 5,
+      reserveHighTarget: 15
+    });
+
+    expect(target.recoveryReserveRebuildActive).toBe(false);
+    expect(target.target).toBe(5);
+  });
+
   it("gates no-feasible recovery on spendable quote liquidity after reserve", () => {
     const helpers = service as unknown as {
       shouldAttemptNoFeasibleRecovery: (params: {
@@ -1795,6 +1978,31 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(spendableGate.pressureDetected).toBe(false);
     expect(rawFreeGate.attempt).toBe(true);
     expect(aboveFloorGate.attempt).toBe(false);
+  });
+
+  it("does not treat recovered quote reserve rebuild as recovery-sell pressure", () => {
+    const helpers = service as unknown as {
+      shouldAttemptNoFeasibleRecovery: (params: {
+        policyEnabled: boolean;
+        maxExecutionQuoteSpendableHome: number;
+        quoteLiquidityThresholdHome: number;
+        rejectionSamples?: Array<{ stage?: string }>;
+      }) => { attempt: boolean; thresholdHome: number; pressureDetected: boolean };
+    };
+
+    const gate = helpers.shouldAttemptNoFeasibleRecovery({
+      policyEnabled: true,
+      maxExecutionQuoteSpendableHome: 25,
+      quoteLiquidityThresholdHome: 3,
+      rejectionSamples: [
+        {
+          stage: "quote-recovery-reserve-rebuild"
+        }
+      ]
+    });
+
+    expect(gate.attempt).toBe(false);
+    expect(gate.pressureDetected).toBe(false);
   });
 
   it("keeps no-feasible recovery eligible when rejection pressure proves quote starvation despite raw spendable elsewhere", () => {

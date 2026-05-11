@@ -16,6 +16,40 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-11 08:32 UTC — T-031 twenty-second slice: preserve quote after no-feasible recovery sells
+- Scope:
+  - respond to `autobot-feedback-20260511-080610.tgz`, where the May 8 re-entry freeze is deployed but runtime shows recovery-sell → BUY churn after risk returns to `NORMAL`.
+- BA requirement mapping:
+  - latest bundle shows `git.commit=663ca9b`, `risk_state=NORMAL`, `daily_net_usdt=-49.72`, `max_drawdown_pct=4.9009`, `open_positions=12`, and `total_alloc_pct=30.80`.
+  - state tail shows `no-feasible-liquidity-recovery` sells followed within minutes by new grid BUY orders that spend recovered quote back down near the hard reserve.
+- PM milestone mapping:
+  - keep `T-031` active with linked `T-032`; this is a bounded strategy-quality/liquidity-control fix, not a new ticket or quote-routing redesign.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added a short no-feasible recovery reserve-rebuild window.
+    - during that window, candidate selection and grid BUY sizing preserve the high quote reserve instead of only the hard reserve.
+    - reserve-rebuild skips are intentionally not treated as pressure for another recovery sell.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added coverage for reserve-rebuild activation, cooldown expiry, and non-escalation to another recovery sell.
+  - `docs/TRIAGE_NOTE_2026-05-11_T031_NO_FEASIBLE_RECOVERY_QUOTE_CHURN.md`:
+    - recorded the same-ticket P1 triage evidence.
+- Risk slider impact:
+  - no exposure caps, daily-loss budgets, or fee floors changed.
+  - the rebuild window scales from 60m at risk 0 to 30m at risk 100.
+- Validation evidence:
+  - `./apps/api/node_modules/.bin/vitest run apps/api/src/modules/bot/bot-engine.service.test.ts -t "reserve rebuild|sell-leg candidates|no-feasible recovery" --cache=false`
+  - `./apps/api/node_modules/.bin/vitest run apps/api/src/modules/bot/bot-engine.service.test.ts --cache=false`
+  - `./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.build.json --noEmit`
+  - `git diff --check`
+  - `./scripts/validate-active-ticket.sh`
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/pmba-gate.sh end`
+- Runtime test request:
+  - deploy without resetting state and collect one fresh 1–3h bundle.
+  - expected evidence: fewer recovery-sell → immediate BUY cycles, recovered quote remains above the high reserve during the rebuild window, and managed exits remain reachable.
+- Follow-up:
+  - if churn persists after quote reserve rebuild is visible, next slice should target order budget / candidate rank during NORMAL recovery rather than daily-loss guard logic.
+
 ## 2026-05-08 08:17 UTC — T-031 twenty-first slice: freeze fresh re-entry during profit-giveback caution
 - Scope:
   - respond to `autobot-feedback-20260508-081302.tgz`, where the May 7 managed-risk reachability patch was deployed and active but the bot re-entered fresh grid buys after profit-giveback de-risking.
