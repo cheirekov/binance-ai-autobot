@@ -16,6 +16,46 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-13 09:30 UTC — T-031 twenty-third slice: deterministic risk budget before exposure
+- Scope:
+  - respond to PM/BA/team review that `T-031` was cycling on runtime skips while the risk slider still behaved too much like an exposure/turnover accelerator.
+- BA requirement mapping:
+  - latest bundle before this patch is `autobot-feedback-20260513-085101.tgz` on `git.commit=a497f98`.
+  - runtime is still `CAUTION` with `trigger=PROFIT_GIVEBACK`, `daily_net_usdt=-33.81`, `max_drawdown_pct=3.48995`, `open_positions=8`, and `total_alloc_pct=0.27`.
+  - the user requirement is explicit: high risk must not mean blind trading; the bot must adapt by controlling losses, requiring real edge, and preserving profits.
+- PM milestone mapping:
+  - keep `T-031` active as the strategy-quality lane, but stop one-off top-skip patches as the default response.
+  - this is a production-pivot slice that introduces a deterministic budget contract between market signal and execution.
+- Technical changes:
+  - `apps/api/src/modules/bot/risk-budget.service.ts`:
+    - added `deriveRiskBudgetDecision`, returning lane, allowed actions, max new exposure, fee-proof min edge, cooldown bias, and reasons.
+    - `HALT`, confirmed bear, and active negative/giveback `CAUTION` force defensive or risk-off behavior for new exposure.
+    - stabilized `CAUTION` may allow only a small `RECOVERY_OPPORTUNITY` after exposure is near-flat and daily realized PnL is non-negative.
+    - min edge is bounded by estimated round-trip cost so high risk cannot lower entry standards below fees/spread/slippage.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - wired the risk budget into execution-lane selection, fresh new-exposure gate, fee/edge threshold, grid BUY pause, and market-entry pause.
+    - emitted `riskBudget` details into relevant skip/cooldown telemetry for next-bundle evidence.
+  - `apps/api/src/modules/bot/risk-budget.service.test.ts`:
+    - added focused coverage for HALT reduce-only, profit-giveback caution, stabilized recovery opportunity, high-risk fee-proof edge, and confirmed-bear defense.
+- Risk slider impact:
+  - risk still influences budget size, but hard risk state, confirmed bear defense, and fee-proof edge now dominate over raw risk appetite.
+  - high risk no longer authorizes blind grid BUY or market entry during active loss/giveback conditions.
+- Validation evidence:
+  - `./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.json --noEmit`
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/risk-budget.service.test.ts --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run --cache=false)`
+  - `git diff --check`
+  - `./scripts/validate-active-ticket.sh`
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/pmba-gate.sh end`
+- Runtime test request:
+  - deploy without resetting state and collect the next normal bundle.
+  - expected evidence: `riskBudget` appears in relevant skip details, active profit-giveback `CAUTION` does not reopen fresh BUY exposure, and any recovery opportunity is small and only after caution stabilizes.
+- Follow-up:
+  - if the next bundles still show cycling without `riskBudget` evidence, treat it as an integration defect.
+  - if `riskBudget` works but profitability remains unproven, next production-grade step is an offline replay/calibration harness before more live strategy experiments.
+
 ## 2026-05-11 08:32 UTC — T-031 twenty-second slice: preserve quote after no-feasible recovery sells
 - Scope:
   - respond to `autobot-feedback-20260511-080610.tgz`, where the May 8 re-entry freeze is deployed but runtime shows recovery-sell → BUY churn after risk returns to `NORMAL`.

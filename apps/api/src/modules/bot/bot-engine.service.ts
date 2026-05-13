@@ -19,6 +19,7 @@ import {
 import { ConversionRouterService } from "../integrations/conversion-router.service";
 import { getPairPolicyBlockReason, isStableAsset } from "../policy/trading-policy";
 import { UniverseService } from "../universe/universe.service";
+import { deriveRiskBudgetDecision } from "./risk-budget.service";
 
 const EXECUTION_FIAT_QUOTES = new Set(["EUR", "JPY", "GBP", "TRY", "BRL", "AUD"]);
 
@@ -6946,7 +6947,31 @@ export class BotEngineService implements OnModuleInit {
           );
           const selectedRegime = this.buildRegimeSnapshot(selectedCandidate ?? null, risk);
           const selectedStrategy = this.buildAdaptiveStrategyScores(selectedCandidate ?? null, selectedRegime.label);
-          const executionLane = this.resolveExecutionLane({
+          const openExposureHome = countableOpenHomePositions.reduce(
+            (sum, position) => sum + Math.max(0, Number.isFinite(position.costQuote) ? position.costQuote : 0),
+            0
+          );
+          let selectedRiskBudget = deriveRiskBudgetDecision({
+            risk,
+            walletTotalHome,
+            riskState: {
+              state: dailyLossGuard.state,
+              trigger: dailyLossGuard.trigger,
+              dailyRealizedPnl: dailyLossGuard.dailyRealizedPnl,
+              peakDailyRealizedPnl: dailyLossGuard.peakDailyRealizedPnl,
+              profitGivebackPct: dailyLossGuard.profitGivebackPct,
+              profitGivebackCautionPct: dailyLossGuard.profitGivebackCautionPct,
+              managedExposurePct: dailyLossGuard.managedExposurePct,
+              maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs
+            },
+            regime: selectedRegime,
+            strategy: selectedStrategy,
+            openExposureHome,
+            openPositions: countableOpenHomePositions.length,
+            activeOrderCount: current.activeOrders.length,
+            baseMinNetEdgePct: capitalProfile.minNetEdgePct
+          });
+          let executionLane = this.resolveExecutionLane({
             tradeMode,
             gridEnabled: configuredGridEnabled,
             risk,
@@ -6956,6 +6981,9 @@ export class BotEngineService implements OnModuleInit {
             regime: selectedRegime,
             strategy: selectedStrategy
           });
+          if (selectedRiskBudget.lane === "RISK_OFF" || selectedRiskBudget.lane === "DEFENSIVE") {
+            executionLane = "DEFENSIVE";
+          }
           tickContext.executionLane = executionLane;
           const gridEnabled = configuredGridEnabled && executionLane !== "MARKET";
           const cautionUnwindActive = this.shouldRunDailyLossCautionUnwind({
@@ -6966,8 +6994,11 @@ export class BotEngineService implements OnModuleInit {
           const maxOpenPositions = Math.max(1, config?.derived.maxOpenPositions ?? 1);
           tickContext.maxOpenPositions = maxOpenPositions;
           const candidateIsOpen = (managedPositions.get(candidateSymbol)?.netQty ?? 0) > 0;
-          if (cautionPauseNewSymbols && !candidateIsOpen) {
-            const summary = `Skip ${candidateSymbol}: Daily loss caution (new symbols paused)`;
+          const riskBudgetBlocksNewExposure = !selectedRiskBudget.allowedActions.openNewPosition;
+          if ((cautionPauseNewSymbols || riskBudgetBlocksNewExposure) && !candidateIsOpen) {
+            const summary = cautionPauseNewSymbols
+              ? `Skip ${candidateSymbol}: Daily loss caution (new symbols paused)`
+              : `Skip ${candidateSymbol}: Risk budget blocked new exposure`;
             const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveCautionEntryPauseCooldownMs(risk));
             const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
             const cooldownMs = cooldown.cooldownMs;
@@ -6995,6 +7026,7 @@ export class BotEngineService implements OnModuleInit {
                         managedExposurePct: dailyLossGuard.managedExposurePct,
                         cautionManagedSymbolOnlyMinExposurePct: cautionPauseNewSymbolsMinExposurePct,
                         cautionPauseNewSymbolsMinExposurePct,
+                        riskBudget: selectedRiskBudget,
                         lookbackMs: dailyLossGuard.lookbackMs,
                         windowStart: dailyLossGuard.windowStartIso,
                         cooldownMs
@@ -7008,12 +7040,15 @@ export class BotEngineService implements OnModuleInit {
               type: "COOLDOWN",
               scope: "SYMBOL",
               symbol: candidateSymbol,
-              reason: `Daily loss caution pause (${Math.round(cooldownMs / 1000)}s)`,
+              reason: cautionPauseNewSymbols
+                ? `Daily loss caution pause (${Math.round(cooldownMs / 1000)}s)`
+                : `Risk budget new-exposure pause (${Math.round(cooldownMs / 1000)}s)`,
               expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
               details: {
-                category: "DAILY_LOSS_CAUTION_NEW_SYMBOL",
+                category: cautionPauseNewSymbols ? "DAILY_LOSS_CAUTION_NEW_SYMBOL" : "RISK_BUDGET_NEW_EXPOSURE",
                 cooldownMs,
-                riskState: dailyLossGuard.state
+                riskState: dailyLossGuard.state,
+                riskBudget: selectedRiskBudget
               }
             });
             this.save(nextWithCooldown);
@@ -7725,12 +7760,36 @@ export class BotEngineService implements OnModuleInit {
           const spreadBufferRate = Math.max(0, Number.parseFloat(process.env.ESTIMATED_SPREAD_BUFFER_RATE ?? "0.0006"));
           const roundTripCostPct = ((takerFeeRate * 2) + spreadBufferRate + Math.max(0, bufferFactor - 1)) * 100;
           const estimatedEdgePct = this.estimateCandidateEdgePct(selectedCandidate);
-          const regimeAdjustedMinNetEdgePct = this.getRegimeAdjustedMinNetEdgePct({
+          selectedRiskBudget = deriveRiskBudgetDecision({
             risk,
-            baseMinNetEdgePct: capitalProfile.minNetEdgePct,
+            walletTotalHome,
+            riskState: {
+              state: dailyLossGuard.state,
+              trigger: dailyLossGuard.trigger,
+              dailyRealizedPnl: dailyLossGuard.dailyRealizedPnl,
+              peakDailyRealizedPnl: dailyLossGuard.peakDailyRealizedPnl,
+              profitGivebackPct: dailyLossGuard.profitGivebackPct,
+              profitGivebackCautionPct: dailyLossGuard.profitGivebackCautionPct,
+              managedExposurePct: dailyLossGuard.managedExposurePct,
+              maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs
+            },
             regime: selectedRegime,
-            strategy: selectedStrategy
+            strategy: selectedStrategy,
+            openExposureHome,
+            openPositions: countableOpenHomePositions.length,
+            activeOrderCount: current.activeOrders.length,
+            baseMinNetEdgePct: capitalProfile.minNetEdgePct,
+            estimatedRoundTripCostPct: roundTripCostPct
           });
+          const regimeAdjustedMinNetEdgePct = Math.max(
+            this.getRegimeAdjustedMinNetEdgePct({
+              risk,
+              baseMinNetEdgePct: capitalProfile.minNetEdgePct,
+              regime: selectedRegime,
+              strategy: selectedStrategy
+            }),
+            selectedRiskBudget.minNetEdgePct
+          );
           const riskNormalized = Math.max(0, Math.min(1, risk / 100));
           const riskAdjustedMinNetEdgePct = Math.max(0.05, capitalProfile.minNetEdgePct * (1 - riskNormalized * 0.65));
           const bypassFeeEdgeFilter = this.shouldBypassFeeEdgeFilter({
@@ -7770,6 +7829,7 @@ export class BotEngineService implements OnModuleInit {
                           regimeLabel: selectedRegime.label,
                           regimeConfidence: Number(selectedRegime.confidence.toFixed(6)),
                           strategyRecommended: selectedStrategy.recommended,
+                          riskBudget: selectedRiskBudget,
                           rsi14: selectedCandidate?.rsi14,
                           adx14: selectedCandidate?.adx14,
                           atrPct14: selectedCandidate?.atrPct14,
@@ -8354,7 +8414,8 @@ export class BotEngineService implements OnModuleInit {
               typeof regime.confidence === "number" &&
               Number.isFinite(regime.confidence) &&
               regime.confidence >= pauseConfidenceThreshold;
-            const buyPausedByCaution = cautionPauseNewSymbols;
+            const buyPausedByRiskBudget = !selectedRiskBudget.allowedActions.placeGridBuy;
+            const buyPausedByCaution = cautionPauseNewSymbols || buyPausedByRiskBudget;
             const buyPaused = buyPausedByCaution || Boolean(existingBuyPauseLock) || shouldPauseBuys;
 
             const defensiveBuyOrders = symbolOpenLimitOrdersAll.filter(
@@ -8377,8 +8438,10 @@ export class BotEngineService implements OnModuleInit {
                   executionLane,
                   regime,
                   strategy: selectedStrategy,
+                  riskBudget: selectedRiskBudget,
                   buyPaused,
                   buyPausedByCaution,
+                  buyPausedByRiskBudget,
                   pauseConfidenceThreshold,
                   existingBuyPauseLock: Boolean(existingBuyPauseLock),
                   canceledBuyOrders: defensiveBuyOrders.length
@@ -8724,9 +8787,11 @@ export class BotEngineService implements OnModuleInit {
                 : Number.NaN;
 
             if (!hasBuyLimit && buyPaused) {
-              const summary = buyPausedByCaution
+              const summary = cautionPauseNewSymbols
                 ? `Skip ${candidateSymbol}: Daily loss caution paused GRID BUY leg`
-                : `Skip ${candidateSymbol}: Grid guard paused BUY leg`;
+                : buyPausedByRiskBudget
+                  ? `Skip ${candidateSymbol}: Risk budget paused GRID BUY leg`
+                  : `Skip ${candidateSymbol}: Grid guard paused BUY leg`;
               const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), guardLockMs);
               const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
               const cooldownMs = cooldown.cooldownMs;
@@ -8750,6 +8815,8 @@ export class BotEngineService implements OnModuleInit {
                         pauseConfidenceThreshold,
                         cautionModeActive,
                         buyPausedByCaution,
+                        buyPausedByRiskBudget,
+                        riskBudget: selectedRiskBudget,
                         buyPaused,
                         hasBuyLimit,
                         hasSellLimit,
@@ -8774,6 +8841,8 @@ export class BotEngineService implements OnModuleInit {
                     cooldownMs,
                     hasSellLimit,
                     buyPausedByCaution,
+                    buyPausedByRiskBudget,
+                    riskBudget: selectedRiskBudget,
                     ...(cooldown.storm ? { storm: cooldown.storm } : {})
                   }
                 });
@@ -9471,8 +9540,11 @@ export class BotEngineService implements OnModuleInit {
             return;
           }
 
-          if (cautionPauseNewSymbols) {
-            const summary = `Skip ${candidateSymbol}: Daily loss caution paused MARKET entry`;
+          const marketEntryPausedByRiskBudget = !selectedRiskBudget.allowedActions.marketEntry;
+          if (cautionPauseNewSymbols || marketEntryPausedByRiskBudget) {
+            const summary = cautionPauseNewSymbols
+              ? `Skip ${candidateSymbol}: Daily loss caution paused MARKET entry`
+              : `Skip ${candidateSymbol}: Risk budget paused MARKET entry`;
             const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveCautionEntryPauseCooldownMs(risk));
             const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
             const cooldownMs = cooldown.cooldownMs;
@@ -9500,6 +9572,7 @@ export class BotEngineService implements OnModuleInit {
                         managedExposurePct: dailyLossGuard.managedExposurePct,
                         cautionManagedSymbolOnlyMinExposurePct: cautionPauseNewSymbolsMinExposurePct,
                         cautionPauseNewSymbolsMinExposurePct,
+                        riskBudget: selectedRiskBudget,
                         lookbackMs: dailyLossGuard.lookbackMs,
                         windowStart: dailyLossGuard.windowStartIso,
                         cooldownMs
@@ -9513,12 +9586,15 @@ export class BotEngineService implements OnModuleInit {
               type: "COOLDOWN",
               scope: "SYMBOL",
               symbol: candidateSymbol,
-              reason: `Daily loss caution paused market entry (${Math.round(cooldownMs / 1000)}s)`,
+              reason: cautionPauseNewSymbols
+                ? `Daily loss caution paused market entry (${Math.round(cooldownMs / 1000)}s)`
+                : `Risk budget paused market entry (${Math.round(cooldownMs / 1000)}s)`,
               expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
               details: {
-                category: "DAILY_LOSS_CAUTION_MARKET_ENTRY",
+                category: cautionPauseNewSymbols ? "DAILY_LOSS_CAUTION_MARKET_ENTRY" : "RISK_BUDGET_MARKET_ENTRY",
                 cooldownMs,
-                riskState: dailyLossGuard.state
+                riskState: dailyLossGuard.state,
+                riskBudget: selectedRiskBudget
               }
             });
             this.save(nextWithCooldown);
