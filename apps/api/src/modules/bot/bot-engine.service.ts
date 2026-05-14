@@ -615,6 +615,11 @@ export class BotEngineService implements OnModuleInit {
     }
     const stormLock = activeLock.reason.trim().toLowerCase().includes("skip storm");
     const runtimeRiskState = params.state.riskState?.state ?? "NORMAL";
+    const buyLegPaused =
+      details?.buyPaused === true || details?.buyPausedByCaution === true || details?.buyPausedByRiskBudget === true;
+    if (buyLegPaused && runtimeRiskState !== "NORMAL") {
+      return blockedReason;
+    }
     if (stormLock && runtimeRiskState === "NORMAL") {
       return null;
     }

@@ -5347,6 +5347,68 @@ describe("bot-engine symbol lock checks", () => {
     ).resolves.toContain("Grid sell leg not actionable yet");
   });
 
+  it("blocks dust sell-leg candidates in daily-loss caution when the buy leg is also paused", async () => {
+    const helpers = service as unknown as {
+      getCandidateSelectionBlockReason: (params: {
+        symbol: string;
+        state: BotState;
+        risk: number;
+        baseAsset: string;
+        quoteAsset: string;
+        qty: number;
+        lastPrice?: number;
+        homeStable: string;
+        bridgeAssets: string[];
+        minExposureHome: number;
+        activeOrderCount: number;
+      }) => Promise<string | null>;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      riskState: {
+        state: "CAUTION",
+        reason_codes: ["DAILY_LOSS_GUARD", "trigger=PROFIT_GIVEBACK"],
+        unwind_only: false,
+        resume_conditions: []
+      },
+      protectionLocks: [
+        {
+          id: "lock-caution-dust",
+          type: "COOLDOWN",
+          createdAt: "2026-05-14T09:55:37.873Z",
+          scope: "SYMBOL",
+          symbol: "SAGAUSDC",
+          reason: "Grid sell leg not actionable yet",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "GRID_SELL_NOT_ACTIONABLE",
+            cooldownMs: 900_000,
+            reason: "Below minQty 0.10000000",
+            buyPaused: true,
+            buyPausedByCaution: true
+          }
+        }
+      ]
+    };
+
+    await expect(
+      helpers.getCandidateSelectionBlockReason({
+        symbol: "SAGAUSDC",
+        state,
+        risk: 100,
+        baseAsset: "SAGA",
+        quoteAsset: "USDC",
+        qty: 0.05579,
+        lastPrice: 0.028,
+        homeStable: "USDC",
+        bridgeAssets: ["BTC"],
+        minExposureHome: 5,
+        activeOrderCount: 0
+      })
+    ).resolves.toContain("Grid sell leg not actionable yet");
+  });
+
   it("allows normal-mode dust home-quote candidates through non-actionable sell storm locks", async () => {
     const helpers = service as unknown as {
       getCandidateSelectionBlockReason: (params: {

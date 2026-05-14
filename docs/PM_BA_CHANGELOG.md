@@ -16,6 +16,42 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-14 11:45 UTC — T-031 twenty-fourth slice: block caution dust sell-leg reselection
+- Scope:
+  - respond to `autobot-feedback-20260514-103746.tgz`, where the risk-budget patch is deployed and working, but the PM/BA gate still fails on a repeated SAGA dust sell-leg loop.
+- BA requirement mapping:
+  - latest bundle shows `git.commit=ca13c42`, `risk_state=CAUTION`, `trigger=PROFIT_GIVEBACK`, `daily_net_usdt=14.08`, `max_drawdown_pct=2.78009`, `open_positions=8`, `total_alloc_pct=0.32`.
+  - top loop remains `Skip SAGAUSDC: Grid sell leg not actionable yet (48)`.
+  - SAGA decision details show `desiredQty=0.05579`, `normalizedQty=0`, `reason=Below minQty 0.10000000`, `buyPausedByCaution=true`, and `buyPausedByRiskBudget=true`.
+  - `riskBudget` telemetry is present, so this is not a failed deployment of the previous patch.
+- PM milestone mapping:
+  - keep `T-031` active and apply a same-ticket stability mitigation.
+  - preserve the risk-budget production pivot; do not reopen quote routing, AI, or futures scope.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - `GRID_SELL_NOT_ACTIONABLE` cooldowns now block dust home-quote candidates during non-`NORMAL` risk states when the BUY leg is paused.
+    - this prevents daily-loss managed-risk bypass from reselecting a symbol where live free quantity is below exchange sell minimum and fresh BUY is also forbidden.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added regression coverage for daily-loss/profit-giveback `CAUTION` with SAGA-like below-minQty dust and paused BUY leg.
+  - `docs/TRIAGE_NOTE_2026-05-14_T031_CAUTION_DUST_SELL_LEG_LOOP.md`:
+    - recorded PM/BA evidence and same-ticket decision.
+- Risk slider impact:
+  - no exposure budget or fee floor changed.
+  - high risk remains unable to force new BUY exposure while active profit-giveback caution is defensive.
+- Validation evidence:
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t "dust sell-leg|grid-sell-not-actionable|managed daily-loss candidates" --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/tsc -p tsconfig.json --noEmit)`
+  - `git diff --check`
+  - `./scripts/validate-active-ticket.sh`
+  - `./scripts/pmba-gate.sh start`
+- Runtime test request:
+  - deploy without resetting state and collect the next normal bundle.
+  - expected evidence: SAGA `Grid sell leg not actionable yet` count drops materially; `riskBudget` still blocks fresh BUY exposure while profit-giveback `CAUTION` is active.
+- Follow-up:
+  - if the loop persists with this patch deployed, next fix should move candidate selection to live-balance-aware managed inventory instead of state-history-only managed positions.
+
 ## 2026-05-13 09:30 UTC — T-031 twenty-third slice: deterministic risk budget before exposure
 - Scope:
   - respond to PM/BA/team review that `T-031` was cycling on runtime skips while the risk slider still behaved too much like an exposure/turnover accelerator.
