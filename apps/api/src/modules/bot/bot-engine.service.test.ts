@@ -5409,6 +5409,69 @@ describe("bot-engine symbol lock checks", () => {
     ).resolves.toContain("Grid sell leg not actionable yet");
   });
 
+  it("does not let managed-risk bypass ignore paused dust sell-leg cooldowns in caution", async () => {
+    const helpers = service as unknown as {
+      getCandidateSelectionBlockReason: (params: {
+        symbol: string;
+        state: BotState;
+        risk: number;
+        baseAsset: string;
+        quoteAsset: string;
+        qty: number;
+        lastPrice?: number;
+        homeStable: string;
+        bridgeAssets: string[];
+        minExposureHome: number;
+        activeOrderCount: number;
+      }) => Promise<string | null>;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      riskState: {
+        state: "CAUTION",
+        reason_codes: ["DAILY_LOSS_GUARD", "trigger=PROFIT_GIVEBACK"],
+        unwind_only: false,
+        resume_conditions: []
+      },
+      protectionLocks: [
+        {
+          id: "lock-countable-caution-dust",
+          type: "COOLDOWN",
+          createdAt: "2026-05-20T14:33:52.873Z",
+          scope: "SYMBOL",
+          symbol: "EDENUSDC",
+          reason: "Skip storm (3/3): Grid sell leg not actionable yet (3600s)",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "GRID_SELL_NOT_ACTIONABLE",
+            cooldownMs: 3_600_000,
+            reason: "Below minQty 0.10000000",
+            buyPaused: true,
+            buyPausedByCaution: true,
+            hasBuyLimit: false
+          }
+        }
+      ]
+    };
+
+    await expect(
+      helpers.getCandidateSelectionBlockReason({
+        symbol: "EDENUSDC",
+        state,
+        risk: 100,
+        baseAsset: "EDEN",
+        quoteAsset: "USDC",
+        qty: 52,
+        lastPrice: 0.23,
+        homeStable: "USDC",
+        bridgeAssets: ["BTC"],
+        minExposureHome: 5,
+        activeOrderCount: 0
+      })
+    ).resolves.toContain("Grid sell leg not actionable yet");
+  });
+
   it("allows normal-mode dust home-quote candidates through non-actionable sell storm locks", async () => {
     const helpers = service as unknown as {
       getCandidateSelectionBlockReason: (params: {

@@ -16,6 +16,42 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-20 15:20 UTC — T-031 twenty-fifth slice: close managed-bypass dust cooldown gap
+- Scope:
+  - respond to `autobot-feedback-20260520-150037.tgz`, where PM/BA gate passes but the same dust sell-leg class moved from SAGA to EDEN.
+- BA requirement mapping:
+  - latest bundle runs `git.commit=7b52732`, `risk_state=CAUTION`, `trigger=PROFIT_GIVEBACK`, `daily_net_usdt=-11.24`, `max_drawdown_pct=1.47933`, `open_positions=12`, `total_alloc_pct=1.23`, and `activeOrders=0`.
+  - top loop is `Skip EDENUSDC: Grid sell leg not actionable yet (34)`, paired with `Skip EDENUSDC: Risk budget paused GRID BUY leg (24)`.
+  - EDEN details show a below-minimum sell leg while BUY is paused by caution/risk budget.
+- PM milestone mapping:
+  - keep `T-031` active and patch the selector ordering gap; do not weaken risk-budget defense or reopen quote routing/AI/futures scope.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - `getCandidateSelectionBlockReason` now inspects `GRID_SELL_NOT_ACTIONABLE` cooldown details before applying managed-risk bypass.
+    - countable managed residuals can no longer bypass a non-`NORMAL` paused-buy dust sell-leg cooldown.
+    - other managed-risk bypass behavior remains available for non-grid-sell cooldown categories.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added EDEN-like regression coverage where countable managed exposure still must respect a paused dust sell-leg cooldown in `CAUTION`.
+  - `docs/TRIAGE_NOTE_2026-05-20_T031_MANAGED_BYPASS_DUST_SELL_LEG_LOOP.md`:
+    - recorded evidence and same-ticket mitigation decision.
+- Risk slider impact:
+  - no exposure budget, fee floor, or risk threshold changed.
+  - high risk still cannot force new BUY exposure while active profit-giveback caution is defensive.
+- Validation evidence:
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t "dust sell-leg|grid-sell-not-actionable|managed daily-loss candidates|paused dust sell-leg" --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run --cache=false)`
+  - `./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.json --noEmit`
+  - `git diff --check`
+  - `./scripts/validate-active-ticket.sh`
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/pmba-gate.sh end`
+- Runtime test request:
+  - deploy without resetting state and collect the next normal bundle.
+  - expected evidence: EDEN `Grid sell leg not actionable yet` stops dominating while risk-budget still blocks fresh BUY exposure during profit-giveback `CAUTION`.
+- Follow-up:
+  - if dust sell-leg loops continue on a new symbol after this patch, the next slice should move from symbol-lock ordering to live-balance-aware managed-position pruning.
+
 ## 2026-05-14 11:45 UTC — T-031 twenty-fourth slice: block caution dust sell-leg reselection
 - Scope:
   - respond to `autobot-feedback-20260514-103746.tgz`, where the risk-budget patch is deployed and working, but the PM/BA gate still fails on a repeated SAGA dust sell-leg loop.

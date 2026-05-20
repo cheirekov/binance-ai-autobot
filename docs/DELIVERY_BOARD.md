@@ -106,7 +106,7 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-031 | IN_PROGRESS | Regime engine v2 | Current slice preserves deterministic risk-budget defense and stops non-`NORMAL` risk state from reselecting dust sell-leg residuals when both grid legs are blocked. |
+| T-031 | IN_PROGRESS | Regime engine v2 | Current slice preserves deterministic risk-budget defense and closes the managed-risk bypass gap that reselected countable dust sell-leg residuals during non-`NORMAL` paused-buy states. |
 | T-032 | TODO | Exit manager v2 | Linked support only while `T-031` is active: preserve downside-control slices and the May 4 fee-aware/severe-caution guard; reopen as active only if downside-control becomes the dominant blocker. |
 | T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
 

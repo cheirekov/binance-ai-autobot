@@ -570,7 +570,7 @@ export class BotEngineService implements OnModuleInit {
   }): Promise<string | null> {
     const blockedReason = this.isSymbolBlocked(params.symbol, params.state);
     if (!blockedReason) return null;
-    if (
+    const bypassManagedRiskBlock =
       blockedReason.startsWith("Protection lock ") &&
       this.shouldBypassManagedRiskSymbolBlock({
         state: params.state,
@@ -578,18 +578,15 @@ export class BotEngineService implements OnModuleInit {
         qty: params.qty,
         lastPrice: params.lastPrice,
         minExposureHome: params.minExposureHome
-      })
-    ) {
-      return null;
-    }
+      });
 
     const activeLock = this.getActiveSymbolProtectionLock(params.state, params.symbol);
-    if (!activeLock) return blockedReason;
-    if (activeLock.type.trim().toUpperCase() !== "COOLDOWN") return blockedReason;
+    if (!activeLock) return bypassManagedRiskBlock ? null : blockedReason;
+    if (activeLock.type.trim().toUpperCase() !== "COOLDOWN") return bypassManagedRiskBlock ? null : blockedReason;
 
     const details = this.readLockDetails(activeLock);
     const category = typeof details?.category === "string" ? details.category.trim().toUpperCase() : "";
-    if (category !== "GRID_SELL_NOT_ACTIONABLE") return blockedReason;
+    if (category !== "GRID_SELL_NOT_ACTIONABLE") return bypassManagedRiskBlock ? null : blockedReason;
 
     const normalizedQuote = params.quoteAsset.trim().toUpperCase();
     const normalizedHome = params.homeStable.trim().toUpperCase();
