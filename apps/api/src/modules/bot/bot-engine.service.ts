@@ -614,7 +614,7 @@ export class BotEngineService implements OnModuleInit {
     const runtimeRiskState = params.state.riskState?.state ?? "NORMAL";
     const buyLegPaused =
       details?.buyPaused === true || details?.buyPausedByCaution === true || details?.buyPausedByRiskBudget === true;
-    if (buyLegPaused && runtimeRiskState !== "NORMAL") {
+    if (buyLegPaused) {
       return blockedReason;
     }
     if (stormLock && runtimeRiskState === "NORMAL") {
@@ -6997,70 +6997,16 @@ export class BotEngineService implements OnModuleInit {
           tickContext.maxOpenPositions = maxOpenPositions;
           const candidateIsOpen = (managedPositions.get(candidateSymbol)?.netQty ?? 0) > 0;
           const riskBudgetBlocksNewExposure = !selectedRiskBudget.allowedActions.openNewPosition;
-          if ((cautionPauseNewSymbols || riskBudgetBlocksNewExposure) && !candidateIsOpen) {
-            const summary = cautionPauseNewSymbols
-              ? `Skip ${candidateSymbol}: Daily loss caution (new symbols paused)`
-              : `Skip ${candidateSymbol}: Risk budget blocked new exposure`;
-            const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveCautionEntryPauseCooldownMs(risk));
-            const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
-            const cooldownMs = cooldown.cooldownMs;
-            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
-            const next = {
-              ...current,
-              activeOrders: filled.activeOrders,
-              orderHistory: filled.orderHistory,
-              decisions: alreadyLogged
-                ? current.decisions
-                : [
-                    {
-                      id: crypto.randomUUID(),
-                      ts: new Date().toISOString(),
-                      kind: "SKIP",
-                      summary,
-                      details: {
-                        stage: "daily-loss-caution",
-                        candidateSymbol,
-                        riskState: dailyLossGuard.state,
-                        trigger: dailyLossGuard.trigger,
-                        dailyRealizedPnl: dailyLossGuard.dailyRealizedPnl,
-                        maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs,
-                        maxDailyLossPct: dailyLossGuard.maxDailyLossPct,
-                        managedExposurePct: dailyLossGuard.managedExposurePct,
-                        cautionManagedSymbolOnlyMinExposurePct: cautionPauseNewSymbolsMinExposurePct,
-                        cautionPauseNewSymbolsMinExposurePct,
-                        riskBudget: selectedRiskBudget,
-                        lookbackMs: dailyLossGuard.lookbackMs,
-                        windowStart: dailyLossGuard.windowStartIso,
-                        cooldownMs
-                      }
-                    },
-                    ...current.decisions
-                  ].slice(0, 200),
-              lastError: undefined
-            } satisfies BotState;
-            const nextWithCooldown = this.upsertProtectionLock(next, {
-              type: "COOLDOWN",
-              scope: "SYMBOL",
-              symbol: candidateSymbol,
-              reason: cautionPauseNewSymbols
-                ? `Daily loss caution pause (${Math.round(cooldownMs / 1000)}s)`
-                : `Risk budget new-exposure pause (${Math.round(cooldownMs / 1000)}s)`,
-              expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
-              details: {
-                category: cautionPauseNewSymbols ? "DAILY_LOSS_CAUTION_NEW_SYMBOL" : "RISK_BUDGET_NEW_EXPOSURE",
-                cooldownMs,
-                riskState: dailyLossGuard.state,
-                riskBudget: selectedRiskBudget
-              }
-            });
-            this.save(nextWithCooldown);
-            return;
-          }
 
           const rebalanceSellCooldownMs = config?.advanced.liveTradeRebalanceSellCooldownMs ?? 900_000;
           const takeProfitPct = 0.35 + (risk / 100) * 0.9; // 0.35% .. 1.25%
           const stopLossPct = -(0.8 + (risk / 100) * 1.2); // -0.8% .. -2.0%
-          const maxSymbolConcentrationPct = this.deriveMaxSymbolConcentrationPct(risk);
+          const baseMaxSymbolConcentrationPct = this.deriveMaxSymbolConcentrationPct(risk);
+          const portfolioBudgetFull = selectedRiskBudget.reasons.includes("portfolio-exposure-budget-full");
+          const maxSymbolConcentrationPct =
+            portfolioBudgetFull && selectedRiskBudget.lane === "DEFENSIVE"
+              ? Math.min(baseMaxSymbolConcentrationPct, Math.max(8, selectedRiskBudget.maxTotalExposurePct * 2))
+              : baseMaxSymbolConcentrationPct;
           const positionExitBridgeAssets = resolveRouteBridgeAssets(config, homeStable);
 
           for (const position of managedOpenHomeSymbols) {
@@ -7269,6 +7215,66 @@ export class BotEngineService implements OnModuleInit {
                 regime: positionRegime
               }
             });
+            return;
+          }
+
+          if ((cautionPauseNewSymbols || riskBudgetBlocksNewExposure) && !candidateIsOpen) {
+            const summary = cautionPauseNewSymbols
+              ? `Skip ${candidateSymbol}: Daily loss caution (new symbols paused)`
+              : `Skip ${candidateSymbol}: Risk budget blocked new exposure`;
+            const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveCautionEntryPauseCooldownMs(risk));
+            const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
+            const cooldownMs = cooldown.cooldownMs;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        stage: "daily-loss-caution",
+                        candidateSymbol,
+                        riskState: dailyLossGuard.state,
+                        trigger: dailyLossGuard.trigger,
+                        dailyRealizedPnl: dailyLossGuard.dailyRealizedPnl,
+                        maxDailyLossAbs: dailyLossGuard.maxDailyLossAbs,
+                        maxDailyLossPct: dailyLossGuard.maxDailyLossPct,
+                        managedExposurePct: dailyLossGuard.managedExposurePct,
+                        cautionManagedSymbolOnlyMinExposurePct: cautionPauseNewSymbolsMinExposurePct,
+                        cautionPauseNewSymbolsMinExposurePct,
+                        riskBudget: selectedRiskBudget,
+                        lookbackMs: dailyLossGuard.lookbackMs,
+                        windowStart: dailyLossGuard.windowStartIso,
+                        cooldownMs
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            const nextWithCooldown = this.upsertProtectionLock(next, {
+              type: "COOLDOWN",
+              scope: "SYMBOL",
+              symbol: candidateSymbol,
+              reason: cautionPauseNewSymbols
+                ? `Daily loss caution pause (${Math.round(cooldownMs / 1000)}s)`
+                : `Risk budget new-exposure pause (${Math.round(cooldownMs / 1000)}s)`,
+              expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+              details: {
+                category: cautionPauseNewSymbols ? "DAILY_LOSS_CAUTION_NEW_SYMBOL" : "RISK_BUDGET_NEW_EXPOSURE",
+                cooldownMs,
+                riskState: dailyLossGuard.state,
+                riskBudget: selectedRiskBudget
+              }
+            });
+            this.save(nextWithCooldown);
             return;
           }
 

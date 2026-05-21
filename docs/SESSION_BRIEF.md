@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-05-20 15:00 UTC
+Last updated: 2026-05-21 12:56 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -10,11 +10,13 @@ Use this file at the start and end of every batch.
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-031` (Regime engine v2)
 - Linked support ticket: `T-032` (bounded downside-control support)
-- Goal (single sentence): stop `CAUTION`/risk-budget defensive mode from reselecting countable dust residuals where the sell leg is below exchange minimum and the BUY leg is paused.
+- Goal (single sentence): make risk-budget defensive mode reduce oversized managed exposure before returning new-exposure skips.
 - In scope:
   - keep `T-031` active as the strategy-quality lane.
   - route new exposure, grid BUYs, market entries, and fee/edge checks through `deriveRiskBudgetDecision`.
-  - respect `GRID_SELL_NOT_ACTIONABLE` cooldowns for dust home-quote symbols during non-`NORMAL` risk states when the BUY leg is also paused, even if managed-risk bypass exposure is countable.
+  - respect `GRID_SELL_NOT_ACTIONABLE` cooldowns for dust home-quote symbols whenever the BUY leg is paused.
+  - run managed-position exits before new-candidate risk-budget skips.
+  - tighten effective concentration cap when risk-budget is defensive because portfolio exposure is over budget.
   - keep recovered quote protected against immediate BUY re-spend after no-feasible recovery sells.
   - keep profit-giveback `CAUTION` as a fresh-entry freeze while giveback remains above the caution threshold or daily realized PnL is negative.
   - preserve the May 7 managed-position lock bypass so existing inventory remains reachable for exit/unwind handling.
@@ -32,10 +34,11 @@ Use this file at the start and end of every batch.
   - news/event action-driving,
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: the risk-budget and first dust-cooldown patches are deployed, but managed-risk bypass still reselects countable EDEN dust before honoring the paused-buy `GRID_SELL_NOT_ACTIONABLE` cooldown.
+- Hypothesis: the May 20 patch is deployed and EDEN churn is cleared, but new-candidate risk-budget skips are preempting managed exit evaluation while SOL exposure is oversized.
 - Target KPI delta:
   - `riskBudget` continues appearing in relevant skip details for new-exposure, GRID BUY, MARKET entry, and fee/edge decisions.
-  - repeated `Skip EDENUSDC: Grid sell leg not actionable yet` drops materially after the cooldown is respected.
+  - `Skip BTCUSDC/ETHUSDC: Risk budget blocked new exposure` counts drop because managed exits are evaluated first.
+  - oversized SOL exposure produces concentration-rebalance/exit evidence if it remains above the effective risk-budget concentration cap.
   - no immediate BUY re-spend of quote recovered by `no-feasible-liquidity-recovery` sells.
   - no fresh grid BUY reopen cycle while `trigger=PROFIT_GIVEBACK` and `state=CAUTION/HALT`.
   - high risk still respects defensive/reduce-only behavior in `HALT`, confirmed bear, and active loss/giveback `CAUTION`.
@@ -51,7 +54,9 @@ Use this file at the start and end of every batch.
 - API behavior:
   - runtime behavior changes in a bounded way:
     - all new exposure gates use `apps/api/src/modules/bot/risk-budget.service.ts`.
-    - dust home-quote `GRID_SELL_NOT_ACTIONABLE` cooldowns are respected in `CAUTION`/`HALT` when the BUY leg is also paused, before managed-risk bypass can release the symbol.
+    - dust home-quote `GRID_SELL_NOT_ACTIONABLE` cooldowns are respected whenever the BUY leg is paused, before managed-risk bypass can release the symbol.
+    - managed exits run before new-candidate risk-budget skips return.
+    - over-budget defensive mode tightens the effective concentration cap for managed-position exits.
     - high risk no longer lowers fee-edge requirements below estimated round-trip cost.
     - `HALT`, confirmed bear, and active negative `CAUTION` become defensive/reduce-only for new exposure.
     - stabilized `CAUTION` can permit only small recovery-opportunity exposure.
@@ -75,16 +80,16 @@ Use this file at the start and end of every batch.
     - March 30-31 `T-032` caution-unwind / thaw behavior remains preserved.
   - active development lane is `T-031`; `T-032` remains preserved as a support lane in runtime.
 - Runtime evidence in decisions/logs:
-  - latest fresh bundle before this patch runs `git.commit=7b52732`.
-  - latest fresh bundle (`autobot-feedback-20260520-150037.tgz`) shows:
-    - `risk_state=CAUTION`
-    - `trigger=PROFIT_GIVEBACK`
-    - `daily_net_usdt=-11.24`
-    - `max_drawdown_pct=1.47933`
+  - latest fresh bundle before this patch runs `git.commit=5ea35c4`.
+  - latest fresh bundle (`autobot-feedback-20260521-125108.tgz`) shows:
+    - `risk_state=NORMAL`
+    - `daily_net_usdt=-38.50`
+    - `max_drawdown_pct=1.56528`
     - `open_positions=12`
-    - `total_alloc_pct=1.23`
-    - top loop `Skip EDENUSDC: Grid sell leg not actionable yet (34)`.
-  - next fresh bundle after this patch should show lower EDEN dust sell-leg churn while `riskBudget` still blocks fresh exposure in active profit-giveback caution.
+    - `total_alloc_pct=21.32`
+    - largest position `SOLUSDC=20.09%`
+    - top loop `Skip BTCUSDC: Risk budget blocked new exposure (59)`.
+  - next fresh bundle after this patch should show managed exit/concentration-rebalance evidence before repeated new-candidate risk-budget skips.
 - Risk slider impact:
   - risk slider now feeds a deterministic budget contract instead of only widening exposure/turnover.
   - risk-state protections remain hard; high risk cannot bypass `HALT`, confirmed bear defense, active negative `CAUTION`, or fee-proof edge.
@@ -103,7 +108,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `pending local patch` (base runtime `7b52732`)
+- Commit hash: `pending local patch` (base runtime `5ea35c4`)
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -124,43 +129,42 @@ Use this file at the start and end of every batch.
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `EVENING (collection) / EVENING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `31.189`
-  - runtime uptime (hours): `936.962`
-  - run end: `Wed May 20 2026 18:00:05 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `NIGHT_RUN`
+  - bundle interval (hours): `21.841`
+  - runtime uptime (hours): `958.803`
+  - run end: `Thu May 21 2026 15:50:34 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip EDENUSDC: Grid sell leg not actionable yet (34))
+  - active ticket runtime signal: `observed` (Skip BTCUSDC: Risk budget blocked new exposure (59))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=47, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=76.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=54, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=74.0%)
   - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `patch_required`
 - Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
-- Required action: `same-ticket managed-bypass mitigation before next long run`
+- Required action: `same-ticket mitigation required before next long run`
 - Open risks:
-  - PM/BA gate passed, but the same dust sell-leg class moved to EDEN because countable managed exposure bypassed the paused-buy sell-leg cooldown.
+  - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260520-150037.tgz`
-  - auto-updated at: `2026-05-20T15:00:50.966Z`
-  - local patch pending: evaluate `GRID_SELL_NOT_ACTIONABLE` paused-buy cooldowns before managed-risk bypass.
+  - bundle: `autobot-feedback-20260521-125108.tgz`
+  - auto-updated at: `2026-05-21T12:56:37.130Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-031
 Decision: patch_required
-Required action: same-ticket managed-bypass mitigation before next long run
-Latest bundle: autobot-feedback-20260520-150037.tgz
+Required action: same-ticket mitigation required before next long run
+Latest bundle: autobot-feedback-20260521-125108.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: stop EDEN-style managed-bypass dust sell-leg reselection while preserving riskBudget defensive behavior.
-In scope: GRID_SELL_NOT_ACTIONABLE cooldown ordering before managed-risk bypass.
+Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
+In scope: exit-manager / de-risking behavior under adverse conditions.
 Out of scope: quote-routing redesign, candidate-hygiene-only optimization, PnL schema changes, AI lane.
-Validation: targeted bot-engine dust sell-leg tests, full bot-engine tests, API tests, tsc, active-ticket gate.
-After deploy: check EDEN sell-leg-not-actionable count drops and riskBudget still blocks fresh BUYs during profit-giveback CAUTION.
+Validation: docker compose -f docker-compose.ci.yml run --rm ci
+After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```

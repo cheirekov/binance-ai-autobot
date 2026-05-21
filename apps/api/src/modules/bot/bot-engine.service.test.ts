@@ -5549,6 +5549,69 @@ describe("bot-engine symbol lock checks", () => {
     ).resolves.toContain("Skip storm");
   });
 
+  it("keeps normal-mode dust home-quote storm locks blocking when the buy leg is paused", async () => {
+    const helpers = service as unknown as {
+      getCandidateSelectionBlockReason: (params: {
+        symbol: string;
+        state: BotState;
+        risk: number;
+        baseAsset: string;
+        quoteAsset: string;
+        qty: number;
+        lastPrice?: number;
+        homeStable: string;
+        bridgeAssets: string[];
+        minExposureHome: number;
+        activeOrderCount: number;
+      }) => Promise<string | null>;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      riskState: {
+        state: "NORMAL",
+        reason_codes: [],
+        unwind_only: false,
+        resume_conditions: []
+      },
+      protectionLocks: [
+        {
+          id: "storm-paused-buy",
+          type: "COOLDOWN",
+          createdAt: "2026-05-21T05:15:26.912Z",
+          scope: "SYMBOL",
+          symbol: "ZECUSDC",
+          reason: "Skip storm (10/3): Grid sell leg not actionable yet (3600s)",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "GRID_SELL_NOT_ACTIONABLE",
+            cooldownMs: 3_600_000,
+            reason: "Below minQty 0.00100000",
+            buyPaused: true,
+            buyPausedByCaution: true,
+            hasBuyLimit: false
+          }
+        }
+      ]
+    };
+
+    await expect(
+      helpers.getCandidateSelectionBlockReason({
+        symbol: "ZECUSDC",
+        state,
+        risk: 100,
+        baseAsset: "ZEC",
+        quoteAsset: "USDC",
+        qty: 0.0004,
+        lastPrice: 72,
+        homeStable: "USDC",
+        bridgeAssets: ["BTC"],
+        minExposureHome: 5,
+        activeOrderCount: 0
+      })
+    ).resolves.toContain("Grid sell leg not actionable yet");
+  });
+
   it("re-blocks dust home-quote cooldowns after repeated non-actionable sell and buy-pause loops", async () => {
     const helpers = service as unknown as {
       getCandidateSelectionBlockReason: (params: {

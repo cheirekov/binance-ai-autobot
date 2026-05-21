@@ -16,6 +16,43 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-21 13:10 UTC — T-031 twenty-sixth slice: prioritize defensive exits before new-exposure skips
+- Scope:
+  - respond to `autobot-feedback-20260521-125108.tgz`, where the May 20 patch is deployed and EDEN is no longer dominant, but wallet/equity deteriorates while risk budget blocks new exposure.
+- BA requirement mapping:
+  - latest bundle runs `git.commit=5ea35c4`, `risk_state=NORMAL`, `daily_net_usdt=-38.50`, `max_drawdown_pct=1.56528`, `open_positions=12`, `total_alloc_pct=21.32`, and largest position `SOLUSDC=20.09%`.
+  - top loop is `Skip BTCUSDC: Risk budget blocked new exposure (59)` while `riskBudget` is defensive because portfolio exposure is over budget.
+  - repeated small SOL sell ladders are not enough when the portfolio is far above the deterministic risk-budget exposure limit.
+- PM milestone mapping:
+  - keep `T-031` active and patch strategy adaptation, not quote routing or AI scope.
+  - preserve `T-032` downside support behavior and the deterministic risk-budget defense.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - managed-position exits now run before a new-candidate risk-budget skip can return.
+    - when `riskBudget` is defensive due `portfolio-exposure-budget-full`, effective single-symbol concentration cap tightens to the risk-budget envelope so oversized positions can trigger concentration-rebalance exits.
+    - `GRID_SELL_NOT_ACTIONABLE` storm locks remain blocking whenever the BUY leg is paused, including `NORMAL` risk state with risk-budget defensive BUY pause.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added ZEC-like regression coverage for `NORMAL` dust storm locks with paused BUY leg.
+  - `docs/TRIAGE_NOTE_2026-05-21_T031_RISK_BUDGET_DEFENSIVE_EXIT_PREEMPTED.md`:
+    - recorded evidence and same-ticket mitigation decision.
+- Risk slider impact:
+  - no new exposure increase.
+  - high risk still respects the exposure budget; over-budget portfolios become reduce-first instead of skip-first.
+- Validation evidence:
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t "dust sell-leg|grid-sell-not-actionable|managed daily-loss candidates|concentration trim" --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run --cache=false)`
+  - `./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.json --noEmit`
+  - `git diff --check`
+  - `./scripts/validate-active-ticket.sh`
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/pmba-gate.sh end`
+- Runtime test request:
+  - deploy without resetting state and collect the next normal bundle.
+  - expected evidence: BTC/ETH risk-budget skip counts should drop, managed exit/concentration-rebalance evidence should appear if SOL remains oversized, and fresh BUY exposure should remain blocked while over budget.
+- Follow-up:
+  - if oversized exposure remains without sell evidence, next slice should instrument why SOL did not pass market-sell validation or cooldown checks.
+
 ## 2026-05-20 15:20 UTC — T-031 twenty-fifth slice: close managed-bypass dust cooldown gap
 - Scope:
   - respond to `autobot-feedback-20260520-150037.tgz`, where PM/BA gate passes but the same dust sell-leg class moved from SAGA to EDEN.
