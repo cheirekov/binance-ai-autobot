@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-05-21 12:56 UTC
+Last updated: 2026-05-22 11:55 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -108,7 +108,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `pending local patch` (base runtime `5ea35c4`)
+- Commit hash: `642dcfd`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -131,36 +131,36 @@ Use this file at the start and end of every batch.
 - Run context:
   - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `21.841`
-  - runtime uptime (hours): `958.803`
-  - run end: `Thu May 21 2026 15:50:34 GMT+0300 (Eastern European Summer Time)`
+  - bundle interval (hours): `22.947`
+  - runtime uptime (hours): `981.75`
+  - run end: `Fri May 22 2026 14:47:25 GMT+0300 (Eastern European Summer Time)`
   - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip BTCUSDC: Risk budget blocked new exposure (59))
+  - active ticket runtime signal: `observed` (Skip BTCUSDC: Risk budget blocked new exposure (14))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=54, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=74.0%)
-  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=67, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=67.0%)
+  - sizing reject pressure: `low` (sizingRejectSkips=9, decisions=200, ratio=4.5%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `patch_required`
+- Decision: `continue`
 - Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
-- Required action: `same-ticket mitigation required before next long run`
+- Required action: `continue active ticket`
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260521-125108.tgz`
-  - auto-updated at: `2026-05-21T12:56:37.130Z`
+  - bundle: `autobot-feedback-20260522-114754.tgz`
+  - auto-updated at: `2026-05-22T11:55:46.136Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-031
-Decision: patch_required
-Required action: same-ticket mitigation required before next long run
-Latest bundle: autobot-feedback-20260521-125108.tgz
+Decision: continue
+Required action: continue active ticket
+Latest bundle: autobot-feedback-20260522-114754.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
 In scope: exit-manager / de-risking behavior under adverse conditions.

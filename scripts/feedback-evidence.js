@@ -30,6 +30,93 @@ const parseJson = (raw) => {
   }
 };
 
+const exchangeBackoffPattern =
+  /Transient exchange backoff active|Live order sync failed|openOrders|502 Bad Gateway|\b(?:HTTP|status|code|response)\s*5\d\d\b|\b5\d\d\s+(?:Bad Gateway|Service Unavailable|Gateway Timeout|Internal Server Error)\b/i;
+
+const hasExchangeBackoffEvidence = (value) => {
+  const text = Array.isArray(value)
+    ? value.map((entry) => String(entry ?? "")).join(" ")
+    : String(value ?? "");
+  return exchangeBackoffPattern.test(text);
+};
+
+const topReasonOf = (entry) => entry?.summary?.activity?.skips?.top_reasons?.[0] ?? null;
+
+const decisionCountOf = (entry) => {
+  const stateCount = Number(entry?.stateMeta?.decisionCount ?? Number.NaN);
+  if (Number.isFinite(stateCount) && stateCount > 0) return stateCount;
+
+  const summaryCount = Number(entry?.summary?.activity?.decisions?.count ?? Number.NaN);
+  if (Number.isFinite(summaryCount) && summaryCount > 0) return summaryCount;
+
+  return Number.NaN;
+};
+
+const formatPct = (value) => Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : "n/a";
+
+const classifyRepeatedDominantLoop = (latestEntry, previousEntry, options = {}) => {
+  const minCount = Number(options.minCount ?? 8);
+  const materialCount = Number(options.materialCount ?? 20);
+  const materialShare = Number(options.materialShare ?? 0.08);
+  const improvementFloor = Number(options.improvementFloor ?? 0.25);
+
+  if (!latestEntry || !previousEntry) {
+    return { failed: false, repeated: false, details: "not enough fresh bundles" };
+  }
+
+  const latestTop = topReasonOf(latestEntry);
+  const previousTop = topReasonOf(previousEntry);
+  const latestReason = String(latestTop?.reason ?? "");
+  const previousReason = String(previousTop?.reason ?? "");
+  const latestCount = Number(latestTop?.count ?? 0);
+  const previousCount = Number(previousTop?.count ?? 0);
+
+  if (!latestReason || latestReason !== previousReason) {
+    return {
+      failed: false,
+      repeated: false,
+      details: `${previousReason || "n/a"} -> ${latestReason || "n/a"}`,
+      latestReason,
+      previousReason,
+      latestCount,
+      previousCount
+    };
+  }
+
+  const latestDecisions = decisionCountOf(latestEntry);
+  const latestShare = Number.isFinite(latestDecisions) && latestDecisions > 0
+    ? latestCount / latestDecisions
+    : Number.NaN;
+  const materialPressure =
+    latestCount >= materialCount ||
+    (Number.isFinite(latestShare) ? latestShare >= materialShare : latestCount >= minCount);
+  const improvementRatio = previousCount > 0 ? (previousCount - latestCount) / previousCount : 0;
+  const materiallyImproving = improvementRatio >= improvementFloor;
+  const failed =
+    latestCount >= minCount &&
+    previousCount >= minCount &&
+    materialPressure &&
+    !materiallyImproving;
+  const disposition = failed
+    ? "material persistent loop"
+    : materiallyImproving
+      ? `improving ${formatPct(improvementRatio)}`
+      : "below material pressure";
+
+  return {
+    failed,
+    repeated: true,
+    details: `"${latestReason}" (${previousCount} -> ${latestCount}; latestShare=${formatPct(latestShare)}; ${disposition})`,
+    latestReason,
+    previousReason,
+    latestCount,
+    previousCount,
+    latestShare,
+    materialPressure,
+    improvementRatio
+  };
+};
+
 const readBundle = (bundlePath) => {
   const summary = parseJson(
     readFromBundle(bundlePath, [
@@ -144,7 +231,9 @@ const collectEvidence = (bundlePaths) => {
 };
 
 module.exports = {
+  classifyRepeatedDominantLoop,
   collectEvidence,
+  hasExchangeBackoffEvidence,
   listBundles
 };
 

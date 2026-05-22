@@ -106,7 +106,7 @@ if [[ "$PHASE" == "end" ]]; then
 const path = require("node:path");
 
 const [latestBundle, previousBundle, activeTicket] = process.argv.slice(2);
-const { collectEvidence } = require(path.join(process.cwd(), "scripts", "feedback-evidence.js"));
+const { classifyRepeatedDominantLoop, collectEvidence } = require(path.join(process.cwd(), "scripts", "feedback-evidence.js"));
 const evidence = collectEvidence([latestBundle, previousBundle]);
 
 const latest = evidence.latest;
@@ -125,22 +125,11 @@ if (!latest.freshness?.hasFreshRuntimeEvidence) {
 const freshWindow = Array.isArray(evidence.freshWindow) ? evidence.freshWindow : [];
 if (freshWindow.length < 2) process.exit(0);
 
-const latestTop = freshWindow[0]?.summary?.activity?.skips?.top_reasons?.[0];
-const previousTop = freshWindow[1]?.summary?.activity?.skips?.top_reasons?.[0];
-const latestReason = String(latestTop?.reason ?? "");
-const previousReason = String(previousTop?.reason ?? "");
-const latestCount = Number(latestTop?.count ?? 0);
-const previousCount = Number(previousTop?.count ?? 0);
+const dominantLoopRepeated = classifyRepeatedDominantLoop(freshWindow[0], freshWindow[1]);
 
-const dominantLoopRepeated =
-  latestReason.length > 0 &&
-  latestReason === previousReason &&
-  latestCount >= 8 &&
-  previousCount >= 8;
-
-if (dominantLoopRepeated) {
+if (dominantLoopRepeated.failed) {
   console.error(
-    `FAIL: Dominant loop reason repeated in last 2 fresh bundles for active ticket ${activeTicket}: "${latestReason}" (${previousCount} -> ${latestCount}).`
+    `FAIL: Dominant loop reason repeated in last 2 fresh bundles for active ticket ${activeTicket}: ${dominantLoopRepeated.details}.`
   );
   console.error("Action required: add triage note (docs/TRIAGE_NOTE_TEMPLATE.md) and either patch mitigation or PM/BA pivot decision.");
   process.exit(1);

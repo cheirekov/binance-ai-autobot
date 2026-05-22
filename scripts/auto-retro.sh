@@ -19,7 +19,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const [sessionFile, outputFile, bundleArg] = process.argv.slice(2);
-const { collectEvidence, listBundles } = require(path.join(process.cwd(), "scripts", "feedback-evidence.js"));
+const {
+  classifyRepeatedDominantLoop,
+  collectEvidence,
+  hasExchangeBackoffEvidence,
+  listBundles
+} = require(path.join(process.cwd(), "scripts", "feedback-evidence.js"));
 
 const sessionRaw = fs.readFileSync(sessionFile, "utf8");
 const ticketMatch = sessionRaw.match(/^- Active ticket:\s*`([^`]+)`/m);
@@ -65,22 +70,7 @@ const drawdownOf = (entry) => Number(entry?.summary?.pnl?.max_drawdown_pct ?? Nu
 
 const repeatedDominantLoop = (() => {
   const recentFresh = freshWindow.slice(0, 2);
-  if (recentFresh.length < 2) return { failed: false, details: "not enough fresh bundles" };
-  const a = topReasonOf(recentFresh[0]);
-  const b = topReasonOf(recentFresh[1]);
-  const aReason = String(a?.reason ?? "");
-  const bReason = String(b?.reason ?? "");
-  const aCount = Number(a?.count ?? 0);
-  const bCount = Number(b?.count ?? 0);
-  const failed = Boolean(aReason && aReason === bReason && aCount >= 8 && bCount >= 8);
-  return {
-    failed,
-    details: failed
-      ? `"${aReason}" (${bCount} -> ${aCount})`
-      : recentFresh[1]
-        ? `${bReason || "n/a"} -> ${aReason || "n/a"}`
-        : "not enough fresh bundles"
-  };
+  return classifyRepeatedDominantLoop(recentFresh[0], recentFresh[1]);
 })();
 
 const threeNegativeDailyNet = (() => {
@@ -118,9 +108,7 @@ const latestTopReasonsText = (latest.summary?.activity?.skips?.top_reasons ?? []
   .map((entry) => String(entry?.reason ?? ""))
   .join(" | ");
 const latestHealthText = JSON.stringify(latest.summary?.health ?? {});
-const exchangeBackoffObserved = /Transient exchange backoff active|Live order sync failed|openOrders|502 Bad Gateway|\b5\d\d\b/i.test(
-  `${latestTopReasonsText} ${latestHealthText}`
-);
+const exchangeBackoffObserved = hasExchangeBackoffEvidence(`${latestTopReasonsText} ${latestHealthText}`);
 const exchangeBackoffRule = {
   observed: exchangeBackoffObserved,
   details: exchangeBackoffObserved
@@ -220,8 +208,7 @@ const lines = [
   ...summaries.map((entry, index) => {
     const top = topReasonOf(entry);
     return `- ${index + 1}. \`${entry.bundle}\` — class=${String(entry.freshness?.classification ?? "unknown")}, dailyNet=${Number.isFinite(dailyNetOf(entry)) ? dailyNetOf(entry).toFixed(2) : "n/a"}, risk=${String(entry.summary?.risk_state?.state ?? "unknown")}, top=${String(top?.reason ?? "n/a")} (${Number(top?.count ?? 0)})`;
-  }),
-  ""
+  })
 ];
 
 fs.writeFileSync(outputFile, `${lines.join("\n")}\n`);

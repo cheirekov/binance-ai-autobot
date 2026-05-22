@@ -61,7 +61,7 @@ const bundleSummary = readJson(summaryPath) ?? {};
 const runContext = readJson(runContextPath) ?? {};
 const sessionRaw = fs.readFileSync(sessionFile, "utf8");
 const retroRaw = fs.existsSync(retroFile) ? fs.readFileSync(retroFile, "utf8") : "";
-const { collectEvidence } = require(path.join(process.cwd(), "scripts", "feedback-evidence.js"));
+const { collectEvidence, hasExchangeBackoffEvidence } = require(path.join(process.cwd(), "scripts", "feedback-evidence.js"));
 const safeExec = (cmd) => {
   try {
     return execSync(cmd, { stdio: ["ignore", "pipe", "ignore"] }).toString("utf8").trim();
@@ -169,7 +169,7 @@ const fundingRegression = Array.isArray(bundleSummary?.activity?.skips?.top_reas
   ? bundleSummary.activity.skips.top_reasons.some((entry) => /Insufficient spendable/i.test(String(entry?.reason ?? "")))
   : false;
 const exchangeBackoffRegression = Array.isArray(bundleSummary?.activity?.skips?.top_reasons)
-  ? bundleSummary.activity.skips.top_reasons.some((entry) => /Transient exchange backoff active|Live order sync failed|openOrders|502 Bad Gateway|\b5\d\d\b/i.test(String(entry?.reason ?? "")))
+  ? bundleSummary.activity.skips.top_reasons.some((entry) => hasExchangeBackoffEvidence(entry?.reason))
   : false;
 const mapNextTicket = (decision) => {
   if (decision === "pivot_required") return "PM/BA-TRIAGE";

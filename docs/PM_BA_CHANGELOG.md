@@ -16,6 +16,37 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-22 11:55 UTC — T-031 process slice: suppress improving repeated-loop false positives
+- Scope:
+  - respond to `autobot-feedback-20260522-114754.tgz`, where the PM/BA gate demanded a patch because `Skip BTCUSDC: Risk budget blocked new exposure` repeated, despite the count dropping `59 -> 14`.
+- BA requirement mapping:
+  - latest bundle has fresh runtime evidence, `daily_net_usdt=+92.77`, `max_drawdown_pct=0.73`, `total_alloc_pct=3.19`, and active order/trade lifecycle evidence.
+  - risk-budget skips are now low pressure instead of a persistent loop; the current evidence supports continuing `T-031` rather than weakening trading safety.
+- PM milestone mapping:
+  - keep `T-031` active with linked `T-032`.
+  - treat this as process-gate correction, not a trading-strategy patch.
+- Technical changes:
+  - `scripts/feedback-evidence.js` now centralizes repeated dominant-loop classification and external exchange/backoff detection.
+  - `scripts/auto-retro.sh` and `scripts/pmba-gate.sh` now fail repeated dominant loops only when the latest loop remains material and is not materially improving.
+  - `scripts/update-session-brief.sh` now uses contextual exchange/backoff detection so fee text like `0.559%` is not misclassified as a `5xx` exchange incident.
+  - `docs/TRIAGE_NOTE_2026-05-22_T031_RISK_BUDGET_LOOP_GATE_FALSE_POSITIVE.md` records the false-positive and PM/BA decision.
+- Risk slider impact:
+  - none; no runtime trading policy, exposure budget, fee floor, or order logic changed.
+- Validation evidence:
+  - `bash -n scripts/auto-retro.sh scripts/pmba-gate.sh scripts/update-session-brief.sh`
+  - `node --check scripts/feedback-evidence.js`
+  - `./scripts/auto-retro.sh autobot-feedback-20260522-114754.tgz`
+  - `./scripts/update-session-brief.sh autobot-feedback-20260522-114754.tgz`
+  - `./scripts/validate-active-ticket.sh`
+  - `git diff --check`
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/pmba-gate.sh end`
+- Runtime test request:
+  - continue collecting the next normal bundle without resetting state.
+  - expected evidence: no PM/BA failure if a repeated top skip is materially lower and KPI trend is improving.
+- Follow-up:
+  - if `Risk budget blocked new exposure` returns with material pressure and no improvement, patch the trading logic rather than the gate.
+
 ## 2026-05-21 13:10 UTC — T-031 twenty-sixth slice: prioritize defensive exits before new-exposure skips
 - Scope:
   - respond to `autobot-feedback-20260521-125108.tgz`, where the May 20 patch is deployed and EDEN is no longer dominant, but wallet/equity deteriorates while risk budget blocks new exposure.

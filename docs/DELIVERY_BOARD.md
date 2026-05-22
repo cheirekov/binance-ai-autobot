@@ -42,8 +42,8 @@ Hard rule: until Gate A passes, AI remains shadow-only for execution changes.
   - session brief update (`docs/SESSION_BRIEF.md`)
   - feedback bundle (`scripts/collect-feedback.sh`)
   - runtime summary artifact in telemetry bundle (`data/telemetry/last_run_summary.json`)
-- End-of-batch gate now includes loop persistence check across the latest 2 bundles (`./scripts/pmba-gate.sh end`) to prevent repeating closed-ticket failure patterns without triage.
-- Auto-retro must not demand a code patch from trailing historical daily loss alone when the latest fresh bundle shows material recovery and no repeated dominant loop; external exchange/order-sync backoff is an operational WARN requiring a clean follow-up bundle.
+- End-of-batch gate now includes material loop persistence checks across the latest 2 bundles (`./scripts/pmba-gate.sh end`) to prevent repeating closed-ticket failure patterns without triage.
+- Auto-retro must not demand a code patch from trailing historical daily loss alone, or from a repeated top skip that is materially improving, when the latest fresh bundle shows KPI recovery; external exchange/order-sync backoff is an operational WARN only with contextual exchange/order-sync evidence.
 - Runtime collection/ingestion procedure is fixed and centralized in `docs/RUN_LOGGING_P0.md` (remote collect + local ingest).
 
 AI message contract reference:
