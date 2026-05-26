@@ -1,6 +1,6 @@
 # Strategy Coverage (Source of Truth)
 
-Last updated: 2026-04-30
+Last updated: 2026-05-26
 Owner: PM/BA + Trader + Architect
 
 Purpose: prevent strategy drift/context loss by keeping one explicit list of:
@@ -96,6 +96,7 @@ These are execution behaviors currently active in runtime:
     - current April 28 slice: in `NORMAL` mode with no active orders, dust-sized home-quote candidates can progress past stale `GRID_SELL_NOT_ACTIONABLE` storm locks, while recovery min-order dust is parked for hours instead of minutes
     - current April 30 slice: home-quote dust is no longer treated as actionable inventory, feasible-live routing skips buy-paused dust symbols, and dust/zero SELL legs no longer block otherwise reachable grid BUY legs
     - current May 4 slice: restored trading now feeds fee-aware closed-PnL into daily-loss/profit-giveback protection, and severe near-halt caution pauses fresh symbols instead of reusing daily loss budget just because exposure is near-flat
+    - current May 26 slice: `riskBudget.maxNewExposureHome` is now converted into quote units and applied to MARKET/grid BUY sizing, while grid SELL and managed exit sizing remain reachable for reduce-only behavior
   - objective: improve candidate quality and rotation under real market regimes without reopening `T-032` or `T-034`
 
 ## Support / next strategy core

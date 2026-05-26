@@ -16,6 +16,46 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-26 07:25 UTC — T-031 twenty-seventh slice: enforce risk-budget BUY sizing caps
+- Scope:
+  - respond to `autobot-feedback-20260525-090223.tgz`, where risk-budget skips remain the top class after the prior reduce-first patch.
+- BA requirement mapping:
+  - latest bundle runs `git.commit=642dcfd`, `risk_state=NORMAL`, `daily_net_usdt=-43.20`, `max_drawdown_pct=1.83`, `open_positions=13`, `total_alloc_pct=2.63`.
+  - observed `riskBudget.maxNewExposureHome≈79.6` while grid BUY orders were placed around `1038-1050` USDC notional.
+  - the deterministic risk-budget contract was being used as an allow/deny gate but not as a BUY sizing cap.
+- PM milestone mapping:
+  - keep `T-031` active and patch strategy-budget enforcement.
+  - preserve linked `T-032` downside controls and do not weaken sell/unwind reachability.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - converts `riskBudget.maxNewExposureHome` into candidate quote units.
+    - clamps MARKET entry and grid BUY sizing to that cap.
+    - emits explicit risk-budget sizing skips when exchange minimums exceed the cap.
+    - records risk-budget BUY cap details on placed BUY orders.
+    - leaves grid SELL/managed exit sizing uncapped by new-exposure budget.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - adds focused coverage for BUY notional cap tolerance and over-cap detection.
+  - `docs/TRIAGE_NOTE_2026-05-26_T031_RISK_BUDGET_BUY_SIZING_CAP_BYPASS.md`:
+    - records evidence and same-ticket mitigation decision.
+- Risk slider impact:
+  - risk-budget max new exposure now affects BUY order size, not only whether a BUY is allowed.
+  - high risk still cannot place BUY orders above the deterministic risk-budget envelope.
+- Validation evidence:
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/risk-budget.service.test.ts --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t "risk-budget BUY notional caps" --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/tsc -p tsconfig.json --noEmit)`
+  - `git diff --check`
+  - `./scripts/validate-active-ticket.sh` (ran Docker CI fallback)
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/pmba-gate.sh end`
+- Runtime test request:
+  - deploy without resetting state and collect the next normal bundle.
+  - expected evidence: grid BUY notional is at or below `riskBudgetBuyNotionalCapQuote` when that cap is present; if exchange minimums are higher than budget, the bot logs a risk-budget sizing skip instead of placing an oversized BUY.
+- Follow-up:
+  - if risk-budget skips remain dominant after capped BUY sizing, inspect unsupported-symbol churn and fee/edge candidate quality before changing the exposure envelope.
+
 ## 2026-05-22 11:55 UTC — T-031 process slice: suppress improving repeated-loop false positives
 - Scope:
   - respond to `autobot-feedback-20260522-114754.tgz`, where the PM/BA gate demanded a patch because `Skip BTCUSDC: Risk budget blocked new exposure` repeated, despite the count dropping `59 -> 14`.

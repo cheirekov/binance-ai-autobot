@@ -1075,6 +1075,19 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(helpers.shouldAttemptBalanceDeltaSellFallback(100, 0)).toBe(false);
   });
 
+  it("enforces risk-budget BUY notional caps with a small tolerance", () => {
+    const helpers = service as unknown as {
+      deriveBuyNotionalCapTolerance: (capQuote: number | null) => number;
+      isBuyNotionalAboveCap: (params: { notionalQuote: number; capQuote: number | null }) => boolean;
+    };
+
+    expect(helpers.deriveBuyNotionalCapTolerance(80)).toBeCloseTo(0.08, 8);
+    expect(helpers.isBuyNotionalAboveCap({ notionalQuote: 80.05, capQuote: 80 })).toBe(false);
+    expect(helpers.isBuyNotionalAboveCap({ notionalQuote: 80.09, capQuote: 80 })).toBe(true);
+    expect(helpers.isBuyNotionalAboveCap({ notionalQuote: 1_050, capQuote: 79.6 })).toBe(true);
+    expect(helpers.isBuyNotionalAboveCap({ notionalQuote: 1_050, capQuote: null })).toBe(false);
+  });
+
   it("treats small non-home quote inventory as non-actionable for grid management", async () => {
     const configuredService = new BotEngineService(
       { load: () => null } as unknown as ConfigService,

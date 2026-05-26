@@ -1,6 +1,6 @@
 # DELIVERY BOARD (PM v2) — Binance AI Autobot
 
-Last updated: 2026-05-13
+Last updated: 2026-05-26
 Owner: PM/BA + Codex + User
 
 This board is structured to reduce scope drift and context-window churn.
@@ -106,7 +106,7 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-031 | IN_PROGRESS | Regime engine v2 | Current slice preserves deterministic risk-budget defense and makes over-budget defensive mode reduce managed exposure before returning new-exposure skips. |
+| T-031 | IN_PROGRESS | Regime engine v2 | Current slice preserves deterministic risk-budget defense and makes BUY sizing obey `riskBudget.maxNewExposureHome` instead of only using risk budget as an allow/deny gate. |
 | T-032 | TODO | Exit manager v2 | Linked support only while `T-031` is active: preserve downside-control slices and the May 4 fee-aware/severe-caution guard; reopen as active only if downside-control becomes the dominant blocker. |
 | T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
 

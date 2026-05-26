@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-05-22 11:55 UTC
+Last updated: 2026-05-26 07:25 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -10,10 +10,12 @@ Use this file at the start and end of every batch.
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-031` (Regime engine v2)
 - Linked support ticket: `T-032` (bounded downside-control support)
-- Goal (single sentence): make risk-budget defensive mode reduce oversized managed exposure before returning new-exposure skips.
+- Goal (single sentence): make BUY sizing obey `riskBudget.maxNewExposureHome` so allowed entries cannot immediately overshoot the deterministic budget.
 - In scope:
   - keep `T-031` active as the strategy-quality lane.
   - route new exposure, grid BUYs, market entries, and fee/edge checks through `deriveRiskBudgetDecision`.
+  - clamp MARKET entry and grid BUY sizing to `riskBudget.maxNewExposureHome` after converting the cap into candidate quote units.
+  - leave grid SELL and managed exit sizing uncapped by new-exposure budget so reduce-only paths remain reachable.
   - respect `GRID_SELL_NOT_ACTIONABLE` cooldowns for dust home-quote symbols whenever the BUY leg is paused.
   - run managed-position exits before new-candidate risk-budget skips.
   - tighten effective concentration cap when risk-budget is defensive because portfolio exposure is over budget.
@@ -34,9 +36,11 @@ Use this file at the start and end of every batch.
   - news/event action-driving,
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: the May 20 patch is deployed and EDEN churn is cleared, but new-candidate risk-budget skips are preempting managed exit evaluation while SOL exposure is oversized.
+- Hypothesis: the May 21 reduce-first patch is deployed and managed exits are visible, but grid BUY sizing still uses the live notional cap after risk budget allows a BUY, producing ~1,050 USDC orders while `riskBudget.maxNewExposureHome` is ~79.6 USDC.
 - Target KPI delta:
   - `riskBudget` continues appearing in relevant skip details for new-exposure, GRID BUY, MARKET entry, and fee/edge decisions.
+  - placed MARKET/grid BUY notional stays at or below `riskBudgetBuyNotionalCapQuote` whenever the cap is present.
+  - exchange-minimum BUYs above the risk-budget cap become explicit risk-budget sizing skips instead of oversized orders.
   - `Skip BTCUSDC/ETHUSDC: Risk budget blocked new exposure` counts drop because managed exits are evaluated first.
   - oversized SOL exposure produces concentration-rebalance/exit evidence if it remains above the effective risk-budget concentration cap.
   - no immediate BUY re-spend of quote recovered by `no-feasible-liquidity-recovery` sells.
@@ -47,13 +51,16 @@ Use this file at the start and end of every batch.
   - lower churn/fee pressure after liquidity recovery.
   - preserve fee-aware daily-loss/profit-giveback and April 30 BUY progression behavior.
 - Stop/rollback condition:
-  - if the patch blocks actionable managed exits/unwinds, weakens hard risk locks, allows recovery-sell → immediate BUY churn, or makes risk 100 bypass fee-proof edge, reopen PM/BA triage immediately.
+  - if the patch blocks actionable managed exits/unwinds, caps SELL sizing with new-exposure budget, weakens hard risk locks, allows recovery-sell → immediate BUY churn, or makes risk 100 bypass fee-proof edge, reopen PM/BA triage immediately.
 
 ## 2) Definition of Done (must be concrete)
 
 - API behavior:
   - runtime behavior changes in a bounded way:
     - all new exposure gates use `apps/api/src/modules/bot/risk-budget.service.ts`.
+    - MARKET entry and grid BUY quantities are bounded by `riskBudget.maxNewExposureHome` after quote conversion.
+    - BUY order details include the applied risk-budget cap for runtime verification.
+    - exchange minimums above the risk-budget BUY cap produce a risk-budget sizing skip.
     - dust home-quote `GRID_SELL_NOT_ACTIONABLE` cooldowns are respected whenever the BUY leg is paused, before managed-risk bypass can release the symbol.
     - managed exits run before new-candidate risk-budget skips return.
     - over-budget defensive mode tightens the effective concentration cap for managed-position exits.
@@ -80,21 +87,22 @@ Use this file at the start and end of every batch.
     - March 30-31 `T-032` caution-unwind / thaw behavior remains preserved.
   - active development lane is `T-031`; `T-032` remains preserved as a support lane in runtime.
 - Runtime evidence in decisions/logs:
-  - latest fresh bundle before this patch runs `git.commit=5ea35c4`.
-  - latest fresh bundle (`autobot-feedback-20260521-125108.tgz`) shows:
+  - latest fresh bundle before this patch runs `git.commit=642dcfd`.
+  - latest fresh bundle (`autobot-feedback-20260525-090223.tgz`) shows:
     - `risk_state=NORMAL`
-    - `daily_net_usdt=-38.50`
-    - `max_drawdown_pct=1.56528`
-    - `open_positions=12`
-    - `total_alloc_pct=21.32`
-    - largest position `SOLUSDC=20.09%`
-    - top loop `Skip BTCUSDC: Risk budget blocked new exposure (59)`.
-  - next fresh bundle after this patch should show managed exit/concentration-rebalance evidence before repeated new-candidate risk-budget skips.
+    - `daily_net_usdt=-43.20`
+    - `max_drawdown_pct=1.82935`
+    - `open_positions=13`
+    - `total_alloc_pct=2.63`
+    - top loop `Skip ETHUSDC: Risk budget blocked new exposure (30)`.
+    - observed grid BUY notional around `1038-1050` USDC while `riskBudget.maxNewExposureHome` was around `79.6` USDC.
+  - next fresh bundle after this patch should show BUY notional at or below `riskBudgetBuyNotionalCapQuote`, or explicit risk-budget sizing skips when exchange minimums exceed the cap.
 - Risk slider impact:
   - risk slider now feeds a deterministic budget contract instead of only widening exposure/turnover.
   - risk-state protections remain hard; high risk cannot bypass `HALT`, confirmed bear defense, active negative `CAUTION`, or fee-proof edge.
 - Validation commands:
   - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/risk-budget.service.test.ts --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t "risk-budget BUY notional caps" --cache=false)`
   - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t "dust sell-leg|grid-sell-not-actionable|managed daily-loss candidates" --cache=false)`
   - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts --cache=false)`
   - `(cd apps/api && ./node_modules/.bin/vitest run --cache=false)`
@@ -108,7 +116,7 @@ Use this file at the start and end of every batch.
 
 ## 3) Deployment handoff
 
-- Commit hash: `642dcfd`
+- Commit hash: `pending`
 - Deploy target: remote Binance Spot testnet runtime
 - Required config changes: none
 - Operator checklist:
@@ -131,28 +139,28 @@ Use this file at the start and end of every batch.
 - Run context:
   - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `22.947`
-  - runtime uptime (hours): `981.75`
-  - run end: `Fri May 22 2026 14:47:25 GMT+0300 (Eastern European Summer Time)`
+  - bundle interval (hours): `69.242`
+  - runtime uptime (hours): `1050.993`
+  - run end: `Mon May 25 2026 12:01:57 GMT+0300 (Eastern European Summer Time)`
   - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip BTCUSDC: Risk budget blocked new exposure (14))
+  - active ticket runtime signal: `observed` (Skip ETHUSDC: Risk budget blocked new exposure (30))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=67, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=67.0%)
-  - sizing reject pressure: `low` (sizingRejectSkips=9, decisions=200, ratio=4.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=89, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=55.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=10, decisions=200, ratio=5.0%)
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `continue`
 - Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
 - Required action: `continue active ticket`
 - Open risks:
-  - none critical from automated checks.
+  - runtime validation pending after deploy; local CI/gates passed for the sizing-cap patch.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260522-114754.tgz`
-  - auto-updated at: `2026-05-22T11:55:46.136Z`
+  - bundle: `autobot-feedback-20260525-090223.tgz`
+  - auto-updated at: `2026-05-25T09:02:42.203Z`
 
 ## 5) Copy/paste prompt for next session
 
@@ -160,10 +168,10 @@ Use this file at the start and end of every batch.
 Ticket: T-031
 Decision: continue
 Required action: continue active ticket
-Latest bundle: autobot-feedback-20260522-114754.tgz
+Latest bundle: autobot-feedback-20260525-090223.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: reduce profit giveback and improve downside control while preserving T-034 funding stability.
-In scope: exit-manager / de-risking behavior under adverse conditions.
+Goal: enforce risk-budget BUY sizing caps while preserving T-034 funding stability.
+In scope: MARKET/grid BUY sizing cap from `riskBudget.maxNewExposureHome`; preserve SELL/unwind reachability.
 Out of scope: quote-routing redesign, candidate-hygiene-only optimization, PnL schema changes, AI lane.
 Validation: docker compose -f docker-compose.ci.yml run --rm ci
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.

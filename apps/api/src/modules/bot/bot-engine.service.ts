@@ -1169,6 +1169,17 @@ export class BotEngineService implements OnModuleInit {
     return false;
   }
 
+  private deriveBuyNotionalCapTolerance(capQuote: number | null): number {
+    if (typeof capQuote !== "number" || !Number.isFinite(capQuote) || capQuote <= 0) return 0;
+    return Math.max(0.01, capQuote * 0.001);
+  }
+
+  private isBuyNotionalAboveCap(params: { notionalQuote: number; capQuote: number | null }): boolean {
+    if (typeof params.capQuote !== "number" || !Number.isFinite(params.capQuote) || params.capQuote <= 0) return false;
+    if (!Number.isFinite(params.notionalQuote) || params.notionalQuote <= 0) return false;
+    return params.notionalQuote > params.capQuote + this.deriveBuyNotionalCapTolerance(params.capQuote);
+  }
+
   private deriveGlobalLockUnwindCooldownMs(risk: number): number {
     const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(risk) ? risk : 50));
     const t = boundedRisk / 100;
@@ -7789,6 +7800,18 @@ export class BotEngineService implements OnModuleInit {
             baseMinNetEdgePct: capitalProfile.minNetEdgePct,
             estimatedRoundTripCostPct: roundTripCostPct
           });
+          const riskBudgetNewExposureCapQuote = await this.normalizeHomeAmountToQuoteUnits({
+            amountHome: selectedRiskBudget.maxNewExposureHome,
+            quoteAsset: candidateQuoteAsset,
+            homeStable,
+            bridgeAssets: executionBridgeAssets
+          });
+          const riskBudgetBuyNotionalCapQuote =
+            typeof riskBudgetNewExposureCapQuote === "number" &&
+            Number.isFinite(riskBudgetNewExposureCapQuote) &&
+            riskBudgetNewExposureCapQuote > 0
+              ? riskBudgetNewExposureCapQuote
+              : null;
           const regimeAdjustedMinNetEdgePct = Math.max(
             this.getRegimeAdjustedMinNetEdgePct({
               risk,
@@ -7985,6 +8008,94 @@ export class BotEngineService implements OnModuleInit {
                 qty = affordableQty;
                 bufferedCost = affordableBufferedCost;
               }
+            }
+          }
+
+          if (!gridEnabled && this.isBuyNotionalAboveCap({ notionalQuote: bufferedCost, capQuote: riskBudgetBuyNotionalCapQuote })) {
+            const budgetQtyTarget =
+              riskBudgetBuyNotionalCapQuote !== null && price > 0 ? riskBudgetBuyNotionalCapQuote / (price * bufferFactor) : 0;
+            const budgetCheck =
+              Number.isFinite(budgetQtyTarget) && budgetQtyTarget > 0
+                ? await this.marketData.validateMarketOrderQty(candidateSymbol, budgetQtyTarget)
+                : null;
+            let budgetQtyStr = budgetCheck?.ok ? budgetCheck.normalizedQty : undefined;
+            if (!budgetQtyStr && budgetCheck?.requiredQty) {
+              const requiredQty = Number.parseFloat(budgetCheck.requiredQty);
+              const requiredBufferedCost =
+                Number.isFinite(requiredQty) && requiredQty > 0 ? requiredQty * price * bufferFactor : Number.NaN;
+              if (
+                Number.isFinite(requiredBufferedCost) &&
+                !this.isBuyNotionalAboveCap({ notionalQuote: requiredBufferedCost, capQuote: riskBudgetBuyNotionalCapQuote })
+              ) {
+                budgetQtyStr = budgetCheck.requiredQty;
+              }
+            }
+            const budgetQty = budgetQtyStr ? Number.parseFloat(budgetQtyStr) : Number.NaN;
+            const budgetBufferedCost =
+              Number.isFinite(budgetQty) && budgetQty > 0 ? budgetQty * price * bufferFactor : Number.NaN;
+            if (
+              budgetQtyStr &&
+              Number.isFinite(budgetQty) &&
+              budgetQty > 0 &&
+              Number.isFinite(budgetBufferedCost) &&
+              !this.isBuyNotionalAboveCap({ notionalQuote: budgetBufferedCost, capQuote: riskBudgetBuyNotionalCapQuote })
+            ) {
+              qtyStr = budgetQtyStr;
+              qty = budgetQty;
+              bufferedCost = budgetBufferedCost;
+            } else {
+              const summary = `Skip ${candidateSymbol}: Risk budget market entry cap below exchange minimum`;
+              const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveCautionEntryPauseCooldownMs(risk));
+              const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
+              const cooldownMs = cooldown.cooldownMs;
+              const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+              const next = {
+                ...current,
+                activeOrders: filled.activeOrders,
+                orderHistory: filled.orderHistory,
+                decisions: alreadyLogged
+                  ? current.decisions
+                  : [
+                      {
+                        id: crypto.randomUUID(),
+                        ts: new Date().toISOString(),
+                        kind: "SKIP",
+                        summary,
+                        details: {
+                          stage: "risk-budget-market-entry-size",
+                          riskBudget: selectedRiskBudget,
+                          riskBudgetBuyNotionalCapQuote,
+                          bufferedCost: Number(bufferedCost.toFixed(6)),
+                          price: Number(price.toFixed(8)),
+                          qty: Number(qty.toFixed(8)),
+                          bufferFactor,
+                          validation: budgetCheck,
+                          ...(cooldown.storm ? { storm: cooldown.storm } : {}),
+                          cooldownMs
+                        }
+                      },
+                      ...current.decisions
+                    ].slice(0, 200),
+                lastError: undefined
+              } satisfies BotState;
+              const nextWithCooldown = this.upsertProtectionLock(next, {
+                type: "COOLDOWN",
+                scope: "SYMBOL",
+                symbol: candidateSymbol,
+                reason: cooldown.storm
+                  ? `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`
+                  : `Risk budget market entry cap below exchange minimum (${Math.round(cooldownMs / 1000)}s)`,
+                expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                details: {
+                  category: "RISK_BUDGET_MARKET_ENTRY_SIZE",
+                  cooldownMs,
+                  riskBudget: selectedRiskBudget,
+                  riskBudgetBuyNotionalCapQuote,
+                  ...(cooldown.storm ? { storm: cooldown.storm } : {})
+                }
+              });
+              this.save(nextWithCooldown);
+              return;
             }
           }
 
@@ -8997,7 +9108,11 @@ export class BotEngineService implements OnModuleInit {
 
               const buyPrice = Number.parseFloat(buyPriceNorm.normalizedPrice);
               const maxAffordableQty = buyPrice > 0 ? quoteSpendable / (buyPrice * bufferFactor) : 0;
-              const buyQtyTarget = Math.min(qty, maxAffordableQty);
+              const maxRiskBudgetBuyQty =
+                riskBudgetBuyNotionalCapQuote !== null && buyPrice > 0
+                  ? riskBudgetBuyNotionalCapQuote / (buyPrice * bufferFactor)
+                  : Number.POSITIVE_INFINITY;
+              const buyQtyTarget = Math.min(qty, maxAffordableQty, maxRiskBudgetBuyQty);
               if (!Number.isFinite(buyQtyTarget) || buyQtyTarget <= 0) {
                 const summary = `Skip ${candidateSymbol}: Insufficient spendable ${candidateQuoteAsset} for grid BUY`;
                 const baseCooldownMs = this.deriveNoActionSymbolCooldownMs(risk);
@@ -9019,6 +9134,10 @@ export class BotEngineService implements OnModuleInit {
                           details: {
                             desiredQty: Number(qty.toFixed(8)),
                             maxAffordableQty: Number(maxAffordableQty.toFixed(8)),
+                            maxRiskBudgetBuyQty: Number(
+                              (Number.isFinite(maxRiskBudgetBuyQty) ? maxRiskBudgetBuyQty : 0).toFixed(8)
+                            ),
+                            riskBudgetBuyNotionalCapQuote,
                             limitPrice: buyPriceNorm.normalizedPrice,
                             quoteFree: Number(quoteFree.toFixed(6)),
                             quoteSpendable: Number(quoteSpendable.toFixed(6)),
@@ -9055,7 +9174,14 @@ export class BotEngineService implements OnModuleInit {
               let buyQtyStr: string | undefined = buyCheck.ok ? buyCheck.normalizedQty : undefined;
               if (!buyQtyStr && buyCheck.requiredQty) {
                 const requiredQty = Number.parseFloat(buyCheck.requiredQty);
-                if (Number.isFinite(requiredQty) && requiredQty > 0 && requiredQty <= maxAffordableQty + 1e-12) {
+                const requiredNotional =
+                  Number.isFinite(requiredQty) && requiredQty > 0 ? requiredQty * buyPrice * bufferFactor : Number.NaN;
+                if (
+                  Number.isFinite(requiredQty) &&
+                  requiredQty > 0 &&
+                  requiredQty <= maxAffordableQty + 1e-12 &&
+                  !this.isBuyNotionalAboveCap({ notionalQuote: requiredNotional, capQuote: riskBudgetBuyNotionalCapQuote })
+                ) {
                   buyQtyStr = buyCheck.requiredQty;
                 }
               }
@@ -9063,7 +9189,64 @@ export class BotEngineService implements OnModuleInit {
 
               if (buyQtyStr && Number.isFinite(buyQty) && buyQty > 0) {
                 const buyNotionalEstimate = buyQty * buyPrice * bufferFactor;
-                if (Number.isFinite(buyNotionalEstimate) && buyNotionalEstimate <= quoteSpendable + 1e-8) {
+                if (this.isBuyNotionalAboveCap({ notionalQuote: buyNotionalEstimate, capQuote: riskBudgetBuyNotionalCapQuote })) {
+                  const summary = `Skip ${candidateSymbol}: Risk budget grid BUY cap below exchange minimum`;
+                  const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), this.deriveCautionEntryPauseCooldownMs(risk));
+                  const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
+                  const cooldownMs = cooldown.cooldownMs;
+                  const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+                  const next = {
+                    ...current,
+                    activeOrders: current.activeOrders,
+                    orderHistory: current.orderHistory,
+                    decisions: alreadyLogged
+                      ? current.decisions
+                      : [
+                          {
+                            id: crypto.randomUUID(),
+                            ts: new Date().toISOString(),
+                            kind: "SKIP",
+                            summary,
+                            details: {
+                              stage: "risk-budget-grid-buy-size",
+                              riskBudget: selectedRiskBudget,
+                              riskBudgetBuyNotionalCapQuote,
+                              buyNotionalEstimate: Number(buyNotionalEstimate.toFixed(6)),
+                              desiredQty: Number(qty.toFixed(8)),
+                              normalizedQty: buyQtyStr,
+                              maxAffordableQty: Number(maxAffordableQty.toFixed(8)),
+                              maxRiskBudgetBuyQty: Number(
+                                (Number.isFinite(maxRiskBudgetBuyQty) ? maxRiskBudgetBuyQty : 0).toFixed(8)
+                              ),
+                              limitPrice: buyPriceNorm.normalizedPrice,
+                              quoteSpendable: Number(quoteSpendable.toFixed(8)),
+                              validation: buyCheck,
+                              ...(cooldown.storm ? { storm: cooldown.storm } : {}),
+                              cooldownMs
+                            }
+                          },
+                          ...current.decisions
+                        ].slice(0, 200),
+                    lastError: undefined
+                  } satisfies BotState;
+                  pendingNoActionState = this.upsertProtectionLock(next, {
+                    type: "COOLDOWN",
+                    scope: "SYMBOL",
+                    symbol: candidateSymbol,
+                    reason: cooldown.storm
+                      ? `Skip storm (${cooldown.storm.count}/${cooldown.storm.threshold}): ${cooldown.storm.problem} (${Math.round(cooldownMs / 1000)}s)`
+                      : `Risk budget grid BUY cap below exchange minimum (${Math.round(cooldownMs / 1000)}s)`,
+                    expiresAt: new Date(Date.now() + cooldownMs).toISOString(),
+                    details: {
+                      category: "RISK_BUDGET_GRID_BUY_SIZE",
+                      cooldownMs,
+                      riskBudget: selectedRiskBudget,
+                      riskBudgetBuyNotionalCapQuote,
+                      limitPrice: buyPriceNorm.normalizedPrice,
+                      ...(cooldown.storm ? { storm: cooldown.storm } : {})
+                    }
+                  });
+                } else if (Number.isFinite(buyNotionalEstimate) && buyNotionalEstimate <= quoteSpendable + 1e-8) {
                   setLiveOperation({
                     stage: "grid-buy-limit",
                     symbol: candidateSymbol,
@@ -9113,6 +9296,9 @@ export class BotEngineService implements OnModuleInit {
                       anchorPrice: Number(price.toFixed(8)),
                       gridSpacingPct: Number(gridSpacingPct.toFixed(6)),
                       limitPrice: buyPriceNorm.normalizedPrice,
+                      riskBudgetBuyNotionalCapQuote:
+                        riskBudgetBuyNotionalCapQuote !== null ? Number(riskBudgetBuyNotionalCapQuote.toFixed(6)) : null,
+                      riskBudgetMaxNewExposureHome: Number(selectedRiskBudget.maxNewExposureHome.toFixed(6)),
                       validation: {
                         ok: buyCheck.ok,
                         normalizedQty: buyCheck.normalizedQty,
@@ -9651,7 +9837,13 @@ export class BotEngineService implements OnModuleInit {
                 requestedQty: entryQtyStr,
                 fallbackQty: entryQty,
                 response: res,
-                reason: retriedSizing ? "entry-retry-sizing" : "entry"
+                reason: retriedSizing ? "entry-retry-sizing" : "entry",
+                details: {
+                  riskBudget: selectedRiskBudget,
+                  riskBudgetBuyNotionalCapQuote:
+                    riskBudgetBuyNotionalCapQuote !== null ? Number(riskBudgetBuyNotionalCapQuote.toFixed(6)) : null,
+                  riskBudgetMaxNewExposureHome: Number(selectedRiskBudget.maxNewExposureHome.toFixed(6))
+                }
               });
               break;
             } catch (entryErr) {
