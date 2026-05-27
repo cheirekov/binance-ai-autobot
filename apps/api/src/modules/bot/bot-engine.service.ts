@@ -1608,6 +1608,26 @@ export class BotEngineService implements OnModuleInit {
     return Number(Math.min(0.85, Math.max(0.15, fraction)).toFixed(4));
   }
 
+  private derivePortfolioBudgetTrimFraction(params: {
+    risk: number;
+    positionExposureHome: number;
+    portfolioExposureExcessHome: number;
+    pnlPct: number;
+  }): number {
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const positionExposureHome = Number.isFinite(params.positionExposureHome) ? Math.max(0, params.positionExposureHome) : 0;
+    const portfolioExposureExcessHome = Number.isFinite(params.portfolioExposureExcessHome)
+      ? Math.max(0, params.portfolioExposureExcessHome)
+      : 0;
+    if (positionExposureHome <= 0 || portfolioExposureExcessHome <= 0) return 0;
+
+    const targetFraction = (portfolioExposureExcessHome * 1.15) / positionExposureHome;
+    const pnlPct = Number.isFinite(params.pnlPct) ? params.pnlPct : 0;
+    let fraction = targetFraction + (pnlPct < 0 ? Math.min(0.08, Math.abs(pnlPct) / 150) : 0);
+    fraction += ((100 - boundedRisk) / 100) * 0.04;
+    return Number(Math.min(0.85, Math.max(0.15, fraction)).toFixed(4));
+  }
+
   private deriveNoFeasibleSizingRejectCooldownMs(params: {
     risk: number;
     stage?: string;
@@ -7018,9 +7038,21 @@ export class BotEngineService implements OnModuleInit {
             portfolioBudgetFull && selectedRiskBudget.lane === "DEFENSIVE"
               ? Math.min(baseMaxSymbolConcentrationPct, Math.max(8, selectedRiskBudget.maxTotalExposurePct * 2))
               : baseMaxSymbolConcentrationPct;
+          const portfolioExposureCapHome =
+            walletTotalHome > 0 ? walletTotalHome * (selectedRiskBudget.maxTotalExposurePct / 100) : 0;
+          const portfolioExposureExcessHome =
+            portfolioBudgetFull && portfolioExposureCapHome > 0 ? Math.max(0, openExposureHome - portfolioExposureCapHome) : 0;
           const positionExitBridgeAssets = resolveRouteBridgeAssets(config, homeStable);
+          const managedExitCandidates =
+            portfolioExposureExcessHome > 0
+              ? [...managedOpenHomeSymbols].sort((a, b) => {
+                  const bCost = Number.isFinite(b.costQuote) ? Math.max(0, b.costQuote) : 0;
+                  const aCost = Number.isFinite(a.costQuote) ? Math.max(0, a.costQuote) : 0;
+                  return bCost - aCost;
+                })
+              : managedOpenHomeSymbols;
 
-          for (const position of managedOpenHomeSymbols) {
+          for (const position of managedExitCandidates) {
             const baseAsset = getExecutionBaseFromSymbol(position.symbol);
             if (!baseAsset) continue;
             if (
@@ -7081,18 +7113,35 @@ export class BotEngineService implements OnModuleInit {
                   pnlPct
                 })
               : 0;
+            const shouldPortfolioBudgetTrim =
+              portfolioExposureExcessHome > 0 &&
+              selectedRiskBudget.lane === "DEFENSIVE" &&
+              Number.isFinite(concentrationExposureHome ?? Number.NaN) &&
+              (concentrationExposureHome ?? 0) > 0;
+            const portfolioBudgetTrimFraction = shouldPortfolioBudgetTrim
+              ? this.derivePortfolioBudgetTrimFraction({
+                  risk,
+                  positionExposureHome: concentrationExposureHome ?? 0,
+                  portfolioExposureExcessHome,
+                  pnlPct
+                })
+              : 0;
             const shouldTakeProfit = pnlPct >= takeProfitPct;
             const shouldStopLoss = pnlPct <= adjustedStopLossPct;
-            if (!shouldTakeProfit && !shouldStopLoss && !shouldConcentrationTrim) continue;
+            if (!shouldTakeProfit && !shouldStopLoss && !shouldConcentrationTrim && !shouldPortfolioBudgetTrim) continue;
             const exitReason = shouldStopLoss
               ? "stop-loss-exit"
               : shouldTakeProfit
                 ? "take-profit-exit"
-                : "concentration-rebalance-exit";
+                : shouldConcentrationTrim
+                  ? "concentration-rebalance-exit"
+                  : "portfolio-budget-rebalance-exit";
 
             const sellQtyDesired =
               shouldConcentrationTrim && !shouldTakeProfit && !shouldStopLoss
                 ? Math.min(position.netQty, baseFree) * concentrationTrimFraction
+                : shouldPortfolioBudgetTrim && !shouldTakeProfit && !shouldStopLoss
+                  ? Math.min(position.netQty, baseFree) * portfolioBudgetTrimFraction
                 : Math.min(position.netQty, baseFree);
             if (!Number.isFinite(sellQtyDesired) || sellQtyDesired <= 0) continue;
 
@@ -7166,6 +7215,12 @@ export class BotEngineService implements OnModuleInit {
                         shouldConcentrationTrim && !shouldTakeProfit && !shouldStopLoss
                           ? Number(concentrationTrimFraction.toFixed(4))
                           : null,
+                      portfolioExposureExcessHome: Number(portfolioExposureExcessHome.toFixed(6)),
+                      portfolioExposureCapHome: Number(portfolioExposureCapHome.toFixed(6)),
+                      portfolioBudgetTrimFraction:
+                        shouldPortfolioBudgetTrim && !shouldTakeProfit && !shouldStopLoss
+                          ? Number(portfolioBudgetTrimFraction.toFixed(4))
+                          : null,
                       avgEntryPrice: Number(avgEntryPrice.toFixed(8)),
                       marketPrice: Number(nowPrice.toFixed(8)),
                       takeProfitPct: Number(takeProfitPct.toFixed(4)),
@@ -7188,6 +7243,12 @@ export class BotEngineService implements OnModuleInit {
                   avgEntryPrice: Number(avgEntryPrice.toFixed(8)),
                   marketPrice: Number(nowPrice.toFixed(8)),
                   pnlPct: Number(pnlPct.toFixed(4)),
+                  portfolioExposureExcessHome: Number(portfolioExposureExcessHome.toFixed(6)),
+                  portfolioExposureCapHome: Number(portfolioExposureCapHome.toFixed(6)),
+                  portfolioBudgetTrimFraction:
+                    shouldPortfolioBudgetTrim && !shouldTakeProfit && !shouldStopLoss
+                      ? Number(portfolioBudgetTrimFraction.toFixed(4))
+                      : null,
                   takeProfitPct: Number(takeProfitPct.toFixed(4)),
                   stopLossPct: Number(adjustedStopLossPct.toFixed(4)),
                   regime: positionRegime,
@@ -7217,6 +7278,12 @@ export class BotEngineService implements OnModuleInit {
                 concentrationTrimFraction:
                   shouldConcentrationTrim && !shouldTakeProfit && !shouldStopLoss
                     ? Number(concentrationTrimFraction.toFixed(4))
+                    : null,
+                portfolioExposureExcessHome: Number(portfolioExposureExcessHome.toFixed(6)),
+                portfolioExposureCapHome: Number(portfolioExposureCapHome.toFixed(6)),
+                portfolioBudgetTrimFraction:
+                  shouldPortfolioBudgetTrim && !shouldTakeProfit && !shouldStopLoss
+                    ? Number(portfolioBudgetTrimFraction.toFixed(4))
                     : null,
                 pnlPct: Number(pnlPct.toFixed(4)),
                 avgEntryPrice: Number(avgEntryPrice.toFixed(8)),

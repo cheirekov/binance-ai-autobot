@@ -1668,6 +1668,42 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(mildTrim).toBeGreaterThanOrEqual(0.15);
   });
 
+  it("derives portfolio-budget trim fractions from aggregate exposure excess", () => {
+    const helpers = service as unknown as {
+      derivePortfolioBudgetTrimFraction: (params: {
+        risk: number;
+        positionExposureHome: number;
+        portfolioExposureExcessHome: number;
+        pnlPct: number;
+      }) => number;
+    };
+
+    const trim = helpers.derivePortfolioBudgetTrimFraction({
+      risk: 100,
+      positionExposureHome: 240,
+      portfolioExposureExcessHome: 15,
+      pnlPct: -2
+    });
+    const cappedTrim = helpers.derivePortfolioBudgetTrimFraction({
+      risk: 0,
+      positionExposureHome: 20,
+      portfolioExposureExcessHome: 100,
+      pnlPct: -20
+    });
+
+    expect(trim).toBeGreaterThanOrEqual(0.15);
+    expect(trim).toBeLessThan(0.25);
+    expect(cappedTrim).toBe(0.85);
+    expect(
+      helpers.derivePortfolioBudgetTrimFraction({
+        risk: 100,
+        positionExposureHome: 0,
+        portfolioExposureExcessHome: 15,
+        pnlPct: 0
+      })
+    ).toBe(0);
+  });
+
   it("enables no-feasible recovery after repeated sizing-cap skips", () => {
     const helpers = service as unknown as {
       deriveNoFeasibleRecoveryPolicy: (params: {

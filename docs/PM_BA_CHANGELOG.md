@@ -16,6 +16,46 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-27 10:55 UTC — T-031 twenty-eighth slice: trim aggregate portfolio budget excess
+- Scope:
+  - respond to `autobot-feedback-20260527-104314.tgz`, where the deployed BUY sizing cap worked but the top loop remained `Risk budget blocked new exposure`.
+- BA requirement mapping:
+  - latest bundle runs `git.commit=9fc5bd9`, `risk_state=CAUTION`, `daily_net_usdt=-11.26`, `max_drawdown_pct=3.66`, `open_positions=11`, `total_alloc_pct=5.30`.
+  - skip details show `riskBudget.maxTotalExposurePct=5`, `maxNewExposureHome=0`, and reasons `portfolio-exposure-budget-full` plus `no-new-exposure-budget`.
+  - no single symbol breached the defensive concentration cap, so managed exits did not fire and fresh-symbol selection rotated through BTC/ETH/SOL/SEI/XRP skips.
+- PM milestone mapping:
+  - keep `T-031` active with linked `T-032` support.
+  - treat the PM/BA `pivot_required` result as an interrupt requiring a same-ticket mitigation, not as permission to weaken the exposure budget.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - adds aggregate portfolio-budget excess calculation from `riskBudget.maxTotalExposurePct`.
+    - adds `portfolio-budget-rebalance-exit` as a reduce-only managed SELL reason when total managed exposure is above the risk-budget envelope.
+    - prioritizes larger managed positions first while aggregate portfolio budget is full, so dust positions do not delay a feasible trim.
+    - sizes the trim from aggregate excess while preserving existing sell validation, balance checks, cooldowns, stop-loss, take-profit, and concentration exits.
+    - records portfolio cap/excess/trim fraction details on managed exit trade evidence.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - adds focused coverage for portfolio-budget trim fraction bounds.
+  - `docs/TRIAGE_NOTE_2026-05-27_T031_PORTFOLIO_BUDGET_FULL_ROTATION.md`:
+    - records the interrupt, evidence, and same-ticket PM/BA decision.
+- Risk slider impact:
+  - the risk slider's total-exposure budget now has a reduce-only release path when aggregate exposure is full.
+  - high risk still cannot reopen new exposure above the deterministic cap; it can only trim existing managed exposure back under budget.
+- Validation evidence:
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t "portfolio-budget trim" --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/risk-budget.service.test.ts --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run --cache=false)`
+  - `./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.json --noEmit`
+  - `git diff --check`
+  - `./scripts/validate-active-ticket.sh` (ran Docker CI fallback)
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/pmba-gate.sh end` still fails on the already-collected May 27/May 26 repeated-loop pair; fresh post-patch runtime evidence is required to clear it.
+- Runtime test request:
+  - deploy without resetting state and collect the next normal bundle.
+  - expected evidence: when `portfolio-exposure-budget-full` is present and aggregate exposure exceeds `riskBudget.maxTotalExposurePct`, managed SELL evidence can show `reason=portfolio-budget-rebalance-exit` before fresh-symbol risk-budget skips dominate.
+- Follow-up:
+  - if the next fresh bundle still repeats the same risk-budget skip loop without portfolio-budget rebalance evidence, inspect managed-position sell eligibility and exchange minimums before changing the budget envelope.
+
 ## 2026-05-26 07:25 UTC — T-031 twenty-seventh slice: enforce risk-budget BUY sizing caps
 - Scope:
   - respond to `autobot-feedback-20260525-090223.tgz`, where risk-budget skips remain the top class after the prior reduce-first patch.
