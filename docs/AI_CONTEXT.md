@@ -16,7 +16,28 @@ To prevent focus loss and repeated loops across sessions:
 
 Any patch is incomplete unless board + changelog are updated.
 
-## Current status (Feb 11, 2026)
+## Current operating status (May 28, 2026)
+
+The active lane is `T-040` bounded beta readiness.
+
+`T-031` and `T-032` are preserved runtime behavior, not active patch lanes. Do not create another trading-code patch from live Binance skip churn alone. Runtime behavior patches require `P0/P1` safety or execution severity plus deterministic reproduction or explicit PM/BA override.
+
+Default current-memory read order:
+1. `docs/DELIVERY_BOARD.md`
+2. `docs/SESSION_BRIEF.md`
+3. `docs/TICKET_SWITCH_RETRO.md`
+4. `docs/RETROSPECTIVE_AUTO.md`
+5. `docs/PM_BA_CHANGELOG.md`
+6. `docs/easy_process/T040_BETA_READINESS_PACKET.md`
+7. `docs/easy_process/T040_VALIDATION_MAP.md`
+8. `docs/easy_process/AI_ORCHESTRATION.md`
+
+Validation entry point:
+- `./scripts/validate-active-ticket.sh`
+
+The older notes below remain useful background, but they are not active-ticket truth.
+
+## Historical bootstrap status (Feb 11, 2026)
 
 Bootstrap scaffolding:
 

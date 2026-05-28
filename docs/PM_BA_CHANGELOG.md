@@ -16,6 +16,50 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-28 11:05 UTC — T-040 activation: freeze T-031/T-032 patch loop and move to bounded beta readiness
+- Scope:
+  - respond to operator concern that T-031/T-032 have become an indefinite live-evidence patch loop since March.
+- BA requirement mapping:
+  - `T-031` and `T-032` runtime behavior is preserved, but the project needs a beta-readiness decision path.
+  - live Binance testnet evidence is non-stationary; repeated skip loops are useful evidence but not automatically code defects.
+  - future runtime behavior patches require P0/P1 safety severity plus deterministic reproduction or explicit PM/BA override.
+- PM milestone mapping:
+  - activate `T-040` as the only `IN_PROGRESS` ticket.
+  - move `T-031/T-032` to validation/preserved runtime behavior.
+  - make Gate P1 beta readiness the active delivery milestone.
+- Technical changes:
+  - `scripts/auto-retro.sh`:
+    - production-readiness tickets convert live-market churn into `validation_required`, not automatic `patch_required`.
+  - `scripts/update-session-brief.sh`:
+    - production-readiness next-session prompts point to beta gates and deterministic validation.
+  - `scripts/pmba-gate.sh`:
+    - repeated dominant live skip reasons warn but do not fail `T-040` without P0/P1 severity.
+  - `docs/DELIVERY_BOARD.md`, `docs/SESSION_BRIEF.md`, `docs/TICKET_SWITCH_RETRO.md`, and `docs/easy_process/*`:
+    - realigned active memory to `T-040`.
+  - `docs/easy_process/T040_BETA_READINESS_PACKET.md`, `docs/easy_process/T040_VALIDATION_MAP.md`, and `docs/easy_process/AI_ORCHESTRATION.md`:
+    - added compact beta-readiness, deterministic validation, and AI orchestration artifacts.
+  - `scripts/validate-active-ticket.sh`:
+    - added targeted `T-040` process validation so readiness work no longer falls back only to full CI.
+  - `/home/yc/.codex/skills/autobot-production-orchestrator/SKILL.md`:
+    - added a Codex skill for future sessions in this repo.
+- Risk slider impact:
+  - none to runtime trading behavior.
+  - risk/exposure code remains preserved; process now prevents risk-guard weakening to satisfy ordinary skip churn.
+- Validation evidence:
+  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh` passed.
+  - `node --check scripts/feedback-evidence.js` passed.
+  - `./scripts/auto-retro.sh autobot-feedback-20260528-105508.tgz` returned `validation_required`.
+  - `./scripts/update-session-brief.sh autobot-feedback-20260528-105508.tgz` returned `nextTicket=T-040`.
+  - `./scripts/pmba-gate.sh start` passed.
+  - `./scripts/pmba-gate.sh end` passed.
+  - `./scripts/validate-active-ticket.sh` passed targeted `T-040` process validation.
+  - `./scripts/validate-active-ticket.sh --full` passed full CI fallback earlier in this batch.
+  - `git diff --check` passed.
+- Runtime test request:
+  - collect the next bundle as beta-readiness evidence, not as automatic T-031/T-032 patch input.
+- Follow-up:
+  - build the Gate P1 beta-readiness packet and deterministic validation map.
+
 ## 2026-05-28 10:58 UTC — T-031 twenty-ninth slice: let BUY-size locks release SELL recovery
 - Scope:
   - respond to `autobot-feedback-20260528-105508.tgz`, where the deployed aggregate-budget trim changed the dominant loop but the run still required a same-ticket patch.

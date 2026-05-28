@@ -1,20 +1,18 @@
 # OPERATOR_NOTE
 
-Last updated: 2026-05-04 11:50 EEST
+Last updated: 2026-05-28 12:15 UTC
 Owner: PM/BA + Codex
 
 ## What to run next
-- deploy the new `T-031` fee-aware guardrail slice
-- keep state
-- collect a short 1–3h fresh bundle before any night-long run
-- evaluate fee-aware daily-loss/giveback details before any second strategy patch
+- run `./scripts/validate-active-ticket.sh` for the targeted `T-040` readiness gate.
+- collect the next bundle as beta-readiness evidence.
+- use deterministic validation before any new trading-code patch.
 
 ## What not to do next
-- do not reopen `T-032` as the active lane from habit
-- do not reopen any DONE ticket
-- do not switch the board again without explicit PM/BA approval and switch-retro alignment
+- do not request another T-031/T-032 patch for ordinary live-market skip churn.
+- do not weaken risk guards to make the bot trade more.
+- do not treat one profitable or unprofitable bundle as production proof.
 
 ## What fresh evidence would change the decision
-- a new bundle shows a concrete `P0/P1` runtime regression
-- the first post-deploy bundle opens fresh symbols while severe daily-loss protection is active
-- downside-control regresses or reachable unwind/sell behavior is blocked
+- P0/P1 safety issue: uncontrolled exposure, repeated exchange order rejects, inability to sell/unwind, broken accounting, crash/restart instability.
+- deterministic fixture/replay proves a production-gate failure.

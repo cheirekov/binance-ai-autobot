@@ -1,19 +1,25 @@
 # PRODUCTION_DELTA_NOTE
 
-Last updated: 2026-03-28 10:47 EET  
+Last updated: 2026-05-28 12:15 UTC
 Owner: PM/BA + Codex
 
 ## How this batch moves the bot closer to production
-This batch makes no new production code change. Its value is decision quality: it confirms the previous `T-032` patch deployed on `5927bd9`, verifies the old defensive cancel-churn signature is gone, and prevents another blind patch by classifying the remaining repeat as a PM/BA scope/policy question.
+It changes the project from endless runtime symptom patching to bounded beta-readiness delivery. `T-031/T-032` runtime behavior is preserved, while `T-040` now owns validation, release, rollback, and severity decisions.
 
 ## What is still missing before the next gate
-- an explicit next active lane / follow-up ticket decision
-- acceptance criteria for daily-loss caution re-entry or healthy-idle behavior
-- fresh evidence on the chosen next lane after PM/BA review
+- exact deterministic test/fixture mapping for the remaining Gate P1 runtime safety scenarios.
+- release/rollback runbook proof.
+- compact operator evidence checklist.
+
+## What this batch added to reduce process waste
+- `docs/easy_process/T040_BETA_READINESS_PACKET.md`
+- `docs/easy_process/T040_VALIDATION_MAP.md`
+- `docs/easy_process/AI_ORCHESTRATION.md`
+- targeted `T-040` mode in `./scripts/validate-active-ticket.sh`
 
 ## Whether this batch improves execution, risk, validation, event awareness, or learning
-- Execution: `no`
+- Execution: `indirect`
 - Risk: `yes`
 - Validation: `yes`
-- Event awareness: `yes`
+- Event awareness: `no`
 - Learning: `no`

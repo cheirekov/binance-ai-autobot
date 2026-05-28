@@ -1,7 +1,7 @@
 # Automatic Retrospective
 
-Last updated: 2026-05-28T10:55:22.580Z
-Active ticket: `T-031`
+Last updated: 2026-05-28T12:06:18.588Z
+Active ticket: `T-040`
 Latest bundle: `autobot-feedback-20260528-105508.tgz`
 Review window: `5` fresh/baseline bundle(s) out of `5` local bundle(s)
 
@@ -33,8 +33,10 @@ Review window: `5` fresh/baseline bundle(s) out of `5` local bundle(s)
 
 ## PM/BA automatic decision
 
-- Decision: `patch_required`
-- Required action: `same-ticket mitigation required before next long run`
+- Decision: `validation_required`
+- Required action: `classify severity and add deterministic validation before any runtime patch; live-market churn alone is not a beta blocker`
+- Production readiness mode: `enabled`
+- Patch policy: `runtime patches require P0/P1 safety severity plus deterministic reproduction`
 
 ## Bundle window
 

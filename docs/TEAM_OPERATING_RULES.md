@@ -9,6 +9,9 @@ Companion docs:
 - `docs/TRIAGE_NOTE_TEMPLATE.md` (mandatory format for non-P0/P1 issue capture)
 - `docs/AI_DECISION_CONTRACT.md` (AI signal interface and hard safety constraints)
 - `docs/RUN_LOGGING_P0.md` (single allowed procedure for remote log collection and local ingestion)
+- `docs/easy_process/T040_BETA_READINESS_PACKET.md` (current beta-readiness decision packet)
+- `docs/easy_process/T040_VALIDATION_MAP.md` (Gate P1 validation map)
+- `docs/easy_process/AI_ORCHESTRATION.md` (compact skill/subagent/MCP use)
 
 ## Team roles (mandatory)
 
@@ -39,9 +42,10 @@ Companion docs:
 6. Keep one active ticket at a time (`IN_PROGRESS`) to avoid drift.
 7. Do not start a new ticket before closing or deferring the current one.
 8. Runtime issues must be triaged from bundle artifacts first (`state`, telemetry, API log tail), then patched.
-9. Each patch batch must be tested with Docker CI before handoff.
+9. Each runtime implementation patch must be tested with Docker CI before handoff.
    - Dev/local (primary): `docker compose -f docker-compose.ci.yml run --rm ci` (Compose v2).
    - Remote/runtime compatibility: `docker-compose -f docker-compose.ci.yml run --rm ci` (Compose v1) when v2 is unavailable.
+   - Validation-only/process batches must run `./scripts/validate-active-ticket.sh`; run full CI with `./scripts/validate-active-ticket.sh --full` before promotion or runtime code handoff.
 10. Avoid micro-churn. Group related fixes into a single testable batch.
 11. If scope changes, update board/changelog before additional code changes.
 11a. New findings during an active ticket must be captured as a triage note first; only P0/P1 may interrupt.
@@ -69,9 +73,10 @@ Companion docs:
    - `inferred` (reasoned from observed data),
    - `assumption` (not yet verified).
 26. Do not present `assumption` as fact. If verification is required, add a concrete validation step.
-27. No-loop rule: if the same dominant failure reason appears in two consecutive bundles for the same ticket, next patch must include either:
+27. No-loop rule: if the same dominant failure reason appears in two consecutive bundles for the same runtime ticket, next patch must include either:
    - a direct mitigation for that reason, or
    - explicit ticket pivot/de-scope approved by PM/BA.
+   - For `T-040` production-readiness work, repeated live-market churn is validation/backlog evidence unless `P0/P1` safety severity and deterministic reproduction are proven.
 28. WIP limits:
    - max one `IN_PROGRESS` ticket,
    - max one active runtime hypothesis per batch.

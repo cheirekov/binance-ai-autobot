@@ -1,32 +1,22 @@
 # MASTER_EXISTING_REPO
 
+Deprecated for normal work. Use `docs/easy_process/prompts/MASTER_EXISTING_REPO_PRODUCTION.md` unless explicitly doing archaeology on old March/April process state.
+
 You are onboarding into an existing Binance autobot repository.
 
 Your job is not to chase the latest symptom.
 Your job is to continue the project professionally toward the North Star.
 
-This repository is designed so that:
-- chat memory is disposable,
-- the living files are authoritative,
-- time and cycle context come from `RUN_CONTEXT.md`,
-- continuity across LLM sessions comes from `DECISION_LEDGER.md` and `NEXT_CYCLE_HANDOFF.md`.
+This old prompt references archive-style memory files. Do not use it to choose active ticket or next patch.
 
 ## Read first
 Read in this order:
-1. `docs/easy_process/ONE_PAGE_WORKFLOW.md`
-2. `docs/easy_process/PROGRAM_STATUS.md`
-3. `docs/easy_process/ACTIVE_TICKET.md`
-4. `docs/easy_process/RUN_CONTEXT.md`
-5. `docs/easy_process/BUNDLE_DIGEST.md`
-6. `docs/easy_process/STATE_DIGEST.md`
-7. `docs/easy_process/VALIDATION_LEDGER.md`
-8. `docs/easy_process/DECISION_LEDGER.md`
-9. `docs/easy_process/NEXT_CYCLE_HANDOFF.md`
-10. `docs/SESSION_BRIEF.md`
-11. `docs/DELIVERY_BOARD.md`
-12. `docs/PM_BA_PLAYBOOK.md`
-13. `docs/TEAM_OPERATING_RULES.md`
-14. `docs/PM_BA_CHANGELOG.md` (latest relevant entries only)
+1. `docs/easy_process/ONE_PAGE_WORKFLOW_PRODUCTION.md`
+2. `docs/DELIVERY_BOARD.md`
+3. `docs/SESSION_BRIEF.md`
+4. `docs/TICKET_SWITCH_RETRO.md`
+5. `docs/RETROSPECTIVE_AUTO.md`
+6. `docs/PM_BA_CHANGELOG.md` (latest relevant entries only)
 
 Read raw `state.json` only if you can justify why the digests are insufficient.
 

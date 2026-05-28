@@ -1,61 +1,47 @@
 # PATCH_RESULT
 
-Last updated: 2026-05-04 11:50 EEST
+Last updated: 2026-05-28 12:15 UTC
 Owner: PM/BA + Codex
 
 ## Incident classification
-- `P1 restored-trading fee/giveback churn`
+- `P1 process loop / beta-readiness blocker`
 
 ## Chosen action class
-- `PATCH_NOW`
+- `VALIDATION_ONLY`
 
 ## Whether bot-engine changed
-- `yes`
+- `no`
 
 ## Files changed
-- `apps/api/src/modules/bot/bot-engine.service.ts`
-- `apps/api/src/modules/bot/bot-engine.service.test.ts`
-- `docs/PM_BA_CHANGELOG.md`
-- `docs/TRIAGE_NOTE_2026-05-04_T031_FEE_AWARE_GIVEBACK_CHURN.md`
-- `docs/SESSION_BRIEF.md`
-- `docs/DELIVERY_BOARD.md`
-- `docs/STRATEGY_COVERAGE.md`
-- `docs/easy_process/LATEST_BATCH_DECISION.md`
-- `docs/easy_process/PATCH_RESULT.md`
+- process scripts
+- delivery/session/easy-process docs
+- T-040 beta-readiness packet, validation map, and AI orchestration guide
+- project operating skill
 
 ## Exact behavior changed
-- closed-PnL events now include buy-side fees in cost basis and subtract sell-side fees from realized PnL.
-- profit-giveback activation now preserves smaller net wins after fees.
-- severe near-halt daily-loss caution pauses fresh symbols even when managed exposure is near-flat.
-- near-flat profit-giveback hard HALT is reserved for severe daily-loss usage or material managed exposure.
+- production-readiness tickets no longer convert live-market churn directly into same-ticket runtime patches.
+- PM/BA gate no longer fails `T-040` solely on repeated live skip reasons.
+- next-session memory starts from beta readiness.
+- `./scripts/validate-active-ticket.sh` now has targeted `T-040` validation instead of falling back to full CI only.
 
 ## Why this is the minimum viable patch
-- it targets the May 4 evidence directly: trading resumed, but high fee/churn and profit giveback drove wallet drawdown.
-- it does not change exposure caps, fee floors, quote routing, or AI behavior.
-
-## Hypothesis addressed
-- the bot adapted into orders after the April 30 patch, but guardrail math still under-counted fee burn and allowed near-flat loss states to thaw fresh-symbol entry too easily.
-
-## Tests added/updated
-- closed PnL is net of buy and sell fees.
-- severe near-halt daily-loss caution pauses fresh-symbol entry at the risk-linked budget threshold.
+- the user’s blocker is process inertia, not one missing trading rule.
+- changing trading code again would reinforce the loop.
 
 ## Validation run
-- `pnpm -C apps/api test -- bot-engine.service.test.ts` unavailable locally (`pnpm` not installed).
-- `./apps/api/node_modules/.bin/vitest run apps/api/src/modules/bot/bot-engine.service.test.ts --cache=false` ✅
-- `./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.build.json --noEmit` ✅
-- `./scripts/validate-active-ticket.sh` ✅
-- `git diff --check` ✅
-- `./scripts/pmba-gate.sh start` ✅
-- `./scripts/pmba-gate.sh end` ✅
+- `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh` passed.
+- `node --check scripts/feedback-evidence.js` passed.
+- `./scripts/auto-retro.sh autobot-feedback-20260528-105508.tgz` returned `validation_required`.
+- `./scripts/update-session-brief.sh autobot-feedback-20260528-105508.tgz` returned `nextTicket=T-040`.
+- `./scripts/pmba-gate.sh start` passed.
+- `./scripts/pmba-gate.sh end` passed.
+- `./scripts/validate-active-ticket.sh` passed targeted `T-040` validation.
+- `./scripts/validate-active-ticket.sh --full` passed full CI fallback earlier in this batch.
+- `git diff --check` passed.
 
 ## Remaining risk
-- the next bundle may stay paused until the rolling daily-loss window clears; that is acceptable if the pause reason is explicit and fee-aware.
+- `T-040` has a process gate, but several runtime safety scenarios still need exact fixture/test mapping before beta promotion.
+- some older triage notes remain in the repo as history; agents must not treat them as active memory.
 
 ## Rollback trigger
-- the patch permits fresh-symbol entry during severe daily-loss protection, bypasses reachable unwind/sell behavior, or hides fees from guardrail math.
-
-## What the next bundle must confirm
-- daily-loss/profit-giveback details use fee-aware realized PnL.
-- no new fresh-symbol entries occur while severe daily-loss caution is active.
-- after the loss window clears, the next blocker is explicit fee/edge, quote, cooldown, or candidate-quality behavior.
+- the process downgrade hides a real P0/P1 safety issue.

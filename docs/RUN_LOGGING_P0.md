@@ -67,7 +67,8 @@ Codex should review the next bundle from the normal live working set only:
 - One linked support ticket is allowed only if `docs/SESSION_BRIEF.md` declares it explicitly and the active ticket stays unchanged.
 - No strategy scope change during ingestion.
 - No state reset unless ticket explicitly requires it.
-- If `pmba-gate.sh end` fails, create triage note first (`docs/TRIAGE_NOTE_TEMPLATE.md`).
+- If `pmba-gate.sh end` fails for a P0/P1 safety or execution issue, create triage note first (`docs/TRIAGE_NOTE_TEMPLATE.md`).
+- If it fails only for non-safety repeated live-market churn, create or update the `T-040` readiness/validation packet instead of another same-ticket runtime patch.
 - If `auto-retro` reports `await_fresh_evidence` or `validation_required`, stop collecting short “same state” bundles and switch to deterministic validation for the active ticket.
 - Deterministic validation command:
   - `./scripts/validate-active-ticket.sh`

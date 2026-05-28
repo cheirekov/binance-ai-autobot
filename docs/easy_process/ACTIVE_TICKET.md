@@ -1,40 +1,35 @@
 # ACTIVE_TICKET
 
-Last updated: 2026-05-04 11:50 EEST
+Last updated: 2026-05-28 11:05 UTC
 Owner: PM/BA + Codex
 
 ## Ticket
-- ID: `T-031`
-- Title: `Regime engine v2`
+- ID: `T-040`
+- Title: `Bounded beta readiness`
 - Status: `IN_PROGRESS`
-- Linked support ticket: `T-032`
-- Current lane: `Lane A — Strategy quality / regime routing with bounded downside-control support`
-- Current incident override: `P1 restored-trading fee/giveback churn`
-
-## Problem statement
-The newest fresh bundle (`autobot-feedback-20260504-084256.tgz`) shows the April 30 no-action dust sell-leg loop cleared into real trading, but the run ended with wallet drawdown, high fees/churn, and `PROFIT_GIVEBACK` daily-loss protection.
+- Linked support ticket: `none`
+- Current lane: `Production readiness / Gate P1`
 
 ## Current decision
-- Ticket decision: `patch_ready`
-- Work mode: `PATCH_NOW`
-- Linked-support decision:
-  - allow bounded `T-032` support because fee-aware daily-loss/giveback protection is required before the next long run.
+- Ticket decision: `validation_required`
+- Work mode: `VALIDATION_ONLY`
 - Process rule:
-  - treat `docs/DELIVERY_BOARD.md` and `docs/PM_BA_CHANGELOG.md` as authoritative for ticket status and history.
-  - treat the latest fresh `docs/RETROSPECTIVE_AUTO.md` / `docs/SESSION_BRIEF.md` pair as authoritative for runtime evidence.
-  - treat `docs/easy_process/*` as current working memory only after it reflects the latest fresh bundle.
+  - `docs/DELIVERY_BOARD.md`, `docs/SESSION_BRIEF.md`, and `docs/TICKET_SWITCH_RETRO.md` are authoritative.
+  - `T-031` and `T-032` are preserved runtime behavior, not active patch lanes.
+  - live Binance skip churn can create backlog, but not mandatory runtime code changes unless P0/P1 severity or deterministic reproduction exists.
 
 ## Hypothesis under test
-- A bounded `T-031`/support slice that makes daily-loss/giveback accounting fee-aware and pauses fresh symbols at severe near-halt loss-budget usage will reduce churn without weakening reachable sell/unwind paths.
+- The project can progress faster by proving bounded beta readiness and exact remaining blockers, instead of treating every fresh live bundle as another T-031/T-032 patch prompt.
 
 ## What counts as success
-- daily-loss/profit-giveback details reflect fee-aware realized PnL.
-- severe near-halt `CAUTION` does not open fresh symbols.
-- the next fresh bundle shows explicit guard/fee/quote/candidate behavior rather than hidden fee churn.
-- April 30 reachable grid BUY progression remains preserved once the loss window clears.
+- Gate P1 beta-readiness packet exists.
+- deterministic validation map exists for runtime tickets.
+- release and rollback runbook is explicit.
+- operator can decide “beta blocked by X” or “beta candidate” from compact artifacts.
 
 ## Stop / rollback conditions
-- fresh evidence re-establishes a live `P0/P1` downside-control incident.
-- the new slice buys while severe daily-loss protection should block fresh exposure.
-- the new slice blocks reachable home-quote / managed sell paths or weakens downside-control reachability.
-- a board switch is attempted without `docs/TICKET_SWITCH_RETRO.md`.
+- uncontrolled exposure growth.
+- repeated exchange order rejects.
+- inability to sell/unwind managed exposure.
+- broken PnL/exposure accounting.
+- crash/restart instability.

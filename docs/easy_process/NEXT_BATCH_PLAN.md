@@ -1,34 +1,35 @@
 # NEXT_BATCH_PLAN
 
-Last updated: 2026-05-04 11:50 EEST
+Last updated: 2026-05-28 12:15 UTC
 Owner: PM/BA + Codex
 
 ## Exact scope
-Keep `T-031` active. Implement one bounded correction so restored trading is governed by fee-aware daily-loss/profit-giveback math and severe near-halt loss-budget usage cannot reopen fresh-symbol entries just because exposure is near-flat.
-
-Linked support mode:
-- `T-032` support slices are allowed in the same batch only when fresh evidence shows downside-control behavior is the immediate blocker to validating the active `T-031` strategy slice.
+Activate `T-040` and produce the first bounded beta-readiness batch. Do not write another trading-behavior patch unless a P0/P1 safety issue or deterministic production-gate failure is found.
 
 ## In scope
-- include buy and sell fees in closed-PnL events used by daily-loss/giveback protection.
-- lower profit-giveback activation to preserve smaller net wins after fees.
-- pause fresh symbols during severe near-halt daily-loss caution.
-- preserve April 30 dust/zero SELL-leg BUY progression and earlier recovery/quarantine behavior.
+- severity gate: define when live evidence can interrupt beta readiness.
+- deterministic validation map for `T-031`, `T-032`, and core execution safety.
+- Gate P1 checklist and pass/fail packet.
+- AI orchestration rules for skill/subagent/MCP use.
+- release/rollback runbook proof.
+- compact evidence quality requirements.
+- script/doc changes that prevent `patch_required` from automatically looping back into T-031/T-032.
 
 ## Out of scope
-- reopening any DONE ticket.
-- quote-routing redesign (`T-034` remains closed).
-- promoting `T-032` to active without fresh downside-control evidence beyond this bounded support slice.
-- fee-floor weakening, PnL schema changes, AI/news lane work.
+- regime/risk-budget/exit-manager tuning from one live bundle.
+- weakening risk guards or exposure caps.
+- AI/news action-driving.
+- claiming production readiness without validation evidence.
 
 ## Acceptance criteria
-- code and tests land under `T-031`.
-- next fresh bundle shows fee-aware daily-loss/giveback details.
-- next fresh bundle does not open fresh symbols while severe near-halt daily-loss caution is active.
-- once the loss window clears, next fresh bundle shows either active grid orders or the next concrete blocker.
+- `T-040` is the only `IN_PROGRESS` ticket.
+- PM/BA gates pass with `T-040`.
+- `./scripts/validate-active-ticket.sh` has a targeted `T-040` mode.
+- auto-retro treats production-readiness live churn as validation unless P0/P1 severity is proven.
+- next-session prompt points to beta readiness, not T-031/T-032 patch work.
 
 ## Rollback condition
-- the first post-patch bundle reopens a hard risk freeze, buys when `CAUTION/HALT` should block new exposure, or weakens reachable sell/unwind behavior.
+- the process change hides or downgrades a real P0/P1 runtime safety issue.
 
 ## What capability this moves forward
-Moves `Lane A — Strategy quality / regime routing` by making restored activity respect fee-aware drawdown protection before the next strategy-quality slice.
+Moves `Gate P1 — Execution-safe baseline` and production readiness by replacing infinite live-patch loops with explicit beta gates and deterministic validation.

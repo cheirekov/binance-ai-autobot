@@ -9,23 +9,15 @@ Do not chase the latest symptom unless it is a true P0.
 ## Read first
 Read in this order:
 1. `docs/easy_process/ONE_PAGE_WORKFLOW_PRODUCTION.md`
-2. `docs/easy_process/NORTH_STAR_PRODUCTION.md`
-3. `docs/easy_process/CAPABILITY_ROADMAP.md`
-4. `docs/easy_process/PRODUCTION_GATES.md`
-5. `docs/easy_process/PROMOTION_LADDER.md`
-6. `docs/easy_process/MARKET_INTELLIGENCE_LANE.md`
-7. `docs/easy_process/LEARNING_AND_MODEL_RISK.md`
-8. `docs/easy_process/RISK_AND_AUTONOMY_CONTRACT.md`
-9. `docs/easy_process/PROGRAM_STATUS.md`
-10. `docs/easy_process/ACTIVE_TICKET.md`
-11. `docs/easy_process/BUNDLE_DIGEST.md`
-12. `docs/easy_process/STATE_DIGEST.md`
-13. `docs/easy_process/VALIDATION_LEDGER.md`
-14. `docs/SESSION_BRIEF.md`
-15. `docs/DELIVERY_BOARD.md`
-16. `docs/PM_BA_PLAYBOOK.md`
-17. `docs/TEAM_OPERATING_RULES.md`
-18. `docs/PM_BA_CHANGELOG.md` (latest relevant entries)
+2. `docs/DELIVERY_BOARD.md`
+3. `docs/SESSION_BRIEF.md`
+4. `docs/TICKET_SWITCH_RETRO.md`
+5. `docs/RETROSPECTIVE_AUTO.md`
+6. `docs/PM_BA_CHANGELOG.md` (latest relevant entries)
+7. `docs/easy_process/LATEST_BATCH_DECISION.md`
+8. `docs/easy_process/T040_BETA_READINESS_PACKET.md`
+9. `docs/easy_process/T040_VALIDATION_MAP.md`
+10. production reference docs only when explicitly doing readiness review.
 
 Read raw `state.json` only if the digests are insufficient.
 

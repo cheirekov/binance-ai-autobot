@@ -10,15 +10,19 @@ Purpose: keep process memory compact enough for normal bundle-cycle work.
 Use these files by default for every normal bundle review:
 1. `docs/DELIVERY_BOARD.md`
 2. `docs/SESSION_BRIEF.md`
-3. `docs/RETROSPECTIVE_AUTO.md`
-4. `docs/PM_BA_CHANGELOG.md`
-5. `docs/easy_process/LATEST_BATCH_DECISION.md`
+3. `docs/TICKET_SWITCH_RETRO.md`
+4. `docs/RETROSPECTIVE_AUTO.md`
+5. `docs/PM_BA_CHANGELOG.md`
+6. `docs/easy_process/LATEST_BATCH_DECISION.md`
+7. `docs/easy_process/T040_BETA_READINESS_PACKET.md`
+8. `docs/easy_process/T040_VALIDATION_MAP.md`
 
 That is the normal bundle working cycle.
 
 ## On-demand reference set
 
 Read these only when the batch actually needs them:
+- `docs/easy_process/AI_ORCHESTRATION.md`
 - `docs/PM_BA_PLAYBOOK.md`
 - `docs/RUN_LOGGING_P0.md`
 - `docs/easy_process/ACTIVE_TICKET.md`

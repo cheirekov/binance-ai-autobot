@@ -173,11 +173,12 @@ const exchangeBackoffRegression = Array.isArray(bundleSummary?.activity?.skips?.
   : false;
 const mapNextTicket = (decision) => {
   if (decision === "pivot_required") return "PM/BA-TRIAGE";
-  if (decision === "validation_required") return "PM/BA-VALIDATION";
+  if (decision === "validation_required" && !/^(T-040|T-PROD|T-BETA)\b/i.test(activeTicket)) return "PM/BA-VALIDATION";
   return activeTicket;
 };
 const decision = retroDecision || "pending_auto_retro";
 const nextTicket = mapNextTicket(decision);
+const isProductionReadinessTicket = /^(T-040|T-PROD|T-BETA)\b/i.test(activeTicket);
 
 const conversionTrades = Number.isFinite(totals.conversions) ? totals.conversions : 0;
 const totalTrades = Number.isFinite(totals.trades) ? totals.trades : 0;
@@ -239,6 +240,17 @@ const promptLines = (() => {
     `Latest bundle: ${path.basename(bundlePath)}`,
     `Fresh runtime evidence: ${freshRuntimeEvidence ? "yes" : "no"} (${freshnessClass})`
   ];
+  if (isProductionReadinessTicket) {
+    return [
+      ...base,
+      "Goal: move the bot toward bounded beta/production readiness, not another T-031/T-032 micro-patch.",
+      "Patch policy: runtime patches require P0/P1 safety severity plus deterministic reproduction.",
+      "In scope: beta gates, deterministic validation fixtures, operator controls, release/rollback packet.",
+      "Out of scope: fixing every live-market skip loop or tuning strategy from one bundle.",
+      "Validation: ./scripts/validate-active-ticket.sh && ./scripts/pmba-gate.sh end",
+      "After patch: update delivery board, production docs, session brief, and changelog."
+    ];
+  }
   if (decision === "validation_required" || decision === "await_fresh_evidence") {
     return [
       ...base,

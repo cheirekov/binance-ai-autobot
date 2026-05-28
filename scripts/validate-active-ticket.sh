@@ -47,6 +47,60 @@ if [[ "$FULL_MODE" -eq 1 ]]; then
 fi
 
 case "$ACTIVE_TICKET" in
+  T-040|T-PROD|T-BETA)
+    echo "Validation mode: targeted beta-readiness process validation"
+    echo "Active ticket: $ACTIVE_TICKET"
+    bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh
+    node --check scripts/feedback-evidence.js
+    ./scripts/pmba-gate.sh start
+    ./scripts/pmba-gate.sh end
+    node <<'NODE'
+const fs = require('fs');
+
+const requiredFiles = [
+  'docs/DELIVERY_BOARD.md',
+  'docs/SESSION_BRIEF.md',
+  'docs/TICKET_SWITCH_RETRO.md',
+  'docs/RETROSPECTIVE_AUTO.md',
+  'docs/easy_process/T040_BETA_READINESS_PACKET.md',
+  'docs/easy_process/T040_VALIDATION_MAP.md',
+  'docs/easy_process/AI_ORCHESTRATION.md',
+];
+
+const read = (path) => fs.readFileSync(path, 'utf8');
+const fail = (message) => {
+  console.error(`T-040 validation failed: ${message}`);
+  process.exit(1);
+};
+
+for (const path of requiredFiles) {
+  if (!fs.existsSync(path)) fail(`missing ${path}`);
+}
+
+const board = read('docs/DELIVERY_BOARD.md');
+const session = read('docs/SESSION_BRIEF.md');
+const retro = read('docs/RETROSPECTIVE_AUTO.md');
+const packet = read('docs/easy_process/T040_BETA_READINESS_PACKET.md');
+const validationMap = read('docs/easy_process/T040_VALIDATION_MAP.md');
+const orchestration = read('docs/easy_process/AI_ORCHESTRATION.md');
+
+const inProgress = [...board.matchAll(/^\| (T-[0-9]{3}) \| IN_PROGRESS \|/gm)].map((match) => match[1]);
+if (inProgress.length !== 1 || inProgress[0] !== 'T-040') {
+  fail(`expected exactly one IN_PROGRESS ticket T-040, found ${inProgress.join(', ') || 'none'}`);
+}
+
+if (!/^- Active ticket: `T-040`/m.test(session)) fail('session brief is not aligned to T-040');
+if (!/Decision: `validation_required`/m.test(session)) fail('session brief decision is not validation_required');
+if (!/^Active ticket: `T-040`/m.test(retro)) fail('auto-retro is not aligned to T-040');
+if (!/Production readiness mode: `enabled`/.test(retro)) fail('auto-retro production readiness mode is not enabled');
+if (!/P0\/P1/.test(packet) || !/deterministic reproduction/.test(packet)) fail('beta packet is missing severity/reproduction patch rule');
+if (!/Gate P1/.test(packet)) fail('beta packet is missing Gate P1 checklist');
+if (!/Required Deterministic Scenarios/.test(validationMap)) fail('validation map is missing deterministic scenarios');
+if (!/PATCH_ALLOWED/.test(orchestration) || !/VALIDATION_ONLY/.test(orchestration)) fail('AI orchestration is missing output classes');
+
+console.log('PASS: T-040 beta-readiness process validation');
+NODE
+    ;;
   T-032)
     echo "Validation mode: targeted deterministic validation"
     echo "Active ticket: $ACTIVE_TICKET"

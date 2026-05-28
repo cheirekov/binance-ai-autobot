@@ -106,8 +106,9 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-031 | IN_PROGRESS | Regime engine v2 | Current slice preserves deterministic risk-budget defense, caps BUY sizing by `riskBudget.maxNewExposureHome`, adds reduce-only aggregate portfolio-budget trims, and keeps BUY-size locks from blocking managed SELL recovery. |
-| T-032 | TODO | Exit manager v2 | Linked support only while `T-031` is active: preserve downside-control slices and the May 4 fee-aware/severe-caution guard; reopen as active only if downside-control becomes the dominant blocker. |
+| T-040 | IN_PROGRESS | Bounded beta readiness | Freeze runtime strategy micro-patching and produce the Gate P1 beta-readiness packet: deterministic validation map, release/rollback runbook, severity gate, and exact remaining blockers. |
+| T-031 | VALIDATION | Regime engine v2 | Preserved runtime behavior. Reopen only for P0/P1 safety or deterministic reproduction of a production-gate blocker; live-market skip churn alone is backlog, not same-ticket patch pressure. |
+| T-032 | VALIDATION | Exit manager v2 | Preserved downside-control behavior. Reopen only for P0/P1 downside-control regression or deterministic failure of sell/unwind reachability. |
 | T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
 
 `T-005` status: moved to DONE after overnight evidence (`autobot-feedback-20260225-100508.tgz`) showed guard transitions/recovery without deadlock.
@@ -120,9 +121,9 @@ Profit milestone rule:
 
 | Priority | ID | Status | Title | Acceptance focus |
 |---|---|---|---|---|
-| 1 | T-032 | TODO | Exit manager v2 | keep downside-control support slices intact while `T-031` is active; reopen only if a real downside-control blocker returns |
-| 2 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source |
-| 3 | T-028 | TODO | Compact advanced UX | improve operator readability without changing strategy behavior |
+| 1 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source for beta |
+| 2 | T-028 | TODO | Compact advanced UX | improve operator readability without changing strategy behavior |
+| 3 | T-026 | TODO | Offline calibration runner | deterministic validation and replay foundation for adaptive decisions |
 
 ### LATER (after Gate A)
 
@@ -152,7 +153,7 @@ Profit milestone rule:
 
 ### Open backlog
 
-`T-003`, `T-020`, `T-023`, `T-025`, `T-026`, `T-028`, `T-031`, `T-032`, `T-035`, `T-036`, `T-037`, `T-038`
+`T-003`, `T-020`, `T-023`, `T-025`, `T-026`, `T-028`, `T-031`, `T-032`, `T-035`, `T-036`, `T-037`, `T-038`, `T-040`
 
 ---
 
@@ -165,5 +166,6 @@ New issues must be written as a triage note and mapped to impact:
 - `P3` enhancement
 
 Only `P0/P1` can interrupt active ticket execution.
+For `T-040`, live-market skip churn is not automatically `P1`. Runtime patches require a proven safety/execution blocker plus deterministic reproduction or an explicit PM/BA override.
 
 Template file: `docs/TRIAGE_NOTE_TEMPLATE.md`

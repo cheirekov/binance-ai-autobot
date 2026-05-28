@@ -3,11 +3,15 @@
 ## Read order for any new LLM
 1. `docs/DELIVERY_BOARD.md`
 2. `docs/SESSION_BRIEF.md`
-3. `docs/RETROSPECTIVE_AUTO.md`
-4. `docs/PM_BA_CHANGELOG.md`
-5. `docs/easy_process/LATEST_BATCH_DECISION.md`
+3. `docs/TICKET_SWITCH_RETRO.md`
+4. `docs/RETROSPECTIVE_AUTO.md`
+5. `docs/PM_BA_CHANGELOG.md`
+6. `docs/easy_process/LATEST_BATCH_DECISION.md`
+7. `docs/easy_process/T040_BETA_READINESS_PACKET.md`
+8. `docs/easy_process/T040_VALIDATION_MAP.md`
 
 ## Production-reference docs (on demand only)
+- `docs/easy_process/AI_ORCHESTRATION.md`
 - `docs/easy_process/NORTH_STAR_PRODUCTION.md`
 - `docs/easy_process/CAPABILITY_ROADMAP.md`
 - `docs/easy_process/PRODUCTION_GATES.md`

@@ -71,6 +71,13 @@ These are execution behaviors currently active in runtime:
 ## 3) Ticket ownership map for strategy evolution
 
 ## Active now
+- `T-040` — Bounded beta readiness
+  - current production lane:
+    - freezes further `T-031/T-032` micro-patching unless P0/P1 severity or deterministic production-gate failure is proven
+    - turns live bundles into beta-readiness evidence rather than automatic runtime patch prompts
+    - owns the Gate P1 packet, deterministic validation map, release/rollback runbook, and operator evidence checklist
+
+## Preserved runtime behavior
 - `T-031` — Regime engine v2
   - live slices:
     - risk-linked regime thresholds + regime-aware fee floor

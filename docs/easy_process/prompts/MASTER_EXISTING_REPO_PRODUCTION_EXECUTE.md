@@ -11,24 +11,23 @@ Do not stop at planning when the batch is clearly in `PATCH_ALLOWED` or `HOTFIX_
 ## Read first
 Read in this order:
 1. `docs/easy_process/ONE_PAGE_WORKFLOW_PRODUCTION.md`
-2. `docs/easy_process/NORTH_STAR_PRODUCTION.md`
-3. `docs/easy_process/CAPABILITY_ROADMAP.md`
-4. `docs/easy_process/PRODUCTION_GATES.md`
-5. `docs/easy_process/PROMOTION_LADDER.md`
-6. `docs/easy_process/MARKET_INTELLIGENCE_LANE.md`
-7. `docs/easy_process/LEARNING_AND_MODEL_RISK.md`
-8. `docs/easy_process/RISK_AND_AUTONOMY_CONTRACT.md`
-9. `docs/easy_process/PROGRAM_STATUS.md`
-10. `docs/easy_process/ACTIVE_TICKET.md`
-11. `docs/easy_process/BUNDLE_DIGEST.md`
-12. `docs/easy_process/STATE_DIGEST.md`
-13. `docs/easy_process/VALIDATION_LEDGER.md`
-14. `docs/SESSION_BRIEF.md`
-15. `docs/RETROSPECTIVE_AUTO.md`
-16. `docs/DELIVERY_BOARD.md`
-17. `docs/PM_BA_PLAYBOOK.md`
-18. `docs/TEAM_OPERATING_RULES.md`
-19. `docs/PM_BA_CHANGELOG.md` (latest relevant entries)
+2. `docs/DELIVERY_BOARD.md`
+3. `docs/SESSION_BRIEF.md`
+4. `docs/TICKET_SWITCH_RETRO.md`
+5. `docs/RETROSPECTIVE_AUTO.md`
+6. `docs/PM_BA_CHANGELOG.md` (latest relevant entries)
+7. `docs/easy_process/LATEST_BATCH_DECISION.md`
+8. `docs/easy_process/T040_BETA_READINESS_PACKET.md`
+9. `docs/easy_process/T040_VALIDATION_MAP.md`
+10. production reference docs only when explicitly doing readiness review:
+   - `docs/easy_process/AI_ORCHESTRATION.md`
+   - `docs/easy_process/NORTH_STAR_PRODUCTION.md`
+   - `docs/easy_process/CAPABILITY_ROADMAP.md`
+   - `docs/easy_process/PRODUCTION_GATES.md`
+   - `docs/easy_process/PROMOTION_LADDER.md`
+   - `docs/easy_process/MARKET_INTELLIGENCE_LANE.md`
+   - `docs/easy_process/LEARNING_AND_MODEL_RISK.md`
+   - `docs/easy_process/RISK_AND_AUTONOMY_CONTRACT.md`
 
 Read raw `state.json` only if the digests are insufficient.
 
@@ -104,15 +103,15 @@ State clearly:
 ## Mandatory execution phase
 After writing the planning outputs, evaluate this gate:
 
-A code patch is **mandatory in the same session** if all are true:
+A code patch is **allowed in the same session** only if all are true:
 - latest evidence is `fresh`
 - `docs/SESSION_BRIEF.md` says `patch_required` or `rollback_required`, or equivalent active-ticket action
 - allowed work mode is `PATCH_ALLOWED` or `HOTFIX_ONLY`
 - the active ticket remains valid
 - the scope can be implemented as a bounded batch
+- the issue is P0/P1 safety/execution severity or has deterministic reproduction as a production-gate blocker
 
-If this gate passes, you must not stop at planning.
-You must implement the batch in code.
+If this gate does not pass, produce validation/readiness artifacts instead of trading-code changes.
 
 ## Required execution outputs when code is mandatory
 If the execution gate passes, you must also:

@@ -108,9 +108,9 @@ Track only these to avoid noisy interpretation:
    - `inferred`: logical interpretation of observed data,
    - `assumption`: not yet verified.
 2. PM/BA decisions cannot rely on `assumption` items alone.
-3. If two consecutive bundles for one ticket have the same dominant failure pattern, the next batch must be one of:
-   - direct mitigation batch for that exact failure,
-   - explicit pivot/de-scope with reason.
+3. If two consecutive bundles for one ticket have the same dominant failure pattern, classify severity first.
+   - `P0/P1` safety or execution blocker → direct mitigation may interrupt.
+   - non-safety live-market churn → validation/backlog/readiness packet, not automatic runtime patching.
 4. If the latest bundle has no fresh runtime evidence, do not patch from it.
    - Use `docs/RETROSPECTIVE_AUTO.md` and `fresh runtime evidence` in `docs/SESSION_BRIEF.md`.
    - Two consecutive stale/mark-to-market-only bundles require deterministic validation, not another live-wait loop.
@@ -133,7 +133,7 @@ The automatic retrospective is not optional process noise; it is the time-awaren
   - no KPI trend improvement across latest 3 fresh bundles (daily net and max drawdown both not improving)
 - Required PM/BA action:
   - `continue` → same lane can continue,
-  - `patch_required` → next batch must be direct same-ticket mitigation,
+  - `patch_required` → direct mitigation only if P0/P1 or a production-gate blocker is deterministic; otherwise validation/backlog,
   - `pivot_required` → PM/BA must explicitly review scope/ticket before the next long run.
   - `await_fresh_evidence` → do not patch from this bundle alone,
   - `validation_required` → stop live waiting and move to deterministic validation.
@@ -170,3 +170,4 @@ A ticket switch is not complete just because the board and session brief changed
   - what did not improve,
   - why the ticket remains open,
   - continue / split / pivot decision.
+- If the trigger fires on `T-031` or `T-032`, default to `T-040` beta-readiness review unless there is a fresh P0/P1 runtime safety issue.

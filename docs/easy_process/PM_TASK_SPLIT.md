@@ -1,62 +1,39 @@
 # PM_TASK_SPLIT
 
-Last updated: 2026-03-28 23:10 EET  
+Last updated: 2026-05-28 11:05 UTC
 Owner: PM/BA + Codex
 
 ## PM/BA
-- Objective: pivot active development to the higher-leverage strategy lane
-- Tasks:
-  - record `pivot_active_ticket`
-  - freeze `T-032` as support/runtime-preserved work
-  - activate `T-031` cleanly in board/session/switch-retro docs
-- Deliverable: explicit pivot recommendation
-- Dependency: latest bundle evidence
+- Objective: stop the live-evidence patch loop.
+- Tasks: activate `T-040`, freeze `T-031/T-032`, define severity threshold.
+- Deliverable: beta-readiness decision packet.
 
 ## Architect
-- Objective: keep the strategy slice bounded
-- Tasks:
-  - confirm current code still uses simpler regime thresholds and a regime-agnostic fee floor
-  - keep the first `T-031` slice limited to those two surfaces
-- Deliverable: bounded strategy-slice definition
-- Dependency: direct bundle read + code audit
+- Objective: separate runtime behavior from release readiness.
+- Tasks: identify deterministic validation gaps and release blockers.
+- Deliverable: Gate P1 validation map.
 
 ## Trader
-- Objective: move adaptation work toward strategy-quality, not more proof-only downside-control waiting
-- Tasks:
-  - review the fact pattern: current blockers are `Fee/edge filter` + parked-ladder waiting
-  - approve a regime-linked threshold / fee-floor strategy slice as the next most valuable move
-- Deliverable: strategy-lane approval
-- Dependency: live bundle facts + code audit
+- Objective: prevent overfitting to one live market window.
+- Tasks: classify live skip churn as normal/adverse/safety-critical.
+- Deliverable: severity rubric for trading evidence.
 
 ## Runtime Analyst
-- Objective: capture the reprioritization evidence cleanly
-- Tasks:
-  - document that the latest bundle is fresh and strategy-quality dominated
-  - document the switch trigger from `T-032` to `T-031`
-  - document the expected next proof after deployment
-- Deliverable: updated pivot digest
-- Dependency: raw bundle review
+- Objective: make evidence compact and actionable.
+- Tasks: define required bundle fields and pass/fail signals for beta.
+- Deliverable: beta-readiness evidence checklist.
 
 ## AI Specialist
-- Objective: keep AI scope unchanged
-- Tasks:
-  - confirm this batch changes no AI behavior or promotion scope
-- Deliverable: AI scope freeze
-- Dependency: none
+- Objective: keep AI/adaptive claims honest.
+- Tasks: ensure AI remains shadow/gated until promotion ladder evidence exists.
+- Deliverable: AI scope freeze for beta.
 
 ## State Steward
-- Objective: realign easy-process memory
-- Tasks:
-  - update working-memory docs from `continue_same_ticket` / `T-032` to `pivot_active_ticket` / `T-031`
-  - keep the manual PM/BA decision explicit
-- Deliverable: current docs aligned to `T-031`
-- Dependency: PM/BA decision
+- Objective: clean working memory.
+- Tasks: update board, session, switch retro, easy-process files, and skill.
+- Deliverable: future agents start from `T-040`.
 
 ## Senior BE/UI
-- Objective: land the first bounded `T-031` slice
-- Tasks:
-  - implement risk-linked regime thresholds
-  - implement regime-aware fee floor
-  - add regression tests and Docker validation
-- Deliverable: bounded strategy patch
-- Dependency: PM/BA review + architect scope freeze
+- Objective: validate without unnecessary code.
+- Tasks: run gates, add deterministic validation only if needed.
+- Deliverable: validation result and remaining blockers.
