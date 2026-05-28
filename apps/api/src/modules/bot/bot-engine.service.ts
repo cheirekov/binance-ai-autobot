@@ -530,8 +530,20 @@ export class BotEngineService implements OnModuleInit {
     lastPrice?: number;
     minExposureHome: number;
   }): boolean {
-    if (!this.isDailyLossRiskState(params.state.riskState)) return false;
     const lock = this.getActiveSymbolProtectionLock(params.state, params.symbol);
+    if (
+      this.getProtectionLockCategory(lock) === "RISK_BUDGET_MARKET_ENTRY_SIZE" &&
+      this.hasManagedRiskBypassExposure({
+        position: params.position,
+        qty: params.qty,
+        lastPrice: params.lastPrice,
+        minExposureHome: params.minExposureHome
+      })
+    ) {
+      return true;
+    }
+
+    if (!this.isDailyLossRiskState(params.state.riskState)) return false;
     if (!this.isManagedRiskBypassableSymbolLock(lock)) return false;
     return this.hasManagedRiskBypassExposure({
       position: params.position,
@@ -2186,6 +2198,7 @@ export class BotEngineService implements OnModuleInit {
       category === "GRID_SELL_NOT_ACTIONABLE" ||
       category === "GRID_SELL_SIZING_REJECT" ||
       category === "GRID_WAIT_ROTATE" ||
+      category === "RISK_BUDGET_MARKET_ENTRY_SIZE" ||
       category === "SKIP_QUOTE_INSUFFICIENT" ||
       category === "SKIP_QUOTE_SHORTFALL"
     );

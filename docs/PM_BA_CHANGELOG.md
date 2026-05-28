@@ -16,6 +16,44 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-28 10:58 UTC — T-031 twenty-ninth slice: let BUY-size locks release SELL recovery
+- Scope:
+  - respond to `autobot-feedback-20260528-105508.tgz`, where the deployed aggregate-budget trim changed the dominant loop but the run still required a same-ticket patch.
+- BA requirement mapping:
+  - latest bundle runs `git.commit=2db57ee`, `risk_state=NORMAL`, `daily_net_usdt=-16.21`, `max_drawdown_pct=0.93`, `open_positions=7`, `total_alloc_pct=5.06`.
+  - top loop moved to `Skip: No feasible candidates after policy/exposure filters (62)`.
+  - `XLMUSDC` is the largest managed position at `4.998%`, while `Skip XLMUSDC: Risk budget market entry cap below exchange minimum (22)` shows the remaining risk-budget BUY cap is below exchange minimum.
+  - no-feasible recovery repeatedly reported `No eligible managed positions available for recovery sell` because the BUY-side `RISK_BUDGET_MARKET_ENTRY_SIZE` lock was treated as a hard symbol lock for SELL recovery.
+- PM milestone mapping:
+  - keep `T-031` active with linked `T-032` support.
+  - preserve deterministic BUY caps while restoring reduce-only SELL reachability.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - lets managed risk SELL paths bypass `RISK_BUDGET_MARKET_ENTRY_SIZE` when the symbol has countable existing exposure.
+    - lets no-feasible recovery SELLs bypass `RISK_BUDGET_MARKET_ENTRY_SIZE`.
+    - keeps the lock effective for new BUY/entry selection.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - adds focused coverage that the BUY-side risk-budget size lock blocks new entries but does not block managed SELL or no-feasible recovery SELL paths.
+  - `docs/TRIAGE_NOTE_2026-05-28_T031_BUY_SIZE_LOCK_BLOCKED_SELL_RECOVERY.md`:
+    - records the evidence and same-ticket PM/BA decision.
+- Risk slider impact:
+  - high risk still cannot buy below exchange minimum or above the deterministic budget.
+  - existing exposure can now be sold/recovered even when the same symbol has a BUY-side risk-budget sizing cooldown.
+- Validation evidence:
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t "BUY-side risk-budget size locks" --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/risk-budget.service.test.ts --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run --cache=false)`
+  - `./apps/api/node_modules/.bin/tsc -p apps/api/tsconfig.json --noEmit`
+  - `git diff --check`
+  - `./scripts/pmba-gate.sh start`
+  - `./scripts/validate-active-ticket.sh` (ran Docker CI fallback)
+- Runtime test request:
+  - deploy without resetting state and collect the next normal bundle.
+  - expected evidence: `RISK_BUDGET_MARKET_ENTRY_SIZE` still suppresses new XLM/GENIUS BUY attempts below exchange minimum, but no-feasible recovery or managed exits can sell countable XLM exposure when needed.
+- Follow-up:
+  - if no-feasible remains dominant after SELL recovery becomes reachable, inspect whether bear-trend no-inventory pauses need a broader global cooldown rather than symbol-local churn handling.
+
 ## 2026-05-27 10:55 UTC — T-031 twenty-eighth slice: trim aggregate portfolio budget excess
 - Scope:
   - respond to `autobot-feedback-20260527-104314.tgz`, where the deployed BUY sizing cap worked but the top loop remained `Risk budget blocked new exposure`.

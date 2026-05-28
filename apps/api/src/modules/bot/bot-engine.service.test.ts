@@ -5129,6 +5129,49 @@ describe("bot-engine symbol lock checks", () => {
     );
   });
 
+  it("does not let BUY-side risk-budget size locks block managed SELL paths", () => {
+    const helpers = service as unknown as {
+      getNoFeasibleRecoverySellBlockReason: (params: { symbol: string; state: BotState }) => string | null;
+      getManagedRiskSymbolBlockReason: (params: {
+        state: BotState;
+        symbol: string;
+        position?: { symbol: string; netQty: number; costQuote: number };
+        minExposureHome: number;
+      }) => string | null;
+      isSymbolBlocked: (symbol: string, state: BotState) => string | null;
+    };
+
+    const state: BotState = {
+      ...defaultBotState(),
+      protectionLocks: [
+        {
+          id: "lock-risk-budget-buy-size",
+          type: "COOLDOWN",
+          createdAt: "2026-05-28T10:54:11.557Z",
+          scope: "SYMBOL",
+          symbol: "XLMUSDC",
+          reason: "Risk budget market entry cap below exchange minimum (120s)",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          details: {
+            category: "RISK_BUDGET_MARKET_ENTRY_SIZE",
+            cooldownMs: 120_000
+          }
+        }
+      ]
+    };
+
+    expect(helpers.isSymbolBlocked("XLMUSDC", state)).toContain("Risk budget market entry cap below exchange minimum");
+    expect(helpers.getNoFeasibleRecoverySellBlockReason({ symbol: "XLMUSDC", state })).toBeNull();
+    expect(
+      helpers.getManagedRiskSymbolBlockReason({
+        state,
+        symbol: "XLMUSDC",
+        position: { symbol: "XLMUSDC", netQty: 1500, costQuote: 260 },
+        minExposureHome: 5
+      })
+    ).toBeNull();
+  });
+
   it("lets managed daily-loss candidates bypass recovery cooldown locks", async () => {
     const helpers = service as unknown as {
       getManagedRiskSymbolBlockReason: (params: {

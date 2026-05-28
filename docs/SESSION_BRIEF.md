@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-05-27 10:48 UTC
+Last updated: 2026-05-28 10:58 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch.
@@ -10,12 +10,13 @@ Use this file at the start and end of every batch.
 - Batch type: `SHORT (1-3h)`
 - Active ticket: `T-031` (Regime engine v2)
 - Linked support ticket: `T-032` (bounded downside-control support)
-- Goal (single sentence): add a reduce-only aggregate portfolio-budget trim so full risk-budget envelopes can release exposure before fresh-symbol retries dominate.
+- Goal (single sentence): keep BUY-side risk-budget size locks from blocking managed SELL exits and no-feasible recovery sells for existing exposure.
 - In scope:
   - keep `T-031` active as the strategy-quality lane.
   - route new exposure, grid BUYs, market entries, and fee/edge checks through `deriveRiskBudgetDecision`.
   - clamp MARKET entry and grid BUY sizing to `riskBudget.maxNewExposureHome` after converting the cap into candidate quote units.
   - leave grid SELL and managed exit sizing uncapped by new-exposure budget so reduce-only paths remain reachable.
+  - treat `RISK_BUDGET_MARKET_ENTRY_SIZE` as a BUY/new-entry lock only; existing exposure must remain sellable.
   - when `portfolio-exposure-budget-full` is present, allow managed SELLs to trim aggregate exposure back toward `riskBudget.maxTotalExposurePct`.
   - respect `GRID_SELL_NOT_ACTIONABLE` cooldowns for dust home-quote symbols whenever the BUY leg is paused.
   - run managed-position exits before new-candidate risk-budget skips.
@@ -37,11 +38,12 @@ Use this file at the start and end of every batch.
   - news/event action-driving,
   - PnL schema/reporting rewrites (`T-007` is closed),
   - endpoint/auth/UI redesign.
-- Hypothesis: the May 26 BUY cap is deployed and working, but aggregate managed exposure is now above the 5% risk-budget envelope without any single symbol breaching concentration, so the engine has no reduce-only release path and keeps retrying fresh symbols that risk budget must reject.
+- Hypothesis: the May 27 aggregate-budget slice is deployed and changed the prior risk-budget loop, but XLM now has both the largest managed position and a BUY-side `RISK_BUDGET_MARKET_ENTRY_SIZE` lock, causing no-feasible recovery to see no eligible managed sell even though existing XLM exposure should be sellable.
 - Target KPI delta:
   - `riskBudget` continues appearing in relevant skip details for new-exposure, GRID BUY, MARKET entry, and fee/edge decisions.
   - placed MARKET/grid BUY notional stays at or below `riskBudgetBuyNotionalCapQuote` whenever the cap is present.
   - exchange-minimum BUYs above the risk-budget cap become explicit risk-budget sizing skips instead of oversized orders.
+  - `RISK_BUDGET_MARKET_ENTRY_SIZE` still blocks new BUY attempts but no longer blocks managed SELL or no-feasible recovery SELL paths.
   - `portfolio-exposure-budget-full` can produce `portfolio-budget-rebalance-exit` managed SELL evidence before fresh-symbol risk-budget skips dominate.
   - `Skip BTCUSDC/ETHUSDC: Risk budget blocked new exposure` counts drop because managed exits are evaluated first.
   - oversized SOL exposure produces concentration-rebalance/exit evidence if it remains above the effective risk-budget concentration cap.
@@ -63,6 +65,7 @@ Use this file at the start and end of every batch.
     - MARKET entry and grid BUY quantities are bounded by `riskBudget.maxNewExposureHome` after quote conversion.
     - BUY order details include the applied risk-budget cap for runtime verification.
     - exchange minimums above the risk-budget BUY cap produce a risk-budget sizing skip.
+    - BUY-side risk-budget size cooldowns do not block managed SELL exits or no-feasible recovery SELLs for existing exposure.
     - aggregate portfolio-budget excess can trigger a reduce-only `portfolio-budget-rebalance-exit`.
     - dust home-quote `GRID_SELL_NOT_ACTIONABLE` cooldowns are respected whenever the BUY leg is paused, before managed-risk bypass can release the symbol.
     - managed exits run before new-candidate risk-budget skips return.
@@ -90,16 +93,18 @@ Use this file at the start and end of every batch.
     - March 30-31 `T-032` caution-unwind / thaw behavior remains preserved.
   - active development lane is `T-031`; `T-032` remains preserved as a support lane in runtime.
 - Runtime evidence in decisions/logs:
-  - latest fresh bundle before this patch runs `git.commit=9fc5bd9`.
-  - latest fresh bundle (`autobot-feedback-20260527-104314.tgz`) shows:
-    - `risk_state=CAUTION`
-    - `daily_net_usdt=-11.26`
-    - `max_drawdown_pct=3.65688`
-    - `open_positions=11`
-    - `total_alloc_pct=5.29634`
-    - top loop `Skip BTCUSDC: Risk budget blocked new exposure (60)`.
-    - skip details show `riskBudget.maxTotalExposurePct=5`, `maxNewExposureHome=0`, `portfolio-exposure-budget-full`, and `no-new-exposure-budget`.
-  - next fresh bundle after this patch should show `portfolio-budget-rebalance-exit` when aggregate exposure is over budget, or explicit sell ineligibility evidence if exchange minimums/cooldowns prevent the trim.
+  - latest fresh bundle before this patch runs `git.commit=2db57ee`.
+  - latest fresh bundle (`autobot-feedback-20260528-105508.tgz`) shows:
+    - `risk_state=NORMAL`
+    - `daily_net_usdt=-16.21`
+    - `max_drawdown_pct=0.93132`
+    - `open_positions=7`
+    - `total_alloc_pct=5.05971`
+    - largest position `XLMUSDC=4.99811%`
+    - top loop `Skip: No feasible candidates after policy/exposure filters (62)`.
+    - `Skip XLMUSDC: Risk budget market entry cap below exchange minimum (22)`.
+    - no-feasible recovery attempted with `No eligible managed positions available for recovery sell`.
+  - next fresh bundle after this patch should show no-feasible recovery and managed exits able to sell countable XLM exposure despite an active BUY-side risk-budget size cooldown.
 - Risk slider impact:
   - risk slider now feeds a deterministic budget contract instead of only widening exposure/turnover.
   - risk-state protections remain hard; high risk cannot bypass `HALT`, confirmed bear defense, active negative `CAUTION`, or fee-proof edge.
@@ -107,6 +112,7 @@ Use this file at the start and end of every batch.
   - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/risk-budget.service.test.ts --cache=false)`
   - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t "risk-budget BUY notional caps" --cache=false)`
   - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t "portfolio-budget trim" --cache=false)`
+  - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t "BUY-side risk-budget size locks" --cache=false)`
   - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t "dust sell-leg|grid-sell-not-actionable|managed daily-loss candidates" --cache=false)`
   - `(cd apps/api && ./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts --cache=false)`
   - `(cd apps/api && ./node_modules/.bin/vitest run --cache=false)`
@@ -143,44 +149,42 @@ Use this file at the start and end of every batch.
 - Run context:
   - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `19.829`
-  - runtime uptime (hours): `1100.675`
-  - run end: `Wed May 27 2026 13:42:55 GMT+0300 (Eastern European Summer Time)`
+  - bundle interval (hours): `24.188`
+  - runtime uptime (hours): `1124.863`
+  - run end: `Thu May 28 2026 13:54:11 GMT+0300 (Eastern European Summer Time)`
   - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip BTCUSDC: Risk budget blocked new exposure (60))
+  - active ticket runtime signal: `observed` (Skip: No feasible candidates after policy/exposure filters (62))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=66, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=67.3%)
-  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=31, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=84.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=2, decisions=200, ratio=1.0%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `pivot_required`
-- Next ticket candidate: `T-031` (same-ticket mitigation after PM/BA triage)
-- Required action: `deploy T-031 aggregate portfolio-budget trim and collect a fresh bundle`
+- Decision: `patch_required`
+- Next ticket candidate: `T-031` (continue active lane unless PM/BA reprioritizes)
+- Required action: `deploy T-031 BUY-size lock SELL-recovery fix and collect a fresh bundle`
 - Open risks:
-  - PM/BA repeated-loop gate will continue failing on the already-collected May 27 bundle until a fresh post-patch bundle changes the runtime evidence.
-  - if managed SELLs are blocked by exchange minimums or recent-buy cooldowns, the next slice should add explicit sell-ineligibility evidence before changing risk-budget limits.
+  - if no-feasible remains dominant after SELL recovery becomes reachable, inspect bear-trend no-inventory pauses and non-home quote pressure before weakening risk-budget caps.
 - Validation status:
   - local API tests, TypeScript, diff check, PM/BA start gate, and active-ticket Docker CI passed.
-  - PM/BA end gate failed on the pre-patch repeated-loop evidence by design.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260527-104314.tgz`
-  - auto-updated at: `2026-05-27T10:43:29.380Z`
+  - bundle: `autobot-feedback-20260528-105508.tgz`
+  - auto-updated at: `2026-05-28T10:55:22.879Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-031
-Decision: pivot_required
-Required action: deploy same-ticket aggregate portfolio-budget trim and collect a fresh bundle
-Latest bundle: autobot-feedback-20260527-104314.tgz
+Decision: patch_required
+Required action: deploy BUY-size lock SELL-recovery fix and collect a fresh bundle
+Latest bundle: autobot-feedback-20260528-105508.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: add reduce-only portfolio-budget rebalance exits when aggregate exposure is above the T-031 risk-budget envelope.
-In scope: T-031 risk-budget rotation, managed SELL trim evidence, preserving T-032 downside controls.
-Out of scope: weakening the 5% budget cap, quote-routing redesign, PnL schema changes, AI lane.
+Goal: keep BUY-side risk-budget size cooldowns from blocking managed SELL exits and no-feasible recovery sells.
+In scope: T-031 risk-budget rotation, managed SELL recovery reachability, preserving T-032 downside controls.
+Out of scope: weakening BUY caps, quote-routing redesign, PnL schema changes, AI lane.
 Validation: docker compose -f docker-compose.ci.yml run --rm ci
 After patch: update docs/DELIVERY_BOARD.md, docs/PM_BA_CHANGELOG.md, docs/SESSION_BRIEF.md.
 ```
