@@ -1,6 +1,6 @@
 # PATCH_RESULT
 
-Last updated: 2026-05-28 12:15 UTC
+Last updated: 2026-05-29 08:14 UTC
 Owner: PM/BA + Codex
 
 ## Incident classification
@@ -23,6 +23,7 @@ Owner: PM/BA + Codex
 - PM/BA gate no longer fails `T-040` solely on repeated live skip reasons.
 - next-session memory starts from beta readiness.
 - `./scripts/validate-active-ticket.sh` now has targeted `T-040` validation instead of falling back to full CI only.
+- T-040 validation now accepts either `continue` or `validation_required` because both are valid readiness decisions.
 
 ## Why this is the minimum viable patch
 - the user’s blocker is process inertia, not one missing trading rule.
@@ -36,7 +37,8 @@ Owner: PM/BA + Codex
 - `./scripts/pmba-gate.sh start` passed.
 - `./scripts/pmba-gate.sh end` passed.
 - `./scripts/validate-active-ticket.sh` passed targeted `T-040` validation.
-- `./scripts/validate-active-ticket.sh --full` passed full CI fallback earlier in this batch.
+- `./scripts/validate-active-ticket.sh --full` passed full CI.
+- `autobot-feedback-20260529-081216.tgz` returned `continue` and `nextTicket=T-040`.
 - `git diff --check` passed.
 
 ## Remaining risk

@@ -16,6 +16,38 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-05-29 08:14 UTC — T-040 readiness evidence: May 29 bundle continues active lane
+- Scope:
+  - classify `autobot-feedback-20260529-081216.tgz` under T-040 beta-readiness mode.
+- BA requirement mapping:
+  - latest evidence must be treated as readiness evidence, not automatic T-031/T-032 patch input.
+  - runtime patching remains blocked unless `P0/P1` severity plus deterministic reproduction is proven.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - use the May 29 bundle as supportive Gate P1 evidence, not production approval.
+- Evidence summary:
+  - `observed`: auto-retro decision is `continue`, next ticket remains `T-040`.
+  - `observed`: environment is `testnet`, risk state is `NORMAL`.
+  - `observed`: `daily_net_usdt=31.00`, `max_drawdown_pct=0.86`, `total_alloc_pct=4.62`, `open_positions=6`.
+  - `observed`: `200` submitted orders, `198` filled, `0` rejected, `2` canceled.
+  - `observed`: health has `0` errors and `0` restarts; no exchange/order-sync backoff in top reasons.
+  - `observed`: dominant skips are risk-budget/min-notional and fee/edge filters, not a repeated P0/P1 safety loop.
+- Technical changes:
+  - `scripts/validate-active-ticket.sh` now accepts both `continue` and `validation_required` for T-040 session decisions.
+  - `docs/easy_process/T040_BETA_READINESS_PACKET.md`, `T040_VALIDATION_MAP.md`, `LATEST_BATCH_DECISION.md`, and `OPERATOR_NOTE.md` record the latest readiness evidence.
+- Risk slider impact:
+  - none to runtime trading behavior.
+- Validation evidence:
+  - `./scripts/validate-active-ticket.sh` passed after validator correction.
+  - `./scripts/validate-active-ticket.sh --full` passed.
+  - `./scripts/pmba-gate.sh start` passed.
+  - `./scripts/pmba-gate.sh end` passed.
+  - `git diff --check` passed.
+- Runtime test request:
+  - keep settings unchanged and collect one more normal-window bundle as readiness evidence.
+- Follow-up:
+  - map remaining Gate P1 runtime safety scenarios to exact deterministic tests/fixtures.
+
 ## 2026-05-28 11:05 UTC — T-040 activation: freeze T-031/T-032 patch loop and move to bounded beta readiness
 - Scope:
   - respond to operator concern that T-031/T-032 have become an indefinite live-evidence patch loop since March.

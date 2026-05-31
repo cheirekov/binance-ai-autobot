@@ -1,11 +1,11 @@
 # OPERATOR_NOTE
 
-Last updated: 2026-05-28 12:15 UTC
+Last updated: 2026-05-29 08:14 UTC
 Owner: PM/BA + Codex
 
 ## What to run next
 - run `./scripts/validate-active-ticket.sh` for the targeted `T-040` readiness gate.
-- collect the next bundle as beta-readiness evidence.
+- keep the bot running unchanged and collect one more normal-window bundle as beta-readiness evidence.
 - use deterministic validation before any new trading-code patch.
 
 ## What not to do next

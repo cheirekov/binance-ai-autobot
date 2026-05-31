@@ -1,10 +1,10 @@
 # NEXT_BATCH_PLAN
 
-Last updated: 2026-05-28 12:15 UTC
+Last updated: 2026-05-29 08:14 UTC
 Owner: PM/BA + Codex
 
 ## Exact scope
-Activate `T-040` and produce the first bounded beta-readiness batch. Do not write another trading-behavior patch unless a P0/P1 safety issue or deterministic production-gate failure is found.
+Continue `T-040` after the May 29 readiness bundle. Do not write another trading-behavior patch unless a P0/P1 safety issue or deterministic production-gate failure is found.
 
 ## In scope
 - severity gate: define when live evidence can interrupt beta readiness.
@@ -27,6 +27,7 @@ Activate `T-040` and produce the first bounded beta-readiness batch. Do not writ
 - `./scripts/validate-active-ticket.sh` has a targeted `T-040` mode.
 - auto-retro treats production-readiness live churn as validation unless P0/P1 severity is proven.
 - next-session prompt points to beta readiness, not T-031/T-032 patch work.
+- May 29 evidence remains classified as readiness support, not production approval.
 
 ## Rollback condition
 - the process change hides or downgrades a real P0/P1 runtime safety issue.

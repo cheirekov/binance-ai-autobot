@@ -90,7 +90,9 @@ if (inProgress.length !== 1 || inProgress[0] !== 'T-040') {
 }
 
 if (!/^- Active ticket: `T-040`/m.test(session)) fail('session brief is not aligned to T-040');
-if (!/Decision: `validation_required`/m.test(session)) fail('session brief decision is not validation_required');
+if (!/Decision: `(continue|validation_required)`/m.test(session)) {
+  fail('session brief decision is neither continue nor validation_required');
+}
 if (!/^Active ticket: `T-040`/m.test(retro)) fail('auto-retro is not aligned to T-040');
 if (!/Production readiness mode: `enabled`/.test(retro)) fail('auto-retro production readiness mode is not enabled');
 if (!/P0\/P1/.test(packet) || !/deterministic reproduction/.test(packet)) fail('beta packet is missing severity/reproduction patch rule');
