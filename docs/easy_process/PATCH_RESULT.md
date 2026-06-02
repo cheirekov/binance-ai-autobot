@@ -1,6 +1,6 @@
 # PATCH_RESULT
 
-Last updated: 2026-05-29 08:14 UTC
+Last updated: 2026-06-02 08:45 UTC
 Owner: PM/BA + Codex
 
 ## Incident classification
@@ -24,6 +24,11 @@ Owner: PM/BA + Codex
 - next-session memory starts from beta readiness.
 - `./scripts/validate-active-ticket.sh` now has targeted `T-040` validation instead of falling back to full CI only.
 - T-040 validation now accepts either `continue` or `validation_required` because both are valid readiness decisions.
+- May 31 evidence is recorded as supportive readiness evidence, not a runtime patch trigger.
+- June 1 evidence is recorded as controlled-negative readiness evidence and drawdown-validation pressure, not a runtime patch trigger.
+- June 2 evidence is deterministically classified as `VALIDATION_REQUIRED`, not a P0/P1 runtime patch trigger.
+- first T-026 calibration runner selects `BUILD_BEAR_CHOPPY_FIXTURE` as the next strategy-validation artifact.
+- generated fixture `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json`.
 
 ## Why this is the minimum viable patch
 - the user’s blocker is process inertia, not one missing trading rule.
@@ -37,8 +42,16 @@ Owner: PM/BA + Codex
 - `./scripts/pmba-gate.sh start` passed.
 - `./scripts/pmba-gate.sh end` passed.
 - `./scripts/validate-active-ticket.sh` passed targeted `T-040` validation.
-- `./scripts/validate-active-ticket.sh --full` passed full CI.
+- `./scripts/validate-active-ticket.sh --full` passed full CI on 2026-05-31.
 - `autobot-feedback-20260529-081216.tgz` returned `continue` and `nextTicket=T-040`.
+- `autobot-feedback-20260531-120353.tgz` returned `continue` and `nextTicket=T-040`.
+- `autobot-feedback-20260601-083624.tgz` returned `continue` and `nextTicket=T-040`.
+- `./scripts/validate-active-ticket.sh --full` passed full CI on 2026-06-01.
+- `node scripts/t040-readiness-check.js` returned `VALIDATION_REQUIRED` for `autobot-feedback-20260602-082850.tgz`.
+- `node scripts/t026-calibration-runner.js` returned `BUILD_BEAR_CHOPPY_FIXTURE`.
+- `node scripts/t026-calibration-runner.js --write-fixture` generated the bear/choppy fixture.
+- `autobot-feedback-20260602-082850.tgz` returned `validation_required` and `nextTicket=T-040`.
+- `./scripts/validate-active-ticket.sh --full` passed full CI on 2026-06-02.
 - `git diff --check` passed.
 
 ## Remaining risk

@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-05-29 08:12 UTC
+Last updated: 2026-06-02 08:29 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch. This brief is intentionally short; long historical preservation details live in `docs/PM_BA_CHANGELOG.md` and `docs/STRATEGY_COVERAGE.md`.
@@ -49,8 +49,12 @@ Use this file at the start and end of every batch. This brief is intentionally s
 - Validation commands:
   - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh`
   - `node --check scripts/feedback-evidence.js`
-  - `./scripts/auto-retro.sh autobot-feedback-20260529-081216.tgz`
-  - `./scripts/update-session-brief.sh autobot-feedback-20260529-081216.tgz`
+  - `node --check scripts/t040-readiness-check.js`
+  - `node --check scripts/t026-calibration-runner.js`
+  - `node scripts/t040-readiness-check.js`
+  - `node scripts/t026-calibration-runner.js`
+  - `./scripts/auto-retro.sh autobot-feedback-20260602-082850.tgz`
+  - `./scripts/update-session-brief.sh autobot-feedback-20260602-082850.tgz`
   - `./scripts/validate-active-ticket.sh`
   - `./scripts/pmba-gate.sh start`
   - `./scripts/pmba-gate.sh end`
@@ -60,7 +64,7 @@ Use this file at the start and end of every batch. This brief is intentionally s
 
 ## 3) Deployment Handoff
 
-- Commit hash: `d708f10`
+- Commit hash: `cbef6cc`
 - Deploy target: process/docs/scripts only; no bot redeploy required unless code changes are later added.
 - Required config changes: none
 - Operator checklist:
@@ -73,36 +77,36 @@ Use this file at the start and end of every batch. This brief is intentionally s
 - Run context:
   - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `21.291`
-  - runtime uptime (hours): `1146.154`
-  - run end: `Fri May 29 2026 11:11:39 GMT+0300 (Eastern European Summer Time)`
+  - bundle interval (hours): `23.875`
+  - runtime uptime (hours): `1242.437`
+  - run end: `Tue Jun 02 2026 11:28:37 GMT+0300 (Eastern European Summer Time)`
   - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip XLMUSDC: Risk budget market entry cap below exchange minimum (20))
+  - active ticket runtime signal: `observed` (Skip TONUSDC: Risk budget market entry cap below exchange minimum (22))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=12, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=94.0%)
-  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=22, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=89.1%)
+  - sizing reject pressure: `low` (sizingRejectSkips=9, decisions=200, ratio=4.5%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `continue`
-- Next ticket candidate: `T-040` (continue active lane unless PM/BA reprioritizes)
-- Required action: `continue active ticket`
+- Decision: `validation_required`
+- Next ticket candidate: `T-040` (stop live-wait loop and use deterministic validation)
+- Required action: `classify severity and add deterministic validation before any runtime patch; live-market churn alone is not a beta blocker`
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260529-081216.tgz`
-  - auto-updated at: `2026-05-29T08:12:35.636Z`
+  - bundle: `autobot-feedback-20260602-082850.tgz`
+  - auto-updated at: `2026-06-02T08:29:08.826Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-040
-Decision: continue
-Required action: continue active ticket
-Latest bundle: autobot-feedback-20260529-081216.tgz
+Decision: validation_required
+Required action: classify severity and add deterministic validation before any runtime patch; live-market churn alone is not a beta blocker
+Latest bundle: autobot-feedback-20260602-082850.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: move the bot toward bounded beta/production readiness, not another T-031/T-032 micro-patch.
 Patch policy: runtime patches require P0/P1 safety severity plus deterministic reproduction.

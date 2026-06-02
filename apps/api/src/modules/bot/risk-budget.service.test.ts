@@ -149,4 +149,39 @@ describe("deriveRiskBudgetDecision", () => {
     expect(decision.allowedActions.placeGridSell).toBe(true);
     expect(decision.reasons).toContain("confirmed-bear-trend");
   });
+
+  it("applies risk-governor hysteresis after negative expectancy while preserving unwind", () => {
+    const baseline = deriveRiskBudgetDecision(
+      baselineInput({
+        openExposureHome: 320,
+        openPositions: 4,
+        recentPerformance: {
+          trades: 10,
+          realizedPnlHome: 18,
+          feesHome: 6
+        }
+      })
+    );
+
+    const defensive = deriveRiskBudgetDecision(
+      baselineInput({
+        openExposureHome: 320,
+        openPositions: 4,
+        recentPerformance: {
+          trades: 10,
+          realizedPnlHome: -28,
+          feesHome: 11
+        }
+      })
+    );
+
+    expect(defensive.lane).toBe("DEFENSIVE");
+    expect(defensive.allowedActions.openNewPosition).toBe(false);
+    expect(defensive.allowedActions.placeGridBuy).toBe(false);
+    expect(defensive.allowedActions.marketEntry).toBe(false);
+    expect(defensive.allowedActions.placeGridSell).toBe(true);
+    expect(defensive.allowedActions.reduceOnly).toBe(true);
+    expect(defensive.minNetEdgePct).toBeGreaterThan(baseline.minNetEdgePct);
+    expect(defensive.reasons).toContain("recent-negative-expectancy");
+  });
 });

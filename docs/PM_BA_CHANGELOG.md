@@ -16,6 +16,139 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-06-02 08:45 UTC — T-040 validation gate: classify 3 negative windows without patch loop
+- Scope:
+  - classify `autobot-feedback-20260602-082850.tgz` under T-040 beta-readiness mode.
+  - add deterministic validation that separates controlled drawdown pressure from P0/P1 safety failure.
+- BA requirement mapping:
+  - latest evidence is readiness evidence, not automatic T-031/T-032 patch input.
+  - three negative fresh windows block beta promotion until bear/choppy behavior is validated.
+  - runtime patching remains blocked unless `P0/P1` severity plus deterministic reproduction is proven.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - move from passive bundle collection to deterministic Gate P1 validation.
+- Evidence summary:
+  - `observed`: auto-retro decision is `validation_required`, next ticket remains `T-040`.
+  - `observed`: latest three fresh daily nets are `-36.55`, `-38.71`, `-8.81`.
+  - `observed`: environment is `testnet`, risk state is `NORMAL`.
+  - `observed`: `max_drawdown_pct=1.98`, `total_alloc_pct=0.12`, `open_positions=5`.
+  - `observed`: `202` submitted orders, `189` filled, `0` rejected, `12` canceled.
+  - `observed`: health has `0` errors and `0` restarts; no exchange/order-sync backoff in top reasons.
+  - `inferred`: this is validation pressure for bear/choppy behavior, not a P0/P1 execution failure.
+- Technical changes:
+  - `scripts/t040-readiness-check.js`:
+    - added deterministic T-040 evidence classifier.
+    - returns `VALIDATION_REQUIRED` for the current 3-negative-window sequence.
+    - fails only when P0/P1-style safety flags are present, such as health errors, restarts, repeated rejected orders, or exchange backoff evidence.
+    - resolves bundle paths from the repo root and treats repeated small rejects across recent windows as safety-review pressure.
+  - `scripts/validate-active-ticket.sh`:
+    - runs the T-040 readiness classifier inside the targeted T-040 gate.
+    - aligns `VALIDATION_REQUIRED` with the beta packet so a process pass cannot be mistaken for production/beta approval.
+  - `scripts/t026-calibration-runner.js`:
+    - added first executable T-026 calibration runner.
+    - selects `BUILD_BEAR_CHOPPY_FIXTURE` from the latest feedback bundle set.
+    - writes `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json`.
+    - ranks candidate families as `risk_governor_hysteresis`, `grid_guard_v2`, and `mean_reversion_gate`.
+    - writes recent reject safety signals into the fixture and avoids treating `.tgz` bundle arguments as fixture output paths after `--write-fixture`.
+  - `apps/api/src/modules/bot/risk-budget.service.test.ts`:
+    - added deterministic `risk_governor_hysteresis` proof that negative expectancy blocks new BUY/market exposure while preserving SELL/reduce-only unwind.
+  - `docs/easy_process/T040_BETA_READINESS_PACKET.md`, `T040_VALIDATION_MAP.md`, `LATEST_BATCH_DECISION.md`, `NEXT_BATCH_PLAN.md`, `PRODUCTION_DELTA_NOTE.md`, and `OPERATOR_NOTE.md`:
+    - record June 2 as validation-required drawdown pressure, not production approval.
+  - `docs/easy_process/REFERENCE_STRATEGY_ADOPTION.md`:
+    - added clean-room strategy adoption path for reference bots.
+  - `docs/REFERENCE_PERMISSION_NOTES.md`:
+    - added explicit permission capture template for any direct reference-code copying.
+  - `docs/easy_process/AI_ORCHESTRATION.md`:
+    - added reference auditor role and permission-note check for direct copying.
+- Risk slider impact:
+  - none to runtime trading behavior.
+- Validation evidence:
+  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh` passed.
+  - `node --check scripts/feedback-evidence.js` passed.
+  - `node --check scripts/t040-readiness-check.js` passed.
+  - `node --check scripts/t026-calibration-runner.js` passed.
+  - `node scripts/t040-readiness-check.js` returned `VALIDATION_REQUIRED`.
+  - `node scripts/t026-calibration-runner.js --write-fixture` returned `BUILD_BEAR_CHOPPY_FIXTURE`, `safetySignals=rejectedWindowsRecent=0,totalRejectedRecent=0,repeatedSmallRejects=false`, and wrote the fixture.
+  - `docker compose -f docker-compose.ci.yml run --rm ci sh -lc "corepack enable && pnpm -C apps/api exec vitest run src/modules/bot/risk-budget.service.test.ts -t 'risk-governor hysteresis'"` passed.
+  - `./scripts/validate-active-ticket.sh` passed.
+  - `./scripts/validate-active-ticket.sh --full` passed.
+  - `./scripts/pmba-gate.sh start` passed.
+  - `./scripts/pmba-gate.sh end` passed.
+  - `git diff --check` passed.
+- Runtime test request:
+  - do not promote to real-money beta yet; build deterministic bear/choppy Gate P1 validation first.
+- Follow-up:
+  - convert the negative sequence into replay/synthetic acceptance cases.
+
+## 2026-06-01 08:42 UTC — T-040 readiness evidence: June 1 controlled-negative window
+- Scope:
+  - classify `autobot-feedback-20260601-083624.tgz` under T-040 beta-readiness mode.
+- BA requirement mapping:
+  - latest evidence is readiness evidence, not automatic T-031/T-032 patch input.
+  - a larger negative live window is not a runtime defect unless it shows `P0/P1` safety severity or deterministic production-gate failure.
+  - the negative sequence should be converted into deterministic bear/choppy validation before any beta promotion.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - use June 1 as supportive controlled-negative Gate P1 evidence, not production approval.
+- Evidence summary:
+  - `observed`: auto-retro decision is `continue`, next ticket remains `T-040`.
+  - `observed`: environment is `testnet`, risk state is `NORMAL`.
+  - `observed`: `daily_net_usdt=-38.71`, `max_drawdown_pct=1.51`, `total_alloc_pct=2.57`, `open_positions=8`.
+  - `observed`: `202` submitted orders, `193` filled, `0` rejected, `7` canceled.
+  - `observed`: health has `0` errors and `0` restarts; no exchange/order-sync backoff in top reasons.
+  - `observed`: dominant skips are risk-budget/min-notional, blocked exposure, no-feasible, and fee/edge filters, not a repeated P0/P1 safety loop.
+- Technical changes:
+  - `docs/easy_process/T040_BETA_READINESS_PACKET.md`, `T040_VALIDATION_MAP.md`, `LATEST_BATCH_DECISION.md`, `NEXT_BATCH_PLAN.md`, `PRODUCTION_DELTA_NOTE.md`, and `OPERATOR_NOTE.md` record the latest readiness evidence.
+  - `docs/SESSION_BRIEF.md` validation commands now point at the latest bundle.
+- Risk slider impact:
+  - none to runtime trading behavior.
+- Validation evidence:
+  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh` passed.
+  - `node --check scripts/feedback-evidence.js` passed.
+  - `./scripts/validate-active-ticket.sh` passed.
+  - `./scripts/validate-active-ticket.sh --full` passed.
+  - `./scripts/pmba-gate.sh start` passed.
+  - `./scripts/pmba-gate.sh end` passed.
+  - `git diff --check` passed.
+- Runtime test request:
+  - continue collecting readiness evidence if desired, but prioritize deterministic bear/choppy Gate P1 scenario mapping before any beta promotion.
+- Follow-up:
+  - map remaining Gate P1 runtime safety scenarios to exact deterministic tests/fixtures.
+
+## 2026-05-31 12:05 UTC — T-040 readiness evidence: May 31 small-negative window stays safe
+- Scope:
+  - classify `autobot-feedback-20260531-120353.tgz` under T-040 beta-readiness mode.
+- BA requirement mapping:
+  - latest evidence is readiness evidence, not automatic T-031/T-032 patch input.
+  - a small negative live window is not a runtime defect unless it shows `P0/P1` safety severity or deterministic production-gate failure.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - use May 31 as supportive small-negative Gate P1 evidence, not production approval.
+- Evidence summary:
+  - `observed`: auto-retro decision is `continue`, next ticket remains `T-040`.
+  - `observed`: environment is `testnet`, risk state is `NORMAL`.
+  - `observed`: `daily_net_usdt=-8.81`, `max_drawdown_pct=0.75`, `total_alloc_pct=5.11`, `open_positions=8`.
+  - `observed`: `200` submitted orders, `197` filled, `0` rejected, `3` canceled.
+  - `observed`: health has `0` errors and `0` restarts; no exchange/order-sync backoff in top reasons.
+  - `observed`: dominant skips are risk-budget/min-notional and fee/edge filters, not a repeated P0/P1 safety loop.
+- Technical changes:
+  - `docs/easy_process/T040_BETA_READINESS_PACKET.md`, `T040_VALIDATION_MAP.md`, `LATEST_BATCH_DECISION.md`, `NEXT_BATCH_PLAN.md`, `PRODUCTION_DELTA_NOTE.md`, and `OPERATOR_NOTE.md` record the latest readiness evidence.
+  - `docs/SESSION_BRIEF.md` validation commands now point at the latest bundle.
+- Risk slider impact:
+  - none to runtime trading behavior.
+- Validation evidence:
+  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh` passed.
+  - `node --check scripts/feedback-evidence.js` passed.
+  - `./scripts/validate-active-ticket.sh` passed.
+  - `./scripts/validate-active-ticket.sh --full` passed.
+  - `./scripts/pmba-gate.sh start` passed.
+  - `./scripts/pmba-gate.sh end` passed.
+  - `git diff --check` passed.
+- Runtime test request:
+  - continue collecting readiness evidence if desired, but prioritize deterministic Gate P1 scenario mapping before any beta promotion.
+- Follow-up:
+  - map remaining Gate P1 runtime safety scenarios to exact deterministic tests/fixtures.
+
 ## 2026-05-29 08:14 UTC — T-040 readiness evidence: May 29 bundle continues active lane
 - Scope:
   - classify `autobot-feedback-20260529-081216.tgz` under T-040 beta-readiness mode.

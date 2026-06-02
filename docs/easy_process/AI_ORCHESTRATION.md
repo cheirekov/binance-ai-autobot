@@ -15,6 +15,7 @@ Future agents must start from the compact working set:
 5. `docs/PM_BA_CHANGELOG.md`
 6. `docs/easy_process/T040_BETA_READINESS_PACKET.md`
 7. `docs/easy_process/T040_VALIDATION_MAP.md`
+8. `docs/easy_process/REFERENCE_STRATEGY_ADOPTION.md` when strategy/reference work is requested
 
 Do not load old triage notes, historical easy-process files, or full changelog sections unless the current task asks for history.
 
@@ -28,14 +29,14 @@ The skill exists to stop future sessions from converting live-market noise into 
 
 ## Subagent Use
 
-Use subagents only for bounded audits with a clear artifact:
-
+Use subagents only for bounded audits with a clear artifact.
 | Subagent role | Input | Output |
 | --- | --- | --- |
 | Runtime Analyst | latest feedback bundle + retro | severity classification and evidence summary |
 | Validation Engineer | tests + validation map | missing deterministic scenarios |
 | Trader/Safety Reviewer | risk docs + state evidence | safety invariant concerns |
 | Release Manager | beta packet + deployment docs | release/rollback checklist gaps |
+| Reference Auditor | `references/` + license notes | clean-room strategy candidates and license constraints |
 
 The main agent remains responsible for final integration and validation.
 
@@ -45,6 +46,7 @@ The main agent remains responsible for final integration and validation.
 - Use GitHub connector only for repository, PR, issue, or CI work.
 - Use OpenAI docs MCP only for current OpenAI API or Codex platform questions.
 - Do not browse or call external tools to justify trading decisions unless the task explicitly requires current external facts.
+- For direct reference-code copying, check `docs/REFERENCE_PERMISSION_NOTES.md` first.
 
 ## Token Budget Rule
 
@@ -69,5 +71,6 @@ Use one of these outputs:
 - `VALIDATION_ONLY`: evidence, tests, fixtures, gates, runbook.
 - `PATCH_ALLOWED`: runtime code change allowed because severity and reproduction are proven.
 - `PROMOTION_PACKET_ONLY`: production/beta approval artifact.
+- `REFERENCE_STRATEGY_ADOPTION`: clean-room strategy extraction, validation fixtures, and shadow-first implementation.
 
 If none fits, default to `VALIDATION_ONLY`.

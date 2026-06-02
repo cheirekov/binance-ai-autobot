@@ -52,8 +52,17 @@ case "$ACTIVE_TICKET" in
     echo "Active ticket: $ACTIVE_TICKET"
     bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh
     node --check scripts/feedback-evidence.js
+    node --check scripts/t040-readiness-check.js
+    node --check scripts/t026-calibration-runner.js
+    T040_OUTPUT="$(node scripts/t040-readiness-check.js)"
+    printf '%s\n' "$T040_OUTPUT"
+    T040_CLASSIFICATION="$(printf '%s\n' "$T040_OUTPUT" | sed -n 's/^T-040 readiness classification: //p' | head -n1)"
+    T026_OUTPUT="$(node scripts/t026-calibration-runner.js)"
+    printf '%s\n' "$T026_OUTPUT"
+    T026_RECOMMENDATION="$(printf '%s\n' "$T026_OUTPUT" | sed -n 's/^T-026 calibration recommendation: //p' | head -n1)"
     ./scripts/pmba-gate.sh start
     ./scripts/pmba-gate.sh end
+    export T040_CLASSIFICATION T026_RECOMMENDATION
     node <<'NODE'
 const fs = require('fs');
 
@@ -83,6 +92,8 @@ const retro = read('docs/RETROSPECTIVE_AUTO.md');
 const packet = read('docs/easy_process/T040_BETA_READINESS_PACKET.md');
 const validationMap = read('docs/easy_process/T040_VALIDATION_MAP.md');
 const orchestration = read('docs/easy_process/AI_ORCHESTRATION.md');
+const t040Classification = process.env.T040_CLASSIFICATION ?? '';
+const t026Recommendation = process.env.T026_RECOMMENDATION ?? '';
 
 const inProgress = [...board.matchAll(/^\| (T-[0-9]{3}) \| IN_PROGRESS \|/gm)].map((match) => match[1]);
 if (inProgress.length !== 1 || inProgress[0] !== 'T-040') {
@@ -99,8 +110,19 @@ if (!/P0\/P1/.test(packet) || !/deterministic reproduction/.test(packet)) fail('
 if (!/Gate P1/.test(packet)) fail('beta packet is missing Gate P1 checklist');
 if (!/Required Deterministic Scenarios/.test(validationMap)) fail('validation map is missing deterministic scenarios');
 if (!/PATCH_ALLOWED/.test(orchestration) || !/VALIDATION_ONLY/.test(orchestration)) fail('AI orchestration is missing output classes');
+if (!/^(CONTINUE_READINESS|VALIDATION_REQUIRED)$/.test(t040Classification)) {
+  fail(`unexpected T-040 readiness classification ${t040Classification || 'empty'}`);
+}
+if (t040Classification === 'VALIDATION_REQUIRED') {
+  if (!/Decision mode: `VALIDATION_REQUIRED`/.test(packet)) fail('beta packet does not record VALIDATION_REQUIRED');
+  if (!/Production posture: not approved/.test(packet)) fail('beta packet does not block production promotion');
+  if (!/Beta posture: pause promotion/.test(packet)) fail('beta packet does not pause beta promotion');
+  if (t026Recommendation !== 'BUILD_BEAR_CHOPPY_FIXTURE') {
+    fail(`expected T-026 BUILD_BEAR_CHOPPY_FIXTURE during validation pressure, found ${t026Recommendation || 'empty'}`);
+  }
+}
 
-console.log('PASS: T-040 beta-readiness process validation');
+console.log(`PASS: T-040 beta-readiness process validation (${t040Classification}; promotion gate remains separate)`);
 NODE
     ;;
   T-032)
