@@ -1,13 +1,14 @@
 # OPERATOR_NOTE
 
-Last updated: 2026-06-02 08:45 UTC
+Last updated: 2026-06-03 16:08 UTC
 Owner: PM/BA + Codex
 
 ## What to run next
 - run `./scripts/validate-active-ticket.sh` for the targeted `T-040` readiness gate.
 - do not promote to real-money beta yet.
-- next engineering work should start `T-026` offline calibration/replay and clean-room reference strategy adoption.
-- current selected fixture: `bear_choppy_controlled_drawdown`.
+- next engineering work should continue `T-026` offline calibration/replay and clean-room reference strategy adoption.
+- latest bundle `autobot-feedback-20260603-160659.tgz` is supportive positive readiness evidence, not production proof.
+- preserved fixture: `bear_choppy_controlled_drawdown`.
 - current candidate ranking: `risk_governor_hysteresis`, `grid_guard_v2`, `mean_reversion_gate`.
 - use deterministic validation before any new trading-code patch.
 

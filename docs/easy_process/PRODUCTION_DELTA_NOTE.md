@@ -1,12 +1,12 @@
 # PRODUCTION_DELTA_NOTE
 
-Last updated: 2026-06-02 08:45 UTC
+Last updated: 2026-06-03 16:08 UTC
 Owner: PM/BA + Codex
 
 ## How this batch moves the bot closer to production
 It changes the project from endless runtime symptom patching to bounded beta-readiness delivery. `T-031/T-032` runtime behavior is preserved, while `T-040` now owns validation, release, rollback, and severity decisions.
 
-The June 2 bundle supports this direction: auto-retro returned `validation_required`, risk state stayed `NORMAL`, no orders were rejected, no restarts were observed, and the active lane remained `T-040` despite a third negative fresh window. It makes deterministic bear/choppy drawdown validation the next production-readiness blocker.
+The June 3 bundle supports this direction: auto-retro returned `continue`, risk state stayed `NORMAL`, daily net recovered to `+26.35 USDT`, no orders were rejected, no restarts were observed, and the active lane remained `T-040`. It removes the immediate three-negative-window blocker, while preserving deterministic bear/choppy drawdown validation as a production-readiness requirement.
 
 ## What is still missing before the next gate
 - exact deterministic test/fixture mapping for the remaining Gate P1 runtime safety scenarios.

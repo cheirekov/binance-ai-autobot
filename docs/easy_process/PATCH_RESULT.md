@@ -1,6 +1,6 @@
 # PATCH_RESULT
 
-Last updated: 2026-06-02 08:45 UTC
+Last updated: 2026-06-03 16:08 UTC
 Owner: PM/BA + Codex
 
 ## Incident classification
@@ -29,6 +29,7 @@ Owner: PM/BA + Codex
 - June 2 evidence is deterministically classified as `VALIDATION_REQUIRED`, not a P0/P1 runtime patch trigger.
 - first T-026 calibration runner selects `BUILD_BEAR_CHOPPY_FIXTURE` as the next strategy-validation artifact.
 - generated fixture `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json`.
+- June 3 evidence is classified as `CONTINUE_READINESS`, with `KEEP_COLLECTING_AND_LABEL_REGIME` from the T-026 calibration runner.
 
 ## Why this is the minimum viable patch
 - the user’s blocker is process inertia, not one missing trading rule.
@@ -52,6 +53,11 @@ Owner: PM/BA + Codex
 - `node scripts/t026-calibration-runner.js --write-fixture` generated the bear/choppy fixture.
 - `autobot-feedback-20260602-082850.tgz` returned `validation_required` and `nextTicket=T-040`.
 - `./scripts/validate-active-ticket.sh --full` passed full CI on 2026-06-02.
+- `node scripts/t040-readiness-check.js` returned `CONTINUE_READINESS` for `autobot-feedback-20260603-160659.tgz`.
+- `node scripts/t026-calibration-runner.js` returned `KEEP_COLLECTING_AND_LABEL_REGIME`.
+- `autobot-feedback-20260603-160659.tgz` returned `continue` and `nextTicket=T-040`.
+- `./scripts/validate-active-ticket.sh` passed targeted `T-040` validation on 2026-06-03.
+- `./scripts/validate-active-ticket.sh --full` passed full CI on 2026-06-03.
 - `git diff --check` passed.
 
 ## Remaining risk

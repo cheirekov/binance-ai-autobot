@@ -16,6 +16,55 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-06-03 16:08 UTC — T-040 readiness evidence: June 3 positive window continues active lane
+- Scope:
+  - classify `autobot-feedback-20260603-160659.tgz` under T-040 beta-readiness mode.
+  - update active readiness docs from June 2 `VALIDATION_REQUIRED` to June 3 `CONTINUE_READINESS` without claiming beta approval.
+- BA requirement mapping:
+  - latest evidence is readiness evidence, not automatic T-031/T-032 patch input.
+  - the positive window removes the immediate three-negative-window blocker.
+  - beta promotion remains blocked until Gate P1 partials, deterministic strategy comparison, and release/rollback proof are complete.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - use mixed positive/drawdown windows for deterministic validation instead of restarting the live-evidence patch loop.
+- Evidence summary:
+  - `observed`: auto-retro decision is `continue`, next ticket remains `T-040`.
+  - `observed`: `scripts/t040-readiness-check.js` returns `CONTINUE_READINESS`.
+  - `observed`: `scripts/t026-calibration-runner.js` returns `KEEP_COLLECTING_AND_LABEL_REGIME`.
+  - `observed`: environment is `testnet`, risk state is `NORMAL`.
+  - `observed`: `daily_net_usdt=+26.35`, `max_drawdown_pct=1.98`, `total_alloc_pct=0.17`, `open_positions=10`.
+  - `observed`: `200` submitted orders, `186` filled, `0` rejected, `14` canceled.
+  - `observed`: health has `0` errors and `0` restarts; no exchange/order-sync backoff in top reasons.
+  - `inferred`: this is supportive readiness evidence, not production proof.
+- Technical changes:
+  - `docs/easy_process/T040_BETA_READINESS_PACKET.md`, `T040_VALIDATION_MAP.md`, `LATEST_BATCH_DECISION.md`, `NEXT_BATCH_PLAN.md`, `PRODUCTION_DELTA_NOTE.md`, `PATCH_RESULT.md`, and `OPERATOR_NOTE.md`:
+    - record June 3 as `CONTINUE_READINESS`.
+    - preserve the June 2 bear/choppy fixture as a required validation artifact.
+    - keep beta and real-money promotion blocked until Gate P1 partials are closed.
+  - `docs/SESSION_BRIEF.md`:
+    - validation commands now point at `autobot-feedback-20260603-160659.tgz`.
+- Risk slider impact:
+  - none to runtime trading behavior.
+- Validation evidence:
+  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh` passed.
+  - `node --check scripts/feedback-evidence.js` passed.
+  - `node --check scripts/t040-readiness-check.js` passed.
+  - `node --check scripts/t026-calibration-runner.js` passed.
+  - `node scripts/t040-readiness-check.js` returned `CONTINUE_READINESS`.
+  - `node scripts/t026-calibration-runner.js` returned `KEEP_COLLECTING_AND_LABEL_REGIME` with `safetySignals=rejectedWindowsRecent=0,totalRejectedRecent=0,repeatedSmallRejects=false`.
+  - `./scripts/auto-retro.sh autobot-feedback-20260603-160659.tgz` returned `continue`.
+  - `./scripts/update-session-brief.sh autobot-feedback-20260603-160659.tgz` returned `nextTicket=T-040`.
+  - `./scripts/pmba-gate.sh start` passed.
+  - `./scripts/pmba-gate.sh end` passed.
+  - `./scripts/validate-active-ticket.sh` passed.
+  - `./scripts/validate-active-ticket.sh --full` passed.
+  - `git diff --check` passed.
+- Runtime test request:
+  - keep running in testnet/paper mode; do not promote to real-money beta yet.
+- Follow-up:
+  - build the offline comparison report for `risk_governor_hysteresis`, `grid_guard_v2`, and `mean_reversion_gate`.
+  - produce release/rollback proof before any bounded beta request.
+
 ## 2026-06-02 08:45 UTC — T-040 validation gate: classify 3 negative windows without patch loop
 - Scope:
   - classify `autobot-feedback-20260602-082850.tgz` under T-040 beta-readiness mode.
