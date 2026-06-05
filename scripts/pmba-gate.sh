@@ -100,7 +100,7 @@ if [[ "$PHASE" == "end" ]]; then
   fi
 
   if command -v node >/dev/null 2>&1; then
-    mapfile -t LATEST_BUNDLES < <(find . -maxdepth 1 -type f -name 'autobot-feedback-*.tgz' -printf '%f\n' | sort | tail -n 2 | tac)
+    mapfile -t LATEST_BUNDLES < <(find . -maxdepth 1 -type f -name 'autobot-feedback-*.tgz' -print | sed 's#^\./##' | sort -r | head -n 2)
     if [[ "${#LATEST_BUNDLES[@]}" -ge 2 ]]; then
       node - "${LATEST_BUNDLES[0]}" "${LATEST_BUNDLES[1]}" "$ACTIVE_TICKET" <<'NODE'
 const path = require("node:path");

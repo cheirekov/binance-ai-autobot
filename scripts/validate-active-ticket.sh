@@ -23,25 +23,32 @@ if [[ -z "$ACTIVE_TICKET" ]]; then
 fi
 
 COMPOSE=()
-if [[ -n "${AUTOBOT_COMPOSE_CMD:-}" ]]; then
-  read -r -a COMPOSE <<<"${AUTOBOT_COMPOSE_CMD}"
-elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-  COMPOSE=(docker compose)
-elif command -v docker-compose >/dev/null 2>&1; then
-  COMPOSE=(docker-compose)
-else
-  echo "Docker Compose not found. Install either 'docker compose' (v2) or 'docker-compose' (v1)." >&2
-  exit 1
-fi
+resolve_compose() {
+  if [[ "${#COMPOSE[@]}" -gt 0 ]]; then
+    return
+  fi
+  if [[ -n "${AUTOBOT_COMPOSE_CMD:-}" ]]; then
+    read -r -a COMPOSE <<<"${AUTOBOT_COMPOSE_CMD}"
+  elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    COMPOSE=(docker compose)
+  elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE=(docker-compose)
+  else
+    echo "Docker Compose not found. Install either 'docker compose' (v2) or 'docker-compose' (v1)." >&2
+    exit 1
+  fi
+}
 
 run_in_ci() {
   local inner="$1"
+  resolve_compose
   "${COMPOSE[@]}" -f docker-compose.ci.yml run --rm ci sh -lc "$inner"
 }
 
 if [[ "$FULL_MODE" -eq 1 ]]; then
   echo "Validation mode: full CI"
   echo "Active ticket: $ACTIVE_TICKET"
+  resolve_compose
   "${COMPOSE[@]}" -f docker-compose.ci.yml run --rm ci
   exit 0
 fi
@@ -50,10 +57,11 @@ case "$ACTIVE_TICKET" in
   T-040|T-PROD|T-BETA)
     echo "Validation mode: targeted beta-readiness process validation"
     echo "Active ticket: $ACTIVE_TICKET"
-    bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh
+    bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh scripts/validate-beta-promotion.sh scripts/run-batch.sh
     node --check scripts/feedback-evidence.js
     node --check scripts/t040-readiness-check.js
     node --check scripts/t026-calibration-runner.js
+    node --check scripts/t026-strategy-replay.js
     node --check scripts/t040-strategy-effectiveness-report.js
     T040_OUTPUT="$(node scripts/t040-readiness-check.js)"
     printf '%s\n' "$T040_OUTPUT"
@@ -141,6 +149,7 @@ NODE
     ;;
   *)
     echo "No ticket-specific deterministic validation mapped for $ACTIVE_TICKET; running full CI instead."
+    resolve_compose
     "${COMPOSE[@]}" -f docker-compose.ci.yml run --rm ci
     ;;
 esac

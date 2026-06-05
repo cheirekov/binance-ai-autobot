@@ -14,7 +14,7 @@ fi
 
 BUNDLE="${1:-}"
 if [[ -z "$BUNDLE" ]]; then
-  BUNDLE="$(find . -maxdepth 1 -type f -name 'autobot-feedback-*.tgz' -printf '%f\n' | sort | tail -n1 || true)"
+  BUNDLE="$(find . -maxdepth 1 -type f -name 'autobot-feedback-*.tgz' -print | sed 's#^\./##' | sort | tail -n1 || true)"
 fi
 
 if [[ -z "$BUNDLE" || ! -f "$BUNDLE" ]]; then
@@ -22,7 +22,8 @@ if [[ -z "$BUNDLE" || ! -f "$BUNDLE" ]]; then
   exit 1
 fi
 
-PREVIOUS_BUNDLE="$(find . -maxdepth 1 -type f -name 'autobot-feedback-*.tgz' -printf '%f\n' | grep -Fxv "$BUNDLE" | sort | tail -n1 || true)"
+BUNDLE_NAME="$(basename "$BUNDLE")"
+PREVIOUS_BUNDLE="$(find . -maxdepth 1 -type f -name 'autobot-feedback-*.tgz' -print | sed 's#^\./##' | grep -Fxv "$BUNDLE_NAME" | sort | tail -n1 || true)"
 
 TMP_DIR="$(mktemp -d)"
 cleanup() { rm -rf "$TMP_DIR"; }

@@ -6,8 +6,16 @@ services:
       - ./:/repo
     command: >
       sh -lc "
+        apk add --no-cache bash &&
         corepack enable &&
-        pnpm install --no-frozen-lockfile &&
+        pnpm install --frozen-lockfile &&
+        bash -n scripts/auto-retro.sh scripts/collect-feedback.sh scripts/generate-last-run-summary.sh scripts/ingest-feedback.sh scripts/pmba-gate.sh scripts/pull-and-ingest-feedback.sh scripts/run-batch.sh scripts/update-session-brief.sh scripts/validate-active-ticket.sh scripts/validate-beta-promotion.sh &&
+        node --check scripts/feedback-evidence.js &&
+        node --check scripts/t026-calibration-runner.js &&
+        node --check scripts/t026-strategy-replay.js &&
+        node --check scripts/t040-readiness-check.js &&
+        node --check scripts/t040-strategy-effectiveness-report.js &&
+        ./scripts/validate-active-ticket.sh &&
         pnpm lint &&
         pnpm test &&
         pnpm build

@@ -19,7 +19,7 @@ USAGE
 fi
 
 LATEST_REMOTE="$(
-  ssh "$REMOTE_HOST" "bash -lc 'find \"$REMOTE_DIR\" -maxdepth 1 -type f -name \"autobot-feedback-*.tgz\" -printf \"%f\n\" | sort | tail -n1'" || true
+  ssh "$REMOTE_HOST" "bash -lc 'find \"$REMOTE_DIR\" -maxdepth 1 -type f -name \"autobot-feedback-*.tgz\" -exec basename {} \\; | sort | tail -n1'" || true
 )"
 
 if [[ -z "$LATEST_REMOTE" ]]; then

@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 BUNDLE="${1:-}"
 if [[ -z "$BUNDLE" ]]; then
-  BUNDLE="$(find . -maxdepth 1 -type f -name 'autobot-feedback-*.tgz' -printf '%f\n' | sort | tail -n1 || true)"
+  BUNDLE="$(find . -maxdepth 1 -type f -name 'autobot-feedback-*.tgz' -print | sed 's#^\./##' | sort | tail -n1 || true)"
 fi
 
 if [[ -z "$BUNDLE" || ! -f "$BUNDLE" ]]; then

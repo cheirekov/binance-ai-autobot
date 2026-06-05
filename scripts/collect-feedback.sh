@@ -74,6 +74,9 @@ copy_if_exists "data/telemetry/last_run_summary.json" "$TMP_DIR/data/telemetry/l
 if [[ -f "data/telemetry/adaptive-shadow.jsonl" ]]; then
   tail -n 5000 "data/telemetry/adaptive-shadow.jsonl" >"$TMP_DIR/data/telemetry/adaptive-shadow.tail.jsonl" || true
 fi
+if [[ -f "data/telemetry/reset-events.jsonl" ]]; then
+  tail -n 200 "data/telemetry/reset-events.jsonl" >"$TMP_DIR/data/telemetry/reset-events.tail.jsonl" || true
+fi
 
 # Delivery context snapshots (team memory + ticket state)
 copy_if_exists "docs/TEAM_OPERATING_RULES.md" "$TMP_DIR/meta/docs/TEAM_OPERATING_RULES.md"
