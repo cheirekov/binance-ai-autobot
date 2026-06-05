@@ -735,6 +735,10 @@ export function DashboardPage(): JSX.Element {
                 <th>RSI</th>
                 <th>ADX</th>
                 <th>ATR%</th>
+                <th>D20</th>
+                <th>BB</th>
+                <th>EMA</th>
+                <th>Cycle</th>
               </tr>
             </thead>
             <tbody>
@@ -749,11 +753,15 @@ export function DashboardPage(): JSX.Element {
                   <td>{c.rsi14 === undefined ? "—" : c.rsi14.toFixed(1)}</td>
                   <td>{c.adx14 === undefined ? "—" : c.adx14.toFixed(1)}</td>
                   <td>{c.atrPct14 === undefined ? "—" : c.atrPct14.toFixed(2)}</td>
+                  <td>{c.donchianBreakoutPct20 === undefined ? "—" : `${c.donchianBreakoutPct20.toFixed(2)}%`}</td>
+                  <td>{c.bollingerPosition20 === undefined ? "—" : c.bollingerPosition20.toFixed(2)}</td>
+                  <td>{c.emaTrendSpreadPct === undefined ? "—" : `${c.emaTrendSpreadPct.toFixed(2)}%`}</td>
+                  <td>{c.rangeCycleScore20 === undefined ? "—" : c.rangeCycleScore20.toFixed(2)}</td>
                 </tr>
               ))}
               {universeRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ color: "var(--muted)" }}>
+                  <td colSpan={11} style={{ color: "var(--muted)" }}>
                     No candidates yet. Start the bot to trigger an examine scan, or press Rescan.
                   </td>
                 </tr>

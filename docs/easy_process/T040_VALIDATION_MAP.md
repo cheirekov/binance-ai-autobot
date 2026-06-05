@@ -1,6 +1,6 @@
 # T040_VALIDATION_MAP
 
-Last updated: 2026-06-03 16:08 UTC
+Last updated: 2026-06-05 08:01 UTC
 Owner: Validation Engineer + PM/BA
 
 Purpose: make beta-readiness measurable. This file maps each production-readiness question to a command, fixture, or explicit gap.
@@ -15,14 +15,18 @@ Purpose: make beta-readiness measurable. This file maps each production-readines
 | T-040 readiness classifier | `node scripts/t040-readiness-check.js` | `CONTINUE_READINESS` |
 | T-026 calibration runner syntax | `node --check scripts/t026-calibration-runner.js` | `PASS` |
 | T-026 calibration runner | `node scripts/t026-calibration-runner.js` | `KEEP_COLLECTING_AND_LABEL_REGIME`; recent rejects `0` |
+| T-040 strategy effectiveness syntax | `node --check scripts/t040-strategy-effectiveness-report.js` | `PASS` |
+| T-040 strategy effectiveness report | `node scripts/t040-strategy-effectiveness-report.js` | `NOT_BETA_READY`; rule-based adaptation visible but not proven profitable |
+| Clean-room strategy signals | `pnpm -C packages/shared test -- strategy-signals` | `PASS` in CI container |
+| Adaptive strategy-family scoring | `pnpm -C apps/api exec vitest run src/modules/bot/bot-engine.service.test.ts -t 'strategy families'` | `PASS` in CI container |
 | Risk-governor hysteresis proof | `pnpm -C apps/api exec vitest run src/modules/bot/risk-budget.service.test.ts -t 'risk-governor hysteresis'` | `PASS` |
 | Reference strategy adoption boundary | `docs/easy_process/REFERENCE_STRATEGY_ADOPTION.md` | `MAPPED` |
 | PM/BA start gate | `./scripts/pmba-gate.sh start` | `PASS` |
 | PM/BA end gate | `./scripts/pmba-gate.sh end` | `PASS` |
 | T-040 active validation | `./scripts/validate-active-ticket.sh` | `MAPPED_THIS_BATCH` |
-| Full CI | `./scripts/validate-active-ticket.sh --full` | `PASS` on 2026-06-03 |
-| Latest bundle classification | `./scripts/auto-retro.sh autobot-feedback-20260603-160659.tgz` | `continue` |
-| Latest session brief refresh | `./scripts/update-session-brief.sh autobot-feedback-20260603-160659.tgz` | `nextTicket=T-040` |
+| Full CI | `./scripts/validate-active-ticket.sh --full` | `PASS` on 2026-06-05 |
+| Latest bundle classification | `./scripts/auto-retro.sh autobot-feedback-20260605-075150.tgz` | `continue` |
+| Latest session brief refresh | `./scripts/update-session-brief.sh autobot-feedback-20260605-075150.tgz` | `nextTicket=T-040` |
 
 ## Required Deterministic Scenarios
 
@@ -30,11 +34,12 @@ Purpose: make beta-readiness measurable. This file maps each production-readines
 | --- | --- | --- | --- |
 | Exposure cannot grow beyond hard caps | prevents production capital blow-up | existing risk-budget tests | map exact test names to Gate P1 |
 | Sell/unwind remains reachable under reserve starvation | prevents boxed-in managed exposure | live evidence + bot-engine tests | add explicit T-040 test target |
-| Exchange order rejects do not create retry storms | prevents fee/order chaos | latest four readiness bundles have `0` rejected orders | add synthetic reject fixture |
-| Order-sync/backoff state is visible and recoverable | prevents silent stuck execution | latest four readiness bundles have no backoff in top reasons; auto-retro checks backoff | add deterministic bundle fixture |
+| Exchange order rejects do not create retry storms | prevents fee/order chaos | latest six readiness bundles have `0` rejected orders | add synthetic reject fixture |
+| Order-sync/backoff state is visible and recoverable | prevents silent stuck execution | latest six readiness bundles have no backoff in top reasons; auto-retro checks backoff | add deterministic bundle fixture |
+| Sizing/min-order rejects stay bounded | prevents hidden churn and unproductive grid attempts | June 5 sizing reject pressure is `low` at `3.0%` after June 4 medium `14.0%`; exchange rejects remain `0` | include both windows in `grid_guard_v2` offline comparison and add acceptance threshold |
 | Fee-aware PnL accounting is stable | prevents false profitability | bot-engine tests | include in T-040 target list |
 | Restart preserves state and operator visibility | prevents hidden position/order loss | config/state persistence exists | add restart fixture or documented manual test |
-| Range/choppy market behavior is classified | proves adaptation beyond one bundle | June 1/2 controlled drawdowns plus generated `bear_choppy_controlled_drawdown` fixture | add offline comparison report and acceptance threshold |
+| Range/choppy market behavior is classified | proves adaptation beyond one bundle | June 1/2/4/5 controlled drawdowns plus generated `bear_choppy_controlled_drawdown` fixture; strategy effectiveness report is `NOT_BETA_READY` | add offline comparison report and acceptance threshold |
 | Trend-leaning market behavior is classified | proves adaptation beyond one bundle | May 29 and June 3 positive windows are live readiness evidence | select replay or synthetic equivalent |
 | AI/news cannot directly drive orders | protects hard risk contract | policy docs | add explicit gate/test or config assertion |
 | Reference strategy can be evaluated offline | prevents blind live strategy copy | adoption plan exists | implement `T-026` replay/calibration runner |
@@ -43,7 +48,7 @@ Purpose: make beta-readiness measurable. This file maps each production-readines
 
 `node scripts/t026-calibration-runner.js` now recommends:
 - `KEEP_COLLECTING_AND_LABEL_REGIME`
-- current window classes: `PROFIT_WINDOW=2`, `CONTROLLED_DRAWDOWN=2`, `NEUTRAL_OR_INCONCLUSIVE=1`
+- current window classes: `CONTROLLED_DRAWDOWN=4`, `PROFIT_WINDOW=1`
 - safety signals: `rejectedWindowsRecent=0`, `totalRejectedRecent=0`, `repeatedSmallRejects=false`
 - preserved fixture file: `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json`
 - preserved candidate families: `risk_governor_hysteresis`, `grid_guard_v2`, `mean_reversion_gate`
@@ -51,19 +56,35 @@ Purpose: make beta-readiness measurable. This file maps each production-readines
 
 This is progress, not promotion. Continue T-040 and use the mixed positive/drawdown evidence to build offline comparison reports rather than waiting passively for more bundles.
 
+## Strategy Effectiveness Result
+
+`node scripts/t040-strategy-effectiveness-report.js` now reports:
+- `NOT_BETA_READY`
+- `aiMode=OFF`
+- `dailyNet=-5.79`, `fiveWindowNet=-93.82`, `realizedAfterFees=-31.64`
+- current window classes: `CONTROLLED_DRAWDOWN=4`, `PROFIT_WINDOW=1`
+- adaptive shadow signals: `5000` events, `TREND=3709`, `MEAN_REVERSION=1093`, `GRID=198`
+- execution lanes observed: `MARKET=2890`, `GRID=1215`, `DEFENSIVE=472`, `UNSPECIFIED=423`
+- top losses after fees: `OPNUSDC=-14.57`, `NEARUSDC=-13.24`, `XRPUSDC=-4.46`
+- top open exposure cost: `SOLUSDC=167.62`, `WLDUSDC=20.72`
+
+Client-facing interpretation: the bot is changing rule-based strategy/lane labels, but the latest evidence does not prove profitable adaptation. Beta promotion stays blocked.
+
 ## Latest Bundle Evidence
 
-`autobot-feedback-20260603-160659.tgz` is supportive readiness evidence:
+`autobot-feedback-20260605-075150.tgz` is small controlled-drawdown readiness evidence:
 - `testnet` environment.
 - `NORMAL` risk state.
-- `+26.35 USDT` daily net.
-- `1.98%` max drawdown.
-- `0.17%` total allocation across `10` open positions.
-- `200` submitted orders, `186` filled, `0` rejected, `14` canceled.
+- `-5.79 USDT` daily net.
+- `1.70%` max drawdown.
+- `3.85%` total allocation across `11` open positions.
+- `200` submitted orders, `181` filled, `0` rejected, `19` canceled.
 - `0` health errors and `0` restarts.
-- top skip reasons are ordinary no-feasible, risk-budget/min-notional, and fee/edge filters.
+- low sizing reject pressure: `6` sizing rejects, `3.0%` of decisions.
+- strategy effectiveness verdict: `NOT_BETA_READY` because five-window net is `-93.82`, realized-after-fees is `-31.64`, and four of the latest five windows are controlled drawdowns.
+- top skip reasons are ordinary no-feasible, fee/edge, and risk-budget grid-buy pauses.
 
-This does not close Gate P1. It removes the immediate three-negative-window blocker, but strategy/adaptation proof and release/rollback proof are still incomplete.
+This does not close Gate P1. It keeps the lane in `CONTINUE_READINESS` because safety is clean, while strengthening the need for offline strategy/grid comparison and release/rollback proof.
 
 ## Severity Routing
 

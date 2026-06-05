@@ -58,6 +58,11 @@ type AdaptiveRegimeSnapshot = {
     rsi14?: number;
     adx14?: number;
     atrPct14?: number;
+    donchianBreakoutPct20?: number;
+    bollingerPosition20?: number;
+    bollingerWidthPct20?: number;
+    emaTrendSpreadPct?: number;
+    rangeCycleScore20?: number;
   };
 };
 
@@ -84,6 +89,11 @@ type AdaptiveShadowEvent = {
     rsi14?: number;
     adx14?: number;
     atrPct14?: number;
+    donchianBreakoutPct20?: number;
+    bollingerPosition20?: number;
+    bollingerWidthPct20?: number;
+    emaTrendSpreadPct?: number;
+    rangeCycleScore20?: number;
   };
   regime: AdaptiveRegimeSnapshot;
   strategy: AdaptiveStrategyScores;
@@ -4376,7 +4386,12 @@ export class BotEngineService implements OnModuleInit {
       priceChangePct24h: candidate?.priceChangePct24h,
       rsi14: candidate?.rsi14,
       adx14: candidate?.adx14,
-      atrPct14: candidate?.atrPct14
+      atrPct14: candidate?.atrPct14,
+      donchianBreakoutPct20: candidate?.donchianBreakoutPct20,
+      bollingerPosition20: candidate?.bollingerPosition20,
+      bollingerWidthPct20: candidate?.bollingerWidthPct20,
+      emaTrendSpreadPct: candidate?.emaTrendSpreadPct,
+      rangeCycleScore20: candidate?.rangeCycleScore20
     };
 
     const change = typeof inputs.priceChangePct24h === "number" ? inputs.priceChangePct24h : Number.NaN;
@@ -4508,17 +4523,52 @@ export class BotEngineService implements OnModuleInit {
     const rsi = Number.isFinite(candidate?.rsi14) ? Math.max(0, Math.min(100, candidate?.rsi14 ?? 50)) : 50;
     const atr = Number.isFinite(candidate?.atrPct14) ? Math.max(0, candidate?.atrPct14 ?? 0) : 0;
     const change = Number.isFinite(candidate?.priceChangePct24h) ? Math.abs(candidate?.priceChangePct24h ?? 0) : 0;
+    const donchianBreakout = Number.isFinite(candidate?.donchianBreakoutPct20) ? candidate?.donchianBreakoutPct20 ?? 0 : 0;
+    const bollingerPosition = Number.isFinite(candidate?.bollingerPosition20) ? candidate?.bollingerPosition20 ?? 0.5 : 0.5;
+    const bollingerWidth = Number.isFinite(candidate?.bollingerWidthPct20) ? Math.max(0, candidate?.bollingerWidthPct20 ?? 0) : 0;
+    const emaTrendSpread = Number.isFinite(candidate?.emaTrendSpreadPct) ? candidate?.emaTrendSpreadPct ?? 0 : 0;
+    const rangeCycleScore = Number.isFinite(candidate?.rangeCycleScore20)
+      ? Math.max(0, Math.min(1, candidate?.rangeCycleScore20 ?? 0))
+      : 0;
+    const bullishBreakoutScore = this.clamp01(Math.max(0, donchianBreakout) / 1.5);
+    const bearishBreakoutScore = this.clamp01(Math.max(0, -donchianBreakout) / 1.5);
+    const bullishEmaScore = this.clamp01(Math.max(0, emaTrendSpread) / 1.2);
+    const bearishEmaScore = this.clamp01(Math.max(0, -emaTrendSpread) / 1.2);
+    const bandExtremeScore = this.clamp01(Math.abs(bollingerPosition - 0.5) * 2);
+    const lowBandReversionScore = this.clamp01((0.28 - bollingerPosition) / 0.28);
+    const highBandReversionScore = this.clamp01((bollingerPosition - 0.72) / 0.28);
+    const moderateBandWidthScore = bollingerWidth > 0 ? this.clamp01(1 - Math.abs(bollingerWidth - 2.2) / 3.2) : 0;
 
-    let trend = this.clamp01((adx / 45) * 0.65 + (Math.min(8, change) / 8) * 0.35);
-    let meanReversion = this.clamp01((rsi <= 35 || rsi >= 65 ? 0.65 : 0.25) + Math.min(1.2, atr) * 0.25);
-    let grid = this.clamp01((regime === "RANGE" ? 0.65 : 0.25) + Math.min(1.4, atr) * 0.2);
+    let trend = this.clamp01(
+      (adx / 45) * 0.38 +
+        (Math.min(8, change) / 8) * 0.16 +
+        bullishBreakoutScore * 0.24 +
+        bullishEmaScore * 0.18 +
+        bearishBreakoutScore * 0.04
+    );
+    let meanReversion = this.clamp01(
+      (rsi <= 35 || rsi >= 65 ? 0.42 : 0.18) +
+        bandExtremeScore * 0.22 +
+        Math.max(lowBandReversionScore, highBandReversionScore) * 0.18 +
+        Math.min(1.2, atr) * 0.12
+    );
+    let grid = this.clamp01(
+      (regime === "RANGE" ? 0.52 : 0.18) +
+        rangeCycleScore * 0.26 +
+        moderateBandWidthScore * 0.12 +
+        Math.min(1.4, atr) * 0.1
+    );
 
     if (regime === "BEAR_TREND") {
-      trend *= 0.5;
-      meanReversion = this.clamp01(meanReversion + 0.04);
-      grid = this.clamp01(grid - 0.14);
+      trend = this.clamp01(trend * 0.45 + bearishBreakoutScore * 0.05 + bearishEmaScore * 0.04);
+      meanReversion = this.clamp01(meanReversion + lowBandReversionScore * 0.08);
+      grid = this.clamp01(grid - 0.18);
     } else if (regime === "BULL_TREND") {
-      trend = this.clamp01(trend + 0.12);
+      trend = this.clamp01(trend + 0.1 + bullishBreakoutScore * 0.08 + bullishEmaScore * 0.06);
+      grid = this.clamp01(grid - 0.04);
+    } else if (regime === "RANGE") {
+      trend = this.clamp01(trend - 0.04);
+      grid = this.clamp01(grid + rangeCycleScore * 0.08);
     }
 
     const candidates: Array<{ strategy: AdaptiveStrategy; score: number }> = [
@@ -5060,7 +5110,12 @@ export class BotEngineService implements OnModuleInit {
                 priceChangePct24h: tickContext.candidate.priceChangePct24h,
                 rsi14: tickContext.candidate.rsi14,
                 adx14: tickContext.candidate.adx14,
-                atrPct14: tickContext.candidate.atrPct14
+                atrPct14: tickContext.candidate.atrPct14,
+                donchianBreakoutPct20: tickContext.candidate.donchianBreakoutPct20,
+                bollingerPosition20: tickContext.candidate.bollingerPosition20,
+                bollingerWidthPct20: tickContext.candidate.bollingerWidthPct20,
+                emaTrendSpreadPct: tickContext.candidate.emaTrendSpreadPct,
+                rangeCycleScore20: tickContext.candidate.rangeCycleScore20
               }
             }
           : {}),

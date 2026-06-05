@@ -3,7 +3,14 @@ import path from "node:path";
 
 import { Injectable } from "@nestjs/common";
 import type { UniverseCandidate, UniverseSnapshot } from "@autobot/shared";
-import { UNIVERSE_VERSION, UniverseSnapshotSchema } from "@autobot/shared";
+import {
+  computeBollingerSignal,
+  computeDonchianBreakoutPct,
+  computeEmaTrendSpreadPct,
+  computeRangeCycleScore,
+  UNIVERSE_VERSION,
+  UniverseSnapshotSchema
+} from "@autobot/shared";
 
 import { ConfigService } from "../config/config.service";
 import { resolveRouteBridgeAssets, resolveUniverseDefaultQuoteAssets, resolveWalletQuoteHintLimit } from "../config/asset-routing";
@@ -518,16 +525,42 @@ export class UniverseService {
         const rsi14 = clampNumber(computeRsi(closes, 14), 0, 100);
         const adx14 = clampNumber(computeAdx(highs, lows, closes, 14), 0, 100);
         const atrPct14 = clampNumber(computeAtrPct(highs, lows, closes, 14), 0, 1000);
+        const donchianBreakoutPct20 = clampNumber(computeDonchianBreakoutPct(highs, lows, closes, 20), -1000, 1000);
+        const bollinger = computeBollingerSignal(closes, 20, 2);
+        const bollingerPosition20 = clampNumber(bollinger?.position ?? null, 0, 1);
+        const bollingerWidthPct20 = clampNumber(bollinger?.widthPct ?? null, 0, 1000);
+        const emaTrendSpreadPct = clampNumber(computeEmaTrendSpreadPct(closes, 12, 26), -1000, 1000);
+        const rangeCycleScore20 = clampNumber(computeRangeCycleScore(closes, 20), 0, 1);
 
         const normalizedVolume = s.quoteVolumeHome24h && s.quoteVolumeHome24h > 0 ? s.quoteVolumeHome24h : s.quoteVolume24h;
         const volumeScore = Math.log10(Math.max(1, normalizedVolume));
         const trendScore = adx14 ? Math.min(adx14 / 50, 1) : 0;
         const volScore = atrPct14 ? Math.min(atrPct14 / 10, 1) : 0;
+        const breakoutScore =
+          donchianBreakoutPct20 === null ? 0 : Math.min(1, Math.abs(donchianBreakoutPct20) / 1.5);
+        const emaSpreadScore = emaTrendSpreadPct === null ? 0 : Math.min(1, Math.abs(emaTrendSpreadPct) / 1.2);
+        const bandExtremeScore =
+          bollingerPosition20 === null ? 0 : Math.min(1, Math.abs(bollingerPosition20 - 0.5) * 2);
+        const rangeScore = rangeCycleScore20 ?? 0;
 
-        const score = volumeScore * 0.45 + trendScore * 0.35 + volScore * 0.2;
+        const score =
+          volumeScore * 0.35 +
+          trendScore * 0.18 +
+          volScore * 0.12 +
+          breakoutScore * 0.13 +
+          emaSpreadScore * 0.08 +
+          bandExtremeScore * 0.07 +
+          rangeScore * 0.07;
 
         const strategyHint =
-          adx14 && adx14 >= 25 ? "TREND" : rsi14 && (rsi14 >= 70 || rsi14 <= 30) ? "MEAN_REVERSION" : "RANGE";
+          (adx14 && adx14 >= 25) ||
+          (donchianBreakoutPct20 !== null && Math.abs(donchianBreakoutPct20) >= 0.4) ||
+          (emaTrendSpreadPct !== null && Math.abs(emaTrendSpreadPct) >= 0.65)
+            ? "TREND"
+            : (rsi14 && (rsi14 >= 70 || rsi14 <= 30)) ||
+                (bollingerPosition20 !== null && (bollingerPosition20 <= 0.12 || bollingerPosition20 >= 0.88))
+              ? "MEAN_REVERSION"
+              : "RANGE";
 
         const reasons = [
           `Vol ${s.quoteVolume24h.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${s.quoteAsset} (24h)`,
@@ -537,7 +570,11 @@ export class UniverseService {
           `Δ ${s.priceChangePct24h.toFixed(2)}% (24h)`,
           rsi14 === null ? null : `RSI14 ${rsi14.toFixed(1)}`,
           adx14 === null ? null : `ADX14 ${adx14.toFixed(1)}`,
-          atrPct14 === null ? null : `ATR14 ${atrPct14.toFixed(2)}%`
+          atrPct14 === null ? null : `ATR14 ${atrPct14.toFixed(2)}%`,
+          donchianBreakoutPct20 === null ? null : `Donchian20 ${donchianBreakoutPct20.toFixed(2)}%`,
+          bollingerPosition20 === null ? null : `BB20 pos ${bollingerPosition20.toFixed(2)}`,
+          emaTrendSpreadPct === null ? null : `EMA12/26 ${emaTrendSpreadPct.toFixed(2)}%`,
+          rangeCycleScore20 === null ? null : `RangeCycle20 ${rangeCycleScore20.toFixed(2)}`
         ].filter(Boolean) as string[];
 
         return UniverseSnapshotSchema.shape.candidates.element.parse({
@@ -550,6 +587,11 @@ export class UniverseService {
           ...(rsi14 === null ? {} : { rsi14 }),
           ...(adx14 === null ? {} : { adx14 }),
           ...(atrPct14 === null ? {} : { atrPct14 }),
+          ...(donchianBreakoutPct20 === null ? {} : { donchianBreakoutPct20 }),
+          ...(bollingerPosition20 === null ? {} : { bollingerPosition20 }),
+          ...(bollingerWidthPct20 === null ? {} : { bollingerWidthPct20 }),
+          ...(emaTrendSpreadPct === null ? {} : { emaTrendSpreadPct }),
+          ...(rangeCycleScore20 === null ? {} : { rangeCycleScore20 }),
           strategyHint,
           score,
           reasons

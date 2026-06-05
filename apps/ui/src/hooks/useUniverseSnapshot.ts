@@ -12,6 +12,11 @@ export type UniverseCandidate = {
   rsi14?: number;
   adx14?: number;
   atrPct14?: number;
+  donchianBreakoutPct20?: number;
+  bollingerPosition20?: number;
+  bollingerWidthPct20?: number;
+  emaTrendSpreadPct?: number;
+  rangeCycleScore20?: number;
   strategyHint?: "TREND" | "RANGE" | "MEAN_REVERSION";
   score: number;
   reasons: string[];

@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-06-03 16:10 UTC
+Last updated: 2026-06-05 07:55 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch. This brief is intentionally short; long historical preservation details live in `docs/PM_BA_CHANGELOG.md` and `docs/STRATEGY_COVERAGE.md`.
@@ -53,8 +53,8 @@ Use this file at the start and end of every batch. This brief is intentionally s
   - `node --check scripts/t026-calibration-runner.js`
   - `node scripts/t040-readiness-check.js`
   - `node scripts/t026-calibration-runner.js`
-  - `./scripts/auto-retro.sh autobot-feedback-20260603-160659.tgz`
-  - `./scripts/update-session-brief.sh autobot-feedback-20260603-160659.tgz`
+  - `./scripts/auto-retro.sh autobot-feedback-20260605-075150.tgz`
+  - `./scripts/update-session-brief.sh autobot-feedback-20260605-075150.tgz`
   - `./scripts/validate-active-ticket.sh`
   - `./scripts/pmba-gate.sh start`
   - `./scripts/pmba-gate.sh end`
@@ -75,21 +75,21 @@ Use this file at the start and end of every batch. This brief is intentionally s
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `EVENING (collection) / EVENING (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `31.628`
-  - runtime uptime (hours): `1274.065`
-  - run end: `Wed Jun 03 2026 19:06:18 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `NIGHT_RUN`
+  - bundle interval (hours): `23.467`
+  - runtime uptime (hours): `1313.81`
+  - run end: `Fri Jun 05 2026 10:50:58 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip: No feasible candidates after policy/exposure filters (20))
+  - active ticket runtime signal: `observed` (Skip: No feasible candidates after policy/exposure filters (76))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=31, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=84.5%)
-  - sizing reject pressure: `low` (sizingRejectSkips=5, decisions=200, ratio=2.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=37, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=81.5%)
+  - sizing reject pressure: `low` (sizingRejectSkips=6, decisions=200, ratio=3.0%)
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `continue`
 - Next ticket candidate: `T-040` (continue active lane unless PM/BA reprioritizes)
@@ -97,8 +97,8 @@ Use this file at the start and end of every batch. This brief is intentionally s
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260603-160659.tgz`
-  - auto-updated at: `2026-06-03T16:10:41.012Z`
+  - bundle: `autobot-feedback-20260605-075150.tgz`
+  - auto-updated at: `2026-06-05T07:55:39.587Z`
 
 ## 5) Copy/paste prompt for next session
 
@@ -106,7 +106,7 @@ Use this file at the start and end of every batch. This brief is intentionally s
 Ticket: T-040
 Decision: continue
 Required action: continue active ticket
-Latest bundle: autobot-feedback-20260603-160659.tgz
+Latest bundle: autobot-feedback-20260605-075150.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: move the bot toward bounded beta/production readiness, not another T-031/T-032 micro-patch.
 Patch policy: runtime patches require P0/P1 safety severity plus deterministic reproduction.

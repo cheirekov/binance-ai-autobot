@@ -4835,6 +4835,84 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(bear.grid).toBeLessThan(range.grid);
   });
 
+  it("uses breakout, band, EMA, and cycle signals to separate strategy families", () => {
+    const helpers = service as unknown as {
+      buildAdaptiveStrategyScores: (
+        candidate: UniverseCandidate | null,
+        regime: "BULL_TREND" | "RANGE" | "NEUTRAL"
+      ) => {
+        trend: number;
+        meanReversion: number;
+        grid: number;
+        recommended: "TREND" | "MEAN_REVERSION" | "GRID";
+      };
+    };
+
+    const base = {
+      baseAsset: "AAA",
+      quoteAsset: "USDC",
+      lastPrice: 10,
+      quoteVolume24h: 1_000_000,
+      score: 1,
+      reasons: []
+    };
+    const breakout = helpers.buildAdaptiveStrategyScores(
+      {
+        ...base,
+        symbol: "AAAUSDC",
+        priceChangePct24h: 2.1,
+        rsi14: 61,
+        adx14: 24,
+        atrPct14: 1.1,
+        donchianBreakoutPct20: 1.2,
+        bollingerPosition20: 0.72,
+        bollingerWidthPct20: 2.4,
+        emaTrendSpreadPct: 0.95,
+        rangeCycleScore20: 0.1
+      },
+      "BULL_TREND"
+    );
+    const range = helpers.buildAdaptiveStrategyScores(
+      {
+        ...base,
+        symbol: "BBBUSDC",
+        priceChangePct24h: 0.1,
+        rsi14: 51,
+        adx14: 12,
+        atrPct14: 0.8,
+        donchianBreakoutPct20: 0,
+        bollingerPosition20: 0.5,
+        bollingerWidthPct20: 2.1,
+        emaTrendSpreadPct: 0.02,
+        rangeCycleScore20: 0.95
+      },
+      "RANGE"
+    );
+    const meanReversion = helpers.buildAdaptiveStrategyScores(
+      {
+        ...base,
+        symbol: "CCCUSDC",
+        priceChangePct24h: -1.2,
+        rsi14: 27,
+        adx14: 14,
+        atrPct14: 0.9,
+        donchianBreakoutPct20: -0.1,
+        bollingerPosition20: 0.03,
+        bollingerWidthPct20: 2.5,
+        emaTrendSpreadPct: -0.15,
+        rangeCycleScore20: 0.2
+      },
+      "NEUTRAL"
+    );
+
+    expect(breakout.recommended).toBe("TREND");
+    expect(breakout.trend).toBeGreaterThan(breakout.grid);
+    expect(range.recommended).toBe("GRID");
+    expect(range.grid).toBeGreaterThan(range.trend);
+    expect(meanReversion.recommended).toBe("MEAN_REVERSION");
+    expect(meanReversion.meanReversion).toBeGreaterThan(meanReversion.trend);
+  });
+
   it("routes SPOT_GRID execution lane by regime and confidence", () => {
     const helpers = service as unknown as {
       resolveExecutionLane: (params: {

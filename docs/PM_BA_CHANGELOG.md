@@ -16,6 +16,129 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-06-05 07:53 UTC — T-040 readiness evidence: June 5 small controlled drawdown with low sizing pressure
+- Scope:
+  - classify `autobot-feedback-20260605-075150.tgz` under T-040 beta-readiness mode.
+  - update active readiness docs without reopening T-031/T-032 runtime patching.
+- BA requirement mapping:
+  - latest evidence is readiness evidence, not automatic T-031/T-032 patch input.
+  - low sizing pressure and zero exchange rejects show the June 4 medium sizing pressure did not escalate into a retry storm.
+  - normal-client beta trust is still blocked because rule-based adaptation is visible but not profitable after fees across the latest evidence window.
+  - beta promotion remains blocked until Gate P1 partials, deterministic strategy/grid comparison, drawdown-regime acceptance, and release/rollback proof are complete.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - route the June 5 small drawdown into T-026 offline comparison instead of a runtime micro-patch.
+- Evidence summary:
+  - `observed`: auto-retro decision is `continue`, next ticket remains `T-040`.
+  - `observed`: `scripts/t040-readiness-check.js` returns `CONTINUE_READINESS`.
+  - `observed`: `scripts/t026-calibration-runner.js` returns `KEEP_COLLECTING_AND_LABEL_REGIME`.
+  - `observed`: `scripts/t040-strategy-effectiveness-report.js` returns `NOT_BETA_READY`.
+  - `observed`: current five-window classes are `CONTROLLED_DRAWDOWN=4`, `PROFIT_WINDOW=1`.
+  - `observed`: environment is `testnet`, risk state is `NORMAL`.
+  - `observed`: `daily_net_usdt=-5.79`, `max_drawdown_pct=1.70`, `total_alloc_pct=3.85`, `open_positions=11`.
+  - `observed`: `200` submitted orders, `181` filled, `0` rejected, `19` canceled.
+  - `observed`: sizing reject pressure is `low` with `6` sizing rejects, `3.0%` of decisions.
+  - `observed`: strategy shadow has `5000` events across `TREND`, `MEAN_REVERSION`, `GRID`, `MARKET`, `GRID`, and `DEFENSIVE`, but five-window net is `-93.82 USDT` and realized-after-fees is `-31.64 USDT`.
+  - `observed`: health has `0` errors and `0` restarts; no exchange/order-sync backoff in top reasons.
+  - `inferred`: this is small controlled drawdown and regime-validation pressure, not a P0/P1 execution failure and not beta-ready strategy proof.
+- Technical changes:
+  - `packages/shared/src/strategy-signals.ts`, `packages/shared/src/strategy-signals.test.ts`:
+    - added clean-room Donchian breakout, Bollinger band, EMA spread, and range-cycle signal helpers with tests.
+  - `packages/shared/src/schemas/universe.ts`, `apps/api/src/modules/universe/universe.service.ts`:
+    - added optional strategy signal fields and candidate scoring from existing candle data.
+  - `apps/api/src/modules/bot/bot-engine.service.ts`, `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - adaptive scoring now uses breakout, band, EMA, and cycle signals to separate `TREND`, `MEAN_REVERSION`, and `GRID`.
+  - `apps/ui/src/hooks/useUniverseSnapshot.ts`, `apps/ui/src/pages/DashboardPage.tsx`:
+    - exposes the new universe strategy signals in the dashboard candidate table.
+  - `scripts/t040-strategy-effectiveness-report.js`:
+    - added bundle-level strategy-effectiveness reporting from `baseline-kpis.json`, `last_run_summary.json`, and `adaptive-shadow.tail.jsonl`.
+    - reports whether strategy/lane switching is visible and whether the recent net/fee evidence supports beta readiness.
+  - `scripts/validate-active-ticket.sh`:
+    - runs the strategy-effectiveness report inside targeted `T-040` validation and accepts only explicit verdict labels.
+  - `docs/easy_process/T040_BETA_READINESS_PACKET.md`, `T040_VALIDATION_MAP.md`, `LATEST_BATCH_DECISION.md`, `NEXT_BATCH_PLAN.md`, `PRODUCTION_DELTA_NOTE.md`, `PATCH_RESULT.md`, and `OPERATOR_NOTE.md`:
+    - record June 5 as `CONTINUE_READINESS`.
+    - record strategy effectiveness as `NOT_BETA_READY`.
+    - preserve the bear/choppy fixture and add June 5 low sizing pressure after June 4 medium pressure as `grid_guard_v2` validation input.
+    - keep beta and real-money promotion blocked until Gate P1 partials are closed.
+  - `docs/SESSION_BRIEF.md`:
+    - validation commands now point at `autobot-feedback-20260605-075150.tgz`.
+- Risk slider impact:
+  - none to runtime trading behavior.
+- Validation evidence:
+  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh` passed.
+  - `node --check scripts/feedback-evidence.js` passed.
+  - `node --check scripts/t040-readiness-check.js` passed.
+  - `node --check scripts/t026-calibration-runner.js` passed.
+  - `node --check scripts/t040-strategy-effectiveness-report.js` passed.
+  - focused shared strategy-signal tests passed in the CI container.
+  - focused bot-engine strategy-family tests passed in the CI container.
+  - workspace lint passed in the CI container.
+  - `node scripts/t040-readiness-check.js` returned `CONTINUE_READINESS`.
+  - `node scripts/t026-calibration-runner.js` returned `KEEP_COLLECTING_AND_LABEL_REGIME` with `safetySignals=rejectedWindowsRecent=0,totalRejectedRecent=0,repeatedSmallRejects=false`.
+  - `node scripts/t040-strategy-effectiveness-report.js` returned `NOT_BETA_READY` with `clientAnswer=rule_based_adaptation_visible_but_not_proven_profitable`.
+  - `./scripts/auto-retro.sh autobot-feedback-20260605-075150.tgz` returned `continue`.
+  - `./scripts/update-session-brief.sh autobot-feedback-20260605-075150.tgz` returned `nextTicket=T-040`.
+  - `./scripts/pmba-gate.sh start` passed.
+  - `./scripts/pmba-gate.sh end` passed.
+  - `./scripts/validate-active-ticket.sh` passed.
+  - `./scripts/validate-active-ticket.sh --full` passed.
+  - `git diff --check` passed.
+- Runtime test request:
+  - keep running in testnet/paper mode; do not promote to real-money beta yet.
+- Follow-up:
+  - include June 4 medium sizing pressure and June 5 low sizing recovery in the offline comparison report for `grid_guard_v2`.
+  - produce release/rollback proof before any bounded beta request.
+
+## 2026-06-04 08:24 UTC — T-040 readiness evidence: June 4 controlled drawdown with medium sizing pressure
+- Scope:
+  - classify `autobot-feedback-20260604-082337.tgz` under T-040 beta-readiness mode.
+  - update active readiness docs without reopening T-031/T-032 runtime patching.
+- BA requirement mapping:
+  - latest evidence is readiness evidence, not automatic T-031/T-032 patch input.
+  - medium sizing pressure is a validation signal unless it becomes exchange rejects, stuck orders, or deterministic production-gate failure.
+  - beta promotion remains blocked until Gate P1 partials, deterministic strategy/grid comparison, sizing-pressure acceptance, and release/rollback proof are complete.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - route the June 4 drawdown and sizing pressure into T-026/grid-guard offline comparison.
+- Evidence summary:
+  - `observed`: auto-retro decision is `continue`, next ticket remains `T-040`.
+  - `observed`: `scripts/t040-readiness-check.js` returns `CONTINUE_READINESS`.
+  - `observed`: `scripts/t026-calibration-runner.js` returns `KEEP_COLLECTING_AND_LABEL_REGIME`.
+  - `observed`: environment is `testnet`, risk state is `NORMAL`.
+  - `observed`: `daily_net_usdt=-39.12`, `max_drawdown_pct=1.90`, `total_alloc_pct=1.34`, `open_positions=8`.
+  - `observed`: `201` submitted orders, `185` filled, `0` rejected, `15` canceled.
+  - `observed`: sizing reject pressure is `medium` with `28` sizing rejects, `14.0%` of decisions.
+  - `observed`: health has `0` errors and `0` restarts; no exchange/order-sync backoff in top reasons.
+  - `inferred`: this is controlled drawdown and grid/sizing validation pressure, not a P0/P1 execution failure.
+- Technical changes:
+  - `docs/easy_process/T040_BETA_READINESS_PACKET.md`, `T040_VALIDATION_MAP.md`, `LATEST_BATCH_DECISION.md`, `NEXT_BATCH_PLAN.md`, `PRODUCTION_DELTA_NOTE.md`, `PATCH_RESULT.md`, and `OPERATOR_NOTE.md`:
+    - record June 4 as `CONTINUE_READINESS`.
+    - preserve the bear/choppy fixture and add sizing/min-order pressure as `grid_guard_v2` validation input.
+    - keep beta and real-money promotion blocked until Gate P1 partials are closed.
+  - `docs/SESSION_BRIEF.md`:
+    - validation commands now point at `autobot-feedback-20260604-082337.tgz`.
+- Risk slider impact:
+  - none to runtime trading behavior.
+- Validation evidence:
+  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh` passed.
+  - `node --check scripts/feedback-evidence.js` passed.
+  - `node --check scripts/t040-readiness-check.js` passed.
+  - `node --check scripts/t026-calibration-runner.js` passed.
+  - `node scripts/t040-readiness-check.js` returned `CONTINUE_READINESS`.
+  - `node scripts/t026-calibration-runner.js` returned `KEEP_COLLECTING_AND_LABEL_REGIME` with `safetySignals=rejectedWindowsRecent=0,totalRejectedRecent=0,repeatedSmallRejects=false`.
+  - `./scripts/auto-retro.sh autobot-feedback-20260604-082337.tgz` returned `continue`.
+  - `./scripts/update-session-brief.sh autobot-feedback-20260604-082337.tgz` returned `nextTicket=T-040`.
+  - `./scripts/pmba-gate.sh start` passed.
+  - `./scripts/pmba-gate.sh end` passed.
+  - `./scripts/validate-active-ticket.sh` passed.
+  - `./scripts/validate-active-ticket.sh --full` passed.
+  - `git diff --check` passed.
+- Runtime test request:
+  - keep running in testnet/paper mode; do not promote to real-money beta yet.
+- Follow-up:
+  - include June 4 sizing/min-order pressure in the offline comparison report for `grid_guard_v2`.
+  - produce release/rollback proof before any bounded beta request.
+
 ## 2026-06-03 16:08 UTC — T-040 readiness evidence: June 3 positive window continues active lane
 - Scope:
   - classify `autobot-feedback-20260603-160659.tgz` under T-040 beta-readiness mode.

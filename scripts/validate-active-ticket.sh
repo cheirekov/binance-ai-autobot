@@ -54,15 +54,19 @@ case "$ACTIVE_TICKET" in
     node --check scripts/feedback-evidence.js
     node --check scripts/t040-readiness-check.js
     node --check scripts/t026-calibration-runner.js
+    node --check scripts/t040-strategy-effectiveness-report.js
     T040_OUTPUT="$(node scripts/t040-readiness-check.js)"
     printf '%s\n' "$T040_OUTPUT"
     T040_CLASSIFICATION="$(printf '%s\n' "$T040_OUTPUT" | sed -n 's/^T-040 readiness classification: //p' | head -n1)"
     T026_OUTPUT="$(node scripts/t026-calibration-runner.js)"
     printf '%s\n' "$T026_OUTPUT"
     T026_RECOMMENDATION="$(printf '%s\n' "$T026_OUTPUT" | sed -n 's/^T-026 calibration recommendation: //p' | head -n1)"
+    T040_EFFECTIVENESS_OUTPUT="$(node scripts/t040-strategy-effectiveness-report.js)"
+    printf '%s\n' "$T040_EFFECTIVENESS_OUTPUT"
+    T040_EFFECTIVENESS_VERDICT="$(printf '%s\n' "$T040_EFFECTIVENESS_OUTPUT" | sed -n 's/^T-040 strategy effectiveness verdict: //p' | head -n1)"
     ./scripts/pmba-gate.sh start
     ./scripts/pmba-gate.sh end
-    export T040_CLASSIFICATION T026_RECOMMENDATION
+    export T040_CLASSIFICATION T026_RECOMMENDATION T040_EFFECTIVENESS_VERDICT
     node <<'NODE'
 const fs = require('fs');
 
@@ -94,6 +98,7 @@ const validationMap = read('docs/easy_process/T040_VALIDATION_MAP.md');
 const orchestration = read('docs/easy_process/AI_ORCHESTRATION.md');
 const t040Classification = process.env.T040_CLASSIFICATION ?? '';
 const t026Recommendation = process.env.T026_RECOMMENDATION ?? '';
+const t040EffectivenessVerdict = process.env.T040_EFFECTIVENESS_VERDICT ?? '';
 
 const inProgress = [...board.matchAll(/^\| (T-[0-9]{3}) \| IN_PROGRESS \|/gm)].map((match) => match[1]);
 if (inProgress.length !== 1 || inProgress[0] !== 'T-040') {
@@ -108,10 +113,14 @@ if (!/^Active ticket: `T-040`/m.test(retro)) fail('auto-retro is not aligned to 
 if (!/Production readiness mode: `enabled`/.test(retro)) fail('auto-retro production readiness mode is not enabled');
 if (!/P0\/P1/.test(packet) || !/deterministic reproduction/.test(packet)) fail('beta packet is missing severity/reproduction patch rule');
 if (!/Gate P1/.test(packet)) fail('beta packet is missing Gate P1 checklist');
+if (!/Strategy effectiveness verdict/.test(packet)) fail('beta packet is missing strategy effectiveness verdict');
 if (!/Required Deterministic Scenarios/.test(validationMap)) fail('validation map is missing deterministic scenarios');
 if (!/PATCH_ALLOWED/.test(orchestration) || !/VALIDATION_ONLY/.test(orchestration)) fail('AI orchestration is missing output classes');
 if (!/^(CONTINUE_READINESS|VALIDATION_REQUIRED)$/.test(t040Classification)) {
   fail(`unexpected T-040 readiness classification ${t040Classification || 'empty'}`);
+}
+if (!/^(NOT_BETA_READY|CANDIDATE_READY_FOR_OPERATOR_REVIEW)$/.test(t040EffectivenessVerdict)) {
+  fail(`unexpected T-040 strategy effectiveness verdict ${t040EffectivenessVerdict || 'empty'}`);
 }
 if (t040Classification === 'VALIDATION_REQUIRED') {
   if (!/Decision mode: `VALIDATION_REQUIRED`/.test(packet)) fail('beta packet does not record VALIDATION_REQUIRED');

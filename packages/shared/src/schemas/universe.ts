@@ -15,6 +15,11 @@ export const UniverseCandidateSchema = z.object({
   rsi14: z.number().min(0).max(100).optional(),
   adx14: z.number().min(0).max(100).optional(),
   atrPct14: z.number().min(0).max(1000).optional(),
+  donchianBreakoutPct20: z.number().min(-1000).max(1000).optional(),
+  bollingerPosition20: z.number().min(0).max(1).optional(),
+  bollingerWidthPct20: z.number().min(0).max(1000).optional(),
+  emaTrendSpreadPct: z.number().min(-1000).max(1000).optional(),
+  rangeCycleScore20: z.number().min(0).max(1).optional(),
   strategyHint: UniverseStrategyHintSchema.optional(),
   score: z.number(),
   reasons: z.array(z.string().min(1)).default([])
@@ -33,4 +38,3 @@ export const UniverseSnapshotSchema = z.object({
   errors: z.array(z.object({ symbol: z.string().optional(), error: z.string().min(1) }))
 });
 export type UniverseSnapshot = z.infer<typeof UniverseSnapshotSchema>;
-
