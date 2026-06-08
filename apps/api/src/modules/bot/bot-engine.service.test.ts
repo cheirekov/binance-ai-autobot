@@ -2584,9 +2584,23 @@ describe("bot-engine insufficient-balance helpers", () => {
       regime: { label: "BEAR_TREND", confidence: 0.84, inputs: {} },
       strategy: { trend: 0.22, meanReversion: 0.51, grid: 0.33, recommended: "MEAN_REVERSION" }
     });
+    const gridChurn = helpers.getRegimeAdjustedMinNetEdgePct({
+      risk: 100,
+      baseMinNetEdgePct: 0.15,
+      regime: { label: "NEUTRAL", confidence: 0.4, inputs: {} },
+      strategy: { trend: 0.52, meanReversion: 0.3, grid: 0.6, recommended: "GRID" }
+    });
+    const gridRangeEdge = helpers.getRegimeAdjustedMinNetEdgePct({
+      risk: 100,
+      baseMinNetEdgePct: 0.15,
+      regime: { label: "RANGE", confidence: 0.72, inputs: {} },
+      strategy: { trend: 0.3, meanReversion: 0.42, grid: 0.68, recommended: "GRID" }
+    });
 
     expect(bull).toBeLessThan(neutral);
     expect(bear).toBeGreaterThan(neutral);
+    expect(gridChurn).toBeGreaterThan(neutral);
+    expect(gridRangeEdge).toBe(neutral);
   });
 
   it("prefers bull trend candidates in MARKET lane over grid-biased waiting candidates", () => {

@@ -4600,6 +4600,15 @@ export class BotEngineService implements OnModuleInit {
       params.regime.confidence >= strongBullThreshold &&
       params.strategy.recommended === "TREND" &&
       params.strategy.trend >= params.strategy.grid + 0.1;
+    const gridHasRangeEdge =
+      params.regime.label === "RANGE" &&
+      params.regime.confidence >= 0.62 &&
+      params.strategy.recommended === "GRID" &&
+      params.strategy.grid >= Math.max(params.strategy.trend, params.strategy.meanReversion) + 0.12;
+    const gridChurnRisk =
+      params.strategy.recommended === "GRID" &&
+      !gridHasRangeEdge &&
+      params.strategy.grid < params.strategy.trend + 0.18;
     const confirmedBear =
       params.regime.label === "BEAR_TREND" &&
       params.regime.confidence >= this.getBearPauseConfidenceThreshold(params.risk);
@@ -4609,6 +4618,10 @@ export class BotEngineService implements OnModuleInit {
       multiplier = 0.88;
     } else if (confirmedBear) {
       multiplier = 1.15;
+    } else if (params.strategy.recommended === "MEAN_REVERSION") {
+      multiplier = 1.18;
+    } else if (gridChurnRisk) {
+      multiplier = 1.12;
     }
 
     return this.toRounded(Math.max(0.05, baseRiskAdjusted * multiplier), 6);
