@@ -174,6 +174,17 @@ describe("deriveRiskBudgetDecision", () => {
         }
       })
     );
+    const feeDrag = deriveRiskBudgetDecision(
+      baselineInput({
+        openExposureHome: 320,
+        openPositions: 4,
+        recentPerformance: {
+          trades: 8,
+          realizedPnlHome: 2,
+          feesHome: 3
+        }
+      })
+    );
 
     expect(defensive.lane).toBe("DEFENSIVE");
     expect(defensive.allowedActions.openNewPosition).toBe(false);
@@ -183,5 +194,9 @@ describe("deriveRiskBudgetDecision", () => {
     expect(defensive.allowedActions.reduceOnly).toBe(true);
     expect(defensive.minNetEdgePct).toBeGreaterThan(baseline.minNetEdgePct);
     expect(defensive.reasons).toContain("recent-negative-expectancy");
+    expect(feeDrag.lane).toBe("DEFENSIVE");
+    expect(feeDrag.allowedActions.openNewPosition).toBe(false);
+    expect(feeDrag.allowedActions.marketEntry).toBe(false);
+    expect(feeDrag.reasons).toContain("recent-negative-expectancy");
   });
 });

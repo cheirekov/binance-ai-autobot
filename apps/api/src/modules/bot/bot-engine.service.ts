@@ -19,7 +19,7 @@ import {
 import { ConversionRouterService } from "../integrations/conversion-router.service";
 import { getPairPolicyBlockReason, isStableAsset } from "../policy/trading-policy";
 import { UniverseService } from "../universe/universe.service";
-import { deriveRiskBudgetDecision } from "./risk-budget.service";
+import { deriveRiskBudgetDecision, type RiskBudgetRecentPerformance } from "./risk-budget.service";
 
 const EXECUTION_FIAT_QUOTES = new Set(["EUR", "JPY", "GBP", "TRY", "BRL", "AUD"]);
 
@@ -695,6 +695,11 @@ export class BotEngineService implements OnModuleInit {
       lowProfitThresholdPct: Number((-0.5 - t * 2).toFixed(2)), // -0.5% -> -2.5%
       lowProfitLockMs: Math.round((120 - t * 90) * 60_000) // 120m -> 30m
     };
+  }
+
+  private deriveRiskBudgetRecentPerformanceLookbackMs(risk: number): number {
+    const policy = this.deriveProtectionPolicy(risk);
+    return Math.max(policy.lowProfitLookbackMs, 2 * 60 * 60_000);
   }
 
   private deriveStopLossEntryCooldownMs(risk: number): number {
@@ -2024,6 +2029,69 @@ export class BotEngineService implements OnModuleInit {
     }
 
     return events;
+  }
+
+  private summarizeRecentRiskBudgetPerformance(params: {
+    state: BotState;
+    nowMs: number;
+    lookbackMs: number;
+  }): RiskBudgetRecentPerformance {
+    const nowMs = Number.isFinite(params.nowMs) ? params.nowMs : Date.now();
+    const lookbackMs = Number.isFinite(params.lookbackMs) ? Math.max(0, params.lookbackMs) : 0;
+    const windowStartMs = nowMs - lookbackMs;
+    const positions = new Map<string, { netQty: number; costQuote: number }>();
+    let trades = 0;
+    let realizedPnlHome = 0;
+    let feesHome = 0;
+
+    const filledOrders = params.state.orderHistory
+      .filter((order) => order.status === "FILLED")
+      .map((order) => ({ order, ts: Date.parse(order.ts) }))
+      .filter((entry) => Number.isFinite(entry.ts))
+      .sort((a, b) => a.ts - b.ts);
+
+    for (const { order, ts } of filledOrders) {
+      const inWindow = ts >= windowStartMs;
+      const symbol = order.symbol.trim().toUpperCase();
+      const qty = Number.isFinite(order.qty) ? Math.max(0, order.qty) : 0;
+      const price = Number.isFinite(order.price) ? Math.max(0, order.price ?? 0) : 0;
+      const notional = qty > 0 && price > 0 ? qty * price : 0;
+      const orderFeeHome = Number.isFinite(order.feeHome) ? Math.max(0, order.feeHome ?? 0) : 0;
+
+      if (inWindow) {
+        trades += 1;
+        feesHome += orderFeeHome;
+      }
+      if (!symbol || qty <= 0 || price <= 0) continue;
+
+      const current = positions.get(symbol) ?? { netQty: 0, costQuote: 0 };
+      if (order.side === "BUY") {
+        current.netQty += qty;
+        current.costQuote += notional;
+        positions.set(symbol, current);
+        continue;
+      }
+
+      const closeQty = Math.min(qty, current.netQty);
+      const avgCost = current.netQty > 0 ? current.costQuote / current.netQty : 0;
+      if (closeQty > 0 && avgCost > 0 && inWindow) {
+        realizedPnlHome += price * closeQty - avgCost * closeQty;
+      }
+
+      current.netQty = Math.max(0, current.netQty - closeQty);
+      current.costQuote = Math.max(0, current.costQuote - avgCost * closeQty);
+      if (current.netQty <= 1e-12) {
+        current.netQty = 0;
+        current.costQuote = 0;
+      }
+      positions.set(symbol, current);
+    }
+
+    return {
+      trades,
+      realizedPnlHome: this.toRounded(realizedPnlHome, 8),
+      feesHome: this.toRounded(feesHome, 8)
+    };
   }
 
   private evaluateProtectionLocks(params: {
@@ -6411,6 +6479,7 @@ export class BotEngineService implements OnModuleInit {
           const walletTotalHome = await this.estimateWalletTotalInHome(balances, homeStable);
           const capitalProfile = this.getCapitalProfile(walletTotalHome);
           const executionBridgeAssets = resolveRouteBridgeAssets(config, homeStable);
+          const riskNowMs = Date.now();
           const dailyLossGuard = this.evaluateDailyLossGuard({
             state: current,
             risk,
@@ -6418,7 +6487,12 @@ export class BotEngineService implements OnModuleInit {
             allowedExecutionQuotes,
             balances,
             walletTotalHome,
-            nowMs: Date.now()
+            nowMs: riskNowMs
+          });
+          const recentRiskBudgetPerformance = this.summarizeRecentRiskBudgetPerformance({
+            state: current,
+            nowMs: riskNowMs,
+            lookbackMs: this.deriveRiskBudgetRecentPerformanceLookbackMs(risk)
           });
           const nextRiskState = this.buildRuntimeRiskState({
             dailyLossGuard,
@@ -7083,7 +7157,8 @@ export class BotEngineService implements OnModuleInit {
             openExposureHome,
             openPositions: countableOpenHomePositions.length,
             activeOrderCount: current.activeOrders.length,
-            baseMinNetEdgePct: capitalProfile.minNetEdgePct
+            baseMinNetEdgePct: capitalProfile.minNetEdgePct,
+            recentPerformance: recentRiskBudgetPerformance
           });
           let executionLane = this.resolveExecutionLane({
             tradeMode,
@@ -7946,7 +8021,8 @@ export class BotEngineService implements OnModuleInit {
             openPositions: countableOpenHomePositions.length,
             activeOrderCount: current.activeOrders.length,
             baseMinNetEdgePct: capitalProfile.minNetEdgePct,
-            estimatedRoundTripCostPct: roundTripCostPct
+            estimatedRoundTripCostPct: roundTripCostPct,
+            recentPerformance: recentRiskBudgetPerformance
           });
           const riskBudgetNewExposureCapQuote = await this.normalizeHomeAmountToQuoteUnits({
             amountHome: selectedRiskBudget.maxNewExposureHome,

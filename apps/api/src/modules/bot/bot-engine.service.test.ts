@@ -2927,6 +2927,102 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(events[0].pnlPct).toBeCloseTo(0.99502488, 8);
   });
 
+  it("summarizes recent risk-budget performance from gross closes and paid fees", () => {
+    const helpers = service as unknown as {
+      summarizeRecentRiskBudgetPerformance: (params: {
+        state: BotState;
+        nowMs: number;
+        lookbackMs: number;
+      }) => { trades: number; realizedPnlHome: number; feesHome: number };
+    };
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      orderHistory: [
+        {
+          id: "old-buy",
+          ts: new Date(now - 4 * 60 * 60_000).toISOString(),
+          symbol: "AAAUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          price: 100,
+          qty: 2,
+          feeHome: 0.4
+        },
+        {
+          id: "recent-sell",
+          ts: new Date(now - 30 * 60_000).toISOString(),
+          symbol: "AAAUSDC",
+          side: "SELL",
+          type: "MARKET",
+          status: "FILLED",
+          price: 103,
+          qty: 1,
+          feeHome: 0.1
+        },
+        {
+          id: "recent-buy",
+          ts: new Date(now - 20 * 60_000).toISOString(),
+          symbol: "BBBUSDC",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          price: 50,
+          qty: 1,
+          feeHome: 0.05
+        }
+      ]
+    };
+
+    const performance = helpers.summarizeRecentRiskBudgetPerformance({
+      state,
+      nowMs: now,
+      lookbackMs: 2 * 60 * 60_000
+    });
+
+    expect(performance.trades).toBe(2);
+    expect(performance.realizedPnlHome).toBeCloseTo(3, 8);
+    expect(performance.feesHome).toBeCloseTo(0.15, 8);
+  });
+
+  it("counts recent open-entry fees before positions close", () => {
+    const helpers = service as unknown as {
+      summarizeRecentRiskBudgetPerformance: (params: {
+        state: BotState;
+        nowMs: number;
+        lookbackMs: number;
+      }) => { trades: number; realizedPnlHome: number; feesHome: number };
+    };
+
+    const now = Date.now();
+    const state: BotState = {
+      ...defaultBotState(),
+      orderHistory: Array.from({ length: 4 }, (_, index) => ({
+        id: `buy-${index}`,
+        ts: new Date(now - (index + 1) * 5 * 60_000).toISOString(),
+        symbol: `AAAUSDC`,
+        side: "BUY" as const,
+        type: "MARKET" as const,
+        status: "FILLED" as const,
+        price: 100 + index,
+        qty: 1,
+        feeHome: 0.25
+      }))
+    };
+
+    const performance = helpers.summarizeRecentRiskBudgetPerformance({
+      state,
+      nowMs: now,
+      lookbackMs: 2 * 60 * 60_000
+    });
+
+    expect(performance.trades).toBe(4);
+    expect(performance.realizedPnlHome).toBe(0);
+    expect(performance.feesHome).toBeCloseTo(1, 8);
+  });
+
   it("returns CAUTION before HALT threshold", () => {
     const helpers = service as unknown as {
       evaluateDailyLossGuard: (params: {

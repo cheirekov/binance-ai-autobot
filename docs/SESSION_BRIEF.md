@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-06-08 07:34 UTC
+Last updated: 2026-06-09 08:14 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch. This brief is intentionally short; long historical preservation details live in `docs/PM_BA_CHANGELOG.md` and `docs/STRATEGY_COVERAGE.md`.
@@ -64,7 +64,7 @@ Use this file at the start and end of every batch. This brief is intentionally s
 
 ## 3) Deployment Handoff
 
-- Commit hash: `a72299f`
+- Commit hash: `0e117e7`
 - Deploy target: process/docs/scripts only; no bot redeploy required unless code changes are later added.
 - Required config changes: none
 - Operator checklist:
@@ -77,18 +77,18 @@ Use this file at the start and end of every batch. This brief is intentionally s
 - Run context:
   - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `40.28`
-  - runtime uptime (hours): `1385.523`
-  - run end: `Mon Jun 08 2026 10:33:48 GMT+0300 (Eastern European Summer Time)`
+  - bundle interval (hours): `24.67`
+  - runtime uptime (hours): `1410.194`
+  - run end: `Tue Jun 09 2026 11:14:01 GMT+0300 (Eastern European Summer Time)`
   - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip ZECUSDC: Risk budget market entry cap below exchange minimum (47))
+  - active ticket runtime signal: `observed` (Skip ALLOUSDC: Risk budget market entry cap below exchange minimum (25))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=14, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=93.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=10, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=95.0%)
   - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `continue`
@@ -97,8 +97,8 @@ Use this file at the start and end of every batch. This brief is intentionally s
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260608-073438.tgz`
-  - auto-updated at: `2026-06-08T07:34:47.268Z`
+  - bundle: `autobot-feedback-20260609-081440.tgz`
+  - auto-updated at: `2026-06-09T08:14:50.199Z`
 
 ## 5) Copy/paste prompt for next session
 
@@ -106,7 +106,7 @@ Use this file at the start and end of every batch. This brief is intentionally s
 Ticket: T-040
 Decision: continue
 Required action: continue active ticket
-Latest bundle: autobot-feedback-20260608-073438.tgz
+Latest bundle: autobot-feedback-20260609-081440.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: move the bot toward bounded beta/production readiness, not another T-031/T-032 micro-patch.
 Patch policy: runtime patches require P0/P1 safety severity plus deterministic reproduction.
