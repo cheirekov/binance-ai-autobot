@@ -1,17 +1,18 @@
 # NEXT_BATCH_PLAN
 
-Last updated: 2026-06-10 08:29 UTC
+Last updated: 2026-06-11 09:06 UTC
 Owner: PM/BA + Codex
 
 ## Exact scope
-Continue `T-040` after the June 10 validation-required bundle with deterministic validation work. Do not write another trading-behavior patch unless a P0/P1 safety issue or deterministic production-gate failure is found.
+Continue `T-040` after the June 11 validation-required bundle with deterministic `grid_guard_v2` proof. Do not write another trading-behavior patch unless a P0/P1 safety issue or deterministic production-gate failure is found.
 
 ## In scope
 - severity gate: define when live evidence can interrupt beta readiness.
 - deterministic validation map for `T-031`, `T-032`, and core execution safety.
-- deterministic bear/choppy drawdown fixture from the latest June 5/6/8/9/10 sequence.
+- deterministic bear/choppy drawdown fixture from the latest June 6/8/9/10/11 sequence.
 - supportive positive readiness evidence from the June 3 window.
-- June 8/9/10 negative-window pressure and June 10 WLD grid/min-order pressure as `grid_guard_v2` offline comparison input.
+- June 8/9/10/11 negative-window pressure and June 11 ETH/KAT grid/risk-budget pressure as `grid_guard_v2` offline comparison input.
+- `scripts/t026-fixture-comparison.js` report showing `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
 - clean-room reference strategy adoption plan.
 - `T-026` offline calibration/replay as the next engineering target.
 - `T-040` strategy-effectiveness reporting as the client-facing answer to whether adaptation is improving net results after fees.
@@ -35,7 +36,7 @@ Continue `T-040` after the June 10 validation-required bundle with deterministic
 - `./scripts/validate-active-ticket.sh` has a targeted `T-040` mode.
 - auto-retro treats production-readiness live churn as validation unless P0/P1 severity is proven.
 - next-session prompt points to beta readiness, not T-031/T-032 patch work.
-- June 10 evidence remains classified as validation-required controlled-drawdown evidence, not production approval or a runtime patch trigger.
+- June 11 evidence remains classified as validation-required negative-expectancy evidence, not production approval or a runtime patch trigger.
 - strategy/reference work uses `docs/easy_process/REFERENCE_STRATEGY_ADOPTION.md` and does not copy GPL or unclear-license code.
 - `node scripts/t026-calibration-runner.js` reports `BUILD_BEAR_CHOPPY_FIXTURE` after the three-negative-window June 10 validation sequence.
 - `node scripts/t040-strategy-effectiveness-report.js` reports the current strategy verdict; latest result is `NOT_BETA_READY`.
@@ -45,4 +46,4 @@ Continue `T-040` after the June 10 validation-required bundle with deterministic
 - the process change hides or downgrades a real P0/P1 runtime safety issue.
 
 ## What capability this moves forward
-Moves `Gate P1 — Execution-safe baseline` and production readiness by turning the post-patch negative sequence into a deterministic fixture/comparison task instead of another live-patch loop.
+Moves `Gate P1 — Execution-safe baseline` and production readiness by turning the post-patch negative sequence into a deterministic `grid_guard_v2` proof task instead of another live-patch loop.

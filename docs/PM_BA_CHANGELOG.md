@@ -16,6 +16,43 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-06-11 09:06 UTC — T-040 validation required: deterministic fixture comparison added
+- Scope:
+  - classify `autobot-feedback-20260611-090617.tgz` under T-040 beta-readiness mode.
+  - refresh the deterministic `bear_choppy_controlled_drawdown` fixture from the latest five-window sequence.
+  - add a repeatable fixture-comparison script and report so validation selects a concrete candidate family before runtime changes.
+- BA requirement mapping:
+  - latest evidence is validation pressure, not automatic T-031/T-032 patch input.
+  - beta promotion remains blocked because latest daily net is negative, latest three fresh windows are negative, and strategy effectiveness remains `NOT_BETA_READY`.
+  - no P0/P1 safety issue is present: exchange rejects, restarts, health errors, and exchange backoff are absent.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - next implementation target is offline proof for `grid_guard_v2`, not a live-market patch.
+- Evidence summary:
+  - `observed`: auto-retro decision is `validation_required`, next ticket remains `T-040`.
+  - `observed`: `scripts/t040-readiness-check.js` returns `VALIDATION_REQUIRED`.
+  - `observed`: `scripts/t026-calibration-runner.js` returns `BUILD_BEAR_CHOPPY_FIXTURE`.
+  - `observed`: `scripts/t026-fixture-comparison.js` returns `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
+  - `observed`: `scripts/t040-strategy-effectiveness-report.js` returns `NOT_BETA_READY`.
+  - `observed`: `daily_net_usdt=-9.09`, `max_drawdown_pct=0.66`, `total_alloc_pct=5.10`, `open_positions=13`.
+  - `observed`: `203` submitted orders, `142` filled, `0` rejected, `61` canceled.
+  - `observed`: fixture comparison aggregate is safety clean, totalDailyNet `-20.97`, totalFees `44.94`, totalRealizedAfterFees `-70.65`.
+- Technical changes:
+  - `scripts/t026-fixture-comparison.js`: added deterministic fixture comparison and candidate-family ranking.
+  - `scripts/validate-active-ticket.sh`: now syntax-checks and runs fixture comparison in T-040 validation mode.
+  - `docker-compose.ci.yml`: added syntax check for the new script.
+  - `docs/easy_process/reports/t026-fixture-comparison.json`: added current report artifact.
+  - T-040 packet/map/operator notes updated for June 11 `VALIDATION_REQUIRED`.
+- Risk slider impact:
+  - none to runtime trading behavior.
+- Validation evidence:
+  - `node scripts/t026-calibration-runner.js --write-fixture` refreshed the fixture and returned `BUILD_BEAR_CHOPPY_FIXTURE`.
+  - `node scripts/t026-fixture-comparison.js --write-report` returned `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
+- Runtime test request:
+  - keep running in testnet/paper mode; do not promote to real-money beta yet.
+- Follow-up:
+  - implement focused offline proof for `grid_guard_v2` before any runtime behavior patch.
+
 ## 2026-06-10 08:29 UTC — T-040 validation required: June 10 controlled drawdown fixture refresh
 - Scope:
   - classify `autobot-feedback-20260610-082902.tgz` under T-040 beta-readiness mode.
