@@ -16,6 +16,41 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-06-10 08:29 UTC — T-040 validation required: June 10 controlled drawdown fixture refresh
+- Scope:
+  - classify `autobot-feedback-20260610-082902.tgz` under T-040 beta-readiness mode.
+  - refresh the deterministic `bear_choppy_controlled_drawdown` fixture from the latest five-window sequence.
+  - update T-040 readiness artifacts so `./scripts/validate-active-ticket.sh` reflects `VALIDATION_REQUIRED`.
+- BA requirement mapping:
+  - latest evidence is validation pressure, not automatic T-031/T-032 patch input.
+  - beta promotion remains blocked because latest daily net is negative, latest three fresh windows are negative, and strategy effectiveness remains `NOT_BETA_READY`.
+  - no P0/P1 safety issue is present: exchange rejects, restarts, health errors, and exchange backoff are absent.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - route the June 10 sequence into offline comparison for `risk_governor_hysteresis`, `grid_guard_v2`, and `mean_reversion_gate`.
+- Evidence summary:
+  - `observed`: auto-retro decision is `validation_required`, next ticket remains `T-040`.
+  - `observed`: `scripts/t040-readiness-check.js` returns `VALIDATION_REQUIRED`.
+  - `observed`: `scripts/t026-calibration-runner.js` returns `BUILD_BEAR_CHOPPY_FIXTURE`.
+  - `observed`: `scripts/t040-strategy-effectiveness-report.js` returns `NOT_BETA_READY`.
+  - `observed`: environment is `testnet`, risk state is `NORMAL`.
+  - `observed`: `daily_net_usdt=-5.33`, `max_drawdown_pct=0.60`, `total_alloc_pct=3.09`, `open_positions=8`.
+  - `observed`: `200` submitted orders, `159` filled, `0` rejected, `41` canceled.
+  - `observed`: sizing reject pressure is `low` with `12` sizing rejects, `6.0%` of decisions.
+  - `observed`: entry trades are `0`, which indicates the recent risk-budget guard reduced market-entry behavior, but realized-after-fees is still `-13.33`.
+- Technical changes:
+  - `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json`: refreshed from the June 10 five-window evidence sequence.
+  - `docs/easy_process/T040_BETA_READINESS_PACKET.md`, `T040_VALIDATION_MAP.md`, `LATEST_BATCH_DECISION.md`, `NEXT_BATCH_PLAN.md`, `PRODUCTION_DELTA_NOTE.md`, and `OPERATOR_NOTE.md`: record `VALIDATION_REQUIRED` and keep beta promotion blocked.
+- Risk slider impact:
+  - none to runtime trading behavior.
+- Validation evidence:
+  - `node scripts/t026-calibration-runner.js --write-fixture` refreshed the fixture and returned `BUILD_BEAR_CHOPPY_FIXTURE`.
+  - `node scripts/t026-strategy-replay.js --limit 120` returned `REPLAY_CANDIDATE_TREND`: `TREND=+1.14%`, `GRID=+0.08%`, `MEAN_REVERSION=-0.81%`, `BUY_HOLD=-1.21%`.
+- Runtime test request:
+  - keep running in testnet/paper mode; do not promote to real-money beta yet.
+- Follow-up:
+  - implement/run offline comparison for the refreshed fixture before any further runtime strategy patch.
+
 ## 2026-06-05 07:53 UTC — T-040 readiness evidence: June 5 small controlled drawdown with low sizing pressure
 - Scope:
   - classify `autobot-feedback-20260605-075150.tgz` under T-040 beta-readiness mode.

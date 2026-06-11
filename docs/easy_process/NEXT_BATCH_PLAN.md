@@ -1,17 +1,17 @@
 # NEXT_BATCH_PLAN
 
-Last updated: 2026-06-05 08:01 UTC
+Last updated: 2026-06-10 08:29 UTC
 Owner: PM/BA + Codex
 
 ## Exact scope
-Continue `T-040` after the June 5 readiness bundle with validation and release-readiness work. Do not write another trading-behavior patch unless a P0/P1 safety issue or deterministic production-gate failure is found.
+Continue `T-040` after the June 10 validation-required bundle with deterministic validation work. Do not write another trading-behavior patch unless a P0/P1 safety issue or deterministic production-gate failure is found.
 
 ## In scope
 - severity gate: define when live evidence can interrupt beta readiness.
 - deterministic validation map for `T-031`, `T-032`, and core execution safety.
-- deterministic bear/choppy drawdown fixture from the June 1/2/4/5 controlled drawdown sequence.
+- deterministic bear/choppy drawdown fixture from the latest June 5/6/8/9/10 sequence.
 - supportive positive readiness evidence from the June 3 window.
-- June 4 medium sizing reject pressure and June 5 low sizing reject pressure as `grid_guard_v2` offline comparison input.
+- June 8/9/10 negative-window pressure and June 10 WLD grid/min-order pressure as `grid_guard_v2` offline comparison input.
 - clean-room reference strategy adoption plan.
 - `T-026` offline calibration/replay as the next engineering target.
 - `T-040` strategy-effectiveness reporting as the client-facing answer to whether adaptation is improving net results after fees.
@@ -35,9 +35,9 @@ Continue `T-040` after the June 5 readiness bundle with validation and release-r
 - `./scripts/validate-active-ticket.sh` has a targeted `T-040` mode.
 - auto-retro treats production-readiness live churn as validation unless P0/P1 severity is proven.
 - next-session prompt points to beta readiness, not T-031/T-032 patch work.
-- June 5 evidence remains classified as small controlled-drawdown readiness evidence, not production approval or a runtime patch trigger.
+- June 10 evidence remains classified as validation-required controlled-drawdown evidence, not production approval or a runtime patch trigger.
 - strategy/reference work uses `docs/easy_process/REFERENCE_STRATEGY_ADOPTION.md` and does not copy GPL or unclear-license code.
-- `node scripts/t026-calibration-runner.js` reports `KEEP_COLLECTING_AND_LABEL_REGIME` after the small controlled-negative June 5 window.
+- `node scripts/t026-calibration-runner.js` reports `BUILD_BEAR_CHOPPY_FIXTURE` after the three-negative-window June 10 validation sequence.
 - `node scripts/t040-strategy-effectiveness-report.js` reports the current strategy verdict; latest result is `NOT_BETA_READY`.
 - fixture exists at `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json`.
 
@@ -45,4 +45,4 @@ Continue `T-040` after the June 5 readiness bundle with validation and release-r
 - the process change hides or downgrades a real P0/P1 runtime safety issue.
 
 ## What capability this moves forward
-Moves `Gate P1 — Execution-safe baseline` and production readiness by replacing infinite live-patch loops with explicit beta gates and deterministic validation.
+Moves `Gate P1 — Execution-safe baseline` and production readiness by turning the post-patch negative sequence into a deterministic fixture/comparison task instead of another live-patch loop.

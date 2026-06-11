@@ -1,6 +1,6 @@
 # T040_BETA_READINESS_PACKET
 
-Last updated: 2026-06-05 08:01 UTC
+Last updated: 2026-06-10 08:29 UTC
 Owner: PM/BA + Codex
 
 Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readiness decision.
@@ -8,30 +8,30 @@ Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readin
 ## Current Decision
 
 - Active ticket: `T-040`
-- Decision mode: `CONTINUE_READINESS`
-- Runtime code posture: clean-room strategy signal patch added after operator override
+- Decision mode: `VALIDATION_REQUIRED`
+- Runtime code posture: recent fill-performance risk-budget guard is deployed; no new runtime behavior patch is approved from this bundle
 - Production posture: not approved for real-money production promotion
-- Beta posture: not beta-ready; continue readiness work while Gate P1 partials, release/rollback proof, deterministic strategy validation, and drawdown-regime acceptance remain open
+- Beta posture: pause promotion; build/refresh deterministic validation before any further runtime strategy patch
 - Strategy effectiveness verdict: `NOT_BETA_READY`
 
 ## Latest Evidence
 
-- Bundle: `autobot-feedback-20260605-075150.tgz`
+- Bundle: `autobot-feedback-20260610-082902.tgz`
 - Cycle: `MORNING_REVIEW`
-- Auto-retro decision: `continue`
+- Auto-retro decision: `validation_required`
 - Environment: `testnet`
 - Risk state: `NORMAL`
-- Daily net: `-5.79 USDT`
-- Max drawdown: `1.70%`
-- Total allocation: `3.85%`
-- Open positions: `11`
-- Orders: `200 submitted`, `181 filled`, `0 rejected`, `19 canceled`
-- Sizing reject pressure: `low` (`6` sizing rejects, `3.0%` of decisions)
+- Daily net: `-5.33 USDT`
+- Max drawdown: `0.60%`
+- Total allocation: `3.09%`
+- Open positions: `8`
+- Orders: `200 submitted`, `159 filled`, `0 rejected`, `41 canceled`
+- Sizing reject pressure: `low` (`12` sizing rejects, `6.0%` of decisions)
 - Runtime health: `0 errors`, `0 restarts`, no exchange/order-sync backoff in top reasons
 - AI mode: `OFF`
-- Strategy effectiveness: `NOT_BETA_READY`; the adaptive shadow shows rule-based switching across strategy families `TREND`, `MEAN_REVERSION`, `GRID` and execution lanes `MARKET`, `GRID`, `DEFENSIVE`, but five-window net is `-93.82 USDT` and realized-after-fees is `-31.64 USDT`.
-- PM/BA interpretation: the latest fresh window is a small controlled drawdown with low sizing pressure and clean execution. This supports continuing T-040 readiness work, but it does not support a normal-client beta claim because the multi-window strategy result is still negative after fees.
-- Post-bundle engineering action: added Donchian breakout, Bollinger band position, EMA spread, and range-cycle signals to candidate scoring and adaptive strategy selection. The next fresh run must prove whether this improves after-fee results.
+- Strategy effectiveness: `NOT_BETA_READY`; rule-based strategy switching is visible, but five-window net is `-17.67 USDT` and realized-after-fees is `-13.33 USDT`.
+- PM/BA interpretation: the latest fresh window is a controlled drawdown with clean safety, but the latest three fresh windows are negative. This is validation pressure for bear/choppy behavior, not a P0/P1 execution failure.
+- Post-bundle engineering action: refreshed `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json` from the June 10 five-window validation sequence.
 
 ## Evidence Sequence
 
@@ -42,7 +42,11 @@ Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readin
 - `2026-06-03`: supportive positive window, `+26.35 USDT`, `0` rejects, `0` restarts, allocation stayed low at `0.17%`.
 - `2026-06-04`: controlled-negative window, `-39.12 USDT`, `0` rejects, `0` restarts, medium sizing reject pressure, allocation at `1.34%`.
 - `2026-06-05`: small controlled-negative window, `-5.79 USDT`, `0` rejects, `0` restarts, sizing reject pressure back to low, allocation at `3.85%`.
-- Interpretation: the process is no longer looping on ordinary live-market churn. The mixed positive/drawdown sequence remains T-026 validation input; it does not justify a same-ticket runtime patch without deterministic reproduction, and it does not justify beta promotion.
+- `2026-06-06`: positive window, `+9.96 USDT`, `0` rejects, `0` restarts, allocation at `2.98%`.
+- `2026-06-08`: controlled-negative window, `-9.38 USDT`, `0` rejects, `0` restarts, allocation at `3.54%`.
+- `2026-06-09`: controlled-negative window, `-7.13 USDT`, `0` rejects, `0` restarts, allocation at `0.12%`; recent fill-performance risk-budget guard deployed from this evidence.
+- `2026-06-10`: controlled-negative window, `-5.33 USDT`, `0` rejects, `0` restarts, allocation at `3.09%`, entry trades `0`, but strategy effectiveness remains negative after fees.
+- Interpretation: the recent runtime guard reduced market-entry behavior, but beta promotion is still blocked because repeated controlled drawdowns and after-fee losses persist. The next work is deterministic validation/comparison, not another live-evidence micro-patch.
 
 ## Operator Job
 
@@ -85,10 +89,10 @@ Runtime behavior patches require:
 
 ## Immediate Next Batch
 
-1. Preserve the generated `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json` fixture.
+1. Preserve the refreshed `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json` fixture from the June 10 validation sequence.
 2. Compare clean-room candidate families in ranked order: `risk_governor_hysteresis`, `grid_guard_v2`, `mean_reversion_gate`.
-3. Treat `autobot-feedback-20260605-075150.tgz` as small controlled-drawdown/readiness evidence, not production proof and not a runtime patch trigger.
-4. Include June 4 medium sizing pressure and June 5 recovery to low sizing pressure in the `grid_guard_v2` offline comparison.
+3. Treat `autobot-feedback-20260610-082902.tgz` as validation-required controlled-drawdown evidence, not production proof and not a runtime patch trigger.
+4. Include June 8/9/10 three-negative pressure and June 10 WLD grid exposure/min-order sell pressure in the `grid_guard_v2` offline comparison.
 5. Use `node scripts/t040-strategy-effectiveness-report.js` after each bundle so the operator sees whether adaptation improved net results after fees.
 6. Add or map tests for the highest-risk missing safety scenarios.
 7. Produce the release/rollback packet.

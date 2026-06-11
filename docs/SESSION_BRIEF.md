@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-06-09 08:14 UTC
+Last updated: 2026-06-10 08:35 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch. This brief is intentionally short; long historical preservation details live in `docs/PM_BA_CHANGELOG.md` and `docs/STRATEGY_COVERAGE.md`.
@@ -64,7 +64,7 @@ Use this file at the start and end of every batch. This brief is intentionally s
 
 ## 3) Deployment Handoff
 
-- Commit hash: `0e117e7`
+- Commit hash: `11547ed`
 - Deploy target: process/docs/scripts only; no bot redeploy required unless code changes are later added.
 - Required config changes: none
 - Operator checklist:
@@ -77,36 +77,36 @@ Use this file at the start and end of every batch. This brief is intentionally s
 - Run context:
   - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `24.67`
-  - runtime uptime (hours): `1410.194`
-  - run end: `Tue Jun 09 2026 11:14:01 GMT+0300 (Eastern European Summer Time)`
+  - bundle interval (hours): `24.248`
+  - runtime uptime (hours): `1434.442`
+  - run end: `Wed Jun 10 2026 11:28:54 GMT+0300 (Eastern European Summer Time)`
   - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip ALLOUSDC: Risk budget market entry cap below exchange minimum (25))
+  - active ticket runtime signal: `observed` (Skip: No feasible candidates after policy/exposure filters (44))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=10, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=95.0%)
-  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=64, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=68.0%)
+  - sizing reject pressure: `low` (sizingRejectSkips=12, decisions=200, ratio=6.0%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `continue`
-- Next ticket candidate: `T-040` (continue active lane unless PM/BA reprioritizes)
-- Required action: `continue active ticket`
+- Decision: `validation_required`
+- Next ticket candidate: `T-040` (stop live-wait loop and use deterministic validation)
+- Required action: `classify severity and add deterministic validation before any runtime patch; live-market churn alone is not a beta blocker`
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260609-081440.tgz`
-  - auto-updated at: `2026-06-09T08:14:50.199Z`
+  - bundle: `autobot-feedback-20260610-082902.tgz`
+  - auto-updated at: `2026-06-10T08:35:35.899Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-040
-Decision: continue
-Required action: continue active ticket
-Latest bundle: autobot-feedback-20260609-081440.tgz
+Decision: validation_required
+Required action: classify severity and add deterministic validation before any runtime patch; live-market churn alone is not a beta blocker
+Latest bundle: autobot-feedback-20260610-082902.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: move the bot toward bounded beta/production readiness, not another T-031/T-032 micro-patch.
 Patch policy: runtime patches require P0/P1 safety severity plus deterministic reproduction.

@@ -1,6 +1,6 @@
 # OPERATOR_NOTE
 
-Last updated: 2026-06-05 08:01 UTC
+Last updated: 2026-06-10 08:29 UTC
 Owner: PM/BA + Codex
 
 ## What to run next
@@ -8,9 +8,9 @@ Owner: PM/BA + Codex
 - run `node scripts/t040-strategy-effectiveness-report.js` after each new bundle to see the plain strategy verdict.
 - do not promote to real-money beta yet.
 - next engineering work should continue `T-026` offline calibration/replay and clean-room reference strategy adoption.
-- latest bundle `autobot-feedback-20260605-075150.tgz` is small controlled-drawdown readiness evidence with low sizing pressure, not production proof and not a runtime patch trigger.
+- latest bundle `autobot-feedback-20260610-082902.tgz` is validation-required controlled-drawdown evidence with clean safety, not production proof and not a runtime patch trigger.
 - current strategy-effectiveness verdict is `NOT_BETA_READY`: adaptation is visible in rule-based strategy/lane telemetry, but not proven profitable after fees.
-- preserved fixture: `bear_choppy_controlled_drawdown`.
+- refreshed fixture: `bear_choppy_controlled_drawdown` from the June 10 five-window validation sequence.
 - current candidate ranking: `risk_governor_hysteresis`, `grid_guard_v2`, `mean_reversion_gate`.
 - use deterministic validation before any new trading-code patch.
 
@@ -24,3 +24,4 @@ Owner: PM/BA + Codex
 ## What fresh evidence would change the decision
 - P0/P1 safety issue: uncontrolled exposure, repeated exchange order rejects, inability to sell/unwind, broken accounting, crash/restart instability.
 - deterministic fixture/replay proves a production-gate failure.
+- strategy-effectiveness report changes from `NOT_BETA_READY` to `CANDIDATE_READY_FOR_OPERATOR_REVIEW`.
