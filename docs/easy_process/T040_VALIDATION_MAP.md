@@ -1,6 +1,6 @@
 # T040_VALIDATION_MAP
 
-Last updated: 2026-06-11 09:06 UTC
+Last updated: 2026-06-12 06:49 UTC
 Owner: Validation Engineer + PM/BA
 
 Purpose: make beta-readiness measurable. This file maps each production-readiness question to a command, fixture, or explicit gap.
@@ -14,9 +14,11 @@ Purpose: make beta-readiness measurable. This file maps each production-readines
 | T-040 readiness classifier syntax | `node --check scripts/t040-readiness-check.js` | `PASS` |
 | T-040 readiness classifier | `node scripts/t040-readiness-check.js` | `VALIDATION_REQUIRED` |
 | T-026 calibration runner syntax | `node --check scripts/t026-calibration-runner.js` | `PASS` |
-| T-026 calibration runner | `node scripts/t026-calibration-runner.js` | `BUILD_BEAR_CHOPPY_FIXTURE`; recent rejects `0` |
+| T-026 calibration runner | `node scripts/t026-calibration-runner.js` | `BUILD_BEAR_CHOPPY_FIXTURE`; recent rejects `0`; rank1 `risk_governor_hysteresis` by coarse calibration |
 | T-026 fixture comparison syntax | `node --check scripts/t026-fixture-comparison.js` | `PASS` |
-| T-026 fixture comparison | `node scripts/t026-fixture-comparison.js --write-report` | `FIXTURE_CANDIDATE_GRID_GUARD_V2`; report at `docs/easy_process/reports/t026-fixture-comparison.json` |
+| T-026 fixture comparison | `node scripts/t026-fixture-comparison.js --write-report` | `FIXTURE_CANDIDATE_GRID_GUARD_V2`; report at `docs/easy_process/reports/t026-fixture-comparison.json`; rank1 `grid_guard_v2`, rank2 `risk_governor_hysteresis` |
+| T-026 grid guard proof syntax | `node --check scripts/t026-grid-guard-proof.js` | `PASS` |
+| T-026 grid guard proof | `node scripts/t026-grid-guard-proof.js --write-report` | `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`; report at `docs/easy_process/reports/t026-grid-guard-proof.json`; runtime patch still not allowed |
 | T-026 strategy replay | `node scripts/t026-strategy-replay.js --limit 120` | `NO_REPLAY_EDGE`; `BUY_HOLD=+4.03%`, `MEAN_REVERSION=+1.18%`, `GRID=+0.85%`, `TREND=-1.49%` |
 | T-040 strategy effectiveness syntax | `node --check scripts/t040-strategy-effectiveness-report.js` | `PASS` |
 | T-040 strategy effectiveness report | `node scripts/t040-strategy-effectiveness-report.js` | `NOT_BETA_READY`; rule-based adaptation visible but not proven profitable |
@@ -28,8 +30,8 @@ Purpose: make beta-readiness measurable. This file maps each production-readines
 | PM/BA end gate | `./scripts/pmba-gate.sh end` | `PASS` |
 | T-040 active validation | `./scripts/validate-active-ticket.sh` | `MAPPED_THIS_BATCH` |
 | Full CI | `./scripts/validate-active-ticket.sh --full` | `PASS` on 2026-06-05 |
-| Latest bundle classification | `./scripts/auto-retro.sh autobot-feedback-20260611-090617.tgz` | `validation_required` |
-| Latest session brief refresh | `./scripts/update-session-brief.sh autobot-feedback-20260611-090617.tgz` | `nextTicket=T-040` |
+| Latest bundle classification | `./scripts/auto-retro.sh autobot-feedback-20260612-063453.tgz` | `validation_required` |
+| Latest session brief refresh | `./scripts/update-session-brief.sh autobot-feedback-20260612-063453.tgz` | `nextTicket=T-040` |
 
 ## Required Deterministic Scenarios
 
@@ -51,43 +53,46 @@ Purpose: make beta-readiness measurable. This file maps each production-readines
 
 `node scripts/t026-calibration-runner.js` now recommends:
 - `BUILD_BEAR_CHOPPY_FIXTURE`
-- current window classes: `CONTROLLED_DRAWDOWN=4`, `PROFIT_WINDOW=1`
+- current window classes: `CONTROLLED_DRAWDOWN=4`, `NEUTRAL_OR_INCONCLUSIVE=1`
 - safety signals: `rejectedWindowsRecent=0`, `totalRejectedRecent=0`, `repeatedSmallRejects=false`
 - preserved fixture file: `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json`
-- preserved candidate families: `risk_governor_hysteresis`, `grid_guard_v2`, `mean_reversion_gate`
-- latest fixture source: `autobot-feedback-20260611-090617.tgz`, `autobot-feedback-20260610-082902.tgz`, `autobot-feedback-20260609-081440.tgz`, `autobot-feedback-20260608-073438.tgz`, `autobot-feedback-20260606-151705.tgz`.
-- fixture comparison result: `FIXTURE_CANDIDATE_GRID_GUARD_V2`; safety clean, totalDailyNet `-20.97`, totalFees `44.94`, totalRealizedAfterFees `-70.65`, with grid/risk-budget/fee-edge pressure in all five windows.
+- coarse calibration ranking: `risk_governor_hysteresis` (`34`), `grid_guard_v2` (`32`), `mean_reversion_gate` (`25`)
+- latest fixture source: `autobot-feedback-20260612-063453.tgz`, `autobot-feedback-20260611-090617.tgz`, `autobot-feedback-20260610-082902.tgz`, `autobot-feedback-20260609-081440.tgz`, `autobot-feedback-20260608-073438.tgz`.
+- fixture comparison result: `FIXTURE_CANDIDATE_GRID_GUARD_V2`; safety clean, totalDailyNet `-37.93`, totalFees `49.28`, totalRealizedAfterFees `-73.01`, with grid/risk-budget/fee-edge pressure in all five windows.
+- fixture comparison ranking: `grid_guard_v2` (`54`), `risk_governor_hysteresis` (`52`), `mean_reversion_gate` (`38`).
+- grid guard proof-target result: `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`; eligibleWindows `5`, lossChurnWindows `5`, pausedGridBuyWindows `3`, buyPressure `75`, sellsObserved `344`.
 - first deterministic proof: `risk_governor_hysteresis` blocks BUY/market exposure after negative expectancy while keeping SELL/reduce-only unwind available.
 
-This is progress, not promotion. Continue T-040 and use the mixed positive/drawdown evidence to build offline comparison reports rather than waiting passively for more bundles.
+This is progress, not promotion. Continue T-040 and use the refreshed negative sequence to build focused offline proof rather than waiting passively for more bundles.
 
 ## Strategy Effectiveness Result
 
 `node scripts/t040-strategy-effectiveness-report.js` now reports:
 - `NOT_BETA_READY`
 - `aiMode=OFF`
-- `dailyNet=-9.09`, `fiveWindowNet=-20.97`, `realizedAfterFees=-16.96`
-- current window classes: `CONTROLLED_DRAWDOWN=3`, `NEUTRAL_OR_INCONCLUSIVE=1`, `PROFIT_WINDOW=1`
-- adaptive shadow signals: `4232` events, `GRID=1709`, `TREND=1612`, `MEAN_REVERSION=911`
-- execution lanes observed: `MARKET=1690`, `DEFENSIVE=1280`, `GRID=1000`, `UNSPECIFIED=262`
-- top losses after fees: `KATUSDC=-12.18`, `NEARUSDC=-6.94`, `OPNUSDC=-4.12`, `HMSTRUSDC=-2.84`
-- top open exposure cost: `ETHUSDC=251.71`, `KATUSDC=2.19`, `CRVUSDC=0.93`
+- `dailyNet=-7.00`, `fiveWindowNet=-37.93`, `realizedAfterFees=-21.25`
+- current window classes: `CONTROLLED_DRAWDOWN=4`, `NEUTRAL_OR_INCONCLUSIVE=1`
+- adaptive shadow signals: `5000` events, `TREND=2352`, `GRID=1700`, `MEAN_REVERSION=948`
+- execution lanes observed: `MARKET=2460`, `DEFENSIVE=1328`, `GRID=998`, `UNSPECIFIED=214`
+- top losses after fees: `KATUSDC=-11.44`, `CRVUSDC=-5.17`, `OPNUSDC=-4.12`, `NEARUSDC=-2.21`, `HMSTRUSDC=-1.54`
+- top open exposure cost: `ETHUSDC=112.23`, `KATUSDC=1.86`, `CRVUSDC=1.58`, `EPICUSDC=0.57`, `OPNUSDC=0.34`
 
 Client-facing interpretation: the bot is changing rule-based strategy/lane labels, but the latest evidence does not prove profitable adaptation. Beta promotion stays blocked.
 
 ## Latest Bundle Evidence
 
-`autobot-feedback-20260611-090617.tgz` is validation-required negative-expectancy evidence:
+`autobot-feedback-20260612-063453.tgz` is validation-required negative-expectancy evidence:
 - `testnet` environment.
 - `NORMAL` risk state.
-- `-9.09 USDT` daily net.
-- `0.66%` max drawdown.
-- `5.10%` total allocation across `13` open positions.
-- `203` submitted orders, `142` filled, `0` rejected, `61` canceled.
+- `-7.00 USDT` daily net.
+- `-37.93 USDT` five-window net.
+- `0.62%` max drawdown.
+- `2.33%` total allocation across `9` open positions.
+- `201` submitted orders, `176` filled, `0` rejected, `24` canceled.
 - `0` health errors and `0` restarts.
-- low sizing reject pressure: `9` sizing rejects, `4.9%`.
-- strategy effectiveness verdict: `NOT_BETA_READY` because five-window net is `-20.97`, realized-after-fees is `-16.96`, and three of the latest five windows are controlled drawdowns.
-- top skip reasons are ordinary no-feasible, fee/edge, and risk-budget grid-buy pauses.
+- low sizing reject pressure: `0` sizing rejects.
+- strategy effectiveness verdict: `NOT_BETA_READY` because five-window net is `-37.93`, realized-after-fees is `-21.25`, and all latest five fixture windows are negative.
+- top skip reasons are ordinary risk-budget market-entry caps, blocked new exposure, grid-buy pauses, and fee/edge filters.
 
 This does not close Gate P1. It puts the lane in `VALIDATION_REQUIRED` because the latest three fresh windows are negative, while safety remains clean and runtime patching still requires deterministic proof.
 

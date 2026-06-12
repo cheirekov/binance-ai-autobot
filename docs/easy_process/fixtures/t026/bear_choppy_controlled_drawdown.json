@@ -4,13 +4,64 @@
   "recommendation": "BUILD_BEAR_CHOPPY_FIXTURE",
   "objective": "prove a reference-inspired strategy can reduce drawdown/fee burn without increasing rejects, restarts, or hard-risk violations",
   "source_bundles": [
+    "autobot-feedback-20260612-063453.tgz",
     "autobot-feedback-20260611-090617.tgz",
     "autobot-feedback-20260610-082902.tgz",
     "autobot-feedback-20260609-081440.tgz",
-    "autobot-feedback-20260608-073438.tgz",
-    "autobot-feedback-20260606-151705.tgz"
+    "autobot-feedback-20260608-073438.tgz"
   ],
   "windows": [
+    {
+      "bundle": "autobot-feedback-20260612-063453.tgz",
+      "class": "CONTROLLED_DRAWDOWN",
+      "dailyNet": -6.9976724600001035,
+      "fees": 10.81106212,
+      "maxDrawdown": 0.6207561827458495,
+      "totalAllocation": 2.3316000294709562,
+      "submittedOrders": 201,
+      "filledOrders": 176,
+      "rejectedOrders": 0,
+      "canceledOrders": 24,
+      "buys": 106,
+      "sells": 70,
+      "healthErrors": 0,
+      "restarts": 0,
+      "topReason": "Skip EPICUSDC: Risk budget market entry cap below exchange minimum",
+      "topReasons": [
+        {
+          "reason": "Skip EPICUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 27
+        },
+        {
+          "reason": "Skip CRVUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 22
+        },
+        {
+          "reason": "Skip XPLUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 21
+        },
+        {
+          "reason": "Skip BTCUSDC: Risk budget blocked new exposure",
+          "count": 14
+        },
+        {
+          "reason": "Skip ZECUSDC: Risk budget blocked new exposure",
+          "count": 12
+        },
+        {
+          "reason": "Skip ETHUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 9
+        },
+        {
+          "reason": "Skip ETHUSDC: Risk budget paused GRID BUY leg",
+          "count": 7
+        },
+        {
+          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.138% < 0.559%)",
+          "count": 3
+        }
+      ]
+    },
     {
       "bundle": "autobot-feedback-20260611-090617.tgz",
       "class": "NEUTRAL_OR_INCONCLUSIVE",
@@ -214,57 +265,6 @@
           "count": 4
         }
       ]
-    },
-    {
-      "bundle": "autobot-feedback-20260606-151705.tgz",
-      "class": "PROFIT_WINDOW",
-      "dailyNet": 9.957853720000458,
-      "fees": 6.46847206,
-      "maxDrawdown": 0.20292758235057423,
-      "totalAllocation": 2.9756535408559386,
-      "submittedOrders": 202,
-      "filledOrders": 157,
-      "rejectedOrders": 0,
-      "canceledOrders": 43,
-      "buys": 84,
-      "sells": 73,
-      "healthErrors": 0,
-      "restarts": 0,
-      "topReason": "Skip: No feasible candidates after policy/exposure filters",
-      "topReasons": [
-        {
-          "reason": "Skip: No feasible candidates after policy/exposure filters",
-          "count": 48
-        },
-        {
-          "reason": "Skip ZECUSDC: Grid sell sizing rejected (Below minQty 0.00100000)",
-          "count": 12
-        },
-        {
-          "reason": "Skip ADAUSDC: Grid sell sizing rejected (Below minQty 0.10000000)",
-          "count": 8
-        },
-        {
-          "reason": "Skip DOGEUSDC: Grid sell sizing rejected (Below minQty 1.00000000)",
-          "count": 4
-        },
-        {
-          "reason": "Skip LINKUSDC: Grid sell sizing rejected (Below minQty 0.01000000)",
-          "count": 4
-        },
-        {
-          "reason": "Skip ZECUSDC: Grid waiting for ladder slot or inventory",
-          "count": 3
-        },
-        {
-          "reason": "Skip DOGEUSDC: Risk budget blocked new exposure",
-          "count": 3
-        },
-        {
-          "reason": "Skip TAOUSDC: Grid sell sizing rejected (Below minQty 0.00010000)",
-          "count": 3
-        }
-      ]
     }
   ],
   "safety_signals": {
@@ -274,20 +274,20 @@
   },
   "candidate_scores": [
     {
-      "family": "grid_guard_v2",
-      "score": 30,
-      "reason": "targets grid/min-order/risk-budget pressure by pausing BUY legs in bad regimes while preserving SELL/unwind",
+      "family": "risk_governor_hysteresis",
+      "score": 34,
+      "reason": "best first response when repeated negative windows need earlier caution/halt hysteresis without breaking sell/unwind reachability",
       "rank": 1
     },
     {
-      "family": "risk_governor_hysteresis",
-      "score": 28,
-      "reason": "best first response when repeated negative windows need earlier caution/halt hysteresis without breaking sell/unwind reachability",
+      "family": "grid_guard_v2",
+      "score": 32,
+      "reason": "targets grid/min-order/risk-budget pressure by pausing BUY legs in bad regimes while preserving SELL/unwind",
       "rank": 2
     },
     {
       "family": "mean_reversion_gate",
-      "score": 20,
+      "score": 25,
       "reason": "candidate entry-quality gate for range/choppy windows; must stay shadow/offline until replay proves edge",
       "rank": 3
     }

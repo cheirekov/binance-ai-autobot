@@ -1,18 +1,22 @@
 # OPERATOR_NOTE
 
-Last updated: 2026-06-11 09:06 UTC
+Last updated: 2026-06-12 06:49 UTC
 Owner: PM/BA + Codex
 
 ## What to run next
 - run `./scripts/validate-active-ticket.sh` for the targeted `T-040` readiness gate.
 - run `node scripts/t040-strategy-effectiveness-report.js` after each new bundle to see the plain strategy verdict.
 - run `node scripts/t026-fixture-comparison.js --write-report` after refreshing the fixture to keep the deterministic candidate ranking current.
+- run `node scripts/t026-grid-guard-proof.js --write-report` after fixture comparison to confirm the grid-guard proof target is still valid.
 - do not promote to real-money beta yet.
 - next engineering work should continue `T-026` offline calibration/replay and clean-room reference strategy adoption.
-- latest bundle `autobot-feedback-20260611-090617.tgz` is validation-required negative-expectancy evidence with clean safety, not production proof and not a runtime patch trigger.
+- latest bundle `autobot-feedback-20260612-063453.tgz` is validation-required negative-expectancy evidence with clean safety, not production proof and not a runtime patch trigger.
 - current strategy-effectiveness verdict is `NOT_BETA_READY`: adaptation is visible in rule-based strategy/lane telemetry, but not proven profitable after fees.
-- refreshed fixture: `bear_choppy_controlled_drawdown` from the June 11 five-window validation sequence.
+- refreshed fixture: `bear_choppy_controlled_drawdown` from the June 12 five-window validation sequence.
 - current fixture comparison ranking: `grid_guard_v2`, `risk_governor_hysteresis`, `mean_reversion_gate`.
+- current grid-guard proof-target verdict: `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
+- current coarse calibration ranking: `risk_governor_hysteresis`, `grid_guard_v2`, `mean_reversion_gate`.
+- keep collecting testnet evidence; do not reset the data folder for this validation state.
 - use deterministic validation before any new trading-code patch.
 
 ## What not to do next

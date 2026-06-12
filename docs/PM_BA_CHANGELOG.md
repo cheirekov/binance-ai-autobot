@@ -16,6 +16,46 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-06-12 06:49 UTC — T-040 validation required: fixture/report refresh plus grid-guard proof target
+- Scope:
+  - classify `autobot-feedback-20260612-063453.tgz` under T-040 beta-readiness mode.
+  - refresh the deterministic `bear_choppy_controlled_drawdown` fixture and fixture-comparison report from the latest five-window sequence.
+  - keep the next work bounded to offline proof instead of a live-market runtime patch.
+- BA requirement mapping:
+  - latest evidence is validation pressure, not automatic T-031/T-032 patch input.
+  - beta promotion remains blocked because latest daily net is negative, latest three fresh windows are negative, and strategy effectiveness remains `NOT_BETA_READY`.
+  - no P0/P1 safety issue is present: exchange rejects, restarts, health errors, and exchange backoff are absent.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - next implementation target is focused offline proof for `grid_guard_v2`, with `risk_governor_hysteresis` as the close fallback.
+- Evidence summary:
+  - `observed`: auto-retro decision is `validation_required`, next ticket remains `T-040`.
+  - `observed`: `scripts/t040-readiness-check.js` returns `VALIDATION_REQUIRED`.
+  - `observed`: `scripts/t026-calibration-runner.js` returns `BUILD_BEAR_CHOPPY_FIXTURE`.
+  - `observed`: `scripts/t026-fixture-comparison.js` returns `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
+  - `observed`: `scripts/t026-grid-guard-proof.js` returns `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
+  - `observed`: `scripts/t040-strategy-effectiveness-report.js` returns `NOT_BETA_READY`.
+  - `observed`: `daily_net_usdt=-7.00`, five-window net `-37.93`, `max_drawdown_pct=0.62`, `total_alloc_pct=2.33`, `open_positions=9`.
+  - `observed`: `201` submitted orders, `176` filled, `0` rejected, `24` canceled.
+  - `observed`: fixture comparison aggregate is safety clean, totalDailyNet `-37.93`, totalFees `49.28`, totalRealizedAfterFees `-73.01`.
+- Technical changes:
+  - `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json`: refreshed from the June 12 five-window evidence sequence.
+  - `docs/easy_process/reports/t026-fixture-comparison.json`: refreshed current report artifact.
+  - `scripts/t026-grid-guard-proof.js`: added deterministic proof-target validation for `grid_guard_v2`.
+  - `docs/easy_process/reports/t026-grid-guard-proof.json`: added current proof-target report.
+  - `scripts/validate-active-ticket.sh` and `docker-compose.ci.yml`: now include the grid-guard proof script.
+  - T-040 packet/map/operator notes updated for June 12 `VALIDATION_REQUIRED`.
+- Risk slider impact:
+  - none to runtime trading behavior.
+- Validation evidence:
+  - `node scripts/t026-calibration-runner.js --write-fixture` refreshed the fixture and returned `BUILD_BEAR_CHOPPY_FIXTURE`.
+  - `node scripts/t026-fixture-comparison.js --write-report` returned `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
+  - `node scripts/t026-grid-guard-proof.js --write-report` returned `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
+- Runtime test request:
+  - keep running in testnet/paper mode; do not promote to real-money beta yet.
+- Follow-up:
+  - implement focused offline proof for `grid_guard_v2` before any runtime behavior patch; pivot to `risk_governor_hysteresis` only if the proof does not beat baseline.
+
 ## 2026-06-11 09:06 UTC — T-040 validation required: deterministic fixture comparison added
 - Scope:
   - classify `autobot-feedback-20260611-090617.tgz` under T-040 beta-readiness mode.

@@ -13,6 +13,7 @@ services:
         node --check scripts/feedback-evidence.js &&
         node --check scripts/t026-calibration-runner.js &&
         node --check scripts/t026-fixture-comparison.js &&
+        node --check scripts/t026-grid-guard-proof.js &&
         node --check scripts/t026-strategy-replay.js &&
         node --check scripts/t040-readiness-check.js &&
         node --check scripts/t040-strategy-effectiveness-report.js &&
