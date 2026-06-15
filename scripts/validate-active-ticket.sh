@@ -64,6 +64,7 @@ case "$ACTIVE_TICKET" in
     node --check scripts/t026-strategy-replay.js
     node --check scripts/t026-fixture-comparison.js
     node --check scripts/t026-grid-guard-proof.js
+    node --check scripts/t026-risk-governor-proof.js
     node --check scripts/t040-strategy-effectiveness-report.js
     T040_OUTPUT="$(node scripts/t040-readiness-check.js)"
     printf '%s\n' "$T040_OUTPUT"
@@ -77,12 +78,15 @@ case "$ACTIVE_TICKET" in
     T026_GRID_GUARD_OUTPUT="$(node scripts/t026-grid-guard-proof.js)"
     printf '%s\n' "$T026_GRID_GUARD_OUTPUT"
     T026_GRID_GUARD_VERDICT="$(printf '%s\n' "$T026_GRID_GUARD_OUTPUT" | sed -n 's/^T-026 grid guard proof verdict: //p' | head -n1)"
+    T026_RISK_GOVERNOR_OUTPUT="$(node scripts/t026-risk-governor-proof.js)"
+    printf '%s\n' "$T026_RISK_GOVERNOR_OUTPUT"
+    T026_RISK_GOVERNOR_VERDICT="$(printf '%s\n' "$T026_RISK_GOVERNOR_OUTPUT" | sed -n 's/^T-026 risk governor proof verdict: //p' | head -n1)"
     T040_EFFECTIVENESS_OUTPUT="$(node scripts/t040-strategy-effectiveness-report.js)"
     printf '%s\n' "$T040_EFFECTIVENESS_OUTPUT"
     T040_EFFECTIVENESS_VERDICT="$(printf '%s\n' "$T040_EFFECTIVENESS_OUTPUT" | sed -n 's/^T-040 strategy effectiveness verdict: //p' | head -n1)"
     ./scripts/pmba-gate.sh start
     ./scripts/pmba-gate.sh end
-    export T040_CLASSIFICATION T026_RECOMMENDATION T026_FIXTURE_VERDICT T026_GRID_GUARD_VERDICT T040_EFFECTIVENESS_VERDICT
+    export T040_CLASSIFICATION T026_RECOMMENDATION T026_FIXTURE_VERDICT T026_GRID_GUARD_VERDICT T026_RISK_GOVERNOR_VERDICT T040_EFFECTIVENESS_VERDICT
     node <<'NODE'
 const fs = require('fs');
 
@@ -116,6 +120,7 @@ const t040Classification = process.env.T040_CLASSIFICATION ?? '';
 const t026Recommendation = process.env.T026_RECOMMENDATION ?? '';
 const t026FixtureVerdict = process.env.T026_FIXTURE_VERDICT ?? '';
 const t026GridGuardVerdict = process.env.T026_GRID_GUARD_VERDICT ?? '';
+const t026RiskGovernorVerdict = process.env.T026_RISK_GOVERNOR_VERDICT ?? '';
 const t040EffectivenessVerdict = process.env.T040_EFFECTIVENESS_VERDICT ?? '';
 
 const inProgress = [...board.matchAll(/^\| (T-[0-9]{3}) \| IN_PROGRESS \|/gm)].map((match) => match[1]);
@@ -146,12 +151,16 @@ if (!/^(FIXTURE_CANDIDATE_[A-Z0-9_]+|NO_FIXTURE_CANDIDATE)$/.test(t026FixtureVer
 if (!/^(GRID_GUARD_OFFLINE_PROOF_TARGET_READY|GRID_GUARD_PROOF_BLOCKED_[A-Z_]+|GRID_GUARD_PROOF_INSUFFICIENT_[A-Z_]+)$/.test(t026GridGuardVerdict)) {
   fail(`unexpected T-026 grid guard proof verdict ${t026GridGuardVerdict || 'empty'}`);
 }
+if (!/^(RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY|RISK_GOVERNOR_PROOF_BLOCKED_[A-Z_]+|RISK_GOVERNOR_PROOF_INSUFFICIENT_[A-Z_]+|RISK_GOVERNOR_PROOF_SECONDARY_ONLY)$/.test(t026RiskGovernorVerdict)) {
+  fail(`unexpected T-026 risk governor proof verdict ${t026RiskGovernorVerdict || 'empty'}`);
+}
 if (t040Classification === 'VALIDATION_REQUIRED') {
   if (!/Decision mode: `VALIDATION_REQUIRED`/.test(packet)) fail('beta packet does not record VALIDATION_REQUIRED');
   if (!/Production posture: not approved/.test(packet)) fail('beta packet does not block production promotion');
   if (!/Beta posture: pause promotion/.test(packet)) fail('beta packet does not pause beta promotion');
   if (!/T-026 fixture comparison/.test(validationMap)) fail('validation map is missing T-026 fixture comparison');
   if (!/T-026 grid guard proof/.test(validationMap)) fail('validation map is missing T-026 grid guard proof');
+  if (!/T-026 risk governor proof/.test(validationMap)) fail('validation map is missing T-026 risk governor proof');
   if (t026Recommendation !== 'BUILD_BEAR_CHOPPY_FIXTURE') {
     fail(`expected T-026 BUILD_BEAR_CHOPPY_FIXTURE during validation pressure, found ${t026Recommendation || 'empty'}`);
   }

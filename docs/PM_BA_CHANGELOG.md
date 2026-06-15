@@ -16,6 +16,49 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-06-15 06:56 UTC — T-040 validation required: risk-governor fallback proof target
+- Scope:
+  - classify `autobot-feedback-20260615-065149.tgz` under T-040 beta-readiness mode.
+  - refresh the deterministic `bear_choppy_controlled_drawdown` fixture and fixture-comparison reports from the latest five-window sequence.
+  - add a risk-governor fallback proof-target script so the next offline proof compares both candidate families.
+- BA requirement mapping:
+  - latest evidence is validation pressure, not automatic T-031/T-032 patch input.
+  - beta promotion remains blocked because latest daily net is negative, latest three fresh windows are negative, and strategy effectiveness remains `NOT_BETA_READY`.
+  - no P0/P1 safety issue is present: exchange rejects, restarts, health errors, and exchange backoff are absent.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - next implementation target is focused offline proof comparing `grid_guard_v2` and `risk_governor_hysteresis`.
+- Evidence summary:
+  - `observed`: auto-retro decision is `validation_required`, next ticket remains `T-040`.
+  - `observed`: `scripts/t040-readiness-check.js` returns `VALIDATION_REQUIRED`.
+  - `observed`: `scripts/t026-calibration-runner.js` returns `BUILD_BEAR_CHOPPY_FIXTURE`.
+  - `observed`: `scripts/t026-fixture-comparison.js` returns `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
+  - `observed`: `scripts/t026-grid-guard-proof.js` returns `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
+  - `observed`: `scripts/t026-risk-governor-proof.js` returns `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
+  - `observed`: `scripts/t040-strategy-effectiveness-report.js` returns `NOT_BETA_READY`.
+  - `observed`: `daily_net_usdt=-23.60`, five-window net `-52.15`, `max_drawdown_pct=0.75`, `total_alloc_pct=5.11`, `open_positions=9`.
+  - `observed`: `201` submitted orders, `195` filled, `0` rejected, `5` canceled.
+  - `observed`: fixture comparison aggregate is safety clean, totalDailyNet `-52.15`, totalFees `48.91`, totalRealizedAfterFees `-93.45`.
+- Technical changes:
+  - `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json`: refreshed from the June 15 five-window evidence sequence.
+  - `docs/easy_process/reports/t026-fixture-comparison.json`: refreshed current report artifact.
+  - `docs/easy_process/reports/t026-grid-guard-proof.json`: refreshed current proof-target report.
+  - `scripts/t026-risk-governor-proof.js`: added deterministic proof-target validation for `risk_governor_hysteresis`.
+  - `docs/easy_process/reports/t026-risk-governor-proof.json`: added current proof-target report.
+  - `scripts/validate-active-ticket.sh` and `docker-compose.ci.yml`: now include the risk-governor proof script.
+  - T-040 packet/map/operator notes updated for June 15 `VALIDATION_REQUIRED`.
+- Risk slider impact:
+  - none to runtime trading behavior.
+- Validation evidence:
+  - `node scripts/t026-calibration-runner.js --write-fixture` refreshed the fixture and returned `BUILD_BEAR_CHOPPY_FIXTURE`.
+  - `node scripts/t026-fixture-comparison.js --write-report` returned `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
+  - `node scripts/t026-grid-guard-proof.js --write-report` returned `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
+  - `node scripts/t026-risk-governor-proof.js --write-report` returned `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
+- Runtime test request:
+  - keep running in testnet/paper mode; do not promote to real-money beta yet.
+- Follow-up:
+  - compare focused offline proof for `grid_guard_v2` and `risk_governor_hysteresis`; patch runtime only after deterministic proof shows improvement and preserves sell/unwind reachability.
+
 ## 2026-06-12 06:49 UTC — T-040 validation required: fixture/report refresh plus grid-guard proof target
 - Scope:
   - classify `autobot-feedback-20260612-063453.tgz` under T-040 beta-readiness mode.

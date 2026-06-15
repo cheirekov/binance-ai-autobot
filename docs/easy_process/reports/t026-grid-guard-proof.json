@@ -2,11 +2,11 @@
   "schema_version": 1,
   "fixture": "bear_choppy_controlled_drawdown",
   "source_bundles": [
+    "autobot-feedback-20260615-065149.tgz",
     "autobot-feedback-20260612-063453.tgz",
     "autobot-feedback-20260611-090617.tgz",
     "autobot-feedback-20260610-082902.tgz",
-    "autobot-feedback-20260609-081440.tgz",
-    "autobot-feedback-20260608-073438.tgz"
+    "autobot-feedback-20260609-081440.tgz"
   ],
   "verdict": "GRID_GUARD_OFFLINE_PROOF_TARGET_READY",
   "runtime_patch_allowed": false,
@@ -23,18 +23,18 @@
     "windows": 5,
     "eligibleWindows": 5,
     "lossChurnWindows": 5,
-    "pausedGridBuyWindows": 3,
-    "totalDailyNet": -37.92668533000051,
-    "totalFees": 49.28226586,
-    "totalRealizedAfterFees": -73.01133734000001,
-    "totalLossChurnAfterFees": 86.90046772,
-    "totalBuyPressure": 75,
-    "totalFixtureBuys": 525,
-    "totalFixtureSells": 344
+    "pausedGridBuyWindows": 4,
+    "totalDailyNet": -52.15041329000087,
+    "totalFees": 48.911427929999995,
+    "totalRealizedAfterFees": -93.44611856000002,
+    "totalLossChurnAfterFees": 109.5637975,
+    "totalBuyPressure": 93,
+    "totalFixtureBuys": 521,
+    "totalFixtureSells": 348
   },
   "candidate_scores": {
-    "grid_guard_v2": 54,
-    "risk_governor_hysteresis": 52
+    "grid_guard_v2": 61,
+    "risk_governor_hysteresis": 54
   },
   "acceptance": {
     "target": "pause or shrink GRID BUY legs only in eligible negative/fee-pressure windows",
@@ -43,6 +43,55 @@
     "must_not_increase": "exchange rejects, health errors, restarts, or hard-risk violations"
   },
   "windows": [
+    {
+      "bundle": "autobot-feedback-20260615-065149.tgz",
+      "class": "NEUTRAL_OR_INCONCLUSIVE",
+      "eligible": true,
+      "dailyNet": -23.60006977000012,
+      "realizedAfterFees": -32.85216238,
+      "totalAllocPct": 5.109274417534431,
+      "filledOrders": 195,
+      "rejectedOrders": 0,
+      "gridLaneEvents": 471,
+      "gridReasonCount": 5,
+      "riskBudgetReasonCount": 119,
+      "feeEdgeReasonCount": 32,
+      "pausedGridBuyReasons": true,
+      "lossChurnSymbols": [
+        {
+          "symbol": "TAOUSDC",
+          "buys": 37,
+          "sells": 20,
+          "netAfterFees": -23.46957793,
+          "openCost": 1.86933663
+        },
+        {
+          "symbol": "BANANAS31USDC",
+          "buys": 23,
+          "sells": 19,
+          "netAfterFees": -10.293657280000001,
+          "openCost": 1.010754
+        },
+        {
+          "symbol": "OPGUSDC",
+          "buys": 16,
+          "sells": 11,
+          "netAfterFees": -0.23700215999999985,
+          "openCost": 0.80018544
+        },
+        {
+          "symbol": "ETHUSDC",
+          "buys": 7,
+          "sells": 2,
+          "netAfterFees": -0.22614416999999998,
+          "openCost": 250.03988307
+        }
+      ],
+      "lossChurnAfterFees": 34.226381540000006,
+      "buyPressure": 31,
+      "fixtureBuys": 111,
+      "fixtureSells": 84
+    },
     {
       "bundle": "autobot-feedback-20260612-063453.tgz",
       "class": "CONTROLLED_DRAWDOWN",
@@ -203,48 +252,6 @@
       "buyPressure": 2,
       "fixtureBuys": 116,
       "fixtureSells": 81
-    },
-    {
-      "bundle": "autobot-feedback-20260608-073438.tgz",
-      "class": "CONTROLLED_DRAWDOWN",
-      "eligible": true,
-      "dailyNet": -9.376341809999758,
-      "realizedAfterFees": -12.417381160000001,
-      "totalAllocPct": 3.538428392798767,
-      "filledOrders": 195,
-      "rejectedOrders": 0,
-      "gridLaneEvents": 298,
-      "gridReasonCount": 0,
-      "riskBudgetReasonCount": 60,
-      "feeEdgeReasonCount": 49,
-      "pausedGridBuyReasons": false,
-      "lossChurnSymbols": [
-        {
-          "symbol": "TAOUSDC",
-          "buys": 5,
-          "sells": 3,
-          "netAfterFees": -5.04732061,
-          "openCost": 0.2981738
-        },
-        {
-          "symbol": "币安人生USDC",
-          "buys": 24,
-          "sells": 14,
-          "netAfterFees": -4.45754234,
-          "openCost": 0.91453574
-        },
-        {
-          "symbol": "EDENUSDC",
-          "buys": 2,
-          "sells": 1,
-          "netAfterFees": -2.05818881,
-          "openCost": 0.05633694
-        }
-      ],
-      "lossChurnAfterFees": 11.56305176,
-      "buyPressure": 13,
-      "fixtureBuys": 115,
-      "fixtureSells": 80
     }
   ]
 }

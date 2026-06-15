@@ -1,19 +1,20 @@
 # NEXT_BATCH_PLAN
 
-Last updated: 2026-06-12 06:49 UTC
+Last updated: 2026-06-15 06:56 UTC
 Owner: PM/BA + Codex
 
 ## Exact scope
-Continue `T-040` after the June 12 validation-required bundle with deterministic `grid_guard_v2` proof. Do not write another trading-behavior patch unless a P0/P1 safety issue or deterministic production-gate failure is found.
+Continue `T-040` after the June 15 validation-required bundle with deterministic `grid_guard_v2` and `risk_governor_hysteresis` proof. Do not write another trading-behavior patch unless a P0/P1 safety issue or deterministic production-gate failure is found.
 
 ## In scope
 - severity gate: define when live evidence can interrupt beta readiness.
 - deterministic validation map for `T-031`, `T-032`, and core execution safety.
-- deterministic bear/choppy drawdown fixture from the latest June 8/9/10/11/12 sequence.
+- deterministic bear/choppy drawdown fixture from the latest June 9/10/11/12/15 sequence.
 - supportive positive readiness evidence from the June 3 window.
-- June 8/9/10/11/12 negative-window pressure and June 12 ETH/KAT/CRV grid/risk-budget pressure as `grid_guard_v2` offline comparison input.
+- June 9/10/11/12/15 negative-window pressure and June 15 ETH/TAO/BANANA risk-budget, fee, and exposure pressure as offline comparison input.
 - `scripts/t026-fixture-comparison.js` report showing `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
 - `scripts/t026-grid-guard-proof.js` report showing `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
+- `scripts/t026-risk-governor-proof.js` report showing `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
 - clean-room reference strategy adoption plan.
 - `T-026` offline calibration/replay as the next engineering target.
 - `T-040` strategy-effectiveness reporting as the client-facing answer to whether adaptation is improving net results after fees.
@@ -38,10 +39,11 @@ Continue `T-040` after the June 12 validation-required bundle with deterministic
 - `./scripts/validate-active-ticket.sh` has a targeted `T-040` mode.
 - auto-retro treats production-readiness live churn as validation unless P0/P1 severity is proven.
 - next-session prompt points to beta readiness, not T-031/T-032 patch work.
-- June 12 evidence remains classified as validation-required negative-expectancy evidence, not production approval or a runtime patch trigger.
+- June 15 evidence remains classified as validation-required negative-expectancy evidence, not production approval or a runtime patch trigger.
 - strategy/reference work uses `docs/easy_process/REFERENCE_STRATEGY_ADOPTION.md` and does not copy GPL or unclear-license code.
-- `node scripts/t026-calibration-runner.js` reports `BUILD_BEAR_CHOPPY_FIXTURE` after the three-negative-window June 12 validation sequence.
+- `node scripts/t026-calibration-runner.js` reports `BUILD_BEAR_CHOPPY_FIXTURE` after the three-negative-window June 15 validation sequence.
 - `node scripts/t026-grid-guard-proof.js` reports `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
+- `node scripts/t026-risk-governor-proof.js` reports `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
 - `node scripts/t040-strategy-effectiveness-report.js` reports the current strategy verdict; latest result is `NOT_BETA_READY`.
 - fixture exists at `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json`.
 
@@ -49,4 +51,4 @@ Continue `T-040` after the June 12 validation-required bundle with deterministic
 - the process change hides or downgrades a real P0/P1 runtime safety issue.
 
 ## What capability this moves forward
-Moves `Gate P1 — Execution-safe baseline` and production readiness by turning the post-patch negative sequence into a deterministic `grid_guard_v2` proof task instead of another live-patch loop. If the offline proof does not beat the baseline, pivot to `risk_governor_hysteresis` using the same fixture.
+Moves `Gate P1 — Execution-safe baseline` and production readiness by turning the post-patch negative sequence into deterministic proof tasks instead of another live-patch loop. Compare `grid_guard_v2` and `risk_governor_hysteresis` against the same fixture before any runtime behavior patch.

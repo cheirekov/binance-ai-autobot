@@ -2,11 +2,11 @@
   "schema_version": 1,
   "fixture": "bear_choppy_controlled_drawdown",
   "source_bundles": [
+    "autobot-feedback-20260615-065149.tgz",
     "autobot-feedback-20260612-063453.tgz",
     "autobot-feedback-20260611-090617.tgz",
     "autobot-feedback-20260610-082902.tgz",
-    "autobot-feedback-20260609-081440.tgz",
-    "autobot-feedback-20260608-073438.tgz"
+    "autobot-feedback-20260609-081440.tgz"
   ],
   "verdict": "FIXTURE_CANDIDATE_GRID_GUARD_V2",
   "runtime_patch_allowed": false,
@@ -21,23 +21,23 @@
     "gridPressureWindows": 5,
     "riskBudgetPressureWindows": 5,
     "feeEdgePressureWindows": 5,
-    "highExposureWindows": 1,
-    "totalDailyNet": -37.92668533000051,
-    "totalFees": 49.28226586,
-    "totalRealizedAfterFees": -73.01133734000001,
-    "totalNegativeSymbolLoss": 116.87003547999998
+    "highExposureWindows": 2,
+    "totalDailyNet": -52.15041329000087,
+    "totalFees": 48.911427929999995,
+    "totalRealizedAfterFees": -93.44611856000002,
+    "totalNegativeSymbolLoss": 134.89473114
   },
   "candidates": [
     {
       "family": "grid_guard_v2",
-      "score": 54,
+      "score": 61,
       "rationale": "grid/risk-budget/min-order pressure is present while after-fee results remain negative",
       "target": "pause or shrink grid BUY legs under validation pressure while preserving SELL/reduce reachability",
       "acceptance": "lower filled-order count, fees, and open exposure without increasing rejects or blocking sells"
     },
     {
       "family": "risk_governor_hysteresis",
-      "score": 52,
+      "score": 54,
       "rationale": "repeated negative windows need longer memory before returning to baseline exposure",
       "target": "extend defensive state when recent windows remain negative after fees",
       "acceptance": "reduce new exposure after negative streaks while leaving unwind/reduce actions available"
@@ -51,6 +51,209 @@
     }
   ],
   "windows": [
+    {
+      "bundle": "autobot-feedback-20260615-065149.tgz",
+      "class": "NEUTRAL_OR_INCONCLUSIVE",
+      "dailyNet": -23.60006977000012,
+      "maxDrawdownPct": 0.7533116749168529,
+      "totalAllocPct": 5.109274417534431,
+      "realized": -22.40587044,
+      "fees": 10.44629194,
+      "realizedAfterFees": -32.85216238,
+      "filledOrders": 195,
+      "rejectedOrders": 0,
+      "healthErrors": 0,
+      "restarts": 0,
+      "entryTrades": 6,
+      "decisions": 200,
+      "topReason": "Skip SOLUSDC: Risk budget market entry cap below exchange minimum",
+      "topReasons": [
+        {
+          "reason": "Skip SOLUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 26
+        },
+        {
+          "reason": "Skip NEARUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 18
+        },
+        {
+          "reason": "Skip OPGUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 15
+        },
+        {
+          "reason": "Skip ETHUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 15
+        },
+        {
+          "reason": "Skip ZECUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 12
+        },
+        {
+          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.553% < 0.559%)",
+          "count": 12
+        },
+        {
+          "reason": "Skip TAOUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 9
+        },
+        {
+          "reason": "Skip BTCUSDC: Risk budget blocked new exposure",
+          "count": 9
+        },
+        {
+          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.541% < 0.559%)",
+          "count": 7
+        },
+        {
+          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.557% < 0.559%)",
+          "count": 6
+        },
+        {
+          "reason": "Skip WLDUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 5
+        },
+        {
+          "reason": "Skip ETHUSDC: Risk budget paused GRID BUY leg",
+          "count": 5
+        },
+        {
+          "reason": "Skip ZECETH: Risk budget market entry cap below exchange minimum",
+          "count": 5
+        },
+        {
+          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.401% < 0.559%)",
+          "count": 4
+        },
+        {
+          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.546% < 0.559%)",
+          "count": 3
+        }
+      ],
+      "pressure": {
+        "gridReasonCount": 5,
+        "gridReasonPct": 2.5,
+        "riskBudgetReasonCount": 119,
+        "riskBudgetReasonPct": 59.5,
+        "feeEdgeReasonCount": 32,
+        "feeEdgeReasonPct": 16,
+        "noFeasibleReasonCount": 0,
+        "noFeasibleReasonPct": 0
+      },
+      "adaptive": {
+        "events": 5000,
+        "strategyCounts": {
+          "GRID": 1730,
+          "MEAN_REVERSION": 795,
+          "TREND": 2475
+        },
+        "laneCounts": {
+          "DEFENSIVE": 2111,
+          "GRID": 471,
+          "MARKET": 2363,
+          "UNSPECIFIED": 55
+        },
+        "decisionCounts": {
+          "SKIP": 4322,
+          "TRADE": 622,
+          "ENGINE": 56
+        }
+      },
+      "topLossSymbols": [
+        {
+          "symbol": "TAOUSDC",
+          "realized": -19.77725276,
+          "fees": 3.69232517,
+          "netAfterFees": -23.46957793,
+          "openCost": 1.86933663,
+          "buys": 37,
+          "sells": 20
+        },
+        {
+          "symbol": "BANANAS31USDC",
+          "realized": -8.25040837,
+          "fees": 2.04324891,
+          "netAfterFees": -10.293657280000001,
+          "openCost": 1.010754,
+          "buys": 23,
+          "sells": 19
+        },
+        {
+          "symbol": "KAITOUSDC",
+          "realized": -1.65173169,
+          "fees": 0.47346666,
+          "netAfterFees": -2.1251983500000002,
+          "openCost": 0.28290775,
+          "buys": 4,
+          "sells": 14
+        },
+        {
+          "symbol": "OPGUSDC",
+          "realized": 1.17824374,
+          "fees": 1.4152459,
+          "netAfterFees": -0.23700215999999985,
+          "openCost": 0.80018544,
+          "buys": 16,
+          "sells": 11
+        },
+        {
+          "symbol": "ETHUSDC",
+          "realized": 0.21299045,
+          "fees": 0.43913462,
+          "netAfterFees": -0.22614416999999998,
+          "openCost": 250.03988307,
+          "buys": 7,
+          "sells": 2
+        }
+      ],
+      "topOpenExposure": [
+        {
+          "symbol": "ETHUSDC",
+          "realized": 0.21299045,
+          "fees": 0.43913462,
+          "netAfterFees": -0.22614416999999998,
+          "openCost": 250.03988307,
+          "buys": 7,
+          "sells": 2
+        },
+        {
+          "symbol": "TAOUSDC",
+          "realized": -19.77725276,
+          "fees": 3.69232517,
+          "netAfterFees": -23.46957793,
+          "openCost": 1.86933663,
+          "buys": 37,
+          "sells": 20
+        },
+        {
+          "symbol": "BANANAS31USDC",
+          "realized": -8.25040837,
+          "fees": 2.04324891,
+          "netAfterFees": -10.293657280000001,
+          "openCost": 1.010754,
+          "buys": 23,
+          "sells": 19
+        },
+        {
+          "symbol": "OPGUSDC",
+          "realized": 1.17824374,
+          "fees": 1.4152459,
+          "netAfterFees": -0.23700215999999985,
+          "openCost": 0.80018544,
+          "buys": 16,
+          "sells": 11
+        },
+        {
+          "symbol": "ZKCUSDC",
+          "realized": 3.49102699,
+          "fees": 1.27543364,
+          "netAfterFees": 2.21559335,
+          "openCost": 0.65304364,
+          "buys": 12,
+          "sells": 6
+        }
+      ],
+      "negativeSymbolLoss": 36.48315275
+    },
     {
       "bundle": "autobot-feedback-20260612-063453.tgz",
       "class": "CONTROLLED_DRAWDOWN",
@@ -862,209 +1065,6 @@
         }
       ],
       "negativeSymbolLoss": 19.190300989999997
-    },
-    {
-      "bundle": "autobot-feedback-20260608-073438.tgz",
-      "class": "CONTROLLED_DRAWDOWN",
-      "dailyNet": -9.376341809999758,
-      "maxDrawdownPct": 0.5374493241777012,
-      "totalAllocPct": 3.538428392798767,
-      "realized": -1.60025129,
-      "fees": 10.81712987,
-      "realizedAfterFees": -12.417381160000001,
-      "filledOrders": 195,
-      "rejectedOrders": 0,
-      "healthErrors": 0,
-      "restarts": 0,
-      "entryTrades": 18,
-      "decisions": 200,
-      "topReason": "Skip ZECUSDC: Risk budget market entry cap below exchange minimum",
-      "topReasons": [
-        {
-          "reason": "Skip ZECUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 47
-        },
-        {
-          "reason": "Skip NEARUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 8
-        },
-        {
-          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.310% < 0.559%)",
-          "count": 8
-        },
-        {
-          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.404% < 0.559%)",
-          "count": 5
-        },
-        {
-          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.272% < 0.559%)",
-          "count": 5
-        },
-        {
-          "reason": "Skip WLDUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 5
-        },
-        {
-          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.421% < 0.559%)",
-          "count": 4
-        },
-        {
-          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.435% < 0.559%)",
-          "count": 4
-        },
-        {
-          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.556% < 0.559%)",
-          "count": 4
-        },
-        {
-          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.552% < 0.559%)",
-          "count": 4
-        },
-        {
-          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.285% < 0.559%)",
-          "count": 3
-        },
-        {
-          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.301% < 0.559%)",
-          "count": 3
-        },
-        {
-          "reason": "Skip SOLUSDC: Fee/edge filter (net 0.426% < 0.559%)",
-          "count": 3
-        },
-        {
-          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.318% < 0.559%)",
-          "count": 3
-        },
-        {
-          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.419% < 0.559%)",
-          "count": 3
-        }
-      ],
-      "pressure": {
-        "gridReasonCount": 0,
-        "gridReasonPct": 0,
-        "riskBudgetReasonCount": 60,
-        "riskBudgetReasonPct": 30,
-        "feeEdgeReasonCount": 49,
-        "feeEdgeReasonPct": 24.5,
-        "noFeasibleReasonCount": 0,
-        "noFeasibleReasonPct": 0
-      },
-      "adaptive": {
-        "events": 1338,
-        "strategyCounts": {
-          "MEAN_REVERSION": 267,
-          "GRID": 340,
-          "TREND": 731
-        },
-        "laneCounts": {
-          "UNSPECIFIED": 123,
-          "DEFENSIVE": 133,
-          "GRID": 298,
-          "MARKET": 784
-        },
-        "decisionCounts": {
-          "SKIP": 988,
-          "TRADE": 315,
-          "ENGINE": 35
-        }
-      },
-      "topLossSymbols": [
-        {
-          "symbol": "TAOUSDC",
-          "realized": -4.4304515,
-          "fees": 0.61686911,
-          "netAfterFees": -5.04732061,
-          "openCost": 0.2981738,
-          "buys": 5,
-          "sells": 3
-        },
-        {
-          "symbol": "SOLUSDC",
-          "realized": -4.32761092,
-          "fees": 0.52742385,
-          "netAfterFees": -4.85503477,
-          "openCost": 0.26291583,
-          "buys": 6,
-          "sells": 6
-        },
-        {
-          "symbol": "币安人生USDC",
-          "realized": -2.49535237,
-          "fees": 1.96218997,
-          "netAfterFees": -4.45754234,
-          "openCost": 0.91453574,
-          "buys": 24,
-          "sells": 14
-        },
-        {
-          "symbol": "EDENUSDC",
-          "realized": -1.94660795,
-          "fees": 0.11158086,
-          "netAfterFees": -2.05818881,
-          "openCost": 0.05633694,
-          "buys": 2,
-          "sells": 1
-        },
-        {
-          "symbol": "SUIUSDC",
-          "realized": -0.84261721,
-          "fees": 0.07084018,
-          "netAfterFees": -0.91345739,
-          "openCost": 0.07613226,
-          "buys": 1,
-          "sells": 1
-        }
-      ],
-      "topOpenExposure": [
-        {
-          "symbol": "ZECUSDC",
-          "realized": 3.88912213,
-          "fees": 4.74851316,
-          "netAfterFees": -0.8593910299999998,
-          "openCost": 100.55048384,
-          "buys": 52,
-          "sells": 26
-        },
-        {
-          "symbol": "NEARUSDC",
-          "realized": 1.2905181,
-          "fees": 1.42733456,
-          "netAfterFees": -0.13681646000000014,
-          "openCost": 76.37699615,
-          "buys": 13,
-          "sells": 10
-        },
-        {
-          "symbol": "币安人生USDC",
-          "realized": -2.49535237,
-          "fees": 1.96218997,
-          "netAfterFees": -4.45754234,
-          "openCost": 0.91453574,
-          "buys": 24,
-          "sells": 14
-        },
-        {
-          "symbol": "TAOUSDC",
-          "realized": -4.4304515,
-          "fees": 0.61686911,
-          "netAfterFees": -5.04732061,
-          "openCost": 0.2981738,
-          "buys": 5,
-          "sells": 3
-        },
-        {
-          "symbol": "SOLUSDC",
-          "realized": -4.32761092,
-          "fees": 0.52742385,
-          "netAfterFees": -4.85503477,
-          "openCost": 0.26291583,
-          "buys": 6,
-          "sells": 6
-        }
-      ],
-      "negativeSymbolLoss": 18.45845709
     }
   ],
   "next_action": "Build focused offline proof for grid_guard_v2 before any runtime behavior patch"
