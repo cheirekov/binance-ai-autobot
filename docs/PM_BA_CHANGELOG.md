@@ -16,6 +16,57 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-06-16 15:45 UTC — T-040 validation required: offline proof selector added
+- Scope:
+  - classify `autobot-feedback-20260616-152318.tgz` under T-040 beta-readiness mode.
+  - refresh the deterministic `bear_choppy_controlled_drawdown` fixture and proof reports from the latest five-window sequence.
+  - add a proof-comparison selector so the next offline proof has a primary/fallback decision instead of another live-evidence loop.
+- BA requirement mapping:
+  - latest evidence is validation pressure, not automatic T-031/T-032 patch input.
+  - beta promotion remains blocked because latest daily net is negative, latest three fresh windows are negative, and strategy effectiveness remains `NOT_BETA_READY`.
+  - no P0/P1 safety issue is present: exchange rejects, restarts, health errors, and exchange backoff are absent.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - next implementation target is focused offline proof for `grid_guard_v2`, with `risk_governor_hysteresis` preserved as fallback.
+- Evidence summary:
+  - `observed`: auto-retro decision is `validation_required`, next ticket remains `T-040`.
+  - `observed`: `scripts/t040-readiness-check.js` returns `VALIDATION_REQUIRED`.
+  - `observed`: `scripts/t026-calibration-runner.js` returns `BUILD_BEAR_CHOPPY_FIXTURE`.
+  - `observed`: `scripts/t026-fixture-comparison.js` returns `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
+  - `observed`: `scripts/t026-grid-guard-proof.js` returns `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
+  - `observed`: `scripts/t026-risk-governor-proof.js` returns `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
+  - `observed`: `scripts/t026-proof-comparison.js` returns `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK`.
+  - `observed`: `scripts/t040-strategy-effectiveness-report.js` returns `NOT_BETA_READY`.
+  - `observed`: `daily_net_usdt=-12.74`, five-window net `-57.76`, `max_drawdown_pct=0.46`, `total_alloc_pct=5.11`, `open_positions=13`.
+  - `observed`: `200` submitted orders, `193` filled, `0` rejected, `7` canceled.
+  - `observed`: fixture comparison aggregate is safety clean, totalDailyNet `-57.76`, totalFees `49.86`, totalRealizedAfterFees `-92.67`.
+- Technical changes:
+  - `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json`: refreshed from the June 16 five-window evidence sequence.
+  - `docs/easy_process/reports/t026-fixture-comparison.json`: refreshed current report artifact.
+  - `docs/easy_process/reports/t026-grid-guard-proof.json`: refreshed current proof-target report.
+  - `docs/easy_process/reports/t026-risk-governor-proof.json`: refreshed current proof-target report.
+  - `scripts/t026-proof-comparison.js`: added deterministic proof-target selection across grid guard and risk governor proof reports.
+  - `docs/easy_process/reports/t026-proof-comparison.json`: added current proof-comparison report.
+  - `scripts/validate-active-ticket.sh` and `docker-compose.ci.yml`: now include the proof-comparison script.
+  - T-040 packet/map/operator notes updated for June 16 `VALIDATION_REQUIRED`.
+- Risk slider impact:
+  - none to runtime trading behavior.
+- Validation evidence:
+  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh` passed.
+  - `node scripts/t026-calibration-runner.js --write-fixture` refreshed the fixture and returned `BUILD_BEAR_CHOPPY_FIXTURE`.
+  - `node scripts/t026-fixture-comparison.js --write-report` returned `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
+  - `node scripts/t026-grid-guard-proof.js --write-report` returned `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
+  - `node scripts/t026-risk-governor-proof.js --write-report` returned `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
+  - `node scripts/t026-proof-comparison.js --write-report` returned `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK`.
+  - `./scripts/validate-active-ticket.sh` passed with `VALIDATION_REQUIRED`; promotion gate remains separate.
+  - `./scripts/pmba-gate.sh start` passed.
+  - `./scripts/pmba-gate.sh end` passed.
+  - `git diff --check` passed.
+- Runtime test request:
+  - keep running in testnet/paper mode; do not promote to real-money beta yet.
+- Follow-up:
+  - build focused offline proof for `grid_guard_v2`; use `risk_governor_hysteresis` only as fallback until primary proof fails acceptance.
+
 ## 2026-06-15 06:56 UTC — T-040 validation required: risk-governor fallback proof target
 - Scope:
   - classify `autobot-feedback-20260615-065149.tgz` under T-040 beta-readiness mode.

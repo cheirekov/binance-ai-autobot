@@ -2,11 +2,11 @@
   "schema_version": 1,
   "fixture": "bear_choppy_controlled_drawdown",
   "source_bundles": [
+    "autobot-feedback-20260616-152318.tgz",
     "autobot-feedback-20260615-065149.tgz",
     "autobot-feedback-20260612-063453.tgz",
     "autobot-feedback-20260611-090617.tgz",
-    "autobot-feedback-20260610-082902.tgz",
-    "autobot-feedback-20260609-081440.tgz"
+    "autobot-feedback-20260610-082902.tgz"
   ],
   "verdict": "RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY",
   "runtime_patch_allowed": false,
@@ -27,19 +27,19 @@
     "windows": 5,
     "leadingNegativeWindows": 5,
     "negativeAfterFeesWindows": 5,
-    "highExposureWindows": 2,
+    "highExposureWindows": 3,
     "tradeChurnWindows": 5,
-    "totalDailyNet": -52.15041329000087,
-    "totalFees": 48.911427929999995,
-    "totalRealizedAfterFees": -93.44611856000002,
-    "totalRiskBudgetReasons": 403,
-    "totalFeeEdgeReasons": 112,
-    "totalFixtureSells": 348
+    "totalDailyNet": -57.76457982000102,
+    "totalFees": 49.85582279,
+    "totalRealizedAfterFees": -92.66722361000001,
+    "totalRiskBudgetReasons": 493,
+    "totalFeeEdgeReasons": 91,
+    "totalFixtureSells": 345
   },
   "candidate_scores": {
-    "grid_guard_v2": 61,
-    "risk_governor_hysteresis": 54,
-    "scoreGap": 7
+    "grid_guard_v2": 65,
+    "risk_governor_hysteresis": 56,
+    "scoreGap": 9
   },
   "acceptance": {
     "target": "extend defensive state after repeated negative-after-fee windows before new exposure resumes",
@@ -48,6 +48,26 @@
     "must_not_increase": "exchange rejects, health errors, restarts, or hard-risk violations"
   },
   "windows": [
+    {
+      "bundle": "autobot-feedback-20260616-152318.tgz",
+      "class": "NEUTRAL_OR_INCONCLUSIVE",
+      "dailyNet": -12.740767450000021,
+      "realizedAfterFees": -8.269055609999999,
+      "totalAllocPct": 5.109796260111092,
+      "filledOrders": 193,
+      "rejectedOrders": 0,
+      "riskBudgetReasonCount": 127,
+      "feeEdgeReasonCount": 2,
+      "largestOpenExposure": {
+        "symbol": "WLDUSDC",
+        "openCost": 174.56731797,
+        "netAfterFees": -1.23947874,
+        "buys": 12,
+        "sells": 6
+      },
+      "fixtureBuys": 115,
+      "fixtureSells": 78
+    },
     {
       "bundle": "autobot-feedback-20260615-065149.tgz",
       "class": "NEUTRAL_OR_INCONCLUSIVE",
@@ -127,26 +147,6 @@
       },
       "fixtureBuys": 99,
       "fixtureSells": 60
-    },
-    {
-      "bundle": "autobot-feedback-20260609-081440.tgz",
-      "class": "CONTROLLED_DRAWDOWN",
-      "dailyNet": -7.126600919999873,
-      "realizedAfterFees": -9.04795056,
-      "totalAllocPct": 0.11662580530387757,
-      "filledOrders": 197,
-      "rejectedOrders": 0,
-      "riskBudgetReasonCount": 37,
-      "feeEdgeReasonCount": 23,
-      "largestOpenExposure": {
-        "symbol": "ALLOUSDC",
-        "openCost": 3.3149087,
-        "netAfterFees": 6.277679169999999,
-        "buys": 65,
-        "sells": 29
-      },
-      "fixtureBuys": 116,
-      "fixtureSells": 81
     }
   ]
 }

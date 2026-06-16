@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-06-15 07:00 UTC
+Last updated: 2026-06-16 15:29 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch. This brief is intentionally short; long historical preservation details live in `docs/PM_BA_CHANGELOG.md` and `docs/STRATEGY_COVERAGE.md`.
@@ -47,7 +47,7 @@ Use this file at the start and end of every batch. This brief is intentionally s
   - T-031/T-032 behavior remains preserved.
   - new runtime patches are allowed only for P0/P1 safety/execution blockers or deterministic production-gate failures.
 - Validation commands:
-  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh`
+  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh`
   - `node --check scripts/feedback-evidence.js`
   - `node --check scripts/t040-readiness-check.js`
   - `node --check scripts/t026-calibration-runner.js`
@@ -57,13 +57,15 @@ Use this file at the start and end of every batch. This brief is intentionally s
   - `node --check scripts/t026-fixture-comparison.js`
   - `node --check scripts/t026-grid-guard-proof.js`
   - `node --check scripts/t026-risk-governor-proof.js`
+  - `node --check scripts/t026-proof-comparison.js`
   - `node --check scripts/t040-strategy-effectiveness-report.js`
   - `node scripts/t026-fixture-comparison.js --write-report`
   - `node scripts/t026-grid-guard-proof.js --write-report`
   - `node scripts/t026-risk-governor-proof.js --write-report`
+  - `node scripts/t026-proof-comparison.js --write-report`
   - `node scripts/t040-strategy-effectiveness-report.js`
-  - `./scripts/auto-retro.sh autobot-feedback-20260615-065149.tgz`
-  - `./scripts/update-session-brief.sh autobot-feedback-20260615-065149.tgz`
+  - `./scripts/auto-retro.sh autobot-feedback-20260616-152318.tgz`
+  - `./scripts/update-session-brief.sh autobot-feedback-20260616-152318.tgz`
   - `./scripts/validate-active-ticket.sh`
   - `./scripts/pmba-gate.sh start`
   - `./scripts/pmba-gate.sh end`
@@ -73,7 +75,7 @@ Use this file at the start and end of every batch. This brief is intentionally s
 
 ## 3) Deployment Handoff
 
-- Commit hash: `0e6c199`
+- Commit hash: `e2f5665`
 - Deploy target: process/docs/scripts only; no bot redeploy required unless code changes are later added.
 - Required config changes: none
 - Operator checklist:
@@ -84,20 +86,20 @@ Use this file at the start and end of every batch. This brief is intentionally s
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `EVENING (collection) / EVENING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `72.267`
-  - runtime uptime (hours): `1552.801`
-  - run end: `Mon Jun 15 2026 09:50:27 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - bundle interval (hours): `32.525`
+  - runtime uptime (hours): `1585.326`
+  - run end: `Tue Jun 16 2026 18:21:59 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `NIGHT_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip SOLUSDC: Risk budget market entry cap below exchange minimum (26))
+  - active ticket runtime signal: `observed` (Skip BTCUSDC: Risk budget blocked new exposure (58))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=13, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=93.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=11, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=94.5%)
   - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `validation_required`
@@ -106,8 +108,8 @@ Use this file at the start and end of every batch. This brief is intentionally s
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260615-065149.tgz`
-  - auto-updated at: `2026-06-15T07:00:37.658Z`
+  - bundle: `autobot-feedback-20260616-152318.tgz`
+  - auto-updated at: `2026-06-16T15:29:22.310Z`
 
 ## 5) Copy/paste prompt for next session
 
@@ -115,7 +117,7 @@ Use this file at the start and end of every batch. This brief is intentionally s
 Ticket: T-040
 Decision: validation_required
 Required action: classify severity and add deterministic validation before any runtime patch; live-market churn alone is not a beta blocker
-Latest bundle: autobot-feedback-20260615-065149.tgz
+Latest bundle: autobot-feedback-20260616-152318.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: move the bot toward bounded beta/production readiness, not another T-031/T-032 micro-patch.
 Patch policy: runtime patches require P0/P1 safety severity plus deterministic reproduction.

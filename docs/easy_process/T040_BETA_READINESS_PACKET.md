@@ -1,6 +1,6 @@
 # T040_BETA_READINESS_PACKET
 
-Last updated: 2026-06-15 06:56 UTC
+Last updated: 2026-06-16 15:45 UTC
 Owner: PM/BA + Codex
 
 Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readiness decision.
@@ -9,30 +9,30 @@ Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readin
 
 - Active ticket: `T-040`
 - Decision mode: `VALIDATION_REQUIRED`
-- Runtime code posture: recent fill-performance risk-budget guard is deployed; deterministic fixture/report refreshed; grid-guard and risk-governor proof-target scripts are active; no new runtime behavior patch is approved from this bundle
+- Runtime code posture: recent fill-performance risk-budget guard is deployed; deterministic fixture/report refreshed; grid-guard, risk-governor, and proof-comparison scripts are active; no new runtime behavior patch is approved from this bundle
 - Production posture: not approved for real-money production promotion
-- Beta posture: pause promotion; prove the next candidate offline before any further runtime strategy patch
+- Beta posture: pause promotion; prove `grid_guard_v2` offline first and keep `risk_governor_hysteresis` as fallback before any further runtime strategy patch
 - Strategy effectiveness verdict: `NOT_BETA_READY`
 
 ## Latest Evidence
 
-- Bundle: `autobot-feedback-20260615-065149.tgz`
-- Cycle: `MORNING_REVIEW`
+- Bundle: `autobot-feedback-20260616-152318.tgz`
+- Cycle: `NIGHT_RUN`
 - Auto-retro decision: `validation_required`
 - Environment: `testnet`
 - Risk state: `NORMAL`
-- Daily net: `-23.60 USDT`
-- Five-window net: `-52.15 USDT`
-- Max drawdown: `0.75%`
+- Daily net: `-12.74 USDT`
+- Five-window net: `-57.76 USDT`
+- Max drawdown: `0.46%`
 - Total allocation: `5.11%`
-- Open positions: `9`
-- Orders: `201 submitted`, `195 filled`, `0 rejected`, `5 canceled`
+- Open positions: `13`
+- Orders: `200 submitted`, `193 filled`, `0 rejected`, `7 canceled`
 - Sizing reject pressure: `low` (`0` sizing rejects)
 - Runtime health: `0 errors`, `0 restarts`, no exchange/order-sync backoff in top reasons
 - AI mode: `OFF`
-- Strategy effectiveness: `NOT_BETA_READY`; rule-based strategy switching is visible, but five-window net is `-52.15 USDT` and latest realized-after-fees is `-32.85 USDT`.
-- PM/BA interpretation: the latest fresh window has clean execution safety, but PnL deteriorated and ETH open exposure reached about `5%`. A normal client should not read this as adaptive-profit proof yet.
-- Post-bundle engineering action: refreshed the T-026 fixture/comparison/proof reports from the June 15 five-window validation sequence and added `scripts/t026-risk-governor-proof.js`.
+- Strategy effectiveness: `NOT_BETA_READY`; rule-based strategy switching is visible, but five-window net is `-57.76 USDT` and latest realized-after-fees is `-8.27 USDT`.
+- PM/BA interpretation: the latest fresh window has clean execution safety, but after-fee PnL remains negative and WLD/JTO exposure is the current concentration. A normal client should not read this as adaptive-profit proof yet.
+- Post-bundle engineering action: refreshed the T-026 fixture/comparison/proof reports from the June 16 five-window validation sequence and added `scripts/t026-proof-comparison.js`.
 
 ## Evidence Sequence
 
@@ -50,7 +50,8 @@ Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readin
 - `2026-06-11`: negative window, `-9.09 USDT`, `0` rejects, `0` restarts, allocation at `5.10%`, entry trades `7`, and strategy effectiveness remains negative after fees.
 - `2026-06-12`: controlled-negative window, `-7.00 USDT`, `0` rejects, `0` restarts, allocation at `2.33%`, entry trades `22`, and strategy effectiveness remains negative after fees.
 - `2026-06-15`: negative window, `-23.60 USDT`, `0` rejects, `0` restarts, allocation at `5.11%`, entry trades `6`, and strategy effectiveness remains negative after fees.
-- Interpretation: the runtime guard is keeping execution safety clean, but it has not proven profitable adaptation. The refreshed fixture comparison ranks `grid_guard_v2` ahead of `risk_governor_hysteresis`; both proof-target scripts now return target-ready so the next work can compare focused offline proofs instead of waiting for more live evidence.
+- `2026-06-16`: negative window, `-12.74 USDT`, `0` rejects, `0` restarts, allocation at `5.11%`, entry trades `30`, and strategy effectiveness remains negative after fees.
+- Interpretation: the runtime guard is keeping execution safety clean, but it has not proven profitable adaptation. The refreshed fixture comparison ranks `grid_guard_v2` ahead of `risk_governor_hysteresis`; both proof-target scripts return target-ready and the proof-comparison script selects grid primary with risk-governor fallback, so the next work is focused offline proof instead of waiting for more live evidence.
 
 ## Operator Job
 
@@ -77,7 +78,7 @@ Runtime behavior patches require:
 | Active-ticket hygiene | exactly one `IN_PROGRESS` ticket and session/retro alignment | `PASS` | keep `T-040` active until readiness packet is complete |
 | Runtime safety invariants | hard exposure, reserve, sell/unwind, PnL, and restart guards have deterministic tests | `PARTIAL` | expand validation map instead of patching strategy from live churn |
 | Execution reliability | repeated exchange rejects, order-sync backoff, and stuck order loops are detectable | `PARTIAL` | latest six readiness bundles have 0 rejects and no backoff; still add deterministic order-failure scenarios |
-| Strategy/adaptation proof | at least one range-leaning and one trend-leaning validation window or accepted deterministic equivalent | `PARTIAL` | latest strategy effectiveness report is `NOT_BETA_READY`; compare focused offline proofs for `grid_guard_v2` and `risk_governor_hysteresis` against the refreshed bear/choppy fixture |
+| Strategy/adaptation proof | at least one range-leaning and one trend-leaning validation window or accepted deterministic equivalent | `PARTIAL` | latest strategy effectiveness report is `NOT_BETA_READY`; build focused offline proof for `grid_guard_v2` against the refreshed bear/choppy fixture, with `risk_governor_hysteresis` as fallback |
 | Sizing/min-order pressure | sizing reject pressure is bounded and not a retry storm | `PARTIAL` | June 5 returned to low at `3.0%`, but June 4 medium pressure remains `grid_guard_v2` offline comparison input |
 | Operator controls | risk slider, kill switch, rollback, and readable state are documented | `PARTIAL` | produce release/rollback packet before beta promotion |
 | Token/process budget | future agents use compact read order, skill, and gates instead of full history loading | `PASS` | keep archive docs out of default context |
@@ -93,11 +94,12 @@ Runtime behavior patches require:
 
 ## Immediate Next Batch
 
-1. Preserve the refreshed `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json` fixture from the June 15 validation sequence.
+1. Preserve the refreshed `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json` fixture from the June 16 validation sequence.
 2. Use `node scripts/t026-fixture-comparison.js --write-report` as the deterministic candidate-family comparison.
-3. Treat `autobot-feedback-20260615-065149.tgz` as validation-required negative-expectancy evidence, not production proof and not a runtime patch trigger.
-4. Prioritize `grid_guard_v2` offline proof because the fixture comparison ranks it first (`61`) ahead of `risk_governor_hysteresis` (`54`), but keep `risk_governor_hysteresis` active because `node scripts/t026-risk-governor-proof.js --write-report` returns `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
-5. Use `node scripts/t040-strategy-effectiveness-report.js` after each bundle so the operator sees whether adaptation improved net results after fees.
-6. Add or map tests for the highest-risk missing safety scenarios.
-7. Produce the release/rollback packet.
-8. Only then consider a bounded beta promotion request.
+3. Use `node scripts/t026-proof-comparison.js --write-report` after grid/risk proof reports to choose the primary offline proof target.
+4. Treat `autobot-feedback-20260616-152318.tgz` as validation-required negative-expectancy evidence, not production proof and not a runtime patch trigger.
+5. Prioritize `grid_guard_v2` offline proof because the fixture comparison ranks it first (`65`) ahead of `risk_governor_hysteresis` (`56`) and proof comparison returns `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK`.
+6. Use `node scripts/t040-strategy-effectiveness-report.js` after each bundle so the operator sees whether adaptation improved net results after fees.
+7. Add or map tests for the highest-risk missing safety scenarios.
+8. Produce the release/rollback packet.
+9. Only then consider a bounded beta promotion request.
