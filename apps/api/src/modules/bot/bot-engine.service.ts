@@ -1034,7 +1034,6 @@ export class BotEngineService implements OnModuleInit {
     hasBotBuyOrders: boolean;
     buyPaused: boolean;
   }): boolean {
-    if (params.executionLane !== "DEFENSIVE") return false;
     if (!params.hasBotBuyOrders) return false;
     return params.buyPaused;
   }

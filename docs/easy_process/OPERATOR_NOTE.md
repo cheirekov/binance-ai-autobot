@@ -1,6 +1,6 @@
 # OPERATOR_NOTE
 
-Last updated: 2026-06-16 15:45 UTC
+Last updated: 2026-06-17 09:45 UTC
 Owner: PM/BA + Codex
 
 ## What to run next
@@ -11,14 +11,16 @@ Owner: PM/BA + Codex
 - run `node scripts/t026-risk-governor-proof.js --write-report` after fixture comparison to confirm the risk-governor fallback target is still valid.
 - run `node scripts/t026-proof-comparison.js --write-report` after both proof-target reports to choose the primary offline proof target.
 - do not promote to real-money beta yet.
+- redeploy the API/bot service before judging the next bundle; the June 17 patch cancels bot-owned grid BUY ladder orders whenever buys are paused.
+- if the next bundle is still `VALIDATION_REQUIRED` and `NOT_BETA_READY`, a docs-only batch must fail validation; the next agent must either patch runtime/test code or write an explicit `STOP_TESTNET` decision.
 - next engineering work should continue `T-026` offline calibration/replay and clean-room reference strategy adoption.
-- latest bundle `autobot-feedback-20260616-152318.tgz` is validation-required negative-expectancy evidence with clean safety, not production proof and not a runtime patch trigger.
+- latest bundle `autobot-feedback-20260617-093804.tgz` is validation-required negative-expectancy evidence with clean safety, lower allocation, and worse after-fee PnL; it is not production proof and not a runtime patch trigger.
 - current strategy-effectiveness verdict is `NOT_BETA_READY`: adaptation is visible in rule-based strategy/lane telemetry, but not proven profitable after fees.
-- refreshed fixture: `bear_choppy_controlled_drawdown` from the June 16 five-window validation sequence.
+- refreshed fixture: `bear_choppy_controlled_drawdown` from the June 17 five-window validation sequence.
 - current fixture comparison ranking: `grid_guard_v2`, `risk_governor_hysteresis`, `mean_reversion_gate`.
 - current grid-guard proof-target verdict: `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
 - current risk-governor proof-target verdict: `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
-- current proof-comparison verdict: `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK`; build the focused grid proof first and keep risk governor as fallback.
+- current proof-comparison verdict: `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK`; build the focused grid proof first and keep risk governor as a close fallback.
 - current coarse calibration ranking: `grid_guard_v2`, `risk_governor_hysteresis`, `mean_reversion_gate`.
 - keep collecting testnet evidence; do not reset the data folder for this validation state.
 - use deterministic validation before any new trading-code patch.

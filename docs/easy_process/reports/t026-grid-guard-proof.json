@@ -2,11 +2,11 @@
   "schema_version": 1,
   "fixture": "bear_choppy_controlled_drawdown",
   "source_bundles": [
+    "autobot-feedback-20260617-093804.tgz",
     "autobot-feedback-20260616-152318.tgz",
     "autobot-feedback-20260615-065149.tgz",
     "autobot-feedback-20260612-063453.tgz",
-    "autobot-feedback-20260611-090617.tgz",
-    "autobot-feedback-20260610-082902.tgz"
+    "autobot-feedback-20260611-090617.tgz"
   ],
   "verdict": "GRID_GUARD_OFFLINE_PROOF_TARGET_READY",
   "runtime_patch_allowed": false,
@@ -23,17 +23,17 @@
     "windows": 5,
     "eligibleWindows": 5,
     "lossChurnWindows": 5,
-    "pausedGridBuyWindows": 4,
-    "totalDailyNet": -57.76457982000102,
-    "totalFees": 49.85582279,
-    "totalRealizedAfterFees": -92.66722361000001,
-    "totalLossChurnAfterFees": 108.29091259,
-    "totalBuyPressure": 109,
-    "totalFixtureBuys": 520,
-    "totalFixtureSells": 345
+    "pausedGridBuyWindows": 5,
+    "totalDailyNet": -82.05747229000008,
+    "totalFees": 52.866528290000005,
+    "totalRealizedAfterFees": -105.80193387,
+    "totalLossChurnAfterFees": 117.31397324,
+    "totalBuyPressure": 130,
+    "totalFixtureBuys": 536,
+    "totalFixtureSells": 352
   },
   "candidate_scores": {
-    "grid_guard_v2": 65,
+    "grid_guard_v2": 62,
     "risk_governor_hysteresis": 56
   },
   "acceptance": {
@@ -43,6 +43,48 @@
     "must_not_increase": "exchange rejects, health errors, restarts, or hard-risk violations"
   },
   "windows": [
+    {
+      "bundle": "autobot-feedback-20260617-093804.tgz",
+      "class": "CONTROLLED_DRAWDOWN",
+      "eligible": true,
+      "dailyNet": -29.624865529999624,
+      "realizedAfterFees": -26.46896781,
+      "totalAllocPct": 1.6190335473181376,
+      "filledOrders": 182,
+      "rejectedOrders": 0,
+      "gridLaneEvents": 511,
+      "gridReasonCount": 35,
+      "riskBudgetReasonCount": 163,
+      "feeEdgeReasonCount": 5,
+      "pausedGridBuyReasons": true,
+      "lossChurnSymbols": [
+        {
+          "symbol": "WLDUSDC",
+          "buys": 32,
+          "sells": 18,
+          "netAfterFees": -16.1959248,
+          "openCost": 1.62150727
+        },
+        {
+          "symbol": "JTOUSDC",
+          "buys": 18,
+          "sells": 16,
+          "netAfterFees": -5.0395401799999995,
+          "openCost": 1.03763026
+        },
+        {
+          "symbol": "XLMUSDC",
+          "buys": 17,
+          "sells": 9,
+          "netAfterFees": -3.45611399,
+          "openCost": 0.90857618
+        }
+      ],
+      "lossChurnAfterFees": 24.69157897,
+      "buyPressure": 24,
+      "fixtureBuys": 115,
+      "fixtureSells": 67
+    },
     {
       "bundle": "autobot-feedback-20260616-152318.tgz",
       "class": "NEUTRAL_OR_INCONCLUSIVE",
@@ -238,41 +280,6 @@
       "buyPressure": 24,
       "fixtureBuys": 89,
       "fixtureSells": 53
-    },
-    {
-      "bundle": "autobot-feedback-20260610-082902.tgz",
-      "class": "CONTROLLED_DRAWDOWN",
-      "eligible": true,
-      "dailyNet": -5.331973060000564,
-      "realizedAfterFees": -13.33425755,
-      "totalAllocPct": 3.0916288115479644,
-      "filledOrders": 159,
-      "rejectedOrders": 0,
-      "gridLaneEvents": 737,
-      "gridReasonCount": 19,
-      "riskBudgetReasonCount": 7,
-      "feeEdgeReasonCount": 23,
-      "pausedGridBuyReasons": false,
-      "lossChurnSymbols": [
-        {
-          "symbol": "MOVEUSDC",
-          "buys": 14,
-          "sells": 12,
-          "netAfterFees": -11.313367809999999,
-          "openCost": 0.7972901
-        },
-        {
-          "symbol": "NEARUSDC",
-          "buys": 6,
-          "sells": 5,
-          "netAfterFees": -4.35515051,
-          "openCost": 0.43192274
-        }
-      ],
-      "lossChurnAfterFees": 15.668518319999999,
-      "buyPressure": 3,
-      "fixtureBuys": 99,
-      "fixtureSells": 60
     }
   ]
 }

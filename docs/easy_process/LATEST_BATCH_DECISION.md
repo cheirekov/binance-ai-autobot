@@ -1,19 +1,19 @@
 # LATEST_BATCH_DECISION
 
-Last updated: 2026-06-16 15:45 UTC
+Last updated: 2026-06-17 09:45 UTC
 Owner: PM/BA + Codex
 
 ## Production capability lane
 - Chosen: `Gate P1 — bounded beta readiness`
 - Why:
-  - `observed`: the June 16 bundle stayed on `T-040` and auto-retro returned `validation_required`.
+  - `observed`: the June 17 bundle stayed on `T-040` and auto-retro returned `validation_required`.
   - `observed`: no `P0/P1` runtime safety trigger appeared in the latest bundle.
-  - `observed`: the latest fresh window returned `-12.74 USDT` daily net with `0` rejected orders, `0` restarts, no exchange/order-sync backoff, and low sizing reject pressure.
-  - `observed`: the strategy-effectiveness report returned `NOT_BETA_READY`; rule-based strategy switching is visible but five-window net is `-57.76 USDT` and latest realized-after-fees is `-8.27 USDT`.
-  - `observed`: `scripts/t026-fixture-comparison.js` ranks `grid_guard_v2` first for the refreshed fixture (`65`), ahead of `risk_governor_hysteresis` (`56`).
+  - `observed`: the latest fresh window returned `-29.62 USDT` daily net with `0` rejected orders, `0` restarts, no exchange/order-sync backoff, low sizing reject pressure, and lower total allocation at `1.62%`.
+  - `observed`: the strategy-effectiveness report returned `NOT_BETA_READY`; rule-based strategy switching is visible but five-window net is `-82.06 USDT` and latest realized-after-fees is `-26.47 USDT`.
+  - `observed`: `scripts/t026-fixture-comparison.js` ranks `grid_guard_v2` first for the refreshed fixture (`62`), ahead of `risk_governor_hysteresis` (`56`).
   - `observed`: `scripts/t026-grid-guard-proof.js` returns `GRID_GUARD_OFFLINE_PROOF_TARGET_READY` with five eligible windows and sell activity present.
   - `observed`: `scripts/t026-risk-governor-proof.js` returns `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY` with five leading negative windows and three high-exposure windows.
-  - `observed`: `scripts/t026-proof-comparison.js` returns `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK`, so the next offline proof target is grid first, risk-governor fallback.
+  - `observed`: `scripts/t026-proof-comparison.js` returns `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK`; the score gap narrowed to `6`, so risk-governor remains a close fallback.
   - `observed`: the latest three fresh windows are negative, so T-040 requires deterministic validation before any beta promotion.
   - `inferred`: the post-patch runtime is safer but still not profitable enough; next work should prove a candidate family offline, not reopen T-031/T-032 from live churn.
 
@@ -27,7 +27,7 @@ Owner: PM/BA + Codex
 
 ## Evidence class
 - Current: `fresh`
-- Latest bundle: `autobot-feedback-20260616-152318.tgz`
+- Latest bundle: `autobot-feedback-20260617-093804.tgz`
 - Evidence role: readiness input, not automatic runtime patch trigger.
 
 ## Allowed work mode
@@ -44,4 +44,4 @@ Owner: PM/BA + Codex
   - create T-040 beta-readiness packet, validation map, and AI orchestration guide.
   - add deterministic readiness classifier and validate gates.
   - add strategy-effectiveness reporting so `continue` cannot hide an unprofitable adaptation window.
-  - refresh `bear_choppy_controlled_drawdown` from the June 16 five-window sequence and use `FIXTURE_CANDIDATE_GRID_GUARD_V2`, `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`, `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`, and `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK` as the next offline proof sequence.
+  - refresh `bear_choppy_controlled_drawdown` from the June 17 five-window sequence and use `FIXTURE_CANDIDATE_GRID_GUARD_V2`, `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`, `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`, and `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK` as the next offline proof sequence.

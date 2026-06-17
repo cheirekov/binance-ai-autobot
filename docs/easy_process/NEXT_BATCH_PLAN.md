@@ -1,17 +1,17 @@
 # NEXT_BATCH_PLAN
 
-Last updated: 2026-06-16 15:45 UTC
+Last updated: 2026-06-17 09:45 UTC
 Owner: PM/BA + Codex
 
 ## Exact scope
-Continue `T-040` after the June 16 validation-required bundle with deterministic `grid_guard_v2` primary proof and `risk_governor_hysteresis` fallback proof. Do not write another trading-behavior patch unless a P0/P1 safety issue or deterministic production-gate failure is found.
+Continue `T-040` after the June 17 validation-required bundle with deterministic `grid_guard_v2` primary proof and `risk_governor_hysteresis` fallback proof. Do not write another trading-behavior patch unless a P0/P1 safety issue or deterministic production-gate failure is found.
 
 ## In scope
 - severity gate: define when live evidence can interrupt beta readiness.
 - deterministic validation map for `T-031`, `T-032`, and core execution safety.
-- deterministic bear/choppy drawdown fixture from the latest June 10/11/12/15/16 sequence.
+- deterministic bear/choppy drawdown fixture from the latest June 11/12/15/16/17 sequence.
 - supportive positive readiness evidence from the June 3 window.
-- June 10/11/12/15/16 negative-window pressure and June 16 WLD/JTO risk-budget, fee, and exposure pressure as offline comparison input.
+- June 11/12/15/16/17 negative-window pressure and June 17 BTC/SOL blocked-exposure, ZEC grid-buy pause, WLD/JTO fee/loss pressure as offline comparison input.
 - `scripts/t026-fixture-comparison.js` report showing `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
 - `scripts/t026-grid-guard-proof.js` report showing `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
 - `scripts/t026-risk-governor-proof.js` report showing `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
@@ -40,9 +40,9 @@ Continue `T-040` after the June 16 validation-required bundle with deterministic
 - `./scripts/validate-active-ticket.sh` has a targeted `T-040` mode.
 - auto-retro treats production-readiness live churn as validation unless P0/P1 severity is proven.
 - next-session prompt points to beta readiness, not T-031/T-032 patch work.
-- June 16 evidence remains classified as validation-required negative-expectancy evidence, not production approval or a runtime patch trigger.
+- June 17 evidence remains classified as validation-required negative-expectancy evidence, not production approval or a runtime patch trigger.
 - strategy/reference work uses `docs/easy_process/REFERENCE_STRATEGY_ADOPTION.md` and does not copy GPL or unclear-license code.
-- `node scripts/t026-calibration-runner.js` reports `BUILD_BEAR_CHOPPY_FIXTURE` after the three-negative-window June 16 validation sequence.
+- `node scripts/t026-calibration-runner.js` reports `BUILD_BEAR_CHOPPY_FIXTURE` after the three-negative-window June 17 validation sequence.
 - `node scripts/t026-grid-guard-proof.js` reports `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
 - `node scripts/t026-risk-governor-proof.js` reports `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
 - `node scripts/t026-proof-comparison.js` reports `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK`.

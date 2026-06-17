@@ -2,11 +2,11 @@
   "schema_version": 1,
   "fixture": "bear_choppy_controlled_drawdown",
   "source_bundles": [
+    "autobot-feedback-20260617-093804.tgz",
     "autobot-feedback-20260616-152318.tgz",
     "autobot-feedback-20260615-065149.tgz",
     "autobot-feedback-20260612-063453.tgz",
-    "autobot-feedback-20260611-090617.tgz",
-    "autobot-feedback-20260610-082902.tgz"
+    "autobot-feedback-20260611-090617.tgz"
   ],
   "verdict": "OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK",
   "runtime_patch_allowed": false,
@@ -17,18 +17,18 @@
     "risk governor stays active due close score, exposure, or persistent after-fee losses"
   ],
   "scores": {
-    "grid_guard_v2": 65,
+    "grid_guard_v2": 62,
     "risk_governor_hysteresis": 56,
-    "gap": 9
+    "gap": 6
   },
   "proof_verdicts": {
     "grid_guard_v2": "GRID_GUARD_OFFLINE_PROOF_TARGET_READY",
     "risk_governor_hysteresis": "RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY"
   },
   "aggregate": {
-    "totalDailyNet": -57.76457982000102,
-    "totalFees": 49.85582279,
-    "totalRealizedAfterFees": -92.66722361000001,
+    "totalDailyNet": -82.05747229000008,
+    "totalFees": 52.866528290000005,
+    "totalRealizedAfterFees": -105.80193387,
     "leadingNegativeWindows": 5,
     "negativeAfterFeesWindows": 5,
     "highExposureWindows": 3

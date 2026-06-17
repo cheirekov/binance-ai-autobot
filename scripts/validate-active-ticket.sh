@@ -93,6 +93,7 @@ case "$ACTIVE_TICKET" in
     export T040_CLASSIFICATION T026_RECOMMENDATION T026_FIXTURE_VERDICT T026_GRID_GUARD_VERDICT T026_RISK_GOVERNOR_VERDICT T026_PROOF_COMPARISON_VERDICT T040_EFFECTIVENESS_VERDICT
     node <<'NODE'
 const fs = require('fs');
+const { execFileSync } = require('child_process');
 
 const requiredFiles = [
   'docs/DELIVERY_BOARD.md',
@@ -127,6 +128,21 @@ const t026GridGuardVerdict = process.env.T026_GRID_GUARD_VERDICT ?? '';
 const t026RiskGovernorVerdict = process.env.T026_RISK_GOVERNOR_VERDICT ?? '';
 const t026ProofComparisonVerdict = process.env.T026_PROOF_COMPARISON_VERDICT ?? '';
 const t040EffectivenessVerdict = process.env.T040_EFFECTIVENESS_VERDICT ?? '';
+const changedFiles = (() => {
+  try {
+    return execFileSync('git', ['diff', '--name-only', 'HEAD', '--'], { encoding: 'utf8' })
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+})();
+const runtimeOrTestChanges = changedFiles.filter((path) => /^(apps|packages)\//.test(path));
+const operatorStopDecisionPath = 'docs/easy_process/OPERATOR_STOP_DECISION.md';
+const operatorStopDecision = fs.existsSync(operatorStopDecisionPath)
+  ? /Decision:\s*`?STOP_TESTNET`?/i.test(read(operatorStopDecisionPath))
+  : false;
 
 const inProgress = [...board.matchAll(/^\| (T-[0-9]{3}) \| IN_PROGRESS \|/gm)].map((match) => match[1]);
 if (inProgress.length !== 1 || inProgress[0] !== 'T-040') {
@@ -173,9 +189,27 @@ if (t040Classification === 'VALIDATION_REQUIRED') {
   if (t026Recommendation !== 'BUILD_BEAR_CHOPPY_FIXTURE') {
     fail(`expected T-026 BUILD_BEAR_CHOPPY_FIXTURE during validation pressure, found ${t026Recommendation || 'empty'}`);
   }
+  if (
+    t040EffectivenessVerdict === 'NOT_BETA_READY' &&
+    changedFiles.length > 0 &&
+    runtimeOrTestChanges.length === 0 &&
+    !operatorStopDecision
+  ) {
+    fail(
+      [
+        'docs-only loop blocked: T-040 is VALIDATION_REQUIRED and NOT_BETA_READY, but this batch has no apps/ or packages/ code/test changes.',
+        'Add a runtime/test patch, or create docs/easy_process/OPERATOR_STOP_DECISION.md with Decision: STOP_TESTNET.'
+      ].join(' ')
+    );
+  }
 }
 
 console.log(`PASS: T-040 beta-readiness process validation (${t040Classification}; promotion gate remains separate)`);
+if (t040Classification === 'VALIDATION_REQUIRED' && t040EffectivenessVerdict === 'NOT_BETA_READY' && changedFiles.length > 0) {
+  console.log(
+    `PASS: T-040 no-docs-only loop gate (${runtimeOrTestChanges.length > 0 ? 'runtime/test changes present' : 'operator stop decision present'})`
+  );
+}
 NODE
     ;;
   T-032)

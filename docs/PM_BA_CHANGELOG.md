@@ -16,6 +16,64 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-06-17 09:45 UTC — T-040 validation required: June 17 fixture refresh
+- Scope:
+  - classify `autobot-feedback-20260617-093804.tgz` under T-040 beta-readiness mode.
+  - refresh the deterministic `bear_choppy_controlled_drawdown` fixture and proof reports from the latest five-window sequence.
+  - keep the next work on focused offline proof, not live-market runtime micro-patching.
+- BA requirement mapping:
+  - latest evidence is validation pressure, not automatic T-031/T-032 patch input.
+  - beta promotion remains blocked because latest daily net is negative, latest three fresh windows are negative, and strategy effectiveness remains `NOT_BETA_READY`.
+  - no P0/P1 safety issue is present: exchange rejects, restarts, health errors, and exchange backoff are absent; total allocation dropped to `1.62%`.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - next implementation target remains focused offline proof for `grid_guard_v2`, with `risk_governor_hysteresis` preserved as a close fallback.
+- Evidence summary:
+  - `observed`: auto-retro decision is `validation_required`, next ticket remains `T-040`.
+  - `observed`: PM/BA gate warns on repeated BTC risk-budget skip but passes because no P0/P1 safety severity is proven.
+  - `observed`: `scripts/t040-readiness-check.js` returns `VALIDATION_REQUIRED`.
+  - `observed`: `scripts/t026-calibration-runner.js` returns `BUILD_BEAR_CHOPPY_FIXTURE`.
+  - `observed`: `scripts/t026-fixture-comparison.js` returns `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
+  - `observed`: `scripts/t026-grid-guard-proof.js` returns `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
+  - `observed`: `scripts/t026-risk-governor-proof.js` returns `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
+  - `observed`: `scripts/t026-proof-comparison.js` returns `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK`.
+  - `observed`: `scripts/t040-strategy-effectiveness-report.js` returns `NOT_BETA_READY`.
+  - `observed`: `daily_net_usdt=-29.62`, five-window net `-82.06`, `max_drawdown_pct=0.65`, `total_alloc_pct=1.62`, `open_positions=8`.
+  - `observed`: `201` submitted orders, `182` filled, `0` rejected, `18` canceled.
+  - `observed`: fixture comparison aggregate is safety clean, totalDailyNet `-82.06`, totalFees `52.87`, totalRealizedAfterFees `-105.80`.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`: changed paused grid-buy handling so existing bot-owned BUY ladder orders are canceled whenever buys are paused, regardless of execution lane.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`: updated focused test coverage for grid-buy pause cancellation across lanes.
+  - `scripts/validate-active-ticket.sh`: added a no-docs-only loop gate. When `T-040` is `VALIDATION_REQUIRED` and strategy effectiveness is `NOT_BETA_READY`, a dirty working tree with only docs/reports/scripts now fails unless there is an `apps/` or `packages/` runtime/test change or an explicit `STOP_TESTNET` operator decision.
+  - `docs/easy_process/AI_ORCHESTRATION.md`: added `CODE_OR_STOP_REQUIRED` as an output class for repeated negative expectancy.
+  - `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json`: refreshed from the June 17 five-window evidence sequence.
+  - `docs/easy_process/reports/t026-fixture-comparison.json`: refreshed current report artifact.
+  - `docs/easy_process/reports/t026-grid-guard-proof.json`: refreshed current proof-target report.
+  - `docs/easy_process/reports/t026-risk-governor-proof.json`: refreshed current proof-target report.
+  - `docs/easy_process/reports/t026-proof-comparison.json`: refreshed current proof-comparison report.
+  - T-040 packet/map/operator notes updated for June 17 `VALIDATION_REQUIRED`.
+- Risk slider impact:
+  - none to runtime trading behavior.
+- Validation evidence:
+  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh` passed.
+  - `node scripts/t026-calibration-runner.js --write-fixture` refreshed the fixture and returned `BUILD_BEAR_CHOPPY_FIXTURE`.
+  - `node scripts/t026-fixture-comparison.js --write-report` returned `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
+  - `node scripts/t026-grid-guard-proof.js --write-report` returned `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
+  - `node scripts/t026-risk-governor-proof.js --write-report` returned `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
+  - `node scripts/t026-proof-comparison.js --write-report` returned `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK`.
+  - `./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t 'cancels bot grid buy orders' --no-cache` passed from `apps/api`.
+  - `./node_modules/.bin/vitest run src/modules/bot/risk-budget.service.test.ts --no-cache` passed from `apps/api`.
+  - `./node_modules/.bin/tsc -p tsconfig.build.json --noEmit` passed from `apps/api`.
+  - `./scripts/validate-active-ticket.sh` passed and reported the no-docs-only loop gate with runtime/test changes present.
+  - `./scripts/validate-active-ticket.sh` passed with `VALIDATION_REQUIRED`; promotion gate remains separate.
+  - `./scripts/pmba-gate.sh start` passed.
+  - `./scripts/pmba-gate.sh end` passed with a repeated BTC skip warning classified as validation/backlog.
+  - `git diff --check` passed.
+- Runtime test request:
+  - keep running in testnet/paper mode; do not promote to real-money beta yet.
+- Follow-up:
+  - build focused offline proof for `grid_guard_v2`; use `risk_governor_hysteresis` only as fallback until primary proof fails acceptance.
+
 ## 2026-06-16 15:45 UTC — T-040 validation required: offline proof selector added
 - Scope:
   - classify `autobot-feedback-20260616-152318.tgz` under T-040 beta-readiness mode.

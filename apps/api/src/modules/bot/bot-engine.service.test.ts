@@ -4047,7 +4047,7 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(true);
   });
 
-  it("keeps defensive grid buy orders when buys are not paused", () => {
+  it("cancels bot grid buy orders whenever buys are paused", () => {
     const helpers = service as unknown as {
       shouldCancelDefensiveGridBuyOrders: (params: {
         executionLane: "NORMAL" | "DEFENSIVE" | "OFFENSIVE";
@@ -4076,7 +4076,14 @@ describe("bot-engine insufficient-balance helpers", () => {
         hasBotBuyOrders: true,
         buyPaused: true
       })
-    ).toBe(false);
+    ).toBe(true);
+    expect(
+      helpers.shouldCancelDefensiveGridBuyOrders({
+        executionLane: "OFFENSIVE",
+        hasBotBuyOrders: true,
+        buyPaused: true
+      })
+    ).toBe(true);
   });
 
   it("suppresses stalled grid candidates when they cannot take action", () => {
