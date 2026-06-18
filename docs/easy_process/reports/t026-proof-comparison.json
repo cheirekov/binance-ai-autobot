@@ -2,11 +2,11 @@
   "schema_version": 1,
   "fixture": "bear_choppy_controlled_drawdown",
   "source_bundles": [
+    "autobot-feedback-20260618-090049.tgz",
     "autobot-feedback-20260617-093804.tgz",
     "autobot-feedback-20260616-152318.tgz",
     "autobot-feedback-20260615-065149.tgz",
-    "autobot-feedback-20260612-063453.tgz",
-    "autobot-feedback-20260611-090617.tgz"
+    "autobot-feedback-20260612-063453.tgz"
   ],
   "verdict": "OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK",
   "runtime_patch_allowed": false,
@@ -17,21 +17,21 @@
     "risk governor stays active due close score, exposure, or persistent after-fee losses"
   ],
   "scores": {
-    "grid_guard_v2": 62,
-    "risk_governor_hysteresis": 56,
-    "gap": 6
+    "grid_guard_v2": 58,
+    "risk_governor_hysteresis": 54,
+    "gap": 4
   },
   "proof_verdicts": {
     "grid_guard_v2": "GRID_GUARD_OFFLINE_PROOF_TARGET_READY",
     "risk_governor_hysteresis": "RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY"
   },
   "aggregate": {
-    "totalDailyNet": -82.05747229000008,
-    "totalFees": 52.866528290000005,
-    "totalRealizedAfterFees": -105.80193387,
+    "totalDailyNet": -112.73188050000044,
+    "totalFees": 55.23398384000001,
+    "totalRealizedAfterFees": -147.66051973,
     "leadingNegativeWindows": 5,
     "negativeAfterFeesWindows": 5,
-    "highExposureWindows": 3
+    "highExposureWindows": 2
   },
   "next_action": "build focused offline proof for the primary target; keep secondary active only as fallback until the primary proof fails acceptance"
 }

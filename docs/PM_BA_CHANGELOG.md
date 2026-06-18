@@ -16,6 +16,57 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-06-18 09:07 UTC — T-040 validation required: negative dust GRID churn guard
+- Scope:
+  - classify `autobot-feedback-20260618-090049.tgz` under T-040 beta-readiness mode.
+  - stop the docs-only loop by patching the measured runtime failure: high notional and fees around dust-sized GRID inventory.
+  - keep beta promotion blocked until the next bundle proves churn reduction.
+- BA requirement mapping:
+  - latest evidence is not adaptive-profit proof: daily net `-39.77 USDT`, five-window net `-112.73 USDT`, latest realized-after-fees `-58.82 USDT`.
+  - latest evidence is also not an exchange/restart incident: `0` rejected orders, `0` restarts, `0` health errors.
+  - execution issue is bounded and concrete: `0` entry trades, `0.11%` allocation, `5.42 USDC` open exposure cost, but `186` fills, `5859.88 USDC` buy notional, `6060.27 USDC` sell notional, and `10.83 USDC` fees.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - move Gate P1 forward by reducing fee-negative churn while preserving SELL/reduce/unwind reachability.
+  - keep `risk_governor_hysteresis` as fallback if churn persists after the GRID guard deploy.
+- Technical changes:
+  - `apps/api/src/modules/bot/bot-engine.service.ts`:
+    - added `shouldPauseGridBuyForNegativeDustChurn(...)`.
+    - GRID BUY legs now pause when recent fill performance is negative after fees, symbol exposure is below the managed-position countable floor, the quote is home stable, and there is no working/actionable sell leg.
+    - existing bot-owned GRID BUY ladder orders are canceled when the dust-churn guard trips.
+    - SELL ladders and unwind/reduce paths remain available.
+  - `apps/api/src/modules/bot/bot-engine.service.test.ts`:
+    - added focused coverage for fee-negative dust churn and guard non-activation when recent performance is positive, exposure is countable, or a sell leg is available.
+  - refreshed `docs/easy_process/fixtures/t026/bear_choppy_controlled_drawdown.json` from the June 12/15/16/17/18 sequence.
+  - refreshed T-026 comparison/proof reports and T-040 handoff notes.
+- Risk slider impact:
+  - uses the existing risk-linked managed-position countable exposure floor (`10 -> 5` home quote).
+  - does not weaken exposure caps, sell/unwind behavior, or hard risk guards.
+- Validation evidence:
+  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh` passed.
+  - `./scripts/auto-retro.sh autobot-feedback-20260618-090049.tgz` returned `validation_required`.
+  - `./scripts/update-session-brief.sh autobot-feedback-20260618-090049.tgz` returned `nextTicket=T-040`.
+  - `node scripts/t040-strategy-effectiveness-report.js` returned `NOT_BETA_READY`.
+  - `node scripts/t026-calibration-runner.js --write-fixture` refreshed the June 18 fixture.
+  - `node scripts/t026-fixture-comparison.js --write-report` returned `FIXTURE_CANDIDATE_GRID_GUARD_V2`.
+  - `node scripts/t026-grid-guard-proof.js --write-report` returned `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
+  - `node scripts/t026-risk-governor-proof.js --write-report` returned `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
+  - `node scripts/t026-proof-comparison.js --write-report` returned `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK`.
+  - `./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t 'fee-negative dust churn|cancels bot grid buy orders|does not let a dust sell leg block' --no-cache` passed from `apps/api`.
+  - `./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts --no-cache` passed from `apps/api`.
+  - `./node_modules/.bin/vitest run src/modules/bot/risk-budget.service.test.ts --no-cache` passed from `apps/api`.
+  - `./node_modules/.bin/tsc -p tsconfig.build.json --noEmit` passed from `apps/api`.
+  - `./scripts/validate-active-ticket.sh` passed and reported the no-docs-only loop gate with runtime/test changes present.
+  - `./scripts/pmba-gate.sh start` passed.
+  - `./scripts/pmba-gate.sh end` passed.
+  - `git diff --check` passed.
+- Runtime test request:
+  - redeploy the API/bot service before judging the next bundle.
+  - verify filled orders, buy/sell notional, fees, and realized-after-fees improve versus June 18.
+  - verify rejects, restarts, health errors, and sell/unwind reachability remain clean.
+- Follow-up:
+  - if churn persists after deployment, evaluate `risk_governor_hysteresis` as the deterministic fallback rather than writing another docs-only batch.
+
 ## 2026-06-17 09:45 UTC — T-040 validation required: June 17 fixture refresh
 - Scope:
   - classify `autobot-feedback-20260617-093804.tgz` under T-040 beta-readiness mode.

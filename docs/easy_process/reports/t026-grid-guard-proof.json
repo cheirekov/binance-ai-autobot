@@ -2,11 +2,11 @@
   "schema_version": 1,
   "fixture": "bear_choppy_controlled_drawdown",
   "source_bundles": [
+    "autobot-feedback-20260618-090049.tgz",
     "autobot-feedback-20260617-093804.tgz",
     "autobot-feedback-20260616-152318.tgz",
     "autobot-feedback-20260615-065149.tgz",
-    "autobot-feedback-20260612-063453.tgz",
-    "autobot-feedback-20260611-090617.tgz"
+    "autobot-feedback-20260612-063453.tgz"
   ],
   "verdict": "GRID_GUARD_OFFLINE_PROOF_TARGET_READY",
   "runtime_patch_allowed": false,
@@ -24,17 +24,17 @@
     "eligibleWindows": 5,
     "lossChurnWindows": 5,
     "pausedGridBuyWindows": 5,
-    "totalDailyNet": -82.05747229000008,
-    "totalFees": 52.866528290000005,
-    "totalRealizedAfterFees": -105.80193387,
-    "totalLossChurnAfterFees": 117.31397324,
-    "totalBuyPressure": 130,
-    "totalFixtureBuys": 536,
-    "totalFixtureSells": 352
+    "totalDailyNet": -112.73188050000044,
+    "totalFees": 55.23398384000001,
+    "totalRealizedAfterFees": -147.66051973,
+    "totalLossChurnAfterFees": 140.61724039,
+    "totalBuyPressure": 147,
+    "totalFixtureBuys": 559,
+    "totalFixtureSells": 373
   },
   "candidate_scores": {
-    "grid_guard_v2": 62,
-    "risk_governor_hysteresis": 56
+    "grid_guard_v2": 58,
+    "risk_governor_hysteresis": 54
   },
   "acceptance": {
     "target": "pause or shrink GRID BUY legs only in eligible negative/fee-pressure windows",
@@ -43,6 +43,55 @@
     "must_not_increase": "exchange rejects, health errors, restarts, or hard-risk violations"
   },
   "windows": [
+    {
+      "bundle": "autobot-feedback-20260618-090049.tgz",
+      "class": "CONTROLLED_DRAWDOWN",
+      "eligible": true,
+      "dailyNet": -39.768505290000576,
+      "realizedAfterFees": -58.81594493,
+      "totalAllocPct": 0.10975416974906686,
+      "filledOrders": 186,
+      "rejectedOrders": 0,
+      "gridLaneEvents": 478,
+      "gridReasonCount": 3,
+      "riskBudgetReasonCount": 79,
+      "feeEdgeReasonCount": 23,
+      "pausedGridBuyReasons": true,
+      "lossChurnSymbols": [
+        {
+          "symbol": "XPLUSDC",
+          "buys": 49,
+          "sells": 17,
+          "netAfterFees": -16.89104351,
+          "openCost": 2.07783462
+        },
+        {
+          "symbol": "WLDUSDC",
+          "buys": 11,
+          "sells": 7,
+          "netAfterFees": -12.60802773,
+          "openCost": 0.54043136
+        },
+        {
+          "symbol": "XLMUSDC",
+          "buys": 13,
+          "sells": 12,
+          "netAfterFees": -10.19494801,
+          "openCost": 0.96521481
+        },
+        {
+          "symbol": "ASTERUSDC",
+          "buys": 31,
+          "sells": 27,
+          "netAfterFees": -9.6848059,
+          "openCost": 1.506097
+        }
+      ],
+      "lossChurnAfterFees": 49.37882515,
+      "buyPressure": 41,
+      "fixtureBuys": 112,
+      "fixtureSells": 74
+    },
     {
       "bundle": "autobot-feedback-20260617-093804.tgz",
       "class": "CONTROLLED_DRAWDOWN",
@@ -231,55 +280,6 @@
       "buyPressure": 33,
       "fixtureBuys": 106,
       "fixtureSells": 70
-    },
-    {
-      "bundle": "autobot-feedback-20260611-090617.tgz",
-      "class": "NEUTRAL_OR_INCONCLUSIVE",
-      "eligible": true,
-      "dailyNet": -9.09409708000021,
-      "realizedAfterFees": -16.95735907,
-      "totalAllocPct": 5.101612671840975,
-      "filledOrders": 142,
-      "rejectedOrders": 0,
-      "gridLaneEvents": 1000,
-      "gridReasonCount": 17,
-      "riskBudgetReasonCount": 126,
-      "feeEdgeReasonCount": 15,
-      "pausedGridBuyReasons": true,
-      "lossChurnSymbols": [
-        {
-          "symbol": "KATUSDC",
-          "buys": 33,
-          "sells": 13,
-          "netAfterFees": -12.176135480000001,
-          "openCost": 2.18595749
-        },
-        {
-          "symbol": "NEARUSDC",
-          "buys": 6,
-          "sells": 4,
-          "netAfterFees": -6.942161420000001,
-          "openCost": 0.40128146
-        },
-        {
-          "symbol": "OPNUSDC",
-          "buys": 6,
-          "sells": 5,
-          "netAfterFees": -4.11824086,
-          "openCost": 0.34380799
-        },
-        {
-          "symbol": "HMSTRUSDC",
-          "buys": 2,
-          "sells": 1,
-          "netAfterFees": -2.83902024,
-          "openCost": 0.09248783
-        }
-      ],
-      "lossChurnAfterFees": 26.075558,
-      "buyPressure": 24,
-      "fixtureBuys": 89,
-      "fixtureSells": 53
     }
   ]
 }

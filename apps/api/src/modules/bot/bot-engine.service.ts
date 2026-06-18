@@ -845,6 +845,48 @@ export class BotEngineService implements OnModuleInit {
     return !isHomeQuoteDustResidual;
   }
 
+  private shouldPauseGridBuyForNegativeDustChurn(params: {
+    recentPerformance: RiskBudgetRecentPerformance;
+    positionExposureHome: number;
+    dustResidualExposureHome: number;
+    minCountableExposureHome: number;
+    quoteAsset: string;
+    homeStable: string;
+    hasSellLimit: boolean;
+    sellLegLikelyFeasible: boolean;
+  }): boolean {
+    if (params.hasSellLimit || params.sellLegLikelyFeasible) return false;
+
+    const recentTrades = Math.max(
+      0,
+      Math.floor(Number.isFinite(params.recentPerformance.trades) ? params.recentPerformance.trades : 0)
+    );
+    if (recentTrades < 4) return false;
+
+    const realizedPnlHome = Number.isFinite(params.recentPerformance.realizedPnlHome)
+      ? params.recentPerformance.realizedPnlHome
+      : 0;
+    const feesHome = Number.isFinite(params.recentPerformance.feesHome) ? params.recentPerformance.feesHome : 0;
+    if (realizedPnlHome - feesHome >= 0) return false;
+
+    const quoteAsset = params.quoteAsset.trim().toUpperCase();
+    const homeStable = params.homeStable.trim().toUpperCase();
+    if (!quoteAsset || quoteAsset !== homeStable) return false;
+
+    const minCountableExposureHome = Number.isFinite(params.minCountableExposureHome)
+      ? Math.max(0, params.minCountableExposureHome)
+      : 0;
+    if (minCountableExposureHome <= 0) return false;
+
+    const exposureCandidates = [params.positionExposureHome, params.dustResidualExposureHome]
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .map((value) => Math.max(0, value));
+    if (exposureCandidates.length === 0) return false;
+
+    const dustExposureHome = Math.max(...exposureCandidates);
+    return dustExposureHome + 1e-8 < minCountableExposureHome;
+  }
+
   private assessGridSellLegFeasibility(params: {
     rules: BinanceSymbolRules;
     qty: number;
@@ -8758,7 +8800,8 @@ export class BotEngineService implements OnModuleInit {
               regime.confidence >= pauseConfidenceThreshold;
             const buyPausedByRiskBudget = !selectedRiskBudget.allowedActions.placeGridBuy;
             const buyPausedByCaution = cautionPauseNewSymbols || buyPausedByRiskBudget;
-            const buyPaused = buyPausedByCaution || Boolean(existingBuyPauseLock) || shouldPauseBuys;
+            let buyPausedByLossChurn = false;
+            let buyPaused = buyPausedByCaution || Boolean(existingBuyPauseLock) || shouldPauseBuys;
 
             const defensiveBuyOrders = symbolOpenLimitOrdersAll.filter(
               (order) => order.side === "BUY" && this.isBotOwnedOrder(order, botPrefix)
@@ -8866,7 +8909,7 @@ export class BotEngineService implements OnModuleInit {
               }
             }
 
-            const symbolOpenLimits = current.activeOrders.filter((order) => {
+            let symbolOpenLimits = current.activeOrders.filter((order) => {
               if (order.symbol !== candidateSymbol) return false;
               if (order.status !== "NEW") return false;
               const t = order.type.trim().toUpperCase();
@@ -8874,8 +8917,8 @@ export class BotEngineService implements OnModuleInit {
               return manageExternalOpenOrders ? true : this.isBotOwnedOrder(order, botPrefix);
             });
 
-            const hasBuyLimit = symbolOpenLimits.some((order) => order.side === "BUY");
-            const hasSellLimit = symbolOpenLimits.some((order) => order.side === "SELL");
+            let hasBuyLimit = symbolOpenLimits.some((order) => order.side === "BUY");
+            let hasSellLimit = symbolOpenLimits.some((order) => order.side === "SELL");
             const maxGridOrdersPerSymbol = Math.max(2, Math.min(6, 2 + Math.round(risk / 25)));
             const recentGridGuardPausedSkips = this.countRecentSymbolSkipMatches({
               state: current,
@@ -9128,11 +9171,65 @@ export class BotEngineService implements OnModuleInit {
                 ? desiredSellQty * sellLimitPrice
                 : Number.NaN;
 
+            buyPausedByLossChurn = this.shouldPauseGridBuyForNegativeDustChurn({
+              recentPerformance: recentRiskBudgetPerformance,
+              positionExposureHome,
+              dustResidualExposureHome,
+              minCountableExposureHome,
+              quoteAsset: candidateQuoteAsset,
+              homeStable,
+              hasSellLimit,
+              sellLegLikelyFeasible
+            });
+            if (buyPausedByLossChurn) {
+              buyPaused = true;
+            }
+
+            const lossChurnBuyOrders = symbolOpenLimits.filter(
+              (order) => order.side === "BUY" && this.isBotOwnedOrder(order, botPrefix)
+            );
+            if (config && buyPausedByLossChurn && lossChurnBuyOrders.length > 0) {
+              current = await this.cancelBotOwnedOpenOrders({
+                config,
+                state: current,
+                orders: lossChurnBuyOrders,
+                reason: `negative-dust-churn-cancel-buy ${candidateSymbol}`,
+                details: {
+                  executionLane,
+                  regime,
+                  strategy: selectedStrategy,
+                  riskBudget: selectedRiskBudget,
+                  recentPerformance: recentRiskBudgetPerformance,
+                  positionExposureHome: Number(positionExposureHome.toFixed(8)),
+                  dustResidualExposureHome: Number(
+                    (Number.isFinite(dustResidualExposureHome) ? dustResidualExposureHome : 0).toFixed(8)
+                  ),
+                  minCountableExposureHome,
+                  buyPaused,
+                  buyPausedByLossChurn,
+                  canceledBuyOrders: lossChurnBuyOrders.length
+                },
+                maxCancels: Math.min(5, lossChurnBuyOrders.length)
+              });
+              symbolOpenLimits = current.activeOrders.filter((order) => {
+                if (order.symbol !== candidateSymbol) return false;
+                if (order.status !== "NEW") return false;
+                const t = order.type.trim().toUpperCase();
+                if (t !== "LIMIT" && t !== "LIMIT_MAKER") return false;
+                return manageExternalOpenOrders ? true : this.isBotOwnedOrder(order, botPrefix);
+              });
+              hasBuyLimit = symbolOpenLimits.some((order) => order.side === "BUY");
+              hasSellLimit = symbolOpenLimits.some((order) => order.side === "SELL");
+              this.save(current);
+            }
+
             if (!hasBuyLimit && buyPaused) {
               const summary = cautionPauseNewSymbols
                 ? `Skip ${candidateSymbol}: Daily loss caution paused GRID BUY leg`
                 : buyPausedByRiskBudget
                   ? `Skip ${candidateSymbol}: Risk budget paused GRID BUY leg`
+                  : buyPausedByLossChurn
+                    ? `Skip ${candidateSymbol}: Recent loss churn paused GRID BUY leg`
                   : `Skip ${candidateSymbol}: Grid guard paused BUY leg`;
               const baseCooldownMs = Math.max(this.deriveNoActionSymbolCooldownMs(risk), guardLockMs);
               const cooldown = this.deriveInfeasibleSymbolCooldown({ state: current, symbol: candidateSymbol, risk, baseCooldownMs, summary });
@@ -9158,7 +9255,14 @@ export class BotEngineService implements OnModuleInit {
                         cautionModeActive,
                         buyPausedByCaution,
                         buyPausedByRiskBudget,
+                        buyPausedByLossChurn,
                         riskBudget: selectedRiskBudget,
+                        recentPerformance: recentRiskBudgetPerformance,
+                        positionExposureHome: Number(positionExposureHome.toFixed(8)),
+                        dustResidualExposureHome: Number(
+                          (Number.isFinite(dustResidualExposureHome) ? dustResidualExposureHome : 0).toFixed(8)
+                        ),
+                        minCountableExposureHome,
                         buyPaused,
                         hasBuyLimit,
                         hasSellLimit,
@@ -9184,6 +9288,7 @@ export class BotEngineService implements OnModuleInit {
                     hasSellLimit,
                     buyPausedByCaution,
                     buyPausedByRiskBudget,
+                    buyPausedByLossChurn,
                     riskBudget: selectedRiskBudget,
                     ...(cooldown.storm ? { storm: cooldown.storm } : {})
                   }

@@ -1,47 +1,43 @@
 # LATEST_BATCH_DECISION
 
-Last updated: 2026-06-17 09:45 UTC
+Last updated: 2026-06-18 09:07 UTC
 Owner: PM/BA + Codex
 
 ## Production capability lane
-- Chosen: `Gate P1 — bounded beta readiness`
+- Chosen: `Gate P1 - bounded beta readiness`
 - Why:
-  - `observed`: the June 17 bundle stayed on `T-040` and auto-retro returned `validation_required`.
-  - `observed`: no `P0/P1` runtime safety trigger appeared in the latest bundle.
-  - `observed`: the latest fresh window returned `-29.62 USDT` daily net with `0` rejected orders, `0` restarts, no exchange/order-sync backoff, low sizing reject pressure, and lower total allocation at `1.62%`.
-  - `observed`: the strategy-effectiveness report returned `NOT_BETA_READY`; rule-based strategy switching is visible but five-window net is `-82.06 USDT` and latest realized-after-fees is `-26.47 USDT`.
-  - `observed`: `scripts/t026-fixture-comparison.js` ranks `grid_guard_v2` first for the refreshed fixture (`62`), ahead of `risk_governor_hysteresis` (`56`).
-  - `observed`: `scripts/t026-grid-guard-proof.js` returns `GRID_GUARD_OFFLINE_PROOF_TARGET_READY` with five eligible windows and sell activity present.
-  - `observed`: `scripts/t026-risk-governor-proof.js` returns `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY` with five leading negative windows and three high-exposure windows.
-  - `observed`: `scripts/t026-proof-comparison.js` returns `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK`; the score gap narrowed to `6`, so risk-governor remains a close fallback.
-  - `observed`: the latest three fresh windows are negative, so T-040 requires deterministic validation before any beta promotion.
-  - `inferred`: the post-patch runtime is safer but still not profitable enough; next work should prove a candidate family offline, not reopen T-031/T-032 from live churn.
+  - `observed`: the June 18 bundle stayed on `T-040` and auto-retro returned `validation_required`.
+  - `observed`: the previous runtime patch was deployed (`commit=4e78369`) and exposure fell to `0.11%`, but the wallet still deteriorated.
+  - `observed`: latest daily net is `-39.77 USDT`; five-window net is `-112.73 USDT`; realized-after-fees is `-58.82 USDT`.
+  - `observed`: execution health is clean (`0` rejected orders, `0` restarts, `0` health errors), so this is not an exchange/restart incident.
+  - `observed`: entry trades were `0`, open exposure cost was only `5.42 USDC`, but filled orders were `186` with `5859.88 USDC` buy notional and `6060.27 USDC` sell notional.
+  - `inferred`: the live blocker is fee-negative GRID churn around dust-sized inventory, not lack of strategy labels or more documentation.
 
 ## Chosen active ticket
 - Current: `T-040` (Bounded beta readiness)
 - Linked support: `none`
 - Decision: `validation_required`
+- Runtime action this batch: `P1 execution-safety mitigation with deterministic unit test`
 - Why:
-  - `observed`: runtime strategy/support behavior exists and is preserved.
-  - `inferred`: the next highest-leverage work is proving beta readiness and exact blockers, not adding another micro-mitigation.
+  - `observed`: strategy switching is visible, but not profitable after fees.
+  - `observed`: the June 18 window shows high order churn against tiny remaining exposure.
+  - `inferred`: stopping dust-sized fee churn is a bounded execution-safety improvement and does not weaken sell/unwind reachability.
 
 ## Evidence class
 - Current: `fresh`
-- Latest bundle: `autobot-feedback-20260617-093804.tgz`
-- Evidence role: readiness input, not automatic runtime patch trigger.
+- Latest bundle: `autobot-feedback-20260618-090049.tgz`
+- Evidence role: readiness input plus deterministic reproduction target for dust-churn GRID buy suppression.
 
 ## Allowed work mode
-- Current batch: `VALIDATION_ONLY_WITH_PROOF_SELECTION`
-- Runtime patch exception: `P0/P1 severity plus deterministic reproduction`.
+- Current batch: `RUNTIME_PATCH_WITH_TEST`
+- Runtime patch basis: `P1 execution-safety issue plus deterministic helper test`
+- Production promotion: `blocked`
 
 ## Batch decision
 - Decision: `continue_same_ticket_with_validation_required`
 - Next ticket candidate: `T-040`
 - Review slice:
-  - freeze `T-031/T-032`.
-  - update process automation and memory.
-  - create beta-readiness operating skill.
-  - create T-040 beta-readiness packet, validation map, and AI orchestration guide.
-  - add deterministic readiness classifier and validate gates.
-  - add strategy-effectiveness reporting so `continue` cannot hide an unprofitable adaptation window.
-  - refresh `bear_choppy_controlled_drawdown` from the June 17 five-window sequence and use `FIXTURE_CANDIDATE_GRID_GUARD_V2`, `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`, `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`, and `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK` as the next offline proof sequence.
+  - deploy the API/bot service with the negative dust-churn GRID buy guard.
+  - keep testnet/paper mode; do not promote to real-money beta.
+  - next bundle must show whether filled orders, buy notional, fees, and realized-after-fees improve after the guard.
+  - if churn persists, evaluate `risk_governor_hysteresis` as the next deterministic fallback, not another docs-only batch.

@@ -2,11 +2,11 @@
   "schema_version": 1,
   "fixture": "bear_choppy_controlled_drawdown",
   "source_bundles": [
+    "autobot-feedback-20260618-090049.tgz",
     "autobot-feedback-20260617-093804.tgz",
     "autobot-feedback-20260616-152318.tgz",
     "autobot-feedback-20260615-065149.tgz",
-    "autobot-feedback-20260612-063453.tgz",
-    "autobot-feedback-20260611-090617.tgz"
+    "autobot-feedback-20260612-063453.tgz"
   ],
   "verdict": "RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY",
   "runtime_patch_allowed": false,
@@ -27,19 +27,19 @@
     "windows": 5,
     "leadingNegativeWindows": 5,
     "negativeAfterFeesWindows": 5,
-    "highExposureWindows": 3,
+    "highExposureWindows": 2,
     "tradeChurnWindows": 5,
-    "totalDailyNet": -82.05747229000008,
-    "totalFees": 52.866528290000005,
-    "totalRealizedAfterFees": -105.80193387,
-    "totalRiskBudgetReasons": 649,
-    "totalFeeEdgeReasons": 73,
-    "totalFixtureSells": 352
+    "totalDailyNet": -112.73188050000044,
+    "totalFees": 55.23398384000001,
+    "totalRealizedAfterFees": -147.66051973,
+    "totalRiskBudgetReasons": 602,
+    "totalFeeEdgeReasons": 81,
+    "totalFixtureSells": 373
   },
   "candidate_scores": {
-    "grid_guard_v2": 62,
-    "risk_governor_hysteresis": 56,
-    "scoreGap": 6
+    "grid_guard_v2": 58,
+    "risk_governor_hysteresis": 54,
+    "scoreGap": 4
   },
   "acceptance": {
     "target": "extend defensive state after repeated negative-after-fee windows before new exposure resumes",
@@ -48,6 +48,26 @@
     "must_not_increase": "exchange rejects, health errors, restarts, or hard-risk violations"
   },
   "windows": [
+    {
+      "bundle": "autobot-feedback-20260618-090049.tgz",
+      "class": "CONTROLLED_DRAWDOWN",
+      "dailyNet": -39.768505290000576,
+      "realizedAfterFees": -58.81594493,
+      "totalAllocPct": 0.10975416974906686,
+      "filledOrders": 186,
+      "rejectedOrders": 0,
+      "riskBudgetReasonCount": 79,
+      "feeEdgeReasonCount": 23,
+      "largestOpenExposure": {
+        "symbol": "XPLUSDC",
+        "openCost": 2.07783462,
+        "netAfterFees": -16.89104351,
+        "buys": 49,
+        "sells": 17
+      },
+      "fixtureBuys": 112,
+      "fixtureSells": 74
+    },
     {
       "bundle": "autobot-feedback-20260617-093804.tgz",
       "class": "CONTROLLED_DRAWDOWN",
@@ -127,26 +147,6 @@
       },
       "fixtureBuys": 106,
       "fixtureSells": 70
-    },
-    {
-      "bundle": "autobot-feedback-20260611-090617.tgz",
-      "class": "NEUTRAL_OR_INCONCLUSIVE",
-      "dailyNet": -9.09409708000021,
-      "realizedAfterFees": -16.95735907,
-      "totalAllocPct": 5.101612671840975,
-      "filledOrders": 142,
-      "rejectedOrders": 0,
-      "riskBudgetReasonCount": 126,
-      "feeEdgeReasonCount": 15,
-      "largestOpenExposure": {
-        "symbol": "ETHUSDC",
-        "openCost": 251.71470855,
-        "netAfterFees": -0.35579581,
-        "buys": 5,
-        "sells": 3
-      },
-      "fixtureBuys": 89,
-      "fixtureSells": 53
     }
   ]
 }

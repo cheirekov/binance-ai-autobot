@@ -4086,6 +4086,65 @@ describe("bot-engine insufficient-balance helpers", () => {
     ).toBe(true);
   });
 
+  it("pauses grid buys for fee-negative dust churn while leaving actionable sell legs alone", () => {
+    const helpers = service as unknown as {
+      shouldPauseGridBuyForNegativeDustChurn: (params: {
+        recentPerformance: { trades: number; realizedPnlHome: number; feesHome: number };
+        positionExposureHome: number;
+        dustResidualExposureHome: number;
+        minCountableExposureHome: number;
+        quoteAsset: string;
+        homeStable: string;
+        hasSellLimit: boolean;
+        sellLegLikelyFeasible: boolean;
+      }) => boolean;
+    };
+
+    const dustLossParams = {
+      recentPerformance: { trades: 12, realizedPnlHome: -8.5, feesHome: 1.2 },
+      positionExposureHome: 2.1,
+      dustResidualExposureHome: 2.2,
+      minCountableExposureHome: 5,
+      quoteAsset: "USDC",
+      homeStable: "USDC",
+      hasSellLimit: false,
+      sellLegLikelyFeasible: false
+    };
+
+    expect(helpers.shouldPauseGridBuyForNegativeDustChurn(dustLossParams)).toBe(true);
+    expect(
+      helpers.shouldPauseGridBuyForNegativeDustChurn({
+        ...dustLossParams,
+        recentPerformance: { trades: 12, realizedPnlHome: 4, feesHome: 0.5 }
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldPauseGridBuyForNegativeDustChurn({
+        ...dustLossParams,
+        positionExposureHome: 5.1,
+        dustResidualExposureHome: 5.2
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldPauseGridBuyForNegativeDustChurn({
+        ...dustLossParams,
+        hasSellLimit: true
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldPauseGridBuyForNegativeDustChurn({
+        ...dustLossParams,
+        sellLegLikelyFeasible: true
+      })
+    ).toBe(false);
+    expect(
+      helpers.shouldPauseGridBuyForNegativeDustChurn({
+        ...dustLossParams,
+        quoteAsset: "BTC"
+      })
+    ).toBe(false);
+  });
+
   it("suppresses stalled grid candidates when they cannot take action", () => {
     const helpers = service as unknown as {
       shouldSuppressGridStalledCandidate: (params: {

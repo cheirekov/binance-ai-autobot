@@ -1,36 +1,38 @@
 # OPERATOR_NOTE
 
-Last updated: 2026-06-17 09:45 UTC
+Last updated: 2026-06-18 09:07 UTC
 Owner: PM/BA + Codex
 
 ## What to run next
-- run `./scripts/validate-active-ticket.sh` for the targeted `T-040` readiness gate.
-- run `node scripts/t040-strategy-effectiveness-report.js` after each new bundle to see the plain strategy verdict.
-- run `node scripts/t026-fixture-comparison.js --write-report` after refreshing the fixture to keep the deterministic candidate ranking current.
-- run `node scripts/t026-grid-guard-proof.js --write-report` after fixture comparison to confirm the grid-guard proof target is still valid.
-- run `node scripts/t026-risk-governor-proof.js --write-report` after fixture comparison to confirm the risk-governor fallback target is still valid.
-- run `node scripts/t026-proof-comparison.js --write-report` after both proof-target reports to choose the primary offline proof target.
-- do not promote to real-money beta yet.
-- redeploy the API/bot service before judging the next bundle; the June 17 patch cancels bot-owned grid BUY ladder orders whenever buys are paused.
-- if the next bundle is still `VALIDATION_REQUIRED` and `NOT_BETA_READY`, a docs-only batch must fail validation; the next agent must either patch runtime/test code or write an explicit `STOP_TESTNET` decision.
-- next engineering work should continue `T-026` offline calibration/replay and clean-room reference strategy adoption.
-- latest bundle `autobot-feedback-20260617-093804.tgz` is validation-required negative-expectancy evidence with clean safety, lower allocation, and worse after-fee PnL; it is not production proof and not a runtime patch trigger.
-- current strategy-effectiveness verdict is `NOT_BETA_READY`: adaptation is visible in rule-based strategy/lane telemetry, but not proven profitable after fees.
-- refreshed fixture: `bear_choppy_controlled_drawdown` from the June 17 five-window validation sequence.
-- current fixture comparison ranking: `grid_guard_v2`, `risk_governor_hysteresis`, `mean_reversion_gate`.
-- current grid-guard proof-target verdict: `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`.
-- current risk-governor proof-target verdict: `RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY`.
-- current proof-comparison verdict: `OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK`; build the focused grid proof first and keep risk governor as a close fallback.
-- current coarse calibration ranking: `grid_guard_v2`, `risk_governor_hysteresis`, `mean_reversion_gate`.
-- keep collecting testnet evidence; do not reset the data folder for this validation state.
-- use deterministic validation before any new trading-code patch.
+- redeploy the API/bot service before judging the next bundle.
+- keep the bot on testnet/paper mode; do not promote to real-money beta yet.
+- do not reset the data folder for this validation state.
+- after the next bundle, run `./scripts/validate-active-ticket.sh`.
+- run `node scripts/t040-strategy-effectiveness-report.js` after the next bundle to see the plain strategy verdict.
+
+## What changed in code
+- the bot now pauses GRID BUY legs when all of these are true:
+  - recent fill performance is negative after fees,
+  - the symbol exposure is below the managed-position countable floor,
+  - there is no working/actionable sell leg,
+  - the quote is the home stable quote.
+- if that guard trips and a bot-owned GRID BUY ladder order is still open, the bot cancels that BUY order.
+- SELL ladders, reduce-only behavior, and managed unwind paths remain available.
+
+## What to watch in the next bundle
+- filled order count should fall materially from the June 18 level (`186`) if the churn guard is working.
+- buy/sell notional should fall materially from June 18 (`5859.88` buy, `6060.27` sell) unless there is real new entry activity.
+- fees should fall from June 18 (`10.83 USDC`).
+- realized-after-fees should stop worsening from June 18 (`-58.82 USDC`).
+- open exposure should stay bounded; June 18 ended at `0.11%` allocation.
+- exchange rejects, health errors, and restarts must remain `0`.
 
 ## What not to do next
 - do not request another T-031/T-032 patch for ordinary live-market skip churn.
 - do not ask to copy GPL or unclear-license strategy code directly.
 - do not weaken risk guards to make the bot trade more.
 - do not treat one profitable or unprofitable bundle as production proof.
-- do not treat ordinary no-feasible or fee/edge pressure as a hotfix unless it becomes exchange rejects, stuck orders, or deterministic production-gate failure.
+- do not write a docs-only batch if the next bundle is still `VALIDATION_REQUIRED` and `NOT_BETA_READY`; either patch runtime/test code for a proven issue or write an explicit `STOP_TESTNET` decision.
 
 ## What fresh evidence would change the decision
 - P0/P1 safety issue: uncontrolled exposure, repeated exchange order rejects, inability to sell/unwind, broken accounting, crash/restart instability.

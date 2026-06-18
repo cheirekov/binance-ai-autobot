@@ -2,11 +2,11 @@
   "schema_version": 1,
   "fixture": "bear_choppy_controlled_drawdown",
   "source_bundles": [
+    "autobot-feedback-20260618-090049.tgz",
     "autobot-feedback-20260617-093804.tgz",
     "autobot-feedback-20260616-152318.tgz",
     "autobot-feedback-20260615-065149.tgz",
-    "autobot-feedback-20260612-063453.tgz",
-    "autobot-feedback-20260611-090617.tgz"
+    "autobot-feedback-20260612-063453.tgz"
   ],
   "verdict": "FIXTURE_CANDIDATE_GRID_GUARD_V2",
   "runtime_patch_allowed": false,
@@ -21,23 +21,23 @@
     "gridPressureWindows": 5,
     "riskBudgetPressureWindows": 5,
     "feeEdgePressureWindows": 5,
-    "highExposureWindows": 3,
-    "totalDailyNet": -82.05747229000008,
-    "totalFees": 52.866528290000005,
-    "totalRealizedAfterFees": -105.80193387,
-    "totalNegativeSymbolLoss": 137.52007329
+    "highExposureWindows": 2,
+    "totalDailyNet": -112.73188050000044,
+    "totalFees": 55.23398384000001,
+    "totalRealizedAfterFees": -147.66051973,
+    "totalNegativeSymbolLoss": 165.64754551
   },
   "candidates": [
     {
       "family": "grid_guard_v2",
-      "score": 62,
+      "score": 58,
       "rationale": "grid/risk-budget/min-order pressure is present while after-fee results remain negative",
       "target": "pause or shrink grid BUY legs under validation pressure while preserving SELL/reduce reachability",
       "acceptance": "lower filled-order count, fees, and open exposure without increasing rejects or blocking sells"
     },
     {
       "family": "risk_governor_hysteresis",
-      "score": 56,
+      "score": 54,
       "rationale": "repeated negative windows need longer memory before returning to baseline exposure",
       "target": "extend defensive state when recent windows remain negative after fees",
       "acceptance": "reduce new exposure after negative streaks while leaving unwind/reduce actions available"
@@ -51,6 +51,209 @@
     }
   ],
   "windows": [
+    {
+      "bundle": "autobot-feedback-20260618-090049.tgz",
+      "class": "CONTROLLED_DRAWDOWN",
+      "dailyNet": -39.768505290000576,
+      "maxDrawdownPct": 1.087590981357583,
+      "totalAllocPct": 0.10975416974906686,
+      "realized": -47.98626226,
+      "fees": 10.82968267,
+      "realizedAfterFees": -58.81594493,
+      "filledOrders": 186,
+      "rejectedOrders": 0,
+      "healthErrors": 0,
+      "restarts": 0,
+      "entryTrades": 0,
+      "decisions": 200,
+      "topReason": "Skip: No feasible candidates after policy/exposure filters",
+      "topReasons": [
+        {
+          "reason": "Skip: No feasible candidates after policy/exposure filters",
+          "count": 45
+        },
+        {
+          "reason": "Skip SOLUSDC: Risk budget blocked new exposure",
+          "count": 35
+        },
+        {
+          "reason": "Skip NEARUSDC: Risk budget blocked new exposure",
+          "count": 15
+        },
+        {
+          "reason": "Skip ETHUSDC: Risk budget blocked new exposure",
+          "count": 12
+        },
+        {
+          "reason": "Skip XLMUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 11
+        },
+        {
+          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.115% < 0.559%)",
+          "count": 5
+        },
+        {
+          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.201% < 0.559%)",
+          "count": 4
+        },
+        {
+          "reason": "Skip SOLUSDC: Fee/edge filter (net 0.189% < 0.559%)",
+          "count": 4
+        },
+        {
+          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.226% < 0.559%)",
+          "count": 4
+        },
+        {
+          "reason": "Skip: No eligible universe candidates after policy and lock filters",
+          "count": 3
+        },
+        {
+          "reason": "Skip XPLUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 3
+        },
+        {
+          "reason": "Skip XLMUSDC: Risk budget paused GRID BUY leg",
+          "count": 3
+        },
+        {
+          "reason": "Skip NEARUSDC: Fee/edge filter (net 0.437% < 0.559%)",
+          "count": 2
+        },
+        {
+          "reason": "Skip SOLUSDC: Fee/edge filter (net 0.190% < 0.559%)",
+          "count": 2
+        },
+        {
+          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.202% < 0.559%)",
+          "count": 2
+        }
+      ],
+      "pressure": {
+        "gridReasonCount": 3,
+        "gridReasonPct": 1.5,
+        "riskBudgetReasonCount": 79,
+        "riskBudgetReasonPct": 39.5,
+        "feeEdgeReasonCount": 23,
+        "feeEdgeReasonPct": 11.5,
+        "noFeasibleReasonCount": 48,
+        "noFeasibleReasonPct": 24
+      },
+      "adaptive": {
+        "events": 5000,
+        "strategyCounts": {
+          "GRID": 1277,
+          "TREND": 2597,
+          "MEAN_REVERSION": 1126
+        },
+        "laneCounts": {
+          "DEFENSIVE": 2048,
+          "GRID": 478,
+          "MARKET": 2367,
+          "UNSPECIFIED": 107
+        },
+        "decisionCounts": {
+          "SKIP": 4354,
+          "ENGINE": 28,
+          "TRADE": 618
+        }
+      },
+      "topLossSymbols": [
+        {
+          "symbol": "XPLUSDC",
+          "realized": -12.64366551,
+          "fees": 4.247378,
+          "netAfterFees": -16.89104351,
+          "openCost": 2.07783462,
+          "buys": 49,
+          "sells": 17
+        },
+        {
+          "symbol": "WLDUSDC",
+          "realized": -11.53207243,
+          "fees": 1.0759553,
+          "netAfterFees": -12.60802773,
+          "openCost": 0.54043136,
+          "buys": 11,
+          "sells": 7
+        },
+        {
+          "symbol": "XLMUSDC",
+          "realized": -8.57453584,
+          "fees": 1.62041217,
+          "netAfterFees": -10.19494801,
+          "openCost": 0.96521481,
+          "buys": 13,
+          "sells": 12
+        },
+        {
+          "symbol": "ASTERUSDC",
+          "realized": -6.74785796,
+          "fees": 2.93694794,
+          "netAfterFees": -9.6848059,
+          "openCost": 1.506097,
+          "buys": 31,
+          "sells": 27
+        },
+        {
+          "symbol": "ENAUSDC",
+          "realized": -3.55555685,
+          "fees": 0.30123965,
+          "netAfterFees": -3.8567964999999997,
+          "openCost": 0.15226084,
+          "buys": 3,
+          "sells": 4
+        }
+      ],
+      "topOpenExposure": [
+        {
+          "symbol": "XPLUSDC",
+          "realized": -12.64366551,
+          "fees": 4.247378,
+          "netAfterFees": -16.89104351,
+          "openCost": 2.07783462,
+          "buys": 49,
+          "sells": 17
+        },
+        {
+          "symbol": "ASTERUSDC",
+          "realized": -6.74785796,
+          "fees": 2.93694794,
+          "netAfterFees": -9.6848059,
+          "openCost": 1.506097,
+          "buys": 31,
+          "sells": 27
+        },
+        {
+          "symbol": "XLMUSDC",
+          "realized": -8.57453584,
+          "fees": 1.62041217,
+          "netAfterFees": -10.19494801,
+          "openCost": 0.96521481,
+          "buys": 13,
+          "sells": 12
+        },
+        {
+          "symbol": "WLDUSDC",
+          "realized": -11.53207243,
+          "fees": 1.0759553,
+          "netAfterFees": -12.60802773,
+          "openCost": 0.54043136,
+          "buys": 11,
+          "sells": 7
+        },
+        {
+          "symbol": "ENAUSDC",
+          "realized": -3.55555685,
+          "fees": 0.30123965,
+          "netAfterFees": -3.8567964999999997,
+          "openCost": 0.15226084,
+          "buys": 3,
+          "sells": 4
+        }
+      ],
+      "negativeSymbolLoss": 59.09288067
+    },
     {
       "bundle": "autobot-feedback-20260617-093804.tgz",
       "class": "CONTROLLED_DRAWDOWN",
@@ -862,209 +1065,6 @@
         }
       ],
       "negativeSymbolLoss": 26.9506387
-    },
-    {
-      "bundle": "autobot-feedback-20260611-090617.tgz",
-      "class": "NEUTRAL_OR_INCONCLUSIVE",
-      "dailyNet": -9.09409708000021,
-      "maxDrawdownPct": 0.6618954478749173,
-      "totalAllocPct": 5.101612671840975,
-      "realized": -8.49513195,
-      "fees": 8.46222712,
-      "realizedAfterFees": -16.95735907,
-      "filledOrders": 142,
-      "rejectedOrders": 0,
-      "healthErrors": 0,
-      "restarts": 0,
-      "entryTrades": 7,
-      "decisions": 200,
-      "topReason": "Skip HMSTRUSDC: Risk budget market entry cap below exchange minimum",
-      "topReasons": [
-        {
-          "reason": "Skip HMSTRUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 32
-        },
-        {
-          "reason": "Skip CRVUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 27
-        },
-        {
-          "reason": "Skip ETHUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 26
-        },
-        {
-          "reason": "Skip BTCUSDC: Risk budget blocked new exposure",
-          "count": 16
-        },
-        {
-          "reason": "Skip SOLUSDC: Risk budget blocked new exposure",
-          "count": 8
-        },
-        {
-          "reason": "Skip XRPUSDC: Risk budget blocked new exposure",
-          "count": 7
-        },
-        {
-          "reason": "Skip ETHUSDC: Risk budget paused GRID BUY leg",
-          "count": 7
-        },
-        {
-          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.116% < 0.559%)",
-          "count": 4
-        },
-        {
-          "reason": "Skip ZECUSDC: Grid buy sizing rejected (Below minQty 0.00100000)",
-          "count": 4
-        },
-        {
-          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.100% < 0.559%)",
-          "count": 4
-        },
-        {
-          "reason": "Skip HMSTRUSDC: Grid sell leg not actionable yet",
-          "count": 3
-        },
-        {
-          "reason": "Skip HMSTRUSDC: Risk budget paused GRID BUY leg",
-          "count": 3
-        },
-        {
-          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.099% < 0.559%)",
-          "count": 3
-        },
-        {
-          "reason": "Skip WBETHETH: Fee/edge filter (net 0.082% < 0.559%)",
-          "count": 2
-        },
-        {
-          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.114% < 0.559%)",
-          "count": 2
-        }
-      ],
-      "pressure": {
-        "gridReasonCount": 17,
-        "gridReasonPct": 8.5,
-        "riskBudgetReasonCount": 126,
-        "riskBudgetReasonPct": 63,
-        "feeEdgeReasonCount": 15,
-        "feeEdgeReasonPct": 7.5,
-        "noFeasibleReasonCount": 0,
-        "noFeasibleReasonPct": 0
-      },
-      "adaptive": {
-        "events": 4232,
-        "strategyCounts": {
-          "MEAN_REVERSION": 911,
-          "GRID": 1709,
-          "TREND": 1612
-        },
-        "laneCounts": {
-          "UNSPECIFIED": 262,
-          "DEFENSIVE": 1280,
-          "GRID": 1000,
-          "MARKET": 1690
-        },
-        "decisionCounts": {
-          "SKIP": 3333,
-          "TRADE": 810,
-          "ENGINE": 89
-        }
-      },
-      "topLossSymbols": [
-        {
-          "symbol": "KATUSDC",
-          "realized": -8.38251473,
-          "fees": 3.79362075,
-          "netAfterFees": -12.176135480000001,
-          "openCost": 2.18595749,
-          "buys": 33,
-          "sells": 13
-        },
-        {
-          "symbol": "NEARUSDC",
-          "realized": -6.66191854,
-          "fees": 0.28024288,
-          "netAfterFees": -6.942161420000001,
-          "openCost": 0.40128146,
-          "buys": 6,
-          "sells": 4
-        },
-        {
-          "symbol": "OPNUSDC",
-          "realized": -3.38948794,
-          "fees": 0.72875292,
-          "netAfterFees": -4.11824086,
-          "openCost": 0.34380799,
-          "buys": 6,
-          "sells": 5
-        },
-        {
-          "symbol": "HMSTRUSDC",
-          "realized": -2.65728235,
-          "fees": 0.18173789,
-          "netAfterFees": -2.83902024,
-          "openCost": 0.09248783,
-          "buys": 2,
-          "sells": 1
-        },
-        {
-          "symbol": "GENIUSUSDC",
-          "realized": -1.79647568,
-          "fees": 0.14188265,
-          "netAfterFees": -1.9383583299999998,
-          "openCost": 0.09462981,
-          "buys": 1,
-          "sells": 1
-        }
-      ],
-      "topOpenExposure": [
-        {
-          "symbol": "ETHUSDC",
-          "realized": 0.01143694,
-          "fees": 0.36723275,
-          "netAfterFees": -0.35579581,
-          "openCost": 251.71470855,
-          "buys": 5,
-          "sells": 3
-        },
-        {
-          "symbol": "KATUSDC",
-          "realized": -8.38251473,
-          "fees": 3.79362075,
-          "netAfterFees": -12.176135480000001,
-          "openCost": 2.18595749,
-          "buys": 33,
-          "sells": 13
-        },
-        {
-          "symbol": "CRVUSDC",
-          "realized": 9.50475625,
-          "fees": 1.75593128,
-          "netAfterFees": 7.748824969999999,
-          "openCost": 0.92520169,
-          "buys": 17,
-          "sells": 8
-        },
-        {
-          "symbol": "ZECUSDC",
-          "realized": 3.38113647,
-          "fees": 0.35854147,
-          "netAfterFees": 3.022595,
-          "openCost": 0.41548647,
-          "buys": 8,
-          "sells": 9
-        },
-        {
-          "symbol": "NEARUSDC",
-          "realized": -6.66191854,
-          "fees": 0.28024288,
-          "netAfterFees": -6.942161420000001,
-          "openCost": 0.40128146,
-          "buys": 6,
-          "sells": 4
-        }
-      ],
-      "negativeSymbolLoss": 30.96540845
     }
   ],
   "next_action": "Build focused offline proof for grid_guard_v2 before any runtime behavior patch"
