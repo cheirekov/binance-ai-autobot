@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-06-18 09:06 UTC
+Last updated: 2026-06-19 08:56 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch. This brief is intentionally short; long historical preservation details live in `docs/PM_BA_CHANGELOG.md` and `docs/STRATEGY_COVERAGE.md`.
@@ -76,58 +76,58 @@ Use this file at the start and end of every batch. This brief is intentionally s
   - `./scripts/pmba-gate.sh end`
   - `git diff --check`
 - Runtime validation plan:
-  - redeploy API/bot service with the June 18 dust-churn guard.
-  - collect the next bundle and compare fills, buy/sell notional, fees, and realized-after-fees against June 18.
+  - June 18 dust-churn guard is deployed in the June 19 bundle (`commit=5cb40be`).
+  - collect the next bundle and compare fills, buy/sell notional, fees, and realized-after-fees against June 19 and June 18.
 
 ## 3) Deployment Handoff
 
-- Commit hash: `pending current patch` (latest deployed bundle reported `4e78369`)
-- Deploy target: API/bot service redeploy required for negative dust-churn GRID BUY guard.
+- Commit hash: `5cb40be`
+- Deploy target: no redeploy required from this validation-only batch.
 - Required config changes: none
 - Operator checklist:
   - do not reset state for this process change.
-  - use next bundle to validate lower filled-order churn, lower buy/sell notional, lower fees, and improved realized-after-fees.
+  - use next bundle to validate repeat positive/controlled daily net, lower filled-order churn, lower buy/sell notional, lower fees, and improved realized-after-fees.
   - do not request another T-031/T-032 patch unless there is P0/P1 severity or deterministic reproduction.
 
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `DAY (collection) / MORNING (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `23.373`
-  - runtime uptime (hours): `1626.956`
-  - run end: `Thu Jun 18 2026 11:59:46 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `DAY_RUN`
+  - bundle interval (hours): `23.926`
+  - runtime uptime (hours): `1650.882`
+  - run end: `Fri Jun 19 2026 11:55:20 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip: No feasible candidates after policy/exposure filters (45))
+  - active ticket runtime signal: `observed` (Skip: No feasible candidates after policy/exposure filters (80))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=18, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=91.0%)
-  - sizing reject pressure: `low` (sizingRejectSkips=1, decisions=200, ratio=0.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=28, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=86.0%)
+  - sizing reject pressure: `low` (sizingRejectSkips=7, decisions=200, ratio=3.5%)
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `validation_required`
 - Next ticket candidate: `T-040` (stop live-wait loop and use deterministic validation)
-- Required action: `deploy the June 18 dust-churn guard and validate churn reduction; beta promotion remains blocked`
+- Required action: `continue readiness validation; no runtime patch from repeated no-feasible skips alone`
 - Open risks:
-  - strategy effectiveness remains `NOT_BETA_READY`; latest five-window net is `-112.73 USDT`.
-  - next bundle must prove the guard reduces fills/notional/fees without blocking SELL/unwind.
+  - strategy effectiveness remains `NOT_BETA_READY`; five-window net is still negative.
+  - filled-order churn stayed high at `190` despite better daily net.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260618-090049.tgz`
-  - auto-updated at: `2026-06-18T09:06:06.878Z`
+  - bundle: `autobot-feedback-20260619-085557.tgz`
+  - auto-updated at: `2026-06-19T08:56:10.080Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-040
 Decision: validation_required
-Required action: deploy the June 18 negative dust-churn GRID BUY guard and validate churn reduction
-Latest bundle: autobot-feedback-20260618-090049.tgz
+Required action: continue readiness validation; no runtime patch from repeated no-feasible skips alone
+Latest bundle: autobot-feedback-20260619-085557.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: move the bot toward bounded beta/production readiness, not another T-031/T-032 micro-patch.
-Patch policy: runtime patches require P0/P1 safety severity plus deterministic reproduction; June 18 patch meets this as a P1 execution-safety churn guard with unit tests.
+Patch policy: runtime patches require P0/P1 safety severity plus deterministic reproduction; June 19 is validation-only because safety is clean and net behavior improved.
 In scope: beta gates, deterministic validation fixtures, operator controls, release/rollback packet.
 Out of scope: fixing every live-market skip loop or tuning strategy from one bundle.
 Validation: ./scripts/validate-active-ticket.sh && ./scripts/pmba-gate.sh end

@@ -1,30 +1,32 @@
 # PRODUCTION_DELTA_NOTE
 
-Last updated: 2026-06-18 09:07 UTC
+Last updated: 2026-06-19 08:58 UTC
 Owner: PM/BA + Codex
 
 ## How this batch moves the bot closer to production
-The June 18 bundle proved the previous patch deployed and reduced exposure, but it did not stop wallet bleed. The bot ended with only `0.11%` allocation and `5.42 USDC` open exposure cost, yet it still produced `186` filled orders, `5859.88 USDC` buy notional, `6060.27 USDC` sell notional, `10.83 USDC` fees, and `-58.82 USDC` realized-after-fees.
+The June 19 bundle is the first post-deploy validation window for the negative dust-churn GRID BUY guard (`commit=5cb40be`). It is not beta proof, but it is a better signal than June 18:
 
-That is not production-ready adaptation. It is a bounded P1 execution-safety issue: fee-negative GRID churn around dust-sized inventory.
+- daily net improved from `-39.77 USDT` to `+3.07 USDT`.
+- realized-after-fees improved from `-58.82 USDT` to `-24.73 USDT`.
+- fees improved from `10.83 USDC` to `9.07 USDC`.
+- exposure stayed low (`0.10%` total allocation).
+- rejected orders, restarts, and health errors stayed `0`.
 
-This batch adds a runtime guard that pauses GRID BUY legs only when recent fills are negative after fees, the symbol exposure is below the managed-position countable floor, and there is no working/actionable sell leg. Existing bot-owned GRID BUY orders are canceled when this guard trips. SELL ladders and reduce/unwind paths remain available.
+The remaining concern is churn: filled orders were still high (`190`) and buy/sell notional remained large (`5748.19/5950.75 USDC`). This means the patch helped net behavior but has not yet proven durable execution efficiency.
 
 ## What is still missing before the next gate
-- deploy this API/bot service change and collect the next bundle.
-- verify filled orders, buy/sell notional, fees, and realized-after-fees improve.
-- keep exchange rejects, restarts, and health errors at `0`.
-- if churn persists after this guard, evaluate `risk_governor_hysteresis` as the deterministic fallback.
-- finish release/rollback runbook proof before any real-money beta promotion.
+- one or more follow-up bundles showing the improvement is repeatable.
+- lower filled-order count and lower notional churn.
+- strategy-effectiveness report must move beyond `NOT_BETA_READY`, or PM/BA must explicitly accept the residual negative expectancy risk.
+- release/rollback runbook proof before any real-money beta promotion.
 
 ## What this batch added to reduce process waste
-- patched `apps/api/src/modules/bot/bot-engine.service.ts` with a fee-negative dust-churn GRID buy pause/cancel guard.
-- added focused unit coverage in `apps/api/src/modules/bot/bot-engine.service.test.ts`.
-- refreshed the June 18 `bear_choppy_controlled_drawdown` fixture and proof reports.
-- updated T-040 handoff notes to require code-or-stop instead of docs-only loops when `NOT_BETA_READY` persists.
+- classified the repeated no-feasible warning as validation/backlog because no P0/P1 safety severity appeared.
+- kept runtime code unchanged after an improving post-deploy bundle.
+- updated operator notes to watch fills, notional, fees, and realized-after-fees instead of chasing skip reason text.
 
 ## Whether this batch improves execution, risk, validation, event awareness, or learning
-- Execution: `yes`
+- Execution: `validation`
 - Risk: `yes`
 - Validation: `yes`
 - Event awareness: `no`

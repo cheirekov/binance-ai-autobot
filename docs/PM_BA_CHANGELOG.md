@@ -16,6 +16,36 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-06-19 08:58 UTC — T-040 post-deploy validation: continue readiness, no runtime patch
+- Scope:
+  - classify `autobot-feedback-20260619-085557.tgz` after deployment of the June 18 dust-churn guard.
+  - decide whether the repeated no-feasible skip warning is a hotfix trigger.
+- BA requirement mapping:
+  - latest daily net improved to `+3.07 USDT`.
+  - latest realized-after-fees improved to `-24.73 USDT` from June 18 `-58.82 USDT`.
+  - fees improved to `9.07 USDC` from June 18 `10.83 USDC`.
+  - safety stayed clean: `0` rejected orders, `0` restarts, `0` health errors, `0.10%` allocation.
+  - churn is not solved yet: `190` filled orders and `5748.19/5950.75 USDC` buy/sell notional.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - continue post-deploy validation instead of writing a runtime patch from repeated no-feasible skips.
+  - keep beta promotion blocked because strategy effectiveness remains `NOT_BETA_READY`.
+- Technical changes:
+  - no runtime code changes.
+  - refreshed T-040 decision, operator, validation, and production handoff notes for June 19 evidence.
+- Risk slider impact:
+  - none.
+- Validation evidence:
+  - `node scripts/t040-readiness-check.js` returned `CONTINUE_READINESS`.
+  - `node scripts/t040-strategy-effectiveness-report.js` returned `NOT_BETA_READY`.
+  - `./scripts/validate-active-ticket.sh` passed with `CONTINUE_READINESS`.
+  - PM/BA gate passed; repeated no-feasible skip warning remains validation/backlog unless P0/P1 severity is proven.
+- Runtime test request:
+  - keep running testnet/paper mode without data reset.
+  - collect another normal bundle and verify whether positive daily net repeats while fills/notional/fees start falling.
+- Follow-up:
+  - if filled-order churn remains high and realized-after-fees worsens again, evaluate `risk_governor_hysteresis` with deterministic reproduction.
+
 ## 2026-06-18 09:07 UTC — T-040 validation required: negative dust GRID churn guard
 - Scope:
   - classify `autobot-feedback-20260618-090049.tgz` under T-040 beta-readiness mode.
