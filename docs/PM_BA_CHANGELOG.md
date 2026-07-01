@@ -16,6 +16,41 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-07-01 09:01 UTC — T-040 runtime mitigation: risk-governor strong-bull hysteresis
+- Scope:
+  - classify `autobot-feedback-20260701-085837.tgz` after the June 18 dust-churn guard.
+  - patch the deterministic risk-governor exception that let strong-bull `NORMAL` conditions keep fresh exposure open after recent after-fee losses.
+- BA requirement mapping:
+  - latest daily net is `-46.55 USDT`.
+  - latest realized-after-fees is `-42.67 USDT`.
+  - fees are `11.62 USDC`.
+  - execution churn remains high: `197` filled orders, `22` entry trades, `6357.51/6557.45 USDC` buy/sell notional.
+  - safety is clean: `0` rejected orders, `0` restarts, `0` health errors, `0.12%` allocation.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - continue Gate P1 beta-readiness; beta promotion remains blocked because strategy effectiveness is `NOT_BETA_READY`.
+- Technical changes:
+  - `apps/api/src/modules/bot/risk-budget.service.ts`: recent negative after-fee performance now blocks fresh exposure regardless of strong-bull `NORMAL` status.
+  - `apps/api/src/modules/bot/risk-budget.service.test.ts`: added coverage proving strong-bull negative expectancy goes `DEFENSIVE`, blocks new exposure/market/grid buys, and preserves grid sell/reduce actions.
+- Risk slider impact:
+  - no threshold changes.
+  - high risk no longer bypasses recent negative-expectancy defensive mode.
+- Validation evidence:
+  - `./node_modules/.bin/vitest run src/modules/bot/risk-budget.service.test.ts --no-cache` passed from `apps/api`.
+  - `./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t 'fee-negative dust churn|cancels bot grid buy orders|does not let a dust sell leg block' --no-cache` passed from `apps/api`.
+  - `./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts --no-cache` passed from `apps/api`.
+  - `./node_modules/.bin/tsc -p tsconfig.build.json --noEmit` passed from `apps/api`.
+  - `./scripts/validate-active-ticket.sh` passed with `CONTINUE_READINESS`.
+  - `./scripts/pmba-gate.sh start` passed.
+  - `./scripts/pmba-gate.sh end` passed.
+  - `git diff --check` passed.
+- Runtime test request:
+  - redeploy the API/bot service.
+  - keep testnet/paper mode and do not reset data.
+  - next bundle should show fewer fresh entries, fewer fills, lower fees, and improved realized-after-fees versus July 1.
+- Follow-up:
+  - if SELL/reduce/unwind becomes blocked, treat as P1 regression and rollback.
+
 ## 2026-06-19 08:58 UTC — T-040 post-deploy validation: continue readiness, no runtime patch
 - Scope:
   - classify `autobot-feedback-20260619-085557.tgz` after deployment of the June 18 dust-churn guard.

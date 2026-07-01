@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-06-19 08:56 UTC
+Last updated: 2026-07-01 08:58 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch. This brief is intentionally short; long historical preservation details live in `docs/PM_BA_CHANGELOG.md` and `docs/STRATEGY_COVERAGE.md`.
@@ -48,6 +48,7 @@ Use this file at the start and end of every batch. This brief is intentionally s
   - T-031/T-032 behavior remains preserved.
   - new runtime patches are allowed only for P0/P1 safety/execution blockers or deterministic production-gate failures.
   - June 18 runtime patch pauses/cancels GRID BUY legs for fee-negative dust churn while preserving SELL/unwind paths.
+  - July 1 runtime patch blocks fresh exposure after recent negative after-fee performance even during strong-bull `NORMAL` conditions.
 - Validation commands:
   - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh`
   - `node --check scripts/feedback-evidence.js`
@@ -76,17 +77,17 @@ Use this file at the start and end of every batch. This brief is intentionally s
   - `./scripts/pmba-gate.sh end`
   - `git diff --check`
 - Runtime validation plan:
-  - June 18 dust-churn guard is deployed in the June 19 bundle (`commit=5cb40be`).
-  - collect the next bundle and compare fills, buy/sell notional, fees, and realized-after-fees against June 19 and June 18.
+  - deploy API/bot service with the July 1 risk-governor hysteresis patch.
+  - collect the next bundle and compare fresh entries, fills, fees, and realized-after-fees against July 1.
 
 ## 3) Deployment Handoff
 
-- Commit hash: `5cb40be`
-- Deploy target: no redeploy required from this validation-only batch.
+- Commit hash: `d1bb273`
+- Deploy target: API/bot service redeploy required for July 1 risk-governor hysteresis patch.
 - Required config changes: none
 - Operator checklist:
   - do not reset state for this process change.
-  - use next bundle to validate repeat positive/controlled daily net, lower filled-order churn, lower buy/sell notional, lower fees, and improved realized-after-fees.
+  - use next bundle to validate lower fresh-entry churn, lower filled-order churn, lower fees, and improved realized-after-fees.
   - do not request another T-031/T-032 patch unless there is P0/P1 severity or deterministic reproduction.
 
 ## 4) End-of-batch result (fill after run)
@@ -94,40 +95,40 @@ Use this file at the start and end of every batch. This brief is intentionally s
 - Run context:
   - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `23.926`
-  - runtime uptime (hours): `1650.882`
-  - run end: `Fri Jun 19 2026 11:55:20 GMT+0300 (Eastern European Summer Time)`
+  - bundle interval (hours): `288.05`
+  - runtime uptime (hours): `1938.932`
+  - run end: `Wed Jul 01 2026 11:58:19 GMT+0300 (Eastern European Summer Time)`
   - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip: No feasible candidates after policy/exposure filters (80))
+  - active ticket runtime signal: `observed` (Skip SOLUSDC: Risk budget blocked new exposure (54))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=28, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=86.0%)
-  - sizing reject pressure: `low` (sizingRejectSkips=7, decisions=200, ratio=3.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=8, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=96.0%)
+  - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
-- Decision: `validation_required`
-- Next ticket candidate: `T-040` (stop live-wait loop and use deterministic validation)
-- Required action: `continue readiness validation; no runtime patch from repeated no-feasible skips alone`
+- Decision: `continue`
+- Next ticket candidate: `T-040` (continue active lane unless PM/BA reprioritizes)
+- Required action: `deploy the July 1 risk-governor hysteresis patch and validate lower churn`
 - Open risks:
-  - strategy effectiveness remains `NOT_BETA_READY`; five-window net is still negative.
-  - filled-order churn stayed high at `190` despite better daily net.
+  - strategy effectiveness remains `NOT_BETA_READY`.
+  - latest realized-after-fees is `-42.67 USDT` with high filled-order churn.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260619-085557.tgz`
-  - auto-updated at: `2026-06-19T08:56:10.080Z`
+  - bundle: `autobot-feedback-20260701-085837.tgz`
+  - auto-updated at: `2026-07-01T08:58:52.698Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-040
-Decision: validation_required
-Required action: continue readiness validation; no runtime patch from repeated no-feasible skips alone
-Latest bundle: autobot-feedback-20260619-085557.tgz
+Decision: continue
+Required action: deploy the July 1 risk-governor hysteresis patch and validate lower churn
+Latest bundle: autobot-feedback-20260701-085837.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: move the bot toward bounded beta/production readiness, not another T-031/T-032 micro-patch.
-Patch policy: runtime patches require P0/P1 safety severity plus deterministic reproduction; June 19 is validation-only because safety is clean and net behavior improved.
+Patch policy: runtime patches require P0/P1 safety severity plus deterministic reproduction; July 1 patch is a P1 execution-churn mitigation with unit coverage.
 In scope: beta gates, deterministic validation fixtures, operator controls, release/rollback packet.
 Out of scope: fixing every live-market skip loop or tuning strategy from one bundle.
 Validation: ./scripts/validate-active-ticket.sh && ./scripts/pmba-gate.sh end

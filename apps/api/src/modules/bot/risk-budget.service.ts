@@ -171,11 +171,9 @@ export function deriveRiskBudgetDecision(input: RiskBudgetInput): RiskBudgetDeci
   const recentNetPnl = recent ? recent.realizedPnlHome - recent.feesHome : 0;
   if (recent && recent.trades >= 4 && recentNetPnl < 0) {
     minNetEdgePct += 0.15;
-    if (!strongBull || guard.state !== "NORMAL") {
-      allowNewExposure = false;
-      lane = lane === "RISK_OFF" ? lane : "DEFENSIVE";
-      cooldownBias = "STRICT";
-    }
+    allowNewExposure = false;
+    lane = lane === "RISK_OFF" ? lane : "DEFENSIVE";
+    cooldownBias = "STRICT";
     reasons.push("recent-negative-expectancy");
   }
 

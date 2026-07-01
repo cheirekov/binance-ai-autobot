@@ -1,42 +1,42 @@
 # LATEST_BATCH_DECISION
 
-Last updated: 2026-06-19 08:58 UTC
+Last updated: 2026-07-01 09:01 UTC
 Owner: PM/BA + Codex
 
 ## Production capability lane
 - Chosen: `Gate P1 - bounded beta readiness`
 - Why:
-  - `observed`: the June 19 bundle ran deployed commit `5cb40be`, which includes the June 18 negative dust-churn GRID BUY guard.
-  - `observed`: readiness classifier returned `CONTINUE_READINESS`.
-  - `observed`: auto-retro still returned `validation_required` because the no-feasible skip reason repeated, but PM/BA gate passed and classified it as validation/backlog without P0/P1 severity.
-  - `observed`: latest daily net improved to `+3.07 USDT`; latest realized-after-fees improved to `-24.73 USDT` from `-58.82 USDT`.
-  - `observed`: exposure stayed tiny (`0.10%` allocation, `5.16 USDC` open exposure cost), rejects/restarts/errors stayed `0`, and fees fell to `9.07 USDC`.
-  - `observed`: filled orders did not improve yet (`190` vs `186`), so the patch is not proven enough for beta promotion.
+  - `observed`: the July 1 bundle ran deployed commit `d1bb273`.
+  - `observed`: auto-retro returned `continue`, but latest daily net was `-46.55 USDT`, risk state ended `CAUTION`, and strategy effectiveness remains `NOT_BETA_READY`.
+  - `observed`: safety stayed clean: `0` rejected orders, `0` restarts, `0` health errors, and `0.12%` allocation.
+  - `observed`: execution churn remained high: `197` fills, `6357.51/6557.45 USDC` buy/sell notional, `11.62 USDC` fees, and only `5.78 USDC` open exposure cost.
+  - `observed`: top losses after fees are concentrated in `SYNUSDC`, `ZROUSDC`, and `AIGENSYNUSDC`.
 
 ## Chosen active ticket
 - Current: `T-040` (Bounded beta readiness)
 - Linked support: `none`
-- Decision: `continue_readiness`
-- Runtime action this batch: `none`
+- Decision: `runtime_patch_with_test`
+- Runtime action this batch: `risk-governor hysteresis patch`
 - Why:
-  - `observed`: no uncontrolled exposure, exchange rejects, sell/unwind failure, broken accounting, or crash/restart instability appeared.
-  - `inferred`: the no-feasible loop is not a hotfix trigger while net behavior improved and safety stayed clean.
+  - `observed`: the June 18 dust-churn guard did not sufficiently reduce longer-window fee churn.
+  - `observed`: risk-budget logic had a deterministic exception that let strong-bull `NORMAL` conditions keep fresh exposure open after recent after-fee losses.
+  - `inferred`: removing that exception is a bounded P1 execution mitigation and preserves SELL/reduce actions.
 
 ## Evidence class
 - Current: `fresh`
-- Latest bundle: `autobot-feedback-20260619-085557.tgz`
-- Evidence role: post-deploy validation for the June 18 dust-churn guard.
+- Latest bundle: `autobot-feedback-20260701-085837.tgz`
+- Evidence role: post-deploy validation showing risk-governor fallback is now needed.
 
 ## Allowed work mode
-- Current batch: `VALIDATION_CONTINUE`
-- Runtime patch basis: `not met`
+- Current batch: `RUNTIME_PATCH_WITH_TEST`
+- Runtime patch basis: `P1 execution fee-churn issue plus deterministic unit test`
 - Production promotion: `blocked`
 
 ## Batch decision
-- Decision: `continue_same_ticket_with_readiness_validation`
+- Decision: `continue_same_ticket_with_runtime_mitigation`
 - Next ticket candidate: `T-040`
 - Review slice:
+  - deploy the API/bot service with the risk-governor hysteresis patch.
   - keep running testnet/paper mode without state reset.
-  - collect another bundle to verify whether positive daily net repeats and churn starts falling.
-  - do not patch runtime from repeated no-feasible skips alone.
-  - if fills/fees remain high while realized-after-fees worsens again, evaluate `risk_governor_hysteresis` with deterministic reproduction.
+  - next bundle must show lower fresh-entry churn, lower fees, and improved realized-after-fees.
+  - do not promote to real-money beta.

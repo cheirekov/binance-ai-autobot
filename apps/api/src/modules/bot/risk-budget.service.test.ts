@@ -199,4 +199,43 @@ describe("deriveRiskBudgetDecision", () => {
     expect(feeDrag.allowedActions.marketEntry).toBe(false);
     expect(feeDrag.reasons).toContain("recent-negative-expectancy");
   });
+
+  it("blocks strong-bull fresh exposure after recent negative expectancy", () => {
+    const decision = deriveRiskBudgetDecision(
+      baselineInput({
+        riskState: {
+          state: "NORMAL",
+          trigger: "NONE",
+          dailyRealizedPnl: 0,
+          managedExposurePct: 0.001
+        },
+        regime: {
+          label: "BULL_TREND",
+          confidence: 0.9
+        },
+        strategy: {
+          trend: 0.92,
+          meanReversion: 0.36,
+          grid: 0.52,
+          recommended: "TREND"
+        },
+        openExposureHome: 6,
+        openPositions: 3,
+        recentPerformance: {
+          trades: 12,
+          realizedPnlHome: -31,
+          feesHome: 11
+        }
+      })
+    );
+
+    expect(decision.lane).toBe("DEFENSIVE");
+    expect(decision.allowedActions.openNewPosition).toBe(false);
+    expect(decision.allowedActions.placeGridBuy).toBe(false);
+    expect(decision.allowedActions.marketEntry).toBe(false);
+    expect(decision.allowedActions.placeGridSell).toBe(true);
+    expect(decision.allowedActions.reduceOnly).toBe(true);
+    expect(decision.reasons).toContain("strong-bull-trend");
+    expect(decision.reasons).toContain("recent-negative-expectancy");
+  });
 });

@@ -1,6 +1,6 @@
 # T040_BETA_READINESS_PACKET
 
-Last updated: 2026-06-19 08:58 UTC
+Last updated: 2026-07-01 09:01 UTC
 Owner: PM/BA + Codex
 
 Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readiness decision.
@@ -9,30 +9,30 @@ Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readin
 
 - Active ticket: `T-040`
 - Decision mode: `VALIDATION_REQUIRED`
-- Runtime code posture: recent fill-performance risk-budget guard is deployed; June 17 patch cancels bot-owned grid BUY ladder orders whenever buys are paused; June 18 patch pauses/cancels GRID BUY legs for fee-negative dust churn while preserving SELL/unwind; June 19 post-deploy evidence is improving but not beta-ready
+- Runtime code posture: recent fill-performance risk-budget guard is deployed; June 17 patch cancels bot-owned grid BUY ladder orders whenever buys are paused; June 18 patch pauses/cancels GRID BUY legs for fee-negative dust churn; July 1 patch extends risk-governor hysteresis so recent after-fee losses block fresh exposure even in strong-bull `NORMAL` conditions
 - Production posture: not approved for real-money production promotion
-- Beta posture: pause promotion; continue validating the dust-churn guard in testnet before any beta promotion
+- Beta posture: pause promotion; deploy and validate the July 1 risk-governor patch in testnet before any beta promotion
 - Strategy effectiveness verdict: `NOT_BETA_READY`
 
 ## Latest Evidence
 
-- Bundle: `autobot-feedback-20260619-085557.tgz`
+- Bundle: `autobot-feedback-20260701-085837.tgz`
 - Cycle: `MORNING_REVIEW`
-- Auto-retro decision: `validation_required`
+- Auto-retro decision: `continue`
 - Environment: `testnet`
-- Risk state: `NORMAL`
-- Daily net: `+3.07 USDT`
-- Five-window net: `-102.66 USDT`
-- Max drawdown: `1.29%`
-- Total allocation: `0.10%`
-- Open positions: `7`
-- Orders: `200 submitted`, `190 filled`, `0 rejected`, `10 canceled`
-- Sizing reject pressure: `low` (`7` sizing rejects)
+- Risk state: `CAUTION`
+- Daily net: `-46.55 USDT`
+- Five-window net: `-125.61 USDT`
+- Max drawdown: `1.54%`
+- Total allocation: `0.12%`
+- Open positions: `3`
+- Orders: `200 submitted`, `197 filled`, `0 rejected`, `3 canceled`
+- Sizing reject pressure: `low` (`0` sizing rejects)
 - Runtime health: `0 errors`, `0 restarts`, no exchange/order-sync backoff in top reasons
 - AI mode: `OFF`
-- Strategy effectiveness: `NOT_BETA_READY`; rule-based strategy switching is visible, latest daily net turned positive, but five-window net is still `-102.66 USDT` and latest realized-after-fees is `-24.73 USDT`.
-- PM/BA interpretation: the post-deploy window improved net behavior and kept safety clean, but churn is still high. A normal client should not read one positive daily bundle as adaptive-profit proof yet.
-- Post-bundle engineering action: no runtime patch; continue readiness validation and collect another bundle.
+- Strategy effectiveness: `NOT_BETA_READY`; five-window net is `-125.61 USDT` and latest realized-after-fees is `-42.67 USDT`.
+- PM/BA interpretation: safety remained clean, but fresh-entry/fee churn persisted around tiny exposure. A normal client should not read this as adaptive-profit proof.
+- Post-bundle engineering action: patched risk-governor hysteresis so recent negative after-fee performance blocks fresh exposure even under strong-bull `NORMAL` conditions.
 
 ## Evidence Sequence
 
@@ -54,7 +54,8 @@ Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readin
 - `2026-06-17`: negative window, `-29.62 USDT`, `0` rejects, `0` restarts, allocation reduced to `1.62%`, entry trades `5`, and strategy effectiveness remains negative after fees.
 - `2026-06-18`: negative window, `-39.77 USDT`, `0` rejects, `0` restarts, allocation reduced to `0.11%`, entry trades `0`, but filled-order churn stayed high against tiny exposure.
 - `2026-06-19`: positive daily window, `+3.07 USDT`, `0` rejects, `0` restarts, allocation stayed low at `0.10%`, entry trades `9`, fees improved, but filled-order churn remained high.
-- Interpretation: the June 18 guard has an improving first post-deploy signal, but not enough to promote. Continue collecting evidence; do not patch runtime from repeated no-feasible skips alone.
+- `2026-07-01`: negative window, `-46.55 USDT`, `0` rejects, `0` restarts, allocation stayed low at `0.12%`, entry trades `22`, and after-fee losses concentrated in `SYNUSDC`, `ZROUSDC`, and `AIGENSYNUSDC`.
+- Interpretation: the June 18 guard was not enough. July 1 applies the risk-governor fallback with deterministic test coverage; next bundle must show lower fresh-entry churn and better realized-after-fees.
 
 ## Operator Job
 
@@ -81,7 +82,7 @@ Runtime behavior patches require:
 | Active-ticket hygiene | exactly one `IN_PROGRESS` ticket and session/retro alignment | `PASS` | keep `T-040` active until readiness packet is complete |
 | Runtime safety invariants | hard exposure, reserve, sell/unwind, PnL, and restart guards have deterministic tests | `PARTIAL` | expand validation map instead of patching strategy from live churn |
 | Execution reliability | repeated exchange rejects, order-sync backoff, and stuck order loops are detectable | `PARTIAL` | latest readiness bundles have 0 rejects and no backoff; June 18 adds a deterministic guard for dust-sized fee churn |
-| Strategy/adaptation proof | at least one range-leaning and one trend-leaning validation window or accepted deterministic equivalent | `PARTIAL` | latest strategy effectiveness report is still `NOT_BETA_READY`; collect another post-deploy bundle before any beta promotion |
+| Strategy/adaptation proof | at least one range-leaning and one trend-leaning validation window or accepted deterministic equivalent | `PARTIAL` | latest strategy effectiveness report is still `NOT_BETA_READY`; deploy the July 1 risk-governor patch and validate lower churn |
 | Sizing/min-order pressure | sizing reject pressure is bounded and not a retry storm | `PARTIAL` | June 5 returned to low at `3.0%`, but June 4 medium pressure remains `grid_guard_v2` offline comparison input |
 | Operator controls | risk slider, kill switch, rollback, and readable state are documented | `PARTIAL` | produce release/rollback packet before beta promotion |
 | Token/process budget | future agents use compact read order, skill, and gates instead of full history loading | `PASS` | keep archive docs out of default context |
@@ -97,11 +98,11 @@ Runtime behavior patches require:
 
 ## Immediate Next Batch
 
-1. Continue running testnet/paper mode without data reset.
+1. Deploy the API/bot service with the July 1 risk-governor hysteresis patch.
 2. Use `node scripts/t026-fixture-comparison.js --write-report` as the deterministic candidate-family comparison.
 3. Use `node scripts/t026-proof-comparison.js --write-report` after grid/risk proof reports to choose the primary offline proof target.
-4. Treat `autobot-feedback-20260619-085557.tgz` as an improving post-deploy validation bundle, not production proof.
-5. Watch whether positive daily net repeats and filled orders/notional churn start falling in the next bundle.
+4. Treat `autobot-feedback-20260701-085837.tgz` as negative-expectancy validation evidence with clean safety, not production proof.
+5. Watch whether fresh entries, filled orders, fees, and realized-after-fees improve in the next bundle.
 6. Use `node scripts/t040-strategy-effectiveness-report.js` after each bundle so the operator sees whether adaptation improved net results after fees.
 7. Add or map tests for the highest-risk missing safety scenarios.
 8. Produce the release/rollback packet.

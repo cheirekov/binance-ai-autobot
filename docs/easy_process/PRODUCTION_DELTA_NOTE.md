@@ -1,32 +1,35 @@
 # PRODUCTION_DELTA_NOTE
 
-Last updated: 2026-06-19 08:58 UTC
+Last updated: 2026-07-01 09:01 UTC
 Owner: PM/BA + Codex
 
 ## How this batch moves the bot closer to production
-The June 19 bundle is the first post-deploy validation window for the negative dust-churn GRID BUY guard (`commit=5cb40be`). It is not beta proof, but it is a better signal than June 18:
+The July 1 bundle shows the bot is still not beta-ready. The safety layer worked, but expectancy did not:
 
-- daily net improved from `-39.77 USDT` to `+3.07 USDT`.
-- realized-after-fees improved from `-58.82 USDT` to `-24.73 USDT`.
-- fees improved from `10.83 USDC` to `9.07 USDC`.
-- exposure stayed low (`0.10%` total allocation).
-- rejected orders, restarts, and health errors stayed `0`.
+- daily net was `-46.55 USDT`.
+- realized-after-fees was `-42.67 USDT`.
+- fees were `11.62 USDC`.
+- filled orders were `197`.
+- buy/sell notional was `6357.51/6557.45 USDC`.
+- open exposure cost was only `5.78 USDC`.
+- rejected orders, restarts, and health errors were `0`.
 
-The remaining concern is churn: filled orders were still high (`190`) and buy/sell notional remained large (`5748.19/5950.75 USDC`). This means the patch helped net behavior but has not yet proven durable execution efficiency.
+The patch moves production readiness forward by closing a deterministic risk-governor hole: recent negative after-fee performance now blocks fresh exposure even in strong-bull `NORMAL` conditions. SELL/reduce permissions remain available when exposure exists.
 
 ## What is still missing before the next gate
-- one or more follow-up bundles showing the improvement is repeatable.
-- lower filled-order count and lower notional churn.
+- deploy this API/bot service patch.
+- verify fresh entries, filled orders, fees, and realized-after-fees improve.
+- keep rejects, restarts, and health errors at `0`.
 - strategy-effectiveness report must move beyond `NOT_BETA_READY`, or PM/BA must explicitly accept the residual negative expectancy risk.
 - release/rollback runbook proof before any real-money beta promotion.
 
 ## What this batch added to reduce process waste
-- classified the repeated no-feasible warning as validation/backlog because no P0/P1 safety severity appeared.
-- kept runtime code unchanged after an improving post-deploy bundle.
-- updated operator notes to watch fills, notional, fees, and realized-after-fees instead of chasing skip reason text.
+- avoided patching from repeated skip text alone.
+- patched the deterministic fresh-exposure exception that remained after the June 18 dust-churn guard.
+- added focused risk-budget unit coverage for strong-bull negative-expectancy behavior.
 
 ## Whether this batch improves execution, risk, validation, event awareness, or learning
-- Execution: `validation`
+- Execution: `yes`
 - Risk: `yes`
 - Validation: `yes`
 - Event awareness: `no`
