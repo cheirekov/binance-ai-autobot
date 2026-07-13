@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-07-03 09:21 UTC
+Last updated: 2026-07-13 09:04 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch. This brief is intentionally short; long historical preservation details live in `docs/PM_BA_CHANGELOG.md` and `docs/STRATEGY_COVERAGE.md`.
@@ -48,8 +48,8 @@ Use this file at the start and end of every batch. This brief is intentionally s
   - T-031/T-032 behavior remains preserved.
   - new runtime patches are allowed only for P0/P1 safety/execution blockers or deterministic production-gate failures.
   - June 18 runtime patch pauses/cancels GRID BUY legs for fee-negative dust churn while preserving SELL/unwind paths.
-  - July 1 runtime patch blocks fresh exposure after recent negative after-fee performance even during strong-bull `NORMAL` conditions; July 2/3 evidence confirms it is deployed on `18b6ce2` and kept entry trades far below the July 1 spike.
-  - July 3 operational review exposed Binance testnet `openOrders` 502 backoff; no trading behavior patch is allowed unless a bot-side P0/P1 failure is reproduced.
+  - July 1 runtime patch blocks fresh exposure after recent negative after-fee performance even during strong-bull `NORMAL` conditions; July 13 evidence confirms the deployed behavior is still keeping entry trades far below the July 1 spike.
+  - July 13 recovered from the July 3 Binance testnet `openOrders` 502 backoff; no trading behavior patch is allowed unless a bot-side P0/P1 failure is reproduced.
 - Validation commands:
   - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh`
   - `node --check scripts/feedback-evidence.js`
@@ -78,54 +78,54 @@ Use this file at the start and end of every batch. This brief is intentionally s
   - `./scripts/pmba-gate.sh end`
   - `git diff --check`
 - Runtime validation plan:
-  - keep API/bot service running with deployed commit `18b6ce2`.
-  - collect the next bundle and compare order-sync health, fresh entries, fills, fees, realized-after-fees, ETH exposure, and SELL/reduce reachability against July 3.
+  - keep API/bot service running with deployed commit `e4c9e54`.
+  - collect the next bundle and compare order-sync health, fresh entries, fills, fees, realized-after-fees, PUMP exposure, and SELL/reduce reachability against July 13.
 
 ## 3) Deployment Handoff
 
-- Commit hash: `18b6ce2`
-- Deploy target: no redeploy required for trading behavior; latest bundle ran deployed commit `18b6ce2`.
+- Commit hash: `pending local validation patch`; latest feedback bundle ran deployed commit `e4c9e54`.
+- Deploy target: no redeploy required for trading behavior; deploy validation scripts/docs only if the remote PM/BA gates should include this routing fix.
 - Required config changes: none
 - Operator checklist:
   - do not reset state for this process change.
-  - use next bundle to validate order-sync backoff clears, entry churn stays low, filled-order churn and fees fall, realized-after-fees improves, and ETH exposure does not keep growing above the July 3 `5.09%` watch level.
+  - use next bundle to validate entry churn stays low, filled-order churn and fees fall, realized-after-fees improves, and PUMP exposure does not keep growing above the July 13 `3.10%` watch level.
   - do not request another T-031/T-032 patch unless there is P0/P1 severity or deterministic reproduction.
 
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `DAY (collection) / DAY (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `25.458`
-  - runtime uptime (hours): `1987.206`
-  - run end: `Fri Jul 03 2026 12:14:45 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `DAY_RUN`
+  - bundle interval (hours): `239.737`
+  - runtime uptime (hours): `2226.943`
+  - run end: `Mon Jul 13 2026 11:58:59 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip ETHUSDC: Risk budget market entry cap below exchange minimum (38))
+  - active ticket runtime signal: `observed` (Skip BTCUSDC: Risk budget blocked new exposure (51))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=30, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=85.0%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=43, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=78.5%)
   - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `validation_required`
 - Next ticket candidate: `T-040` (stop live-wait loop and use deterministic validation)
-- Required action: `classify severity and add deterministic validation before any runtime patch; live-market churn alone is not a beta blocker`
+- Required action: `build focused offline proof for grid_guard_v2 before any runtime strategy patch; live-market churn alone is not a beta blocker`
 - Open risks:
-  - exchange/order-sync backoff is the latest operational blocker; wait for a clean follow-up bundle before inferring strategy failure.
+  - strategy effectiveness is still `NOT_BETA_READY`; latest daily net is `-25.68 USDT` and latest realized-after-fees is `-53.11 USDT`.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260703-091448.tgz`
-  - auto-updated at: `2026-07-03T09:21:24.794Z`
+  - bundle: `autobot-feedback-20260713-085946.tgz`
+  - auto-updated at: `2026-07-13T08:59:59.017Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-040
 Decision: validation_required
-Required action: classify severity and add deterministic validation before any runtime patch; live-market churn alone is not a beta blocker
-Latest bundle: autobot-feedback-20260703-091448.tgz
+Required action: build focused offline proof for grid_guard_v2 before any runtime strategy patch; live-market churn alone is not a beta blocker
+Latest bundle: autobot-feedback-20260713-085946.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: move the bot toward bounded beta/production readiness, not another T-031/T-032 micro-patch.
 Patch policy: runtime patches require P0/P1 safety severity plus deterministic reproduction.

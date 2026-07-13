@@ -16,6 +16,37 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-07-13 09:04 UTC — T-040 validation routing: latest clean safety, offline strategy proof
+- Scope:
+  - classify `autobot-feedback-20260713-085946.tgz` after the remote testnet run on commit `e4c9e54`.
+  - decide whether renewed negative PnL and risk-budget skips justify a trading-code patch.
+  - correct validation routing so an older July 3 exchange-backoff window does not keep the latest clean bundle in `PATCH_ALLOWED_REVIEW`.
+- BA requirement mapping:
+  - latest daily net is `-25.68 USDT`; latest realized-after-fees is `-53.11 USDT`; five-window net is `-85.49 USDT`.
+  - strategy effectiveness remains `NOT_BETA_READY`: strategy/lane switching is visible, but not profitable after fees.
+  - execution safety is clean: `0` rejected orders, `0` health errors, `0` restarts, `0` unmanaged exposure.
+  - allocation is bounded at `3.10%`, mostly `PUMPUSDC`; SELL/reduce reachability remains a watch item.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - beta promotion remains blocked.
+  - move the next productive work to deterministic/offline `grid_guard_v2` proof, with `risk_governor_hysteresis` as fallback.
+- Technical changes:
+  - `scripts/t026-calibration-runner.js`: only latest safety failure or repeated recent rejects recommend `PATCH_ALLOWED_REVIEW`; older safety windows remain historical evidence.
+  - `scripts/validate-active-ticket.sh`: the no-docs-only guard now accepts deterministic validation helper changes, not just `apps/` or `packages/` changes.
+  - no trading behavior changes.
+- Risk slider impact:
+  - none.
+- Validation evidence:
+  - `node scripts/t040-readiness-check.js` returned `VALIDATION_REQUIRED`.
+  - `node scripts/t026-calibration-runner.js` returned `BUILD_BEAR_CHOPPY_FIXTURE`.
+  - `node scripts/t040-strategy-effectiveness-report.js` returned `NOT_BETA_READY`.
+  - `./scripts/validate-active-ticket.sh` passed, including the no-docs-only loop gate.
+- Runtime test request:
+  - keep running testnet/paper mode without data reset.
+  - next bundle should keep rejects/restarts/health errors at `0`, entries low, fees/fills falling, realized-after-fees improving, and PUMP exposure bounded/unwindable.
+- Follow-up:
+  - build the focused offline proof for `grid_guard_v2` before any runtime strategy patch.
+
 ## 2026-07-03 09:17 UTC — T-040 operational review: exchange/order-sync backoff
 - Scope:
   - classify `autobot-feedback-20260703-091448.tgz` after the July 1 risk-governor hysteresis patch continued running on commit `18b6ce2`.

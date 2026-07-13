@@ -156,12 +156,13 @@ const buildReport = (evidence) => {
   const latestThree = windows.slice(0, 3);
   const negativeThree = latestThree.length === 3 && latestThree.every((window) => window.dailyNet < 0);
   const safetyFailures = windows.filter((window) => window.class === "SAFETY_FAILURE");
+  const latestSafetyFailure = windows[0]?.class === "SAFETY_FAILURE";
   const rejectedWindows = latestThree.filter((window) => window.rejectedOrders > 0);
   const totalRejectedRecent = latestThree.reduce((sum, window) => sum + window.rejectedOrders, 0);
   const repeatedSmallRejects = rejectedWindows.length >= 2 || totalRejectedRecent >= 3;
   const controlledDrawdowns = windows.filter((window) => window.class === "CONTROLLED_DRAWDOWN");
 
-  const recommendation = safetyFailures.length > 0 || repeatedSmallRejects
+  const recommendation = latestSafetyFailure || repeatedSmallRejects
     ? "PATCH_ALLOWED_REVIEW"
     : negativeThree
       ? "BUILD_BEAR_CHOPPY_FIXTURE"
@@ -176,6 +177,8 @@ const buildReport = (evidence) => {
     classes,
     windows,
     safetySignals: {
+      latestSafetyFailure,
+      safetyFailureWindows: safetyFailures.length,
       rejectedWindowsRecent: rejectedWindows.length,
       totalRejectedRecent,
       repeatedSmallRejects
@@ -202,7 +205,7 @@ const printReport = (report) => {
   console.log(`- windows=${report.windows.length}`);
   console.log(`- classes=${JSON.stringify(report.classes)}`);
   console.log(
-    `- safetySignals=rejectedWindowsRecent=${report.safetySignals.rejectedWindowsRecent},totalRejectedRecent=${report.safetySignals.totalRejectedRecent},repeatedSmallRejects=${report.safetySignals.repeatedSmallRejects}`
+    `- safetySignals=latestSafetyFailure=${report.safetySignals.latestSafetyFailure},safetyFailureWindows=${report.safetySignals.safetyFailureWindows},rejectedWindowsRecent=${report.safetySignals.rejectedWindowsRecent},totalRejectedRecent=${report.safetySignals.totalRejectedRecent},repeatedSmallRejects=${report.safetySignals.repeatedSmallRejects}`
   );
   for (const window of report.windows) {
     console.log(

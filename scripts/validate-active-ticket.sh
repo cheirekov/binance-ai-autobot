@@ -145,6 +145,10 @@ const changedFiles = (() => {
   }
 })();
 const runtimeOrTestChanges = changedFiles.filter((path) => /^(apps|packages)\//.test(path));
+const deterministicValidationChanges = changedFiles.filter((path) =>
+  /^scripts\/(?:feedback-evidence\.js|t0(?:26|40)-.+\.js)$/.test(path)
+);
+const codeOrValidationChanges = [...new Set([...runtimeOrTestChanges, ...deterministicValidationChanges])];
 const operatorStopDecisionPath = 'docs/easy_process/OPERATOR_STOP_DECISION.md';
 const operatorStopDecision = fs.existsSync(operatorStopDecisionPath)
   ? /Decision:\s*`?STOP_TESTNET`?/i.test(read(operatorStopDecisionPath))
@@ -198,13 +202,13 @@ if (t040Classification === 'VALIDATION_REQUIRED') {
   if (
     t040EffectivenessVerdict === 'NOT_BETA_READY' &&
     changedFiles.length > 0 &&
-    runtimeOrTestChanges.length === 0 &&
+    codeOrValidationChanges.length === 0 &&
     !operatorStopDecision
   ) {
     fail(
       [
-        'docs-only loop blocked: T-040 is VALIDATION_REQUIRED and NOT_BETA_READY, but this batch has no apps/ or packages/ code/test changes.',
-        'Add a runtime/test patch, or create docs/easy_process/OPERATOR_STOP_DECISION.md with Decision: STOP_TESTNET.'
+        'docs-only loop blocked: T-040 is VALIDATION_REQUIRED and NOT_BETA_READY, but this batch has no runtime/test or deterministic validation-code changes.',
+        'Add an apps/ or packages/ runtime/test patch, update a deterministic validation helper, or create docs/easy_process/OPERATOR_STOP_DECISION.md with Decision: STOP_TESTNET.'
       ].join(' ')
     );
   }
@@ -223,7 +227,7 @@ if (t040Classification === 'PATCH_ALLOWED_REVIEW') {
 console.log(`PASS: T-040 beta-readiness process validation (${t040Classification}; promotion gate remains separate)`);
 if (t040Classification === 'VALIDATION_REQUIRED' && t040EffectivenessVerdict === 'NOT_BETA_READY' && changedFiles.length > 0) {
   console.log(
-    `PASS: T-040 no-docs-only loop gate (${runtimeOrTestChanges.length > 0 ? 'runtime/test changes present' : 'operator stop decision present'})`
+    `PASS: T-040 no-docs-only loop gate (${codeOrValidationChanges.length > 0 ? 'runtime/test or deterministic validation-code changes present' : 'operator stop decision present'})`
   );
 }
 NODE

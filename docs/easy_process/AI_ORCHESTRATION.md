@@ -1,6 +1,6 @@
 # AI_ORCHESTRATION
 
-Last updated: 2026-06-17 10:20 UTC
+Last updated: 2026-07-13 09:04 UTC
 Owner: PM/BA + Codex
 
 Purpose: make AI work cheaper, smaller, and more production-directed.
@@ -69,7 +69,7 @@ Escalate to broader history only when:
 Use one of these outputs:
 - `NO_CODE`: docs or decision only.
 - `VALIDATION_ONLY`: evidence, tests, fixtures, gates, runbook.
-- `CODE_OR_STOP_REQUIRED`: wallet/expectancy remains negative under `T-040`; a docs-only batch is invalid. Add an `apps/` or `packages/` runtime/test patch, or create an explicit `STOP_TESTNET` operator decision.
+- `CODE_OR_STOP_REQUIRED`: wallet/expectancy remains negative under `T-040`; a docs-only batch is invalid. Add an `apps/` or `packages/` runtime/test patch, update a deterministic validation helper, or create an explicit `STOP_TESTNET` operator decision.
 - `PATCH_ALLOWED`: runtime code change allowed because severity and reproduction are proven.
 - `PROMOTION_PACKET_ONLY`: production/beta approval artifact.
 - `REFERENCE_STRATEGY_ADOPTION`: clean-room strategy extraction, validation fixtures, and shadow-first implementation.
