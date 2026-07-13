@@ -67,9 +67,15 @@ case "$ACTIVE_TICKET" in
     node --check scripts/t026-proof-comparison.js
     node --check scripts/t026-risk-governor-proof.js
     node --check scripts/t040-strategy-effectiveness-report.js
-    T040_OUTPUT="$(node scripts/t040-readiness-check.js)"
+    set +e
+    T040_OUTPUT="$(node scripts/t040-readiness-check.js 2>&1)"
+    T040_STATUS=$?
+    set -e
     printf '%s\n' "$T040_OUTPUT"
     T040_CLASSIFICATION="$(printf '%s\n' "$T040_OUTPUT" | sed -n 's/^T-040 readiness classification: //p' | head -n1)"
+    if [[ "$T040_STATUS" -ne 0 && "$T040_CLASSIFICATION" != "PATCH_ALLOWED_REVIEW" ]]; then
+      exit "$T040_STATUS"
+    fi
     T026_OUTPUT="$(node scripts/t026-calibration-runner.js)"
     printf '%s\n' "$T026_OUTPUT"
     T026_RECOMMENDATION="$(printf '%s\n' "$T026_OUTPUT" | sed -n 's/^T-026 calibration recommendation: //p' | head -n1)"
@@ -160,7 +166,7 @@ if (!/Gate P1/.test(packet)) fail('beta packet is missing Gate P1 checklist');
 if (!/Strategy effectiveness verdict/.test(packet)) fail('beta packet is missing strategy effectiveness verdict');
 if (!/Required Deterministic Scenarios/.test(validationMap)) fail('validation map is missing deterministic scenarios');
 if (!/PATCH_ALLOWED/.test(orchestration) || !/VALIDATION_ONLY/.test(orchestration)) fail('AI orchestration is missing output classes');
-if (!/^(CONTINUE_READINESS|VALIDATION_REQUIRED)$/.test(t040Classification)) {
+if (!/^(CONTINUE_READINESS|VALIDATION_REQUIRED|PATCH_ALLOWED_REVIEW)$/.test(t040Classification)) {
   fail(`unexpected T-040 readiness classification ${t040Classification || 'empty'}`);
 }
 if (!/^(NOT_BETA_READY|CANDIDATE_READY_FOR_OPERATOR_REVIEW)$/.test(t040EffectivenessVerdict)) {
@@ -201,6 +207,16 @@ if (t040Classification === 'VALIDATION_REQUIRED') {
         'Add a runtime/test patch, or create docs/easy_process/OPERATOR_STOP_DECISION.md with Decision: STOP_TESTNET.'
       ].join(' ')
     );
+  }
+}
+if (t040Classification === 'PATCH_ALLOWED_REVIEW') {
+  if (!/Decision mode: `PATCH_ALLOWED_REVIEW`/.test(packet)) fail('beta packet does not record PATCH_ALLOWED_REVIEW');
+  if (!/Production posture: not approved/.test(packet)) fail('beta packet does not block production promotion');
+  if (!/Beta posture: pause promotion/.test(packet)) fail('beta packet does not pause beta promotion');
+  if (!/exchange\/order-sync|order-sync|backoff/i.test(packet)) fail('beta packet does not record the operational review trigger');
+  if (!/exchange\/order-sync|order-sync|backoff/i.test(validationMap)) fail('validation map does not record the operational review trigger');
+  if (t026Recommendation !== 'PATCH_ALLOWED_REVIEW') {
+    fail(`expected T-026 PATCH_ALLOWED_REVIEW during safety review, found ${t026Recommendation || 'empty'}`);
   }
 }
 

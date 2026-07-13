@@ -109,11 +109,13 @@ const latestTopReasonsText = (latest.summary?.activity?.skips?.top_reasons ?? []
   .map((entry) => String(entry?.reason ?? ""))
   .join(" | ");
 const latestHealthText = JSON.stringify(latest.summary?.health ?? {});
+const latestBackoffReason = (latest.summary?.activity?.skips?.top_reasons ?? [])
+  .find((entry) => hasExchangeBackoffEvidence(String(entry?.reason ?? "")));
 const exchangeBackoffObserved = hasExchangeBackoffEvidence(`${latestTopReasonsText} ${latestHealthText}`);
 const exchangeBackoffRule = {
   observed: exchangeBackoffObserved,
   details: exchangeBackoffObserved
-    ? `latest top reasons include external exchange/order-sync backoff (${String(latestTopReason?.reason ?? "n/a")})`
+    ? `latest evidence includes external exchange/order-sync backoff (${String(latestBackoffReason?.reason ?? latestTopReason?.reason ?? "n/a")})`
     : "not observed in latest top reasons"
 };
 

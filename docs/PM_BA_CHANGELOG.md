@@ -16,6 +16,68 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-07-03 09:17 UTC — T-040 operational review: exchange/order-sync backoff
+- Scope:
+  - classify `autobot-feedback-20260703-091448.tgz` after the July 1 risk-governor hysteresis patch continued running on commit `18b6ce2`.
+  - decide whether `PATCH_ALLOWED_REVIEW` requires a trading-code patch.
+  - fix process validation so `PATCH_ALLOWED_REVIEW` evidence can complete T-040 active-ticket validation instead of aborting before PM/BA classification.
+- BA requirement mapping:
+  - latest daily net improved to `-2.68 USDT`.
+  - latest realized-after-fees improved to `-26.86 USDT`, but remains negative.
+  - five-window net remains negative at `-99.58 USDT`; strategy effectiveness remains `NOT_BETA_READY`.
+  - filled orders improved to `181`; fees improved to `9.08 USDC`; entry trades stayed low at `5`.
+  - exposure stayed bounded at `5.09%`, now mostly `ETHUSDC`; HBAR exposure fell to dust.
+  - exchange/order-sync health is not clean: `1` health error and repeated Binance testnet `502 Bad Gateway` on `openOrders`.
+  - trading safety stayed bounded: `0` rejected orders, `0` restarts, `0` unmanaged exposure, service still running.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - beta promotion remains blocked.
+  - treat July 3 as operational review evidence, not T-031/T-032 strategy patch input.
+- Technical changes:
+  - `scripts/validate-active-ticket.sh`: captures nonzero `t040-readiness-check.js` output and accepts `PATCH_ALLOWED_REVIEW` as a valid T-040 review classification with packet/map checks.
+  - `scripts/auto-retro.sh`: reports the actual exchange/order-sync backoff reason instead of the unrelated top skip reason.
+  - no trading behavior changes.
+- Risk slider impact:
+  - none.
+- Validation evidence:
+  - `node scripts/t040-readiness-check.js` returned `PATCH_ALLOWED_REVIEW`.
+  - `node scripts/t040-strategy-effectiveness-report.js` returned `NOT_BETA_READY`.
+- Runtime test request:
+  - keep running testnet/paper mode without data reset.
+  - collect a clean follow-up bundle; order-sync backoff and health errors should clear before judging strategy quality.
+- Follow-up:
+  - if Binance `openOrders` 502/order-sync backoff persists in the next normal bundle, add deterministic exchange-backoff validation or open a focused P1 operational hotfix.
+
+## 2026-07-02 07:52 UTC — T-040 post-patch validation: continue, no runtime patch
+- Scope:
+  - classify `autobot-feedback-20260702-074745.tgz` after deployment of the July 1 risk-governor hysteresis patch.
+  - decide whether renewed risk-budget skip dominance or HBAR exposure requires another runtime patch.
+- BA requirement mapping:
+  - latest bundle ran deployed commit `18b6ce2`.
+  - fresh entries improved from July 1 `22` to `2`.
+  - daily net improved from `-46.55 USDT` to `-13.65 USDT`.
+  - fees improved from `11.62 USDC` to `10.39 USDC`; filled orders improved from `197` to `189`.
+  - strategy effectiveness remains `NOT_BETA_READY`: latest realized-after-fees is `-60.92 USDT` and five-window net is `-126.52 USDT`.
+  - safety stayed clean: `0` rejected orders, `0` restarts, `0` health errors.
+  - exposure watch: total allocation rose to `5.10%`, mostly `HBARUSDC`; active HBAR `SELL` limit order preserves visible exit reachability.
+- PM milestone mapping:
+  - keep `T-040` as the only active lane.
+  - continue Gate P1 validation; beta promotion remains blocked.
+  - do not reopen T-031/T-032 or patch runtime from risk-budget skip text alone.
+- Technical changes:
+  - no runtime code changes.
+  - refreshed current T-040 decision, operator, validation, and production handoff notes for July 2 evidence.
+- Risk slider impact:
+  - none.
+- Validation evidence:
+  - `node scripts/t040-readiness-check.js` returned `CONTINUE_READINESS`.
+  - `node scripts/t040-strategy-effectiveness-report.js` returned `NOT_BETA_READY`.
+- Runtime test request:
+  - keep running testnet/paper mode without data reset.
+  - next bundle should keep entries low, reduce fees/fills, improve realized-after-fees, and prove HBAR exposure stays bounded/unwindable.
+- Follow-up:
+  - if HBAR/total exposure keeps growing above cap, SELL/reduce becomes blocked, or exchange rejects/restarts appear, treat as P1 hotfix evidence.
+
 ## 2026-07-01 09:01 UTC — T-040 runtime mitigation: risk-governor strong-bull hysteresis
 - Scope:
   - classify `autobot-feedback-20260701-085837.tgz` after the June 18 dust-churn guard.

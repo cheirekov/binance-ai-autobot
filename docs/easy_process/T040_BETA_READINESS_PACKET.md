@@ -1,6 +1,6 @@
 # T040_BETA_READINESS_PACKET
 
-Last updated: 2026-07-01 09:01 UTC
+Last updated: 2026-07-03 09:17 UTC
 Owner: PM/BA + Codex
 
 Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readiness decision.
@@ -8,31 +8,32 @@ Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readin
 ## Current Decision
 
 - Active ticket: `T-040`
-- Decision mode: `VALIDATION_REQUIRED`
+- Decision mode: `PATCH_ALLOWED_REVIEW`
 - Runtime code posture: recent fill-performance risk-budget guard is deployed; June 17 patch cancels bot-owned grid BUY ladder orders whenever buys are paused; June 18 patch pauses/cancels GRID BUY legs for fee-negative dust churn; July 1 patch extends risk-governor hysteresis so recent after-fee losses block fresh exposure even in strong-bull `NORMAL` conditions
 - Production posture: not approved for real-money production promotion
-- Beta posture: pause promotion; deploy and validate the July 1 risk-governor patch in testnet before any beta promotion
+- Beta posture: pause promotion; continue validating the deployed July 1 risk-governor patch and July 3 order-sync backoff behavior in testnet before any beta promotion
 - Strategy effectiveness verdict: `NOT_BETA_READY`
 
 ## Latest Evidence
 
-- Bundle: `autobot-feedback-20260701-085837.tgz`
-- Cycle: `MORNING_REVIEW`
-- Auto-retro decision: `continue`
+- Bundle: `autobot-feedback-20260703-091448.tgz`
+- Cycle: `DAY_RUN`
+- Auto-retro decision: `validation_required`
 - Environment: `testnet`
-- Risk state: `CAUTION`
-- Daily net: `-46.55 USDT`
-- Five-window net: `-125.61 USDT`
-- Max drawdown: `1.54%`
-- Total allocation: `0.12%`
-- Open positions: `3`
-- Orders: `200 submitted`, `197 filled`, `0 rejected`, `3 canceled`
+- Risk state: `NORMAL`
+- Readiness classifier: `PATCH_ALLOWED_REVIEW`
+- Daily net: `-2.68 USDT`
+- Five-window net: `-99.58 USDT`
+- Max drawdown: `0.37%`
+- Total allocation: `5.09%`
+- Open positions: `12`
+- Orders: `200 submitted`, `181 filled`, `0 rejected`, `19 canceled`
 - Sizing reject pressure: `low` (`0` sizing rejects)
-- Runtime health: `0 errors`, `0 restarts`, no exchange/order-sync backoff in top reasons
+- Runtime health: `1 error`, `0 restarts`, repeated exchange/order-sync backoff from Binance testnet `502 Bad Gateway` on `openOrders`
 - AI mode: `OFF`
-- Strategy effectiveness: `NOT_BETA_READY`; five-window net is `-125.61 USDT` and latest realized-after-fees is `-42.67 USDT`.
-- PM/BA interpretation: safety remained clean, but fresh-entry/fee churn persisted around tiny exposure. A normal client should not read this as adaptive-profit proof.
-- Post-bundle engineering action: patched risk-governor hysteresis so recent negative after-fee performance blocks fresh exposure even under strong-bull `NORMAL` conditions.
+- Strategy effectiveness: `NOT_BETA_READY`; five-window net is `-99.58 USDT` and latest realized-after-fees is `-26.86 USDT`.
+- PM/BA interpretation: expectancy trend improved, HBAR concentration resolved, and exposure stayed bounded, but exchange/order-sync health is not clean and after-fee expectancy remains negative. A normal client should not read this as adaptive-profit proof.
+- Post-bundle engineering action: no trading-code patch; corrected T-040 validation plumbing for `PATCH_ALLOWED_REVIEW` and corrected auto-retro backoff wording.
 
 ## Evidence Sequence
 
@@ -55,7 +56,9 @@ Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readin
 - `2026-06-18`: negative window, `-39.77 USDT`, `0` rejects, `0` restarts, allocation reduced to `0.11%`, entry trades `0`, but filled-order churn stayed high against tiny exposure.
 - `2026-06-19`: positive daily window, `+3.07 USDT`, `0` rejects, `0` restarts, allocation stayed low at `0.10%`, entry trades `9`, fees improved, but filled-order churn remained high.
 - `2026-07-01`: negative window, `-46.55 USDT`, `0` rejects, `0` restarts, allocation stayed low at `0.12%`, entry trades `22`, and after-fee losses concentrated in `SYNUSDC`, `ZROUSDC`, and `AIGENSYNUSDC`.
-- Interpretation: the June 18 guard was not enough. July 1 applies the risk-governor fallback with deterministic test coverage; next bundle must show lower fresh-entry churn and better realized-after-fees.
+- `2026-07-02`: negative but improved daily window, `-13.65 USDT`, `0` rejects, `0` restarts, allocation rose to `5.10%` mostly in `HBARUSDC`, entry trades fell to `2`, and strategy effectiveness remained negative after fees.
+- `2026-07-03`: near-flat negative window, `-2.68 USDT`, `0` rejects, `0` restarts, `1` health error, allocation `5.09%` mostly in `ETHUSDC`, entry trades `5`, order-sync backoff repeated after Binance testnet `502 Bad Gateway`.
+- Interpretation: the July 1 patch is reducing fresh-entry churn and losses are improving, but beta promotion stays blocked until after-fee expectancy turns positive and exchange/order-sync health is clean.
 
 ## Operator Job
 
@@ -81,8 +84,8 @@ Runtime behavior patches require:
 | --- | --- | --- | --- |
 | Active-ticket hygiene | exactly one `IN_PROGRESS` ticket and session/retro alignment | `PASS` | keep `T-040` active until readiness packet is complete |
 | Runtime safety invariants | hard exposure, reserve, sell/unwind, PnL, and restart guards have deterministic tests | `PARTIAL` | expand validation map instead of patching strategy from live churn |
-| Execution reliability | repeated exchange rejects, order-sync backoff, and stuck order loops are detectable | `PARTIAL` | latest readiness bundles have 0 rejects and no backoff; June 18 adds a deterministic guard for dust-sized fee churn |
-| Strategy/adaptation proof | at least one range-leaning and one trend-leaning validation window or accepted deterministic equivalent | `PARTIAL` | latest strategy effectiveness report is still `NOT_BETA_READY`; deploy the July 1 risk-governor patch and validate lower churn |
+| Execution reliability | repeated exchange rejects, order-sync backoff, and stuck order loops are detectable | `PARTIAL` | July 3 detected Binance testnet 502 order-sync backoff; next bundle must prove recovery or trigger deterministic exchange-backoff validation |
+| Strategy/adaptation proof | at least one range-leaning and one trend-leaning validation window or accepted deterministic equivalent | `PARTIAL` | latest strategy effectiveness report is still `NOT_BETA_READY`; continue validating ETH concentration and after-fee improvement |
 | Sizing/min-order pressure | sizing reject pressure is bounded and not a retry storm | `PARTIAL` | June 5 returned to low at `3.0%`, but June 4 medium pressure remains `grid_guard_v2` offline comparison input |
 | Operator controls | risk slider, kill switch, rollback, and readable state are documented | `PARTIAL` | produce release/rollback packet before beta promotion |
 | Token/process budget | future agents use compact read order, skill, and gates instead of full history loading | `PASS` | keep archive docs out of default context |
@@ -94,16 +97,16 @@ Runtime behavior patches require:
 - remaining runtime safety scenarios have deterministic tests or accepted beta-risk waivers.
 - drawdown/adaptation evidence is classified across at least one trend-like and one bear/choppy validation case, with offline comparison acceptance recorded.
 - `scripts/t040-strategy-effectiveness-report.js` no longer reports `NOT_BETA_READY`, or PM/BA explicitly accepts the remaining negative expectancy as beta risk.
-- `scripts/t040-readiness-check.js` continues to report `CONTINUE_READINESS` or PM/BA explicitly accepts any renewed drawdown behavior as beta risk.
+- `scripts/t040-readiness-check.js` returns `CONTINUE_READINESS`; `PATCH_ALLOWED_REVIEW` from exchange/order-sync health must be resolved or explicitly accepted before beta.
 
 ## Immediate Next Batch
 
-1. Deploy the API/bot service with the July 1 risk-governor hysteresis patch.
-2. Use `node scripts/t026-fixture-comparison.js --write-report` as the deterministic candidate-family comparison.
-3. Use `node scripts/t026-proof-comparison.js --write-report` after grid/risk proof reports to choose the primary offline proof target.
-4. Treat `autobot-feedback-20260701-085837.tgz` as negative-expectancy validation evidence with clean safety, not production proof.
-5. Watch whether fresh entries, filled orders, fees, and realized-after-fees improve in the next bundle.
+1. Keep the deployed July 1 risk-governor patch running in testnet/paper mode.
+2. Treat `autobot-feedback-20260703-091448.tgz` as operational review evidence: strategy losses improved, but exchange/order-sync health is not clean.
+3. Watch whether order-sync backoff clears in the next bundle.
+4. Watch whether fresh entries stay low, filled orders and fees fall, and realized-after-fees improves.
+5. Watch ETH concentration: total allocation should not keep growing above `5.09%`, and SELL/reduce must stay reachable.
 6. Use `node scripts/t040-strategy-effectiveness-report.js` after each bundle so the operator sees whether adaptation improved net results after fees.
-7. Add or map tests for the highest-risk missing safety scenarios.
+7. Add or map deterministic tests for exchange/order-sync backoff if it persists.
 8. Produce the release/rollback packet.
 9. Only then consider a bounded beta promotion request.

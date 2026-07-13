@@ -1,42 +1,45 @@
 # OPERATOR_NOTE
 
-Last updated: 2026-07-01 09:01 UTC
+Last updated: 2026-07-03 09:17 UTC
 Owner: PM/BA + Codex
 
 ## What to run next
-- redeploy the API/bot service with the July 1 risk-governor hysteresis patch.
 - keep the bot on testnet/paper mode.
 - do not reset the data folder.
+- do not redeploy trading behavior for this bundle; the July 1 patch is already running in commit `18b6ce2`.
 - collect the next normal bundle.
 - after the next bundle, run `./scripts/validate-active-ticket.sh`.
 - run `node scripts/t040-strategy-effectiveness-report.js` after the next bundle for the plain strategy verdict.
 
-## What the July 1 bundle showed
-- deployed commit: `d1bb273`.
-- daily net fell to `-46.55 USDT`.
-- realized-after-fees was `-42.67 USDT`.
-- fees were `11.62 USDC`.
-- exposure stayed low at `0.12%`.
-- rejects, restarts, and health errors stayed `0`.
-- filled orders remained high at `197`.
-- buy/sell notional remained high at `6357.51/6557.45 USDC`.
-- top after-fee losses: `SYNUSDC=-25.78`, `ZROUSDC=-8.98`, `AIGENSYNUSDC=-7.90`.
+## What the July 3 bundle showed
+- deployed commit: `18b6ce2`.
+- daily net improved to `-2.68 USDT` from July 2 `-13.65 USDT`.
+- realized-after-fees improved to `-26.86 USDT` from July 2 `-60.92 USDT`, but is still negative.
+- filled orders fell to `181` from `189`.
+- fees fell to `9.08 USDC` from `10.39 USDC`.
+- fresh entries were `5`, still far below July 1 `22`.
+- exposure stayed near the cap at `5.09%`, now mostly `ETHUSDC` at `5.00%`.
+- HBAR exposure fell to dust.
+- rejects and restarts stayed `0`.
+- health errors rose to `1` because Binance testnet returned repeated `502 Bad Gateway` on `openOrders`; the bot backed off instead of submitting more orders.
+- active orders ended at `0`.
 
 ## What changed in code
-- risk-governor negative-expectancy hysteresis now blocks fresh exposure even during strong-bull `NORMAL` conditions.
-- SELL/reduce permissions remain available when there is open exposure.
-- this targets fresh-entry churn after recent after-fee losses; it is not a skip-loop patch.
+- no trading behavior changed after this bundle.
+- validation plumbing was corrected so `PATCH_ALLOWED_REVIEW` evidence can be audited instead of aborting the active-ticket gate.
+- auto-retro now prints the actual exchange/order-sync backoff reason.
 
 ## What to watch in the next bundle
-- fresh entries should fall from July 1 `22`.
-- filled orders should fall from `197`.
-- fees should fall from `11.62 USDC`.
-- realized-after-fees should improve from `-42.67 USDT`.
-- exposure must stay bounded.
-- exchange rejects, health errors, and restarts must remain `0`.
+- order-sync must recover: no `Live order sync failed`, `Transient exchange backoff active`, or Binance `502 Bad Gateway` in top reasons.
+- health errors should return to `0`.
+- fresh entries should stay low, near July 3 `5` or July 2 `2`.
+- filled orders and fees should fall further.
+- realized-after-fees should improve from `-26.86 USDT`.
+- ETH exposure must not keep growing above the risk cap.
+- exchange rejects and restarts must remain `0`.
 
 ## What not to do next
 - do not promote to real-money beta yet.
-- do not reset state before measuring the patch.
+- do not reset state before measuring the ETH exposure and order-sync recovery.
 - do not weaken risk guards to make the bot trade more.
-- do not treat one improved bundle as production proof.
+- do not write a new runtime patch from repeated risk-budget skip text alone.
