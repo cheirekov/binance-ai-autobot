@@ -1,0 +1,346 @@
+{
+  "schema_version": 1,
+  "source_bundles": [
+    "autobot-feedback-20260713-085946.tgz",
+    "autobot-feedback-20260714-075300.tgz"
+  ],
+  "verdict": "ENTRY_BURST_GUARD_OFFLINE_PROOF_PASSED",
+  "runtime_patch_allowed": false,
+  "reason": "deterministic bundle-delta replay supports a neutral/range MARKET entry burst cap; runtime behavior remains unchanged pending PM/BA severity or explicit override",
+  "window": {
+    "start": "2026-07-13T08:58:59.577Z",
+    "end": "2026-07-14T07:52:15.804Z",
+    "orders": 35,
+    "maxNeutralEntries": 2
+  },
+  "replay_fidelity": {
+    "observedExposureCost": 233.6614062,
+    "reconstructedExposureCost": 233.59569508,
+    "exposureGap": 0.06571112,
+    "tolerance": 2.33661406
+  },
+  "checks": {
+    "safetyClean": true,
+    "enoughObservedOrders": true,
+    "baselineExposureMatchesObserved": true,
+    "repeatedNeutralEntriesReproduced": true,
+    "sellPathPreserved": true,
+    "feesReduced": true,
+    "exposureReduced": true,
+    "markToMarketImproved": true
+  },
+  "baseline": {
+    "realizedPnl": -27.28433657,
+    "fees": 1.61112545,
+    "unrealizedPnl": -1.31513822,
+    "markToMarketPnl": -28.59947479,
+    "endingExposureCost": 233.59569508,
+    "endingMarketValue": 232.28055686,
+    "filledOrders": 35,
+    "sellOrdersRequested": 15,
+    "sellOrdersExecuted": 15,
+    "sellOrdersSkippedNoInventory": 0,
+    "clippedSellQty": 163.6,
+    "suppressedEntries": 0,
+    "suppressedNotional": 0,
+    "suppressedFees": 0,
+    "suppressed": [],
+    "positions": [
+      {
+        "symbol": "ZECUSDC",
+        "qty": 0.452,
+        "cost": 229.74175382,
+        "markPrice": 505.41,
+        "marketValue": 228.44532,
+        "unrealizedPnl": -1.29643382
+      },
+      {
+        "symbol": "ARBUSDC",
+        "qty": 15.8,
+        "cost": 1.54899065,
+        "markPrice": 0.09803738,
+        "marketValue": 1.54899065,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "AAVEUSDC",
+        "qty": 0.005,
+        "cost": 0.49353468,
+        "markPrice": 98.706936,
+        "marketValue": 0.49353468,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "PUMPUSDC",
+        "qty": 264,
+        "cost": 0.39585013,
+        "markPrice": 0.00149943,
+        "marketValue": 0.39585013,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "ALLOUSDC",
+        "qty": 0.7,
+        "cost": 0.2842144,
+        "markPrice": 0.3793,
+        "marketValue": 0.26551,
+        "unrealizedPnl": -0.0187044
+      },
+      {
+        "symbol": "SENTUSDC",
+        "qty": 15,
+        "cost": 0.24582961,
+        "markPrice": 0.01638864,
+        "marketValue": 0.24582961,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "VIRTUALUSDC",
+        "qty": 0.4,
+        "cost": 0.24335994,
+        "markPrice": 0.60839985,
+        "marketValue": 0.24335994,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "TLMUSDC",
+        "qty": 65,
+        "cost": 0.13134643,
+        "markPrice": 0.00202071,
+        "marketValue": 0.13134643,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "WLDUSDC",
+        "qty": 0.3,
+        "cost": 0.12414057,
+        "markPrice": 0.41380192,
+        "marketValue": 0.12414057,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "VANRYUSDC",
+        "qty": 13,
+        "cost": 0.08180909,
+        "markPrice": 0.00629301,
+        "marketValue": 0.08180909,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "KITEUSDC",
+        "qty": 0.6,
+        "cost": 0.08047704,
+        "markPrice": 0.1341284,
+        "marketValue": 0.08047704,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "UNIUSDC",
+        "qty": 0.02,
+        "cost": 0.0760722,
+        "markPrice": 3.80361,
+        "marketValue": 0.0760722,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "SXTUSDC",
+        "qty": 7,
+        "cost": 0.06663324,
+        "markPrice": 0.00951903,
+        "marketValue": 0.06663324,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "APEUSDC",
+        "qty": 0.41,
+        "cost": 0.06656518,
+        "markPrice": 0.1623541,
+        "marketValue": 0.06656518,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "PEPEUSDC",
+        "qty": 5375,
+        "cost": 0.0151181,
+        "markPrice": 0.00000281,
+        "marketValue": 0.0151181,
+        "unrealizedPnl": 0
+      }
+    ]
+  },
+  "candidate": {
+    "realizedPnl": -22.06830733,
+    "fees": 1.35409845,
+    "unrealizedPnl": -0.78817866,
+    "markToMarketPnl": -22.85648599,
+    "endingExposureCost": 141.32401552,
+    "endingMarketValue": 140.53583686,
+    "filledOrders": 31,
+    "sellOrdersRequested": 15,
+    "sellOrdersExecuted": 15,
+    "sellOrdersSkippedNoInventory": 0,
+    "clippedSellQty": 390,
+    "suppressedEntries": 4,
+    "suppressedNotional": 183.8927,
+    "suppressedFees": 0.17469808,
+    "suppressed": [
+      {
+        "id": "41451354",
+        "ts": "2026-07-14T03:22:42.866Z",
+        "symbol": "ALLOUSDC",
+        "regime": "NEUTRAL",
+        "strategy": "TREND",
+        "notional": 69.02904,
+        "feeHome": 0.06557759
+      },
+      {
+        "id": "41452251",
+        "ts": "2026-07-14T03:25:57.818Z",
+        "symbol": "ALLOUSDC",
+        "regime": "NEUTRAL",
+        "strategy": "TREND",
+        "notional": 22.9635,
+        "feeHome": 0.02181533
+      },
+      {
+        "id": "317773183",
+        "ts": "2026-07-14T06:11:11.968Z",
+        "symbol": "ZECUSDC",
+        "regime": "NEUTRAL",
+        "strategy": "TREND",
+        "notional": 68.5179,
+        "feeHome": 0.06509201
+      },
+      {
+        "id": "317786612",
+        "ts": "2026-07-14T06:30:35.529Z",
+        "symbol": "ZECUSDC",
+        "regime": "NEUTRAL",
+        "strategy": "TREND",
+        "notional": 23.38226,
+        "feeHome": 0.02221315
+      }
+    ],
+    "positions": [
+      {
+        "symbol": "ZECUSDC",
+        "qty": 0.271,
+        "cost": 137.75428866,
+        "markPrice": 505.41,
+        "marketValue": 136.96611,
+        "unrealizedPnl": -0.78817866
+      },
+      {
+        "symbol": "ARBUSDC",
+        "qty": 15.8,
+        "cost": 1.54899065,
+        "markPrice": 0.09803738,
+        "marketValue": 1.54899065,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "AAVEUSDC",
+        "qty": 0.005,
+        "cost": 0.49353468,
+        "markPrice": 98.706936,
+        "marketValue": 0.49353468,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "PUMPUSDC",
+        "qty": 264,
+        "cost": 0.39585013,
+        "markPrice": 0.00149943,
+        "marketValue": 0.39585013,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "SENTUSDC",
+        "qty": 15,
+        "cost": 0.24582961,
+        "markPrice": 0.01638864,
+        "marketValue": 0.24582961,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "VIRTUALUSDC",
+        "qty": 0.4,
+        "cost": 0.24335994,
+        "markPrice": 0.60839985,
+        "marketValue": 0.24335994,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "TLMUSDC",
+        "qty": 65,
+        "cost": 0.13134643,
+        "markPrice": 0.00202071,
+        "marketValue": 0.13134643,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "WLDUSDC",
+        "qty": 0.3,
+        "cost": 0.12414057,
+        "markPrice": 0.41380192,
+        "marketValue": 0.12414057,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "VANRYUSDC",
+        "qty": 13,
+        "cost": 0.08180909,
+        "markPrice": 0.00629301,
+        "marketValue": 0.08180909,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "KITEUSDC",
+        "qty": 0.6,
+        "cost": 0.08047704,
+        "markPrice": 0.1341284,
+        "marketValue": 0.08047704,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "UNIUSDC",
+        "qty": 0.02,
+        "cost": 0.0760722,
+        "markPrice": 3.80361,
+        "marketValue": 0.0760722,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "SXTUSDC",
+        "qty": 7,
+        "cost": 0.06663324,
+        "markPrice": 0.00951903,
+        "marketValue": 0.06663324,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "APEUSDC",
+        "qty": 0.41,
+        "cost": 0.06656518,
+        "markPrice": 0.1623541,
+        "marketValue": 0.06656518,
+        "unrealizedPnl": 0
+      },
+      {
+        "symbol": "PEPEUSDC",
+        "qty": 5375,
+        "cost": 0.0151181,
+        "markPrice": 0.00000281,
+        "marketValue": 0.0151181,
+        "unrealizedPnl": 0
+      }
+    ]
+  },
+  "deltas": {
+    "markToMarketPnl": 5.7429888,
+    "realizedPnl": 5.21602924,
+    "fees": -0.257027,
+    "endingExposureCost": -92.27167956,
+    "filledOrders": -4
+  }
+}

@@ -1,40 +1,26 @@
 # PRODUCTION_DELTA_NOTE
 
-Last updated: 2026-07-03 09:17 UTC
+Last updated: 2026-07-14 08:24 UTC
 Owner: PM/BA + Codex
 
-## How this batch moves the bot closer to production
-The July 3 bundle is post-patch validation plus operational review, not production proof:
+## Production movement
+The July 14 bundle is not production proof. It does move validation forward because the loss mechanism is now reproduced at filled-order level instead of inferred from aggregate skip counts.
 
-- the deployed commit is `18b6ce2`.
-- daily net improved again to `-2.68 USDT`.
-- realized-after-fees improved to `-26.86 USDT`, but remains negative.
-- fees improved to `9.08 USDC`.
-- filled orders improved to `181`.
-- entry trades stayed low at `5`, far below July 1 `22`.
-- rejected orders and restarts stayed `0`.
+- Deployed commit: `e4c9e54`
+- Strategy verdict: `NOT_BETA_READY`
+- Safety: clean (`0` rejects, `0` errors, `0` restarts)
+- Confirmed candidate: `entry_burst_guard_v1`, implemented for bounded testnet validation under PM/BA override
+- Counterfactual result: mark-to-market `+5.74 USDC`, fees `-0.26 USDC`, ending exposure `-92.27 USDC`, sells preserved `15/15`
 
-This moves production readiness forward because the July 1 risk-governor patch still appears to be reducing fresh-entry churn. It also exposed an operational blocker: Binance testnet returned repeated `502 Bad Gateway` responses on `openOrders`, and the bot entered exchange/order-sync backoff instead of continuing to trade blindly.
+## Remaining blocker
+- Realized-after-fees is `-72.46 USDT`; five-window net is `-119.63 USDT`.
+- Allocation is `5.09%`, concentrated in ZEC.
+- The runtime patch needs one clean post-deploy bundle proving entry caps and SELL/reduce reachability.
+- Release/rollback proof and a non-`NOT_BETA_READY` strategy verdict are still required before real-money beta.
 
-## What is still missing before the next gate
-- realized-after-fees is still negative at `-26.86 USDT`.
-- five-window net is still negative at `-99.58 USDT`.
-- exposure is still near the risk cap at `5.09%`, mostly `ETHUSDC`.
-- order-sync backoff must clear in a follow-up bundle.
-- health errors must return to `0`.
-- strategy-effectiveness report must move beyond `NOT_BETA_READY`, or PM/BA must explicitly accept the residual negative expectancy risk.
-- release/rollback runbook proof is still required before any real-money beta promotion.
-
-## What this batch added to reduce process waste
-- recorded the July 3 evidence as `PATCH_ALLOWED_REVIEW`, not automatic trading-code patch work.
-- avoided writing a strategy/risk-budget patch from exchange 502 noise.
-- corrected validation plumbing so `PATCH_ALLOWED_REVIEW` can complete the T-040 gate.
-- corrected auto-retro wording so it names the actual exchange/order-sync backoff reason.
-- converted the next check into a bounded watch: order-sync recovery, health errors, entry count, fees, after-fee result, ETH concentration, and SELL/reduce reachability.
-
-## Whether this batch improves execution, risk, validation, event awareness, or learning
-- Execution: `operational_review_required`
-- Risk: `watch_eth_concentration`
-- Validation: `yes`
+## Capability status
+- Execution: `clean_but_entry_burst_observed`
+- Risk: `watch_zec_concentration`
+- Validation: `entry_burst_offline_proof_confirmed_twice_and_runtime_test_passed`
 - Event awareness: `no`
-- Learning: `indirect`
+- Learning: `deterministic_counterfactual`

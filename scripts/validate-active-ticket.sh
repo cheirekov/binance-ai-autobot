@@ -64,9 +64,11 @@ case "$ACTIVE_TICKET" in
     node --check scripts/t026-strategy-replay.js
     node --check scripts/t026-fixture-comparison.js
     node --check scripts/t026-grid-guard-proof.js
+    node --check scripts/t026-entry-burst-proof.js
     node --check scripts/t026-proof-comparison.js
     node --check scripts/t026-risk-governor-proof.js
     node --check scripts/t040-strategy-effectiveness-report.js
+    node --test scripts/t026-entry-burst-proof.test.js
     set +e
     T040_OUTPUT="$(node scripts/t040-readiness-check.js 2>&1)"
     T040_STATUS=$?
@@ -85,6 +87,12 @@ case "$ACTIVE_TICKET" in
     T026_GRID_GUARD_OUTPUT="$(node scripts/t026-grid-guard-proof.js)"
     printf '%s\n' "$T026_GRID_GUARD_OUTPUT"
     T026_GRID_GUARD_VERDICT="$(printf '%s\n' "$T026_GRID_GUARD_OUTPUT" | sed -n 's/^T-026 grid guard proof verdict: //p' | head -n1)"
+    T026_ENTRY_BURST_OUTPUT="$(node scripts/t026-entry-burst-proof.js)"
+    printf '%s\n' "$T026_ENTRY_BURST_OUTPUT"
+    T026_ENTRY_BURST_VERDICT="$(printf '%s\n' "$T026_ENTRY_BURST_OUTPUT" | sed -n 's/^T-026 entry burst proof verdict: //p' | head -n1)"
+    T026_ENTRY_BURST_INDEPENDENT_OUTPUT="$(node scripts/t026-entry-burst-proof.js --previous autobot-feedback-20260604-082337.tgz --current autobot-feedback-20260605-075150.tgz)"
+    printf '%s\n' "$T026_ENTRY_BURST_INDEPENDENT_OUTPUT"
+    T026_ENTRY_BURST_INDEPENDENT_VERDICT="$(printf '%s\n' "$T026_ENTRY_BURST_INDEPENDENT_OUTPUT" | sed -n 's/^T-026 entry burst proof verdict: //p' | head -n1)"
     T026_RISK_GOVERNOR_OUTPUT="$(node scripts/t026-risk-governor-proof.js)"
     printf '%s\n' "$T026_RISK_GOVERNOR_OUTPUT"
     T026_RISK_GOVERNOR_VERDICT="$(printf '%s\n' "$T026_RISK_GOVERNOR_OUTPUT" | sed -n 's/^T-026 risk governor proof verdict: //p' | head -n1)"
@@ -96,7 +104,7 @@ case "$ACTIVE_TICKET" in
     T040_EFFECTIVENESS_VERDICT="$(printf '%s\n' "$T040_EFFECTIVENESS_OUTPUT" | sed -n 's/^T-040 strategy effectiveness verdict: //p' | head -n1)"
     ./scripts/pmba-gate.sh start
     ./scripts/pmba-gate.sh end
-    export T040_CLASSIFICATION T026_RECOMMENDATION T026_FIXTURE_VERDICT T026_GRID_GUARD_VERDICT T026_RISK_GOVERNOR_VERDICT T026_PROOF_COMPARISON_VERDICT T040_EFFECTIVENESS_VERDICT
+    export T040_CLASSIFICATION T026_RECOMMENDATION T026_FIXTURE_VERDICT T026_GRID_GUARD_VERDICT T026_ENTRY_BURST_VERDICT T026_ENTRY_BURST_INDEPENDENT_VERDICT T026_RISK_GOVERNOR_VERDICT T026_PROOF_COMPARISON_VERDICT T040_EFFECTIVENESS_VERDICT
     node <<'NODE'
 const fs = require('fs');
 const { execFileSync } = require('child_process');
@@ -131,6 +139,8 @@ const t040Classification = process.env.T040_CLASSIFICATION ?? '';
 const t026Recommendation = process.env.T026_RECOMMENDATION ?? '';
 const t026FixtureVerdict = process.env.T026_FIXTURE_VERDICT ?? '';
 const t026GridGuardVerdict = process.env.T026_GRID_GUARD_VERDICT ?? '';
+const t026EntryBurstVerdict = process.env.T026_ENTRY_BURST_VERDICT ?? '';
+const t026EntryBurstIndependentVerdict = process.env.T026_ENTRY_BURST_INDEPENDENT_VERDICT ?? '';
 const t026RiskGovernorVerdict = process.env.T026_RISK_GOVERNOR_VERDICT ?? '';
 const t026ProofComparisonVerdict = process.env.T026_PROOF_COMPARISON_VERDICT ?? '';
 const t040EffectivenessVerdict = process.env.T040_EFFECTIVENESS_VERDICT ?? '';
@@ -182,10 +192,16 @@ if (!/^(FIXTURE_CANDIDATE_[A-Z0-9_]+|NO_FIXTURE_CANDIDATE)$/.test(t026FixtureVer
 if (!/^(GRID_GUARD_OFFLINE_PROOF_TARGET_READY|GRID_GUARD_PROOF_BLOCKED_[A-Z_]+|GRID_GUARD_PROOF_INSUFFICIENT_[A-Z_]+)$/.test(t026GridGuardVerdict)) {
   fail(`unexpected T-026 grid guard proof verdict ${t026GridGuardVerdict || 'empty'}`);
 }
+if (!/^ENTRY_BURST_GUARD_OFFLINE_PROOF_(PASSED|INCONCLUSIVE)$/.test(t026EntryBurstVerdict)) {
+  fail(`unexpected T-026 entry burst proof verdict ${t026EntryBurstVerdict || 'empty'}`);
+}
+if (t026EntryBurstIndependentVerdict !== 'ENTRY_BURST_GUARD_OFFLINE_PROOF_PASSED') {
+  fail(`expected independent entry burst proof to pass, found ${t026EntryBurstIndependentVerdict || 'empty'}`);
+}
 if (!/^(RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY|RISK_GOVERNOR_PROOF_BLOCKED_[A-Z_]+|RISK_GOVERNOR_PROOF_INSUFFICIENT_[A-Z_]+|RISK_GOVERNOR_PROOF_SECONDARY_ONLY)$/.test(t026RiskGovernorVerdict)) {
   fail(`unexpected T-026 risk governor proof verdict ${t026RiskGovernorVerdict || 'empty'}`);
 }
-if (!/^OFFLINE_PROOF_COMPARE_(GRID_PRIMARY|GRID_PRIMARY_RISK_FALLBACK|RISK_GOVERNOR_PRIMARY|RISK_PRIMARY_GRID_FALLBACK|BLOCKED)$/.test(t026ProofComparisonVerdict)) {
+if (!/^OFFLINE_PROOF_COMPARE_(ENTRY_BURST_CONFIRMED|ENTRY_BURST_PRIMARY|GRID_PRIMARY|GRID_PRIMARY_RISK_FALLBACK|RISK_GOVERNOR_PRIMARY|RISK_PRIMARY_GRID_FALLBACK|BLOCKED)$/.test(t026ProofComparisonVerdict)) {
   fail(`unexpected T-026 proof comparison verdict ${t026ProofComparisonVerdict || 'empty'}`);
 }
 if (t040Classification === 'VALIDATION_REQUIRED') {
@@ -194,6 +210,7 @@ if (t040Classification === 'VALIDATION_REQUIRED') {
   if (!/Beta posture: pause promotion/.test(packet)) fail('beta packet does not pause beta promotion');
   if (!/T-026 fixture comparison/.test(validationMap)) fail('validation map is missing T-026 fixture comparison');
   if (!/T-026 grid guard proof/.test(validationMap)) fail('validation map is missing T-026 grid guard proof');
+  if (!/T-026 entry burst proof/.test(validationMap)) fail('validation map is missing T-026 entry burst proof');
   if (!/T-026 proof comparison/.test(validationMap)) fail('validation map is missing T-026 proof comparison');
   if (!/T-026 risk governor proof/.test(validationMap)) fail('validation map is missing T-026 risk governor proof');
   if (t026Recommendation !== 'BUILD_BEAR_CHOPPY_FIXTURE') {

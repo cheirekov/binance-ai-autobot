@@ -6,6 +6,8 @@ const ROOT_DIR = path.resolve(__dirname, "..");
 const DEFAULT_FIXTURE_COMPARISON_PATH = "docs/easy_process/reports/t026-fixture-comparison.json";
 const DEFAULT_GRID_PROOF_PATH = "docs/easy_process/reports/t026-grid-guard-proof.json";
 const DEFAULT_RISK_PROOF_PATH = "docs/easy_process/reports/t026-risk-governor-proof.json";
+const DEFAULT_ENTRY_BURST_PROOF_PATH = "docs/easy_process/reports/t026-entry-burst-proof.json";
+const DEFAULT_ENTRY_BURST_INDEPENDENT_PROOF_PATH = "docs/easy_process/reports/t026-entry-burst-proof-independent.json";
 const DEFAULT_REPORT_PATH = "docs/easy_process/reports/t026-proof-comparison.json";
 
 const asNumber = (value, fallback = 0) => {
@@ -22,6 +24,8 @@ const parseArgs = (argv) => {
     fixtureComparisonPath: DEFAULT_FIXTURE_COMPARISON_PATH,
     gridProofPath: DEFAULT_GRID_PROOF_PATH,
     riskProofPath: DEFAULT_RISK_PROOF_PATH,
+    entryBurstProofPath: DEFAULT_ENTRY_BURST_PROOF_PATH,
+    entryBurstIndependentProofPath: DEFAULT_ENTRY_BURST_INDEPENDENT_PROOF_PATH,
     reportPath: DEFAULT_REPORT_PATH,
     writeReport: false,
     json: false,
@@ -41,6 +45,12 @@ const parseArgs = (argv) => {
       index += 1;
     } else if (arg === "--risk-proof" && next) {
       options.riskProofPath = next;
+      index += 1;
+    } else if (arg === "--entry-burst-proof" && next) {
+      options.entryBurstProofPath = next;
+      index += 1;
+    } else if (arg === "--entry-burst-independent-proof" && next) {
+      options.entryBurstIndependentProofPath = next;
       index += 1;
     } else if (arg === "--write-report") {
       options.writeReport = true;
@@ -68,7 +78,7 @@ const findCandidate = (comparison, family) =>
 
 const isReady = (report, prefix) => report?.verdict === `${prefix}_OFFLINE_PROOF_TARGET_READY`;
 
-const buildComparison = ({ fixtureComparison, gridProof, riskProof, fallbackScoreGap = 10 }) => {
+const buildComparison = ({ fixtureComparison, gridProof, riskProof, entryBurstProof, entryBurstIndependentProof, fallbackScoreGap = 10 }) => {
   const gridCandidate = findCandidate(fixtureComparison, "grid_guard_v2");
   const riskCandidate = findCandidate(fixtureComparison, "risk_governor_hysteresis");
   const gridScore = asNumber(gridCandidate?.score, 0);
@@ -76,6 +86,9 @@ const buildComparison = ({ fixtureComparison, gridProof, riskProof, fallbackScor
   const scoreGap = Math.abs(gridScore - riskScore);
   const gridReady = isReady(gridProof, "GRID_GUARD");
   const riskReady = isReady(riskProof, "RISK_GOVERNOR");
+  const entryBurstPassed = entryBurstProof?.verdict === "ENTRY_BURST_GUARD_OFFLINE_PROOF_PASSED";
+  const entryBurstIndependentPassed = entryBurstIndependentProof?.verdict === "ENTRY_BURST_GUARD_OFFLINE_PROOF_PASSED";
+  const entryBurstConfirmed = entryBurstPassed && entryBurstIndependentPassed;
   const highExposureWindows = asNumber(fixtureComparison?.aggregate?.highExposureWindows, 0);
   const negativeAfterFeesWindows = asNumber(fixtureComparison?.aggregate?.negativeAfterFeesWindows, 0);
 
@@ -84,7 +97,15 @@ const buildComparison = ({ fixtureComparison, gridProof, riskProof, fallbackScor
   let secondary = "none";
   const reasons = [];
 
-  if (gridReady && gridScore >= riskScore) {
+  if (entryBurstConfirmed) {
+    primary = "entry_burst_guard_v1";
+    verdict = "OFFLINE_PROOF_COMPARE_ENTRY_BURST_CONFIRMED";
+    reasons.push("two independent bundle-delta replays pass counterfactual acceptance and exposure-fidelity checks");
+  } else if (entryBurstPassed) {
+    primary = "entry_burst_guard_v1";
+    verdict = "OFFLINE_PROOF_COMPARE_ENTRY_BURST_PRIMARY";
+    reasons.push("bundle-delta replay directly reproduces repeated neutral MARKET entries and passes its counterfactual acceptance checks");
+  } else if (gridReady && gridScore >= riskScore) {
     primary = "grid_guard_v2";
     verdict = "OFFLINE_PROOF_COMPARE_GRID_PRIMARY";
     reasons.push("fixture comparison ranks grid_guard_v2 first");
@@ -96,11 +117,11 @@ const buildComparison = ({ fixtureComparison, gridProof, riskProof, fallbackScor
 
   const keepRiskFallback = riskReady && (
     primary !== "risk_governor_hysteresis" &&
-    (scoreGap <= fallbackScoreGap || highExposureWindows >= 2 || negativeAfterFeesWindows >= 5)
+    (entryBurstPassed || scoreGap <= fallbackScoreGap || highExposureWindows >= 2 || negativeAfterFeesWindows >= 5)
   );
   if (keepRiskFallback) {
     secondary = "risk_governor_hysteresis";
-    verdict = "OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK";
+    if (!entryBurstPassed) verdict = "OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK";
     reasons.push("risk governor stays active due close score, exposure, or persistent after-fee losses");
   }
 
@@ -111,16 +132,21 @@ const buildComparison = ({ fixtureComparison, gridProof, riskProof, fallbackScor
     reasons.push("grid guard remains available as a secondary ready proof target");
   }
 
-  if (!gridReady && !riskReady) {
+  if (!entryBurstPassed && !gridReady && !riskReady) {
     reasons.push("no proof target is ready");
   }
 
   return {
     schema_version: 1,
     fixture: fixtureComparison.fixture,
-    source_bundles: fixtureComparison.source_bundles,
+    source_bundles: [...new Set([
+      ...(entryBurstProof?.source_bundles ?? []),
+      ...(entryBurstIndependentProof?.source_bundles ?? []),
+      ...(fixtureComparison.source_bundles ?? [])
+    ])],
     verdict,
-    runtime_patch_allowed: false,
+    runtime_patch_allowed: entryBurstConfirmed,
+    approval_scope: entryBurstConfirmed ? "delegated PM/BA override; bounded testnet entry-burst implementation only" : "none",
     primary,
     secondary,
     reasons,
@@ -130,6 +156,8 @@ const buildComparison = ({ fixtureComparison, gridProof, riskProof, fallbackScor
       gap: scoreGap
     },
     proof_verdicts: {
+      entry_burst_guard_v1: entryBurstProof?.verdict ?? "MISSING",
+      entry_burst_guard_v1_independent: entryBurstIndependentProof?.verdict ?? "MISSING",
       grid_guard_v2: gridProof.verdict,
       risk_governor_hysteresis: riskProof.verdict
     },
@@ -141,7 +169,11 @@ const buildComparison = ({ fixtureComparison, gridProof, riskProof, fallbackScor
       negativeAfterFeesWindows,
       highExposureWindows
     },
-    next_action: "build focused offline proof for the primary target; keep secondary active only as fallback until the primary proof fails acceptance"
+    next_action: entryBurstConfirmed
+      ? "bounded testnet implementation approved; deploy without state reset and validate cap activation plus SELL/reduce reachability"
+      : entryBurstPassed
+        ? "validate entry_burst_guard_v1 across another independent bundle delta; runtime behavior remains unchanged without PM/BA override or P0/P1 severity"
+      : "build focused offline proof for the primary target; keep secondary active only as fallback until the primary proof fails acceptance"
   };
 };
 
@@ -150,6 +182,8 @@ const printReport = (report) => {
   console.log(`- primary=${report.primary}; secondary=${report.secondary}; runtimePatchAllowed=${report.runtime_patch_allowed ? "yes" : "no"}`);
   console.log(`- scores=grid_guard_v2=${report.scores.grid_guard_v2}; risk_governor_hysteresis=${report.scores.risk_governor_hysteresis}; gap=${report.scores.gap}`);
   console.log(`- proofs=grid_guard_v2=${report.proof_verdicts.grid_guard_v2}; risk_governor_hysteresis=${report.proof_verdicts.risk_governor_hysteresis}`);
+  console.log(`- entryBurstProof=${report.proof_verdicts.entry_burst_guard_v1}`);
+  console.log(`- entryBurstIndependentProof=${report.proof_verdicts.entry_burst_guard_v1_independent}`);
   console.log(`- nextAction=${report.next_action}`);
 };
 
@@ -159,6 +193,8 @@ const main = () => {
     fixtureComparison: readJson(options.fixtureComparisonPath),
     gridProof: readJson(options.gridProofPath),
     riskProof: readJson(options.riskProofPath),
+    entryBurstProof: readJson(options.entryBurstProofPath),
+    entryBurstIndependentProof: readJson(options.entryBurstIndependentProofPath),
     fallbackScoreGap: options.fallbackScoreGap
   });
 

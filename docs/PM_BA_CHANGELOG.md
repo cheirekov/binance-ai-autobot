@@ -16,6 +16,27 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-07-14 08:24 UTC — T-040 deterministic entry-burst proof
+- Scope:
+  - classify `autobot-feedback-20260714-075300.tgz` and continue the pending deterministic strategy proof.
+  - replace the aggregate GRID hypothesis with event-level filled-order evidence.
+- BA requirement mapping:
+  - strategy effectiveness remains `NOT_BETA_READY`: daily net `-31.07 USDT`, five-window net `-119.63 USDT`, realized-after-fees `-72.46 USDT`.
+  - execution safety remains clean: `0` rejects, `0` health errors, `0` restarts.
+  - ALLO and ZEC each received four neutral MARKET entries; ZEC ended near `229.74 USDC` open cost.
+- Technical changes:
+  - added `scripts/t026-entry-burst-proof.js` to replay the July 13→14 filled-order delta with a neutral/range two-entry cap.
+  - added focused unit tests and integrated the proof into `scripts/validate-active-ticket.sh` and `scripts/t026-proof-comparison.js`.
+  - confirmed the candidate on the independent June 4→5 delta.
+  - added the runtime guard after exit handling: risk `70-100` allows two consecutive neutral/range MARKET entries; lower risk allows one; filled SELL resets; GRID limit buys do not count.
+- Validation evidence:
+  - proof verdict `ENTRY_BURST_GUARD_OFFLINE_PROOF_PASSED`.
+  - counterfactual delta: mark-to-market `+5.74 USDC`, realized `+5.22 USDC`, fees `-0.26 USDC`, ending exposure `-92.27 USDC`, fills `-4`, sells preserved `15/15`.
+- Risk slider impact:
+  - none; runtime configuration remains unchanged.
+- Follow-up:
+  - deploy to testnet without state reset and validate cap activation, SELL/reduce reachability, fees, exposure, and health.
+
 ## 2026-07-13 09:04 UTC — T-040 validation routing: latest clean safety, offline strategy proof
 - Scope:
   - classify `autobot-feedback-20260713-085946.tgz` after the remote testnet run on commit `e4c9e54`.

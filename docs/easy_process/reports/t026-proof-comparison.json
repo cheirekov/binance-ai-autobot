@@ -2,18 +2,23 @@
   "schema_version": 1,
   "fixture": "bear_choppy_controlled_drawdown",
   "source_bundles": [
+    "autobot-feedback-20260713-085946.tgz",
+    "autobot-feedback-20260714-075300.tgz",
+    "autobot-feedback-20260604-082337.tgz",
+    "autobot-feedback-20260605-075150.tgz",
     "autobot-feedback-20260618-090049.tgz",
     "autobot-feedback-20260617-093804.tgz",
     "autobot-feedback-20260616-152318.tgz",
     "autobot-feedback-20260615-065149.tgz",
     "autobot-feedback-20260612-063453.tgz"
   ],
-  "verdict": "OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK",
-  "runtime_patch_allowed": false,
-  "primary": "grid_guard_v2",
+  "verdict": "OFFLINE_PROOF_COMPARE_ENTRY_BURST_CONFIRMED",
+  "runtime_patch_allowed": true,
+  "approval_scope": "delegated PM/BA override; bounded testnet entry-burst implementation only",
+  "primary": "entry_burst_guard_v1",
   "secondary": "risk_governor_hysteresis",
   "reasons": [
-    "fixture comparison ranks grid_guard_v2 first",
+    "two independent bundle-delta replays pass counterfactual acceptance and exposure-fidelity checks",
     "risk governor stays active due close score, exposure, or persistent after-fee losses"
   ],
   "scores": {
@@ -22,6 +27,8 @@
     "gap": 4
   },
   "proof_verdicts": {
+    "entry_burst_guard_v1": "ENTRY_BURST_GUARD_OFFLINE_PROOF_PASSED",
+    "entry_burst_guard_v1_independent": "ENTRY_BURST_GUARD_OFFLINE_PROOF_PASSED",
     "grid_guard_v2": "GRID_GUARD_OFFLINE_PROOF_TARGET_READY",
     "risk_governor_hysteresis": "RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY"
   },
@@ -33,5 +40,5 @@
     "negativeAfterFeesWindows": 5,
     "highExposureWindows": 2
   },
-  "next_action": "build focused offline proof for the primary target; keep secondary active only as fallback until the primary proof fails acceptance"
+  "next_action": "bounded testnet implementation approved; deploy without state reset and validate cap activation plus SELL/reduce reachability"
 }

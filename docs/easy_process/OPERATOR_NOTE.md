@@ -1,44 +1,24 @@
 # OPERATOR_NOTE
 
-Last updated: 2026-07-13 09:04 UTC
+Last updated: 2026-07-14 08:24 UTC
 Owner: PM/BA + Codex
 
-## What to run next
-- keep the bot on testnet/paper mode.
-- do not reset the data folder.
-- do not redeploy trading behavior for this bundle.
-- collect the next normal bundle.
-- after the next bundle, run `./scripts/validate-active-ticket.sh`.
-- run `node scripts/t040-strategy-effectiveness-report.js` after the next bundle for the plain strategy verdict.
+## Operator action
+- Keep the bot on testnet/paper mode.
+- Do not reset the data folder.
+- Deploy this patch to the testnet trading service without resetting state.
+- Collect the next normal bundle after deployment.
 
-## What the July 13 bundle showed
-- deployed commit: `e4c9e54`.
-- daily net worsened to `-25.68 USDT` from July 3 `-2.68 USDT`.
-- realized-after-fees worsened to `-53.11 USDT` from July 3 `-26.86 USDT`.
-- five-window net is still negative at `-85.49 USDT`.
-- filled orders fell to `173` from July 3 `181`.
-- fees fell to `8.75 USDC` from July 3 `9.08 USDC`.
-- fresh entries were `6`, still far below July 1 `22`.
-- exposure reduced to `3.10%`, now mostly `PUMPUSDC`.
-- rejects, restarts, and health errors stayed `0`.
-- exchange/order-sync backoff from July 3 is absent in the latest top reasons.
-- active orders ended at `1`.
+## July 14 result
+- Daily net `-31.07 USDT`; realized-after-fees `-72.46 USDT`; five-window net `-119.63 USDT`.
+- Filled orders `169`; fees `8.31 USDC`; allocation `5.09%`.
+- ZEC open cost `229.74 USDC` after four neutral MARKET entries.
+- Rejects, health errors, and restarts stayed `0`.
 
-## What changed in code
-- no trading behavior changed after this bundle.
-- `scripts/t026-calibration-runner.js` now treats old safety windows as history unless the latest bundle has a safety failure or repeated recent rejects.
-- `scripts/validate-active-ticket.sh` now allows deterministic validation helper changes to satisfy the no-docs-only guard.
+## Engineering result
+- Added `scripts/t026-entry-burst-proof.js`, a second independent replay, and focused unit tests.
+- Actual July 13→14 replay: `+5.74 USDC` mark-to-market delta, `-0.26 USDC` fees, `-92.27 USDC` ending exposure, and `15/15` sell events preserved.
+- Runtime behavior now caps neutral/range MARKET entry bursts at two consecutive fills for risk `70-100` and one for lower risk; a filled SELL resets the cap. GRID limit buys do not count.
 
-## What to watch in the next bundle
-- rejects, health errors, and restarts must remain `0`.
-- fresh entries should stay near July 13 `6` or July 3 `5`, not return to July 1 `22`.
-- filled orders and fees should fall further.
-- realized-after-fees should improve from `-53.11 USDT`.
-- PUMP exposure must not keep growing above the risk cap.
-- SELL/reduce must remain reachable.
-
-## What not to do next
-- do not promote to real-money beta yet.
-- do not reset state before measuring PUMP exposure and strategy-proof impact.
-- do not weaken risk guards to make the bot trade more.
-- do not write a new runtime strategy patch until offline proof identifies the change and preserves SELL/reduce.
+## Next check
+After deployment, verify the cap blocks the third neutral/range MARKET entry, does not block SELL/reduce, and does not increase rejects or health errors. Real-money beta remains blocked.

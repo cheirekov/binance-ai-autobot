@@ -2690,6 +2690,39 @@ export class BotEngineService implements OnModuleInit {
     return null;
   }
 
+  private getAdaptiveMarketEntryBurstGuard(params: {
+    symbol: string;
+    state: BotState;
+    regime: AdaptiveRegimeSnapshot;
+    risk: number;
+  }): { summary: string; details: Record<string, unknown> } | null {
+    if (params.regime.label !== "NEUTRAL" && params.regime.label !== "RANGE") return null;
+
+    const boundedRisk = Math.max(0, Math.min(100, Number.isFinite(params.risk) ? params.risk : 50));
+    const maxConsecutiveMarketEntries = boundedRisk >= 70 ? 2 : 1;
+    let consecutiveMarketEntries = 0;
+
+    for (const order of this.getRecentSymbolOrders(params.state, params.symbol)) {
+      if (order.status !== "FILLED") continue;
+      if (order.side === "SELL") break;
+      if (order.side === "BUY" && order.type.trim().toUpperCase() === "MARKET") {
+        consecutiveMarketEntries += 1;
+      }
+    }
+
+    if (consecutiveMarketEntries < maxConsecutiveMarketEntries) return null;
+    return {
+      summary: `Adaptive ${params.regime.label.toLowerCase()} entry burst cap reached (${maxConsecutiveMarketEntries})`,
+      details: {
+        category: "ADAPTIVE_MARKET_ENTRY_BURST",
+        regime: params.regime,
+        risk: boundedRisk,
+        consecutiveMarketEntries,
+        maxConsecutiveMarketEntries
+      }
+    };
+  }
+
   private getManagedPositions(state: BotState): Map<string, ManagedPosition> {
     const positions = new Map<string, ManagedPosition>();
     const filledOrders = [...state.orderHistory]
@@ -10120,6 +10153,37 @@ export class BotEngineService implements OnModuleInit {
               }
             });
             this.save(nextWithCooldown);
+            return;
+          }
+
+          const adaptiveEntryBurstGuard = this.getAdaptiveMarketEntryBurstGuard({
+            symbol: candidateSymbol,
+            state: current,
+            regime: selectedRegime,
+            risk
+          });
+          if (adaptiveEntryBurstGuard) {
+            const summary = `Skip ${candidateSymbol}: ${adaptiveEntryBurstGuard.summary}`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: adaptiveEntryBurstGuard.details
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            this.save(next);
             return;
           }
 

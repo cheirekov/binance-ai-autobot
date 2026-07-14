@@ -2825,6 +2825,75 @@ describe("bot-engine insufficient-balance helpers", () => {
     expect(otherSymbol).toBeNull();
   });
 
+  it("caps repeated neutral market entries without counting grid buys and resets after a sell", () => {
+    const helpers = service as unknown as {
+      getAdaptiveMarketEntryBurstGuard: (params: {
+        symbol: string;
+        state: BotState;
+        regime: { label: "NEUTRAL" | "RANGE" | "BULL_TREND"; confidence: number; inputs: Record<string, unknown> };
+        risk: number;
+      }) => { summary: string; details: Record<string, unknown> } | null;
+    };
+    const now = Date.now();
+    const marketBuy = (id: string, ageMs: number): Order => ({
+      id,
+      ts: new Date(now - ageMs).toISOString(),
+      symbol: "ZECUSDC",
+      side: "BUY",
+      type: "MARKET",
+      status: "FILLED",
+      qty: 0.1,
+      price: 500
+    });
+    const gridBuy: Order = {
+      ...marketBuy("grid", 30_000),
+      type: "LIMIT"
+    };
+    const neutral = { label: "NEUTRAL" as const, confidence: 0.4, inputs: {} };
+    const bull = { label: "BULL_TREND" as const, confidence: 0.9, inputs: {} };
+    const burstState: BotState = {
+      ...defaultBotState(),
+      orderHistory: [marketBuy("buy-2", 10_000), gridBuy, marketBuy("buy-1", 40_000)]
+    };
+
+    const guarded = helpers.getAdaptiveMarketEntryBurstGuard({
+      symbol: "ZECUSDC",
+      state: burstState,
+      regime: neutral,
+      risk: 100
+    });
+    expect(guarded?.summary).toBe("Adaptive neutral entry burst cap reached (2)");
+    expect(guarded?.details).toMatchObject({
+      category: "ADAPTIVE_MARKET_ENTRY_BURST",
+      consecutiveMarketEntries: 2,
+      maxConsecutiveMarketEntries: 2
+    });
+    expect(helpers.getAdaptiveMarketEntryBurstGuard({
+      symbol: "ZECUSDC",
+      state: burstState,
+      regime: bull,
+      risk: 100
+    })).toBeNull();
+
+    const resetState: BotState = {
+      ...burstState,
+      orderHistory: [
+        marketBuy("buy-3", 5_000),
+        {
+          ...marketBuy("sell", 8_000),
+          side: "SELL"
+        },
+        ...burstState.orderHistory
+      ]
+    };
+    expect(helpers.getAdaptiveMarketEntryBurstGuard({
+      symbol: "ZECUSDC",
+      state: resetState,
+      regime: neutral,
+      risk: 100
+    })).toBeNull();
+  });
+
   it("activates daily loss guard when realized losses exceed risk-linked threshold", () => {
     const helpers = service as unknown as {
       evaluateDailyLossGuard: (params: {

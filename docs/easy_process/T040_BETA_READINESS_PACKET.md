@@ -1,6 +1,6 @@
 # T040_BETA_READINESS_PACKET
 
-Last updated: 2026-07-13 09:04 UTC
+Last updated: 2026-07-14 08:24 UTC
 Owner: PM/BA + Codex
 
 Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readiness decision.
@@ -9,31 +9,31 @@ Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readin
 
 - Active ticket: `T-040`
 - Decision mode: `VALIDATION_REQUIRED`
-- Runtime code posture: recent fill-performance risk-budget guard is deployed; June 17 patch cancels bot-owned grid BUY ladder orders whenever buys are paused; June 18 patch pauses/cancels GRID BUY legs for fee-negative dust churn; July 1 patch extends risk-governor hysteresis so recent after-fee losses block fresh exposure even in strong-bull `NORMAL` conditions; July 13 changes are validation routing only, not trading behavior
+- Runtime code posture: deployed server remains commit `e4c9e54`; local July 14 patch adds the confirmed neutral/range MARKET entry-burst cap for bounded testnet deployment
 - Production posture: not approved for real-money production promotion
-- Beta posture: pause promotion; build deterministic/offline proof for the primary `grid_guard_v2` candidate before any strategy runtime patch
+- Beta posture: pause promotion; deploy and validate the confirmed `entry_burst_guard_v1` patch on testnet
 - Strategy effectiveness verdict: `NOT_BETA_READY`
 
 ## Latest Evidence
 
-- Bundle: `autobot-feedback-20260713-085946.tgz`
+- Bundle: `autobot-feedback-20260714-075300.tgz`
 - Cycle: `MORNING_REVIEW`
 - Auto-retro decision: `validation_required`
 - Environment: `testnet`
 - Risk state: `NORMAL`
 - Readiness classifier: `VALIDATION_REQUIRED`
-- Daily net: `-25.68 USDT`
-- Five-window net: `-85.49 USDT`
-- Max drawdown: `0.75%`
-- Total allocation: `3.10%`
+- Daily net: `-31.07 USDT`
+- Five-window net: `-119.63 USDT`
+- Max drawdown: `0.93%`
+- Total allocation: `5.09%`
 - Open positions: `13`
-- Orders: `201 submitted`, `173 filled`, `0 rejected`, `27 canceled`
+- Orders: `201 submitted`, `169 filled`, `0 rejected`; fees `8.31 USDC`
 - Sizing reject pressure: `low` (`0` sizing rejects)
 - Runtime health: `0 errors`, `0 restarts`, no exchange/order-sync backoff in latest top reasons
 - AI mode: `OFF`
-- Strategy effectiveness: `NOT_BETA_READY`; five-window net is `-85.49 USDT` and latest realized-after-fees is `-53.11 USDT`.
+- Strategy effectiveness: `NOT_BETA_READY`; five-window net is `-119.63 USDT` and latest realized-after-fees is `-72.46 USDT`.
 - PM/BA interpretation: rule-based adaptation is visible (`GRID`, `MEAN_REVERSION`, and `TREND` recommendations plus defensive/grid/market lanes), but it is not proven profitable. A normal client should not read this as adaptive-profit proof.
-- Post-bundle engineering action: no trading-code patch; corrected T-026/T-040 validation routing so a stale historical exchange-backoff window does not keep the latest clean bundle in `PATCH_ALLOWED_REVIEW`.
+- Post-bundle engineering action: two independent replays passed; PM/BA approved a bounded testnet patch that caps neutral/range MARKET entry bursts while preserving exit handling.
 
 ## Evidence Sequence
 
@@ -59,7 +59,8 @@ Purpose: replace open-ended bundle-to-bundle patching with a bounded beta-readin
 - `2026-07-02`: negative but improved daily window, `-13.65 USDT`, `0` rejects, `0` restarts, allocation rose to `5.10%` mostly in `HBARUSDC`, entry trades fell to `2`, and strategy effectiveness remained negative after fees.
 - `2026-07-03`: near-flat negative window, `-2.68 USDT`, `0` rejects, `0` restarts, `1` health error, allocation `5.09%` mostly in `ETHUSDC`, entry trades `5`, order-sync backoff repeated after Binance testnet `502 Bad Gateway`.
 - `2026-07-13`: negative window, `-25.68 USDT`, `0` rejects, `0` restarts, `0` health errors, allocation reduced to `3.10%`, entry trades `6`, active open exposure mostly `PUMPUSDC`, and strategy effectiveness remained negative after fees.
-- Interpretation: exchange/order-sync health recovered, exposure stayed bounded, and entries stayed far below the July 1 spike; beta promotion stays blocked because after-fee expectancy remains negative.
+- `2026-07-14`: negative window, `-31.07 USDT`, `0` rejects, `0` restarts, `0` health errors, allocation `5.09%`, and repeated neutral MARKET entries concentrated exposure in `ZECUSDC`.
+- Interpretation: execution safety remains clean and the entry-burst candidate is confirmed across two independent windows, but beta promotion stays blocked until the bounded testnet patch proves after-fee and SELL/reduce behavior post-deploy.
 
 ## Operator Job
 
@@ -85,8 +86,8 @@ Runtime behavior patches require:
 | --- | --- | --- | --- |
 | Active-ticket hygiene | exactly one `IN_PROGRESS` ticket and session/retro alignment | `PASS` | keep `T-040` active until readiness packet is complete |
 | Runtime safety invariants | hard exposure, reserve, sell/unwind, PnL, and restart guards have deterministic tests | `PARTIAL` | expand validation map instead of patching strategy from live churn |
-| Execution reliability | repeated exchange rejects, order-sync backoff, and stuck order loops are detectable | `PARTIAL` | July 13 recovered to `0` health errors, `0` rejects, `0` restarts; keep detection in place |
-| Strategy/adaptation proof | at least one range-leaning and one trend-leaning validation window or accepted deterministic equivalent | `PARTIAL` | latest strategy effectiveness report is still `NOT_BETA_READY`; build offline `grid_guard_v2` proof before any runtime strategy patch |
+| Execution reliability | repeated exchange rejects, order-sync backoff, and stuck order loops are detectable | `PARTIAL` | July 14 has `0` health errors, `0` rejects, `0` restarts; keep detection in place |
+| Strategy/adaptation proof | at least one range-leaning and one trend-leaning validation window or accepted deterministic equivalent | `PARTIAL` | `entry_burst_guard_v1` passed two independent bundle-delta replays and runtime tests; require post-deploy evidence |
 | Sizing/min-order pressure | sizing reject pressure is bounded and not a retry storm | `PARTIAL` | June 5 returned to low at `3.0%`, but June 4 medium pressure remains `grid_guard_v2` offline comparison input |
 | Operator controls | risk slider, kill switch, rollback, and readable state are documented | `PARTIAL` | produce release/rollback packet before beta promotion |
 | Token/process budget | future agents use compact read order, skill, and gates instead of full history loading | `PASS` | keep archive docs out of default context |
@@ -103,10 +104,10 @@ Runtime behavior patches require:
 ## Immediate Next Batch
 
 1. Keep the deployed trading behavior running in testnet/paper mode.
-2. Treat `autobot-feedback-20260713-085946.tgz` as validation-only evidence: safety is clean, but strategy effectiveness is still `NOT_BETA_READY`.
-3. Build the focused offline proof for `grid_guard_v2`; keep `risk_governor_hysteresis` as fallback because the scores are close.
-4. Watch whether fresh entries stay low, filled orders and fees fall, and realized-after-fees improves.
-5. Watch `PUMPUSDC` concentration: total allocation should not keep growing above the July 13 `3.10%` level, and SELL/reduce must stay reachable.
+2. Treat `autobot-feedback-20260714-075300.tgz` as validation-only evidence: safety is clean, but strategy effectiveness is still `NOT_BETA_READY`.
+3. Deploy `entry_burst_guard_v1` to testnet without resetting state; keep `risk_governor_hysteresis` as fallback.
+4. Watch repeated neutral/range MARKET entries, filled orders, fees, and realized-after-fees.
+5. Watch `ZECUSDC` concentration: total allocation should not grow above `5.09%`, and SELL/reduce must stay reachable.
 6. Use `node scripts/t040-strategy-effectiveness-report.js` after each bundle so the operator sees whether adaptation improved net results after fees.
-7. Produce the release/rollback packet only after deterministic strategy proof and clean active-ticket validation.
+7. Produce the release/rollback packet only after clean post-deploy entry-burst validation.
 8. Only then consider a bounded beta promotion request.

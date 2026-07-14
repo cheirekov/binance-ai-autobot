@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-07-13 09:04 UTC
+Last updated: 2026-07-14 08:06 UTC
 Owner: PM/BA + Codex
 
 Use this file at the start and end of every batch. This brief is intentionally short; long historical preservation details live in `docs/PM_BA_CHANGELOG.md` and `docs/STRATEGY_COVERAGE.md`.
@@ -50,6 +50,8 @@ Use this file at the start and end of every batch. This brief is intentionally s
   - June 18 runtime patch pauses/cancels GRID BUY legs for fee-negative dust churn while preserving SELL/unwind paths.
   - July 1 runtime patch blocks fresh exposure after recent negative after-fee performance even during strong-bull `NORMAL` conditions; July 13 evidence confirms the deployed behavior is still keeping entry trades far below the July 1 spike.
   - July 13 recovered from the July 3 Binance testnet `openOrders` 502 backoff; no trading behavior patch is allowed unless a bot-side P0/P1 failure is reproduced.
+  - July 14 event replay reproduced repeated neutral MARKET entry bursts in ALLO/ZEC; `entry_burst_guard_v1` passed the latest offline counterfactual.
+  - a second independent June 4→5 replay also passed; PM/BA approved and local runtime code now caps neutral/range MARKET entry bursts for bounded testnet deployment.
 - Validation commands:
   - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh`
   - `node --check scripts/feedback-evidence.js`
@@ -60,11 +62,14 @@ Use this file at the start and end of every batch. This brief is intentionally s
   - `node scripts/t026-calibration-runner.js --write-fixture`
   - `node --check scripts/t026-fixture-comparison.js`
   - `node --check scripts/t026-grid-guard-proof.js`
+  - `node --check scripts/t026-entry-burst-proof.js`
+  - `node --test scripts/t026-entry-burst-proof.test.js`
   - `node --check scripts/t026-risk-governor-proof.js`
   - `node --check scripts/t026-proof-comparison.js`
   - `node --check scripts/t040-strategy-effectiveness-report.js`
   - `node scripts/t026-fixture-comparison.js --write-report`
   - `node scripts/t026-grid-guard-proof.js --write-report`
+  - `node scripts/t026-entry-burst-proof.js --write-report`
   - `node scripts/t026-risk-governor-proof.js --write-report`
   - `node scripts/t026-proof-comparison.js --write-report`
   - `node scripts/t040-strategy-effectiveness-report.js`
@@ -79,16 +84,16 @@ Use this file at the start and end of every batch. This brief is intentionally s
   - `git diff --check`
 - Runtime validation plan:
   - keep API/bot service running with deployed commit `e4c9e54`.
-  - collect the next bundle and compare order-sync health, fresh entries, fills, fees, realized-after-fees, PUMP exposure, and SELL/reduce reachability against July 13.
+  - collect the next bundle and run an independent entry-burst replay; compare fills, fees, realized-after-fees, ZEC exposure, and SELL/reduce reachability against July 14.
 
 ## 3) Deployment Handoff
 
-- Commit hash: `pending local validation patch`; latest feedback bundle ran deployed commit `e4c9e54`.
-- Deploy target: no redeploy required for trading behavior; deploy validation scripts/docs only if the remote PM/BA gates should include this routing fix.
+- Commit hash: `e4c9e54`
+- Deploy target: redeploy API/bot service to testnet with the entry-burst patch; do not reset state.
 - Required config changes: none
 - Operator checklist:
   - do not reset state for this process change.
-  - use next bundle to validate entry churn stays low, filled-order churn and fees fall, realized-after-fees improves, and PUMP exposure does not keep growing above the July 13 `3.10%` watch level.
+  - use the next bundle for an independent entry-burst replay; validate fills, fees, realized-after-fees, ZEC exposure, and SELL/reduce reachability against July 14.
   - do not request another T-031/T-032 patch unless there is P0/P1 severity or deterministic reproduction.
 
 ## 4) End-of-batch result (fill after run)
@@ -96,36 +101,36 @@ Use this file at the start and end of every batch. This brief is intentionally s
 - Run context:
   - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `239.737`
-  - runtime uptime (hours): `2226.943`
-  - run end: `Mon Jul 13 2026 11:58:59 GMT+0300 (Eastern European Summer Time)`
+  - bundle interval (hours): `22.888`
+  - runtime uptime (hours): `2249.831`
+  - run end: `Tue Jul 14 2026 10:52:15 GMT+0300 (Eastern European Summer Time)`
   - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip BTCUSDC: Risk budget blocked new exposure (51))
+  - active ticket runtime signal: `observed` (Skip ETHUSDC: Risk budget blocked new exposure (49))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=43, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=78.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=49, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=75.6%)
   - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `validation_required`
 - Next ticket candidate: `T-040` (stop live-wait loop and use deterministic validation)
-- Required action: `build focused offline proof for grid_guard_v2 before any runtime strategy patch; live-market churn alone is not a beta blocker`
+- Required action: `classify severity and add deterministic validation before any runtime patch; live-market churn alone is not a beta blocker`
 - Open risks:
-  - strategy effectiveness is still `NOT_BETA_READY`; latest daily net is `-25.68 USDT` and latest realized-after-fees is `-53.11 USDT`.
+  - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260713-085946.tgz`
-  - auto-updated at: `2026-07-13T08:59:59.017Z`
+  - bundle: `autobot-feedback-20260714-075300.tgz`
+  - auto-updated at: `2026-07-14T08:06:18.457Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
 Ticket: T-040
 Decision: validation_required
-Required action: build focused offline proof for grid_guard_v2 before any runtime strategy patch; live-market churn alone is not a beta blocker
-Latest bundle: autobot-feedback-20260713-085946.tgz
+Required action: classify severity and add deterministic validation before any runtime patch; live-market churn alone is not a beta blocker
+Latest bundle: autobot-feedback-20260714-075300.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: move the bot toward bounded beta/production readiness, not another T-031/T-032 micro-patch.
 Patch policy: runtime patches require P0/P1 safety severity plus deterministic reproduction.

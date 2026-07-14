@@ -1,44 +1,31 @@
 # NEXT_BATCH_PLAN
 
-Last updated: 2026-07-13 09:04 UTC
+Last updated: 2026-07-14 08:24 UTC
 Owner: PM/BA + Codex
 
-## Exact scope
-Continue `T-040` validation after `autobot-feedback-20260713-085946.tgz`. Do not open a new T-031/T-032 loop from risk-budget skip text or negative live PnL alone.
+## Scope
+Continue `T-040` after deploying the confirmed `entry_burst_guard_v1` testnet patch.
 
 ## In scope
 - keep testnet/paper running without data reset.
-- build the focused offline proof for `grid_guard_v2`.
-- keep `risk_governor_hysteresis` as the fallback proof target.
-- compare the next bundle against July 13, July 3, July 2, and July 1.
-- run `node scripts/t040-strategy-effectiveness-report.js` after the next bundle.
-- keep `T-040` as the only active lane.
-- watch `PUMPUSDC` concentration because July 13 ended with `3.10%` allocation, mostly `PUMPUSDC`.
+- verify `Skip <symbol>: Adaptive neutral/range entry burst cap reached` appears when a third MARKET entry would otherwise occur.
+- count consecutive MARKET entries per symbol and confirm a filled SELL resets the cap.
+- monitor ZEC exposure, fees, fills, realized-after-fees, and SELL/reduce reachability.
+- keep `risk_governor_hysteresis` as fallback validation.
 
 ## Out of scope
+- any broader strategy or risk-governor change beyond the approved entry-burst guard.
 - weakening risk guards or exposure caps.
-- AI/news action-driving.
-- claiming beta readiness while `NOT_BETA_READY` persists.
-- copying reference-bot code.
-- writing a runtime patch from risk-budget skip churn alone.
-- writing a strategy patch without deterministic/offline proof.
+- AI/news action-driving or real-money beta promotion.
+- reopening T-031/T-032 from skip text alone.
 
-## Acceptance criteria for the next bundle
+## Acceptance
 - rejects, restarts, and health errors remain `0`.
-- fresh entries stay low: July 13 was `6`, July 3 was `5`, July 1 was `22`.
-- filled orders fall below July 13 `173`.
-- fees fall below July 13 `8.75 USDC`.
-- realized-after-fees improves from July 13 `-53.11 USDT`.
-- total allocation does not grow beyond the July 13 `3.10%` watch level without an actionable exit path.
-- `PUMPUSDC` exposure does not grow beyond cap and SELL/reduce remains reachable.
-- order-sync backoff stays absent.
+- filled orders improve from `169`; fees improve from `8.31 USDC`.
+- realized-after-fees improves from `-72.46 USDT`.
+- allocation does not exceed `5.09%` without an actionable exit.
+- ZEC exposure does not grow beyond cap and SELL/reduce remains reachable.
+- no symbol receives more than two consecutive neutral/range MARKET entries at risk `100` without an intervening filled SELL.
 
-## Rollback or hotfix condition
-- SELL/reduce/unwind becomes blocked.
-- exchange rejects, health errors, or restarts reappear.
-- total exposure keeps growing above cap while new exposure is supposedly blocked.
-- PUMP concentration increases materially without an actionable exit path.
-- order-sync backoff recurs across another normal collection window.
-
-## What capability this moves forward
-Moves `Gate P1 - Execution-safe baseline` toward strategy proof by keeping live safety bounded while forcing negative expectancy into deterministic/offline validation instead of another live-market micro-patch.
+## Hotfix condition
+Open P0/P1 work only for uncontrolled exposure, repeated exchange rejects, blocked SELL/unwind, broken accounting, crash/restart instability, or a hard guardrail regression.
