@@ -1,0 +1,1525 @@
+{
+  "verdict": "NO_WALK_FORWARD_EDGE",
+  "baseUrl": "https://demo-api.binance.com",
+  "interval": "1h",
+  "limit": 240,
+  "capital": 1000,
+  "feeBps": 10,
+  "trainRatio": 0.6,
+  "symbolsRequested": 12,
+  "symbolsEvaluated": 12,
+  "errors": [],
+  "familySummary": [
+    {
+      "family": "BUY_HOLD",
+      "symbols": 12,
+      "avgNetPct": 1.4493939770565136,
+      "avgMaxDrawdownPct": 5.530723629771977,
+      "totalTrades": 24,
+      "profitableSymbols": 9
+    },
+    {
+      "family": "TREND",
+      "symbols": 12,
+      "avgNetPct": 1.0239883228558568,
+      "avgMaxDrawdownPct": 3.43462493365328,
+      "totalTrades": 76,
+      "profitableSymbols": 9
+    },
+    {
+      "family": "GRID",
+      "symbols": 12,
+      "avgNetPct": 0.23006855638492796,
+      "avgMaxDrawdownPct": 1.120530213346672,
+      "totalTrades": 237,
+      "profitableSymbols": 9
+    },
+    {
+      "family": "MEAN_REVERSION",
+      "symbols": 12,
+      "avgNetPct": -1.3549245854481846,
+      "avgMaxDrawdownPct": 3.52051324985536,
+      "totalTrades": 82,
+      "profitableSymbols": 1
+    }
+  ],
+  "walkForward": {
+    "verdict": "NO_WALK_FORWARD_EDGE",
+    "passed": false,
+    "checks": {
+      "enoughSymbols": true,
+      "positiveAfterFees": true,
+      "majorityProfitable": false,
+      "drawdownNotWorseThanBuyHold": true,
+      "competitiveWithBuyHold": false
+    },
+    "symbols": 12,
+    "selections": {
+      "TREND": 2,
+      "GRID": 9,
+      "MEAN_REVERSION": 1
+    },
+    "profitableSymbols": 3,
+    "minimumProfitable": 6,
+    "trainAvgNetPct": 0.7049627868382534,
+    "validationAvgNetPct": 0.07704793655661886,
+    "validationAvgMaxDrawdownPct": 0.46485232026011886,
+    "validationTrades": 26,
+    "buyHoldAvgNetPct": 3.47191661397491,
+    "buyHoldAvgMaxDrawdownPct": 1.8829548302514183
+  },
+  "symbolResults": [
+    {
+      "symbol": "ETHUSDC",
+      "candles": 240,
+      "firstClose": 1799.09,
+      "lastClose": 1933.92,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 1072.7946316860193,
+        "netPct": 7.279463168601932,
+        "maxDrawdownPct": 5.7426818852395245,
+        "trades": 2
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 1036.7150256830244,
+        "netPct": 3.671502568302435,
+        "maxDrawdownPct": 4.614191393257521,
+        "trades": 8
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 986.0501652019751,
+        "netPct": -1.394983479802488,
+        "maxDrawdownPct": 3.6541256932393686,
+        "trades": 6
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 1001.0005597938278,
+        "netPct": 0.10005597938278471,
+        "maxDrawdownPct": 0.36067574249714157,
+        "trades": 7
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "selectedFamily": "TREND",
+        "trainSelected": {
+          "family": "TREND",
+          "finalEquity": 1019.8910834086289,
+          "netPct": 1.9891083408628902,
+          "maxDrawdownPct": 2.8316481214865035,
+          "trades": 4
+        },
+        "validationSelected": {
+          "family": "TREND",
+          "finalEquity": 1021.7116827918633,
+          "netPct": 2.1711682791863267,
+          "maxDrawdownPct": 2.655312839526468,
+          "trades": 4
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 1056.4466585583466,
+          "netPct": 5.64466585583466,
+          "maxDrawdownPct": 1.6214130135972484,
+          "trades": 2
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1019.4189494133146,
+            "netPct": 1.9418949413314635,
+            "maxDrawdownPct": 5.656236250226466,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1019.8910834086289,
+            "netPct": 1.9891083408628902,
+            "maxDrawdownPct": 2.8316481214865035,
+            "trades": 4
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 975.3547813670313,
+            "netPct": -2.464521863296875,
+            "maxDrawdownPct": 3.565764593518751,
+            "trades": 4
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000.925901140232,
+            "netPct": 0.09259011402319857,
+            "maxDrawdownPct": 0.36067574249714157,
+            "trades": 7
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1056.4466585583466,
+            "netPct": 5.64466585583466,
+            "maxDrawdownPct": 1.6214130135972484,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1021.7116827918633,
+            "netPct": 2.1711682791863267,
+            "maxDrawdownPct": 2.655312839526468,
+            "trades": 4
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1008.2443566006397,
+            "netPct": 0.8244356600639663,
+            "maxDrawdownPct": 0.17770667124802447,
+            "trades": 2
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0
+          }
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDC",
+      "candles": 240,
+      "firstClose": 64152.01,
+      "lastClose": 66287.48,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 1031.2221133442272,
+        "netPct": 3.122211334422718,
+        "maxDrawdownPct": 3.975481185257573,
+        "trades": 2
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 1003.065239049104,
+        "netPct": 0.30652390491039794,
+        "maxDrawdownPct": 3.481300801122013,
+        "trades": 6
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 998.8135749912418,
+        "netPct": -0.11864250087581922,
+        "maxDrawdownPct": 2.519267519113794,
+        "trades": 8
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 1009.292611530193,
+        "netPct": 0.9292611530192972,
+        "maxDrawdownPct": 0.6704536607148157,
+        "trades": 23
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "selectedFamily": "GRID",
+        "trainSelected": {
+          "family": "GRID",
+          "finalEquity": 1006.34835532275,
+          "netPct": 0.6348355322749968,
+          "maxDrawdownPct": 0.6704536607148157,
+          "trades": 21
+        },
+        "validationSelected": {
+          "family": "GRID",
+          "finalEquity": 1000,
+          "netPct": 0,
+          "maxDrawdownPct": 0,
+          "trades": 0
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 1049.2882795690293,
+          "netPct": 4.928827956902933,
+          "maxDrawdownPct": 1.4718781266708205,
+          "trades": 2
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 983.8951684488139,
+            "netPct": -1.6104831551186065,
+            "maxDrawdownPct": 3.975481185257573,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1000.635495541238,
+            "netPct": 0.0635495541238015,
+            "maxDrawdownPct": 2.0715334829251026,
+            "trades": 2
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 984.9057425135151,
+            "netPct": -1.5094257486484937,
+            "maxDrawdownPct": 2.519267519113794,
+            "trades": 6
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1006.34835532275,
+            "netPct": 0.6348355322749968,
+            "maxDrawdownPct": 0.6704536607148157,
+            "trades": 21
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1049.2882795690293,
+            "netPct": 4.928827956902933,
+            "maxDrawdownPct": 1.4718781266708205,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 997.8230188730615,
+            "netPct": -0.21769811269384715,
+            "maxDrawdownPct": 2.331457117433028,
+            "trades": 4
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1011.4385867738637,
+            "netPct": 1.1438586773863677,
+            "maxDrawdownPct": 0.4353055700368941,
+            "trades": 2
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0
+          }
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDC",
+      "candles": 240,
+      "firstClose": 78.04,
+      "lastClose": 78.3,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 1001.3259648898,
+        "netPct": 0.13259648898000478,
+        "maxDrawdownPct": 5.3537284894837525,
+        "trades": 2
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 1038.6673478215132,
+        "netPct": 3.8667347821513203,
+        "maxDrawdownPct": 1.7548420642142242,
+        "trades": 4
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 974.0926041350685,
+        "netPct": -2.5907395864931457,
+        "maxDrawdownPct": 4.3276835589753935,
+        "trades": 4
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 1007.7778841193135,
+        "netPct": 0.7777884119313512,
+        "maxDrawdownPct": 0.5375195993175513,
+        "trades": 23
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "selectedFamily": "GRID",
+        "trainSelected": {
+          "family": "GRID",
+          "finalEquity": 1002.9236474157271,
+          "netPct": 0.2923647415727146,
+          "maxDrawdownPct": 0.5375195993175513,
+          "trades": 17
+        },
+        "validationSelected": {
+          "family": "GRID",
+          "finalEquity": 1000,
+          "netPct": 0,
+          "maxDrawdownPct": 0,
+          "trades": 0
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 1051.1632808716706,
+          "netPct": 5.116328087167062,
+          "maxDrawdownPct": 1.7548420642142317,
+          "trades": 2
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 956.5668221424909,
+            "netPct": -4.343317785750912,
+            "maxDrawdownPct": 5.226258763543674,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1000.2078180280959,
+            "netPct": 0.02078180280958577,
+            "maxDrawdownPct": 1.6875479417028816,
+            "trades": 2
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 972.9219760889721,
+            "netPct": -2.707802391102791,
+            "maxDrawdownPct": 4.198831954341023,
+            "trades": 4
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1002.9236474157271,
+            "netPct": 0.2923647415727146,
+            "maxDrawdownPct": 0.5375195993175513,
+            "trades": 17
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1051.1632808716706,
+            "netPct": 5.116328087167062,
+            "maxDrawdownPct": 1.7548420642142317,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1038.451538870432,
+            "netPct": 3.8451538870431934,
+            "maxDrawdownPct": 1.754842064214238,
+            "trades": 2
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0
+          }
+        }
+      }
+    },
+    {
+      "symbol": "TAOUSDC",
+      "candles": 240,
+      "firstClose": 212.3,
+      "lastClose": 201.7,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 948.1714634950541,
+        "netPct": -5.182853650494587,
+        "maxDrawdownPct": 11.34983652498832,
+        "trades": 2
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 973.3686232399759,
+        "netPct": -2.663137676002407,
+        "maxDrawdownPct": 4.787804343461323,
+        "trades": 8
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 978.6316475185116,
+        "netPct": -2.136835248148839,
+        "maxDrawdownPct": 6.700357026641912,
+        "trades": 10
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 1005.468207055879,
+        "netPct": 0.5468207055879021,
+        "maxDrawdownPct": 3.380125558052818,
+        "trades": 43
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "selectedFamily": "GRID",
+        "trainSelected": {
+          "family": "GRID",
+          "finalEquity": 982.6066620696786,
+          "netPct": -1.7393337930321422,
+          "maxDrawdownPct": 3.380125558052818,
+          "trades": 26
+        },
+        "validationSelected": {
+          "family": "GRID",
+          "finalEquity": 1000.9197104767009,
+          "netPct": 0.09197104767008568,
+          "maxDrawdownPct": 0.03397435897435344,
+          "trades": 3
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 1049.5140860271115,
+          "netPct": 4.951408602711148,
+          "maxDrawdownPct": 2.8614457831325355,
+          "trades": 2
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 907.2736363636363,
+            "netPct": -9.272636363636366,
+            "maxDrawdownPct": 11.34983652498832,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 964.8333080357144,
+            "netPct": -3.516669196428563,
+            "maxDrawdownPct": 3.516669196428563,
+            "trades": 2
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 972.0780296571942,
+            "netPct": -2.792197034280582,
+            "maxDrawdownPct": 6.700357026641912,
+            "trades": 8
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 982.6066620696786,
+            "netPct": -1.7393337930321422,
+            "maxDrawdownPct": 3.380125558052818,
+            "trades": 26
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1049.5140860271115,
+            "netPct": 4.951408602711148,
+            "maxDrawdownPct": 2.8614457831325355,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1020.2998015451401,
+            "netPct": 2.0299801545140097,
+            "maxDrawdownPct": 2.504520783132539,
+            "trades": 4
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1006.7418639876353,
+            "netPct": 0.674186398763527,
+            "maxDrawdownPct": 1.2755102040816244,
+            "trades": 2
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000.9197104767009,
+            "netPct": 0.09197104767008568,
+            "maxDrawdownPct": 0.03397435897435344,
+            "trades": 3
+          }
+        }
+      }
+    },
+    {
+      "symbol": "BTCJPY",
+      "candles": 240,
+      "firstClose": 10388112,
+      "lastClose": 10793636,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 1036.9602793689555,
+        "netPct": 3.6960279368955526,
+        "maxDrawdownPct": 3.7813018041705138,
+        "trades": 2
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 1006.9606336496228,
+        "netPct": 0.6960633649622764,
+        "maxDrawdownPct": 3.492993655255268,
+        "trades": 6
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 993.650996312304,
+        "netPct": -0.6349003687696041,
+        "maxDrawdownPct": 2.630754591964637,
+        "trades": 6
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 1009.2329545086909,
+        "netPct": 0.9232954508690908,
+        "maxDrawdownPct": 0.5717528981539255,
+        "trades": 21
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "selectedFamily": "GRID",
+        "trainSelected": {
+          "family": "GRID",
+          "finalEquity": 1005.9711120358511,
+          "netPct": 0.5971112035851093,
+          "maxDrawdownPct": 0.5717528981539255,
+          "trades": 19
+        },
+        "validationSelected": {
+          "family": "GRID",
+          "finalEquity": 1000,
+          "netPct": 0,
+          "maxDrawdownPct": 0,
+          "trades": 0
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 1050.612327620701,
+          "netPct": 5.061232762070108,
+          "maxDrawdownPct": 1.3935611305983813,
+          "trades": 2
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 987.9471225822364,
+            "netPct": -1.2052877417763626,
+            "maxDrawdownPct": 3.7813018041705138,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1002.8174228559205,
+            "netPct": 0.281742285592054,
+            "maxDrawdownPct": 2.0019099164530596,
+            "trades": 2
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 980.5879049427455,
+            "netPct": -1.9412095057254533,
+            "maxDrawdownPct": 2.630754591964637,
+            "trades": 4
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1005.9711120358511,
+            "netPct": 0.5971112035851093,
+            "maxDrawdownPct": 0.5717528981539255,
+            "trades": 19
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1050.612327620701,
+            "netPct": 5.061232762070108,
+            "maxDrawdownPct": 1.3935611305983813,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1000.0868013180732,
+            "netPct": 0.008680131807318503,
+            "maxDrawdownPct": 2.285546631981259,
+            "trades": 4
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1011.0628073805656,
+            "netPct": 1.1062807380565574,
+            "maxDrawdownPct": 0.4345105545606202,
+            "trades": 2
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0
+          }
+        }
+      }
+    },
+    {
+      "symbol": "ETHBTC",
+      "candles": 240,
+      "firstClose": 0.02804,
+      "lastClose": 0.02918,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 1038.5759336661913,
+        "netPct": 3.85759336661913,
+        "maxDrawdownPct": 3.658945955018464,
+        "trades": 2
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 1033.9977498175256,
+        "netPct": 3.3997749817525578,
+        "maxDrawdownPct": 2.243473716012105,
+        "trades": 4
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 987.3985219328306,
+        "netPct": -1.260147806716941,
+        "maxDrawdownPct": 1.9125683060109306,
+        "trades": 2
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 1000,
+        "netPct": 0,
+        "maxDrawdownPct": 0,
+        "trades": 0
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "selectedFamily": "TREND",
+        "trainSelected": {
+          "family": "TREND",
+          "finalEquity": 1025.7720739697077,
+          "netPct": 2.577207396970766,
+          "maxDrawdownPct": 2.1456193353474395,
+          "trades": 2
+        },
+        "validationSelected": {
+          "family": "TREND",
+          "finalEquity": 1009.4166093587522,
+          "netPct": 0.9416609358752225,
+          "maxDrawdownPct": 0.7145287512759421,
+          "trades": 2
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 1004.8885155279504,
+          "netPct": 0.48885155279504033,
+          "maxDrawdownPct": 0.9661835748792291,
+          "trades": 2
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1034.3048880171184,
+            "netPct": 3.4304888017118405,
+            "maxDrawdownPct": 2.584759986572662,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1025.7720739697077,
+            "netPct": 2.577207396970766,
+            "maxDrawdownPct": 2.1456193353474395,
+            "trades": 2
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 993.8968149417407,
+            "netPct": -0.6103185058259327,
+            "maxDrawdownPct": 0.8879781420765023,
+            "trades": 2
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1004.8885155279504,
+            "netPct": 0.48885155279504033,
+            "maxDrawdownPct": 0.9661835748792291,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1009.4166093587522,
+            "netPct": 0.9416609358752225,
+            "maxDrawdownPct": 0.7145287512759421,
+            "trades": 2
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000.5425559436908,
+            "netPct": 0.05425559436907861,
+            "maxDrawdownPct": 0.05214858129004547,
+            "trades": 3
+          }
+        }
+      }
+    },
+    {
+      "symbol": "BTCEUR",
+      "candles": 240,
+      "firstClose": 56206.72,
+      "lastClose": 58040.46,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 1030.5607073399763,
+        "netPct": 3.0560707339976263,
+        "maxDrawdownPct": 4.067911149416281,
+        "trades": 2
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 1008.4833438941066,
+        "netPct": 0.8483343894106611,
+        "maxDrawdownPct": 3.098617166534898,
+        "trades": 6
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 999.6125315105301,
+        "netPct": -0.03874684894699385,
+        "maxDrawdownPct": 2.4447631567403394,
+        "trades": 8
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 1007.0364125738386,
+        "netPct": 0.7036412573838561,
+        "maxDrawdownPct": 0.8269296068241261,
+        "trades": 21
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "selectedFamily": "GRID",
+        "trainSelected": {
+          "family": "GRID",
+          "finalEquity": 1004.0169183228913,
+          "netPct": 0.40169183228913424,
+          "maxDrawdownPct": 0.8269296068241261,
+          "trades": 19
+        },
+        "validationSelected": {
+          "family": "GRID",
+          "finalEquity": 1000,
+          "netPct": 0,
+          "maxDrawdownPct": 0,
+          "trades": 0
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 1049.9396787789585,
+          "netPct": 4.9939678778958525,
+          "maxDrawdownPct": 1.474553061222336,
+          "trades": 2
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 982.6744606968703,
+            "netPct": -1.7325539303129744,
+            "maxDrawdownPct": 4.067911149416281,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1006.6558695187488,
+            "netPct": 0.6655869518748773,
+            "maxDrawdownPct": 1.6095183412430845,
+            "trades": 2
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 985.8182840134469,
+            "netPct": -1.4181715986553058,
+            "maxDrawdownPct": 2.4447631567403394,
+            "trades": 6
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1004.0169183228913,
+            "netPct": 0.40169183228913424,
+            "maxDrawdownPct": 0.8269296068241261,
+            "trades": 19
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1049.9396787789585,
+            "netPct": 4.9939678778958525,
+            "maxDrawdownPct": 1.474553061222336,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 996.9503874946822,
+            "netPct": -0.3049612505317782,
+            "maxDrawdownPct": 2.4031895806493333,
+            "trades": 4
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1012.3171850592507,
+            "netPct": 1.2317185059250733,
+            "maxDrawdownPct": 0.39844911404851474,
+            "trades": 2
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0
+          }
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDC",
+      "candles": 240,
+      "firstClose": 1.1079,
+      "lastClose": 1.1352,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 1022.5929553208773,
+        "netPct": 2.259295532087731,
+        "maxDrawdownPct": 5.275414240931482,
+        "trades": 2
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 1015.5734301989075,
+        "netPct": 1.5573430198907545,
+        "maxDrawdownPct": 2.9727547088527317,
+        "trades": 6
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 990.4985277027646,
+        "netPct": -0.9501472297235408,
+        "maxDrawdownPct": 3.711436987167798,
+        "trades": 6
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 1018.5018400965887,
+        "netPct": 1.8501840096588693,
+        "maxDrawdownPct": 0.7558497397300638,
+        "trades": 29
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "selectedFamily": "GRID",
+        "trainSelected": {
+          "family": "GRID",
+          "finalEquity": 1007.4242236042169,
+          "netPct": 0.7424223604216876,
+          "maxDrawdownPct": 0.7558497397300638,
+          "trades": 18
+        },
+        "validationSelected": {
+          "family": "GRID",
+          "finalEquity": 1000,
+          "netPct": 0,
+          "maxDrawdownPct": 0,
+          "trades": 0
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 1051.5414286244663,
+          "netPct": 5.154142862446633,
+          "maxDrawdownPct": 1.453752498637101,
+          "trades": 2
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 976.291618196588,
+            "netPct": -2.3708381803411953,
+            "maxDrawdownPct": 5.275414240931482,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1006.4509356336488,
+            "netPct": 0.6450935633648782,
+            "maxDrawdownPct": 1.8747223456241653,
+            "trades": 2
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 972.3653832347792,
+            "netPct": -2.763461676522081,
+            "maxDrawdownPct": 3.4969460355891733,
+            "trades": 4
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1007.4242236042169,
+            "netPct": 0.7424223604216876,
+            "maxDrawdownPct": 0.7558497397300638,
+            "trades": 18
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1051.5414286244663,
+            "netPct": 5.154142862446633,
+            "maxDrawdownPct": 1.453752498637101,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1009.0640231354303,
+            "netPct": 0.9064023135430261,
+            "maxDrawdownPct": 1.9072328100745002,
+            "trades": 4
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1016.7721786833857,
+            "netPct": 1.6772178683385732,
+            "maxDrawdownPct": 0.18360414945378573,
+            "trades": 2
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0
+          }
+        }
+      }
+    },
+    {
+      "symbol": "BNBBTC",
+      "candles": 240,
+      "firstClose": 0.00903,
+      "lastClose": 0.008692,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 960.6450378737542,
+        "netPct": -3.9354962126245825,
+        "maxDrawdownPct": 4.76607866768927,
+        "trades": 2
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 977.5424996911511,
+        "netPct": -2.245750030884892,
+        "maxDrawdownPct": 2.87693736574159,
+        "trades": 6
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 966.9879275512257,
+        "netPct": -3.3012072448774346,
+        "maxDrawdownPct": 3.4495177843989775,
+        "trades": 8
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 985.8339027120738,
+        "netPct": -1.4166097287926163,
+        "maxDrawdownPct": 1.4360242837995587,
+        "trades": 14
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "selectedFamily": "GRID",
+        "trainSelected": {
+          "family": "GRID",
+          "finalEquity": 1000.413681846557,
+          "netPct": 0.04136818465569832,
+          "maxDrawdownPct": 0.13594935678776252,
+          "trades": 6
+        },
+        "validationSelected": {
+          "family": "GRID",
+          "finalEquity": 992.2621832599984,
+          "netPct": -0.7737816740001563,
+          "maxDrawdownPct": 0.7123466805695804,
+          "trades": 5
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 974.8960094403238,
+          "netPct": -2.5103990559676164,
+          "maxDrawdownPct": 2.3590204448438503,
+          "trades": 2
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 985.4016518272425,
+            "netPct": -1.4598348172757483,
+            "maxDrawdownPct": 2.607647638873682,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 977.5424996911511,
+            "netPct": -2.245750030884892,
+            "maxDrawdownPct": 2.87693736574159,
+            "trades": 6
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 985.4219163445803,
+            "netPct": -1.4578083655419733,
+            "maxDrawdownPct": 1.9523494374586388,
+            "trades": 4
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000.413681846557,
+            "netPct": 0.04136818465569832,
+            "maxDrawdownPct": 0.13594935678776252,
+            "trades": 6
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 974.8960094403238,
+            "netPct": -2.5103990559676164,
+            "maxDrawdownPct": 2.3590204448438503,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 986.1599519030143,
+            "netPct": -1.3840048096985698,
+            "maxDrawdownPct": 1.2852900997983625,
+            "trades": 4
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 992.2621832599984,
+            "netPct": -0.7737816740001563,
+            "maxDrawdownPct": 0.7123466805695804,
+            "trades": 5
+          }
+        }
+      }
+    },
+    {
+      "symbol": "BNBETH",
+      "candles": 240,
+      "firstClose": 0.3219,
+      "lastClose": 0.2978,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 923.2826896551725,
+        "netPct": -7.671731034482752,
+        "maxDrawdownPct": 7.658914728682163,
+        "trades": 2
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 977.6740431015585,
+        "netPct": -2.2325956898441515,
+        "maxDrawdownPct": 2.591191565692277,
+        "trades": 6
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 938.7784771234512,
+        "netPct": -6.122152287654876,
+        "maxDrawdownPct": 6.0281804681230025,
+        "trades": 10
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 968.0995127446844,
+        "netPct": -3.190048725531563,
+        "maxDrawdownPct": 3.3860718000077643,
+        "trades": 20
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "selectedFamily": "GRID",
+        "trainSelected": {
+          "family": "GRID",
+          "finalEquity": 992.6380572841089,
+          "netPct": -0.7361942715891132,
+          "maxDrawdownPct": 2.5128680510676475,
+          "trades": 18
+        },
+        "validationSelected": {
+          "family": "GRID",
+          "finalEquity": 984.9355664994795,
+          "netPct": -1.5064433500520522,
+          "maxDrawdownPct": 1.4620652127750826,
+          "trades": 12
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 968.0934781758957,
+          "netPct": -3.190652182410429,
+          "maxDrawdownPct": 3.811369509043928,
+          "trades": 2
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 951.8058620689654,
+            "netPct": -4.819413793103456,
+            "maxDrawdownPct": 6.759689922480612,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 984.4172548110856,
+            "netPct": -1.5582745188914373,
+            "maxDrawdownPct": 1.8531449430479217,
+            "trades": 4
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 951.1035673379969,
+            "netPct": -4.889643266200312,
+            "maxDrawdownPct": 5.517120189980176,
+            "trades": 4
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 992.6380572841089,
+            "netPct": -0.7361942715891132,
+            "maxDrawdownPct": 2.5128680510676475,
+            "trades": 18
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 968.0934781758957,
+            "netPct": -3.190652182410429,
+            "maxDrawdownPct": 3.811369509043928,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 987.041274328261,
+            "netPct": -1.295872567173899,
+            "maxDrawdownPct": 1.3882025031355036,
+            "trades": 6
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 984.9355664994795,
+            "netPct": -1.5064433500520522,
+            "maxDrawdownPct": 1.4620652127750826,
+            "trades": 12
+          }
+        }
+      }
+    },
+    {
+      "symbol": "SUIUSDC",
+      "candles": 240,
+      "firstClose": 0.7412,
+      "lastClose": 0.7691,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 1035.5674164867783,
+        "netPct": 3.5567416486778254,
+        "maxDrawdownPct": 5.020026702269688,
+        "trades": 2
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 1018.5310631394651,
+        "netPct": 1.8531063139465116,
+        "maxDrawdownPct": 4.529268004677586,
+        "trades": 8
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 1038.1490423618022,
+        "netPct": 3.814904236180223,
+        "maxDrawdownPct": 1.3177971979469985,
+        "trades": 8
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 1013.1218166735966,
+        "netPct": 1.312181667359664,
+        "maxDrawdownPct": 1.2633860971813726,
+        "trades": 27
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "selectedFamily": "MEAN_REVERSION",
+        "trainSelected": {
+          "family": "MEAN_REVERSION",
+          "finalEquity": 1034.4940829709549,
+          "netPct": 3.4494082970954882,
+          "maxDrawdownPct": 1.3177971979469985,
+          "trades": 8
+        },
+        "validationSelected": {
+          "family": "MEAN_REVERSION",
+          "finalEquity": 1000,
+          "netPct": 0,
+          "maxDrawdownPct": 0,
+          "trades": 0
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 1053.1868401481888,
+          "netPct": 5.318684014818882,
+          "maxDrawdownPct": 1.8172171375514037,
+          "trades": 2
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 990.8647273340529,
+            "netPct": -0.9135272665947127,
+            "maxDrawdownPct": 5.020026702269688,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1011.4911828235937,
+            "netPct": 1.1491182823593704,
+            "maxDrawdownPct": 2.98826530612244,
+            "trades": 2
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1034.4940829709549,
+            "netPct": 3.4494082970954882,
+            "maxDrawdownPct": 1.3177971979469985,
+            "trades": 8
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1008.211382812497,
+            "netPct": 0.821138281249705,
+            "maxDrawdownPct": 1.2633860971813726,
+            "trades": 19
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1053.1868401481888,
+            "netPct": 5.318684014818882,
+            "maxDrawdownPct": 1.8172171375514037,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1015.270126838663,
+            "netPct": 1.5270126838663032,
+            "maxDrawdownPct": 2.257925569982644,
+            "trades": 4
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000.9086331097528,
+            "netPct": 0.09086331097528273,
+            "maxDrawdownPct": 0.09067878379691,
+            "trades": 3
+          }
+        }
+      }
+    },
+    {
+      "symbol": "ETHEUR",
+      "candles": 240,
+      "firstClose": 1576.32,
+      "lastClose": 1693.56,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 1072.2280841199756,
+        "netPct": 7.222808411997563,
+        "maxDrawdownPct": 5.718362224116688,
+        "trades": 2
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 1032.2995994567482,
+        "netPct": 3.2299599456748185,
+        "maxDrawdownPct": 4.772124419017818,
+        "trades": 8
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 984.7450334045125,
+        "netPct": -1.5254966595487531,
+        "maxDrawdownPct": 3.5497067079411595,
+        "trades": 6
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 1002.242524957505,
+        "netPct": 0.22425249575049977,
+        "maxDrawdownPct": 0.25757357388092594,
+        "trades": 9
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "selectedFamily": "GRID",
+        "trainSelected": {
+          "family": "GRID",
+          "finalEquity": 1002.0956361695181,
+          "netPct": 0.20956361695181158,
+          "maxDrawdownPct": 0.25757357388092594,
+          "trades": 9
+        },
+        "validationSelected": {
+          "family": "GRID",
+          "finalEquity": 1000,
+          "netPct": 0,
+          "maxDrawdownPct": 0,
+          "trades": 0
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 1057.0594103343465,
+          "netPct": 5.705941033434646,
+          "maxDrawdownPct": 1.6102216186259555,
+          "trades": 2
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1018.0899233975335,
+            "netPct": 1.8089923397533538,
+            "maxDrawdownPct": 5.704745666382488,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1014.9454000798518,
+            "netPct": 1.4945400079851765,
+            "maxDrawdownPct": 2.957027102899325,
+            "trades": 4
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 973.8917939475808,
+            "netPct": -2.610820605241918,
+            "maxDrawdownPct": 3.535776943693593,
+            "trades": 4
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1002.0956361695181,
+            "netPct": 0.20956361695181158,
+            "maxDrawdownPct": 0.25757357388092594,
+            "trades": 9
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1057.0594103343465,
+            "netPct": 5.705941033434646,
+            "maxDrawdownPct": 1.6102216186259555,
+            "trades": 2
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 1014.4360748450111,
+            "netPct": 1.4436074845011149,
+            "maxDrawdownPct": 3.273259683722091,
+            "trades": 4
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1008.8855655836641,
+            "netPct": 0.8885565583664061,
+            "maxDrawdownPct": 0.11920562355602078,
+            "trades": 2
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0
+          }
+        }
+      }
+    }
+  ]
+}

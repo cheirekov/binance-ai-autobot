@@ -8,6 +8,7 @@ const DEFAULT_GRID_PROOF_PATH = "docs/easy_process/reports/t026-grid-guard-proof
 const DEFAULT_RISK_PROOF_PATH = "docs/easy_process/reports/t026-risk-governor-proof.json";
 const DEFAULT_ENTRY_BURST_PROOF_PATH = "docs/easy_process/reports/t026-entry-burst-proof.json";
 const DEFAULT_ENTRY_BURST_INDEPENDENT_PROOF_PATH = "docs/easy_process/reports/t026-entry-burst-proof-independent.json";
+const DEFAULT_ENTRY_BURST_POSTDEPLOY_PATH = "docs/easy_process/reports/t040-entry-burst-postdeploy.json";
 const DEFAULT_REPORT_PATH = "docs/easy_process/reports/t026-proof-comparison.json";
 
 const asNumber = (value, fallback = 0) => {
@@ -26,6 +27,7 @@ const parseArgs = (argv) => {
     riskProofPath: DEFAULT_RISK_PROOF_PATH,
     entryBurstProofPath: DEFAULT_ENTRY_BURST_PROOF_PATH,
     entryBurstIndependentProofPath: DEFAULT_ENTRY_BURST_INDEPENDENT_PROOF_PATH,
+    entryBurstPostdeployPath: DEFAULT_ENTRY_BURST_POSTDEPLOY_PATH,
     reportPath: DEFAULT_REPORT_PATH,
     writeReport: false,
     json: false,
@@ -51,6 +53,9 @@ const parseArgs = (argv) => {
       index += 1;
     } else if (arg === "--entry-burst-independent-proof" && next) {
       options.entryBurstIndependentProofPath = next;
+      index += 1;
+    } else if (arg === "--entry-burst-postdeploy" && next) {
+      options.entryBurstPostdeployPath = next;
       index += 1;
     } else if (arg === "--write-report") {
       options.writeReport = true;
@@ -78,7 +83,7 @@ const findCandidate = (comparison, family) =>
 
 const isReady = (report, prefix) => report?.verdict === `${prefix}_OFFLINE_PROOF_TARGET_READY`;
 
-const buildComparison = ({ fixtureComparison, gridProof, riskProof, entryBurstProof, entryBurstIndependentProof, fallbackScoreGap = 10 }) => {
+const buildComparison = ({ fixtureComparison, gridProof, riskProof, entryBurstProof, entryBurstIndependentProof, entryBurstPostdeploy, fallbackScoreGap = 10 }) => {
   const gridCandidate = findCandidate(fixtureComparison, "grid_guard_v2");
   const riskCandidate = findCandidate(fixtureComparison, "risk_governor_hysteresis");
   const gridScore = asNumber(gridCandidate?.score, 0);
@@ -89,6 +94,7 @@ const buildComparison = ({ fixtureComparison, gridProof, riskProof, entryBurstPr
   const entryBurstPassed = entryBurstProof?.verdict === "ENTRY_BURST_GUARD_OFFLINE_PROOF_PASSED";
   const entryBurstIndependentPassed = entryBurstIndependentProof?.verdict === "ENTRY_BURST_GUARD_OFFLINE_PROOF_PASSED";
   const entryBurstConfirmed = entryBurstPassed && entryBurstIndependentPassed;
+  const entryBurstAccepted = entryBurstPostdeploy?.verdict === "ENTRY_BURST_POSTDEPLOY_PASS";
   const highExposureWindows = asNumber(fixtureComparison?.aggregate?.highExposureWindows, 0);
   const negativeAfterFeesWindows = asNumber(fixtureComparison?.aggregate?.negativeAfterFeesWindows, 0);
 
@@ -97,7 +103,18 @@ const buildComparison = ({ fixtureComparison, gridProof, riskProof, entryBurstPr
   let secondary = "none";
   const reasons = [];
 
-  if (entryBurstConfirmed) {
+  if (entryBurstAccepted) {
+    reasons.push("entry_burst_guard_v1 passed post-deploy acceptance and is removed from candidate selection");
+    if (gridReady && gridScore >= riskScore) {
+      primary = "grid_guard_v2";
+      verdict = "OFFLINE_PROOF_COMPARE_GRID_PRIMARY";
+      reasons.push("fixture comparison ranks grid_guard_v2 first for the next offline calibration");
+    } else if (riskReady) {
+      primary = "risk_governor_hysteresis";
+      verdict = "OFFLINE_PROOF_COMPARE_RISK_GOVERNOR_PRIMARY";
+      reasons.push("risk_governor_hysteresis is the highest remaining ready proof target");
+    }
+  } else if (entryBurstConfirmed) {
     primary = "entry_burst_guard_v1";
     verdict = "OFFLINE_PROOF_COMPARE_ENTRY_BURST_CONFIRMED";
     reasons.push("two independent bundle-delta replays pass counterfactual acceptance and exposure-fidelity checks");
@@ -121,7 +138,7 @@ const buildComparison = ({ fixtureComparison, gridProof, riskProof, entryBurstPr
   );
   if (keepRiskFallback) {
     secondary = "risk_governor_hysteresis";
-    if (!entryBurstPassed) verdict = "OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK";
+    if (primary === "grid_guard_v2") verdict = "OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK";
     reasons.push("risk governor stays active due close score, exposure, or persistent after-fee losses");
   }
 
@@ -145,8 +162,8 @@ const buildComparison = ({ fixtureComparison, gridProof, riskProof, entryBurstPr
       ...(fixtureComparison.source_bundles ?? [])
     ])],
     verdict,
-    runtime_patch_allowed: entryBurstConfirmed,
-    approval_scope: entryBurstConfirmed ? "delegated PM/BA override; bounded testnet entry-burst implementation only" : "none",
+    runtime_patch_allowed: entryBurstConfirmed && !entryBurstAccepted,
+    approval_scope: entryBurstConfirmed && !entryBurstAccepted ? "delegated PM/BA override; bounded testnet entry-burst implementation only" : "none",
     primary,
     secondary,
     reasons,
@@ -158,6 +175,7 @@ const buildComparison = ({ fixtureComparison, gridProof, riskProof, entryBurstPr
     proof_verdicts: {
       entry_burst_guard_v1: entryBurstProof?.verdict ?? "MISSING",
       entry_burst_guard_v1_independent: entryBurstIndependentProof?.verdict ?? "MISSING",
+      entry_burst_guard_v1_postdeploy: entryBurstPostdeploy?.verdict ?? "MISSING",
       grid_guard_v2: gridProof.verdict,
       risk_governor_hysteresis: riskProof.verdict
     },
@@ -169,7 +187,9 @@ const buildComparison = ({ fixtureComparison, gridProof, riskProof, entryBurstPr
       negativeAfterFeesWindows,
       highExposureWindows
     },
-    next_action: entryBurstConfirmed
+    next_action: entryBurstAccepted
+      ? "entry-burst guard accepted; continue T-026 walk-forward calibration and require out-of-sample edge before any new runtime candidate"
+      : entryBurstConfirmed
       ? "bounded testnet implementation approved; deploy without state reset and validate cap activation plus SELL/reduce reachability"
       : entryBurstPassed
         ? "validate entry_burst_guard_v1 across another independent bundle delta; runtime behavior remains unchanged without PM/BA override or P0/P1 severity"
@@ -184,6 +204,7 @@ const printReport = (report) => {
   console.log(`- proofs=grid_guard_v2=${report.proof_verdicts.grid_guard_v2}; risk_governor_hysteresis=${report.proof_verdicts.risk_governor_hysteresis}`);
   console.log(`- entryBurstProof=${report.proof_verdicts.entry_burst_guard_v1}`);
   console.log(`- entryBurstIndependentProof=${report.proof_verdicts.entry_burst_guard_v1_independent}`);
+  console.log(`- entryBurstPostdeploy=${report.proof_verdicts.entry_burst_guard_v1_postdeploy}`);
   console.log(`- nextAction=${report.next_action}`);
 };
 
@@ -195,6 +216,7 @@ const main = () => {
     riskProof: readJson(options.riskProofPath),
     entryBurstProof: readJson(options.entryBurstProofPath),
     entryBurstIndependentProof: readJson(options.entryBurstIndependentProofPath),
+    entryBurstPostdeploy: readJson(options.entryBurstPostdeployPath),
     fallbackScoreGap: options.fallbackScoreGap
   });
 

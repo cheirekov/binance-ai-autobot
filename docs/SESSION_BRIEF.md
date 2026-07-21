@@ -1,141 +1,73 @@
 # Session Brief
 
-Last updated: 2026-07-14 08:06 UTC
+Last updated: 2026-07-21 11:53 UTC
 Owner: PM/BA + Codex
-
-Use this file at the start and end of every batch. This brief is intentionally short; long historical preservation details live in `docs/PM_BA_CHANGELOG.md` and `docs/STRATEGY_COVERAGE.md`.
 
 ## 1) Batch Contract
 
-- Batch type: `SHORT (1-3h)`
-- Active ticket: `T-040` (Bounded beta readiness)
+- Batch type: `IMPLEMENTATION`
+- Active ticket: `T-026` (Offline calibration runner)
 - Linked support ticket: `none`
-- Goal (single sentence): stop the T-031/T-032 live-evidence patch loop and move the project to a bounded beta-readiness gate.
-- In scope:
-  - freeze `T-031` and `T-032` as preserved runtime behavior.
-  - make `T-040` the single active lane for Gate P1 beta readiness.
-  - change process memory so `patch_required` from live Binance evidence does not automatically create another same-ticket runtime patch.
-  - require P0/P1 severity plus deterministic reproduction before any new runtime behavior patch.
-  - for the June 18 bundle, patch the proven P1 execution issue: fee-negative GRID churn around dust-sized inventory.
-  - create/update the project operating skill for future agents.
-  - keep existing safety, risk-budget, and downside-control code intact.
-- Out of scope:
-  - another regime/risk-budget/exit-manager micro-patch from the latest bundle.
-  - weakening hard risk guards, exposure caps, or sell/unwind reachability.
-  - AI/news live action-driving.
-  - production claims without a beta-readiness packet.
-- Hypothesis: the project is not blocked by one missing trading rule; it is blocked by a process loop that treats non-stationary live-market evidence as mandatory T-031/T-032 patch work.
-- Target KPI delta:
-  - next session starts from `T-040` and beta readiness, not `T-031/T-032`.
-  - auto-retro on production-readiness tickets returns validation/readiness action for live-market churn unless P0/P1 severity is proven.
-  - PM/BA gate no longer fails `T-040` solely because a repeated skip reason appears in live bundles.
-  - deterministic validation gaps are explicit backlog items.
-- Stop/rollback condition:
-  - if a fresh bundle shows uncontrolled exposure, repeated exchange order rejects, inability to sell/unwind, broken PnL accounting, or crash/restart instability, open a P0/P1 hotfix and pause beta promotion.
+- Goal: build deterministic walk-forward strategy calibration so progress does not depend on the current Binance market window.
+- In scope: replay fixtures, train/validation separation, after-fee expectancy, drawdown, candidate comparison, and promotion thresholds.
+- Out of scope: tuning from one bundle, weakening risk controls, real-money deployment, or another T-031/T-032/T-040 runtime patch.
+- Live evidence policy: bundles are supporting datasets; only a reproduced P0/P1 safety failure may interrupt T-026.
 
 ## 2) Definition Of Done
 
-- Process behavior:
-  - `docs/DELIVERY_BOARD.md` has exactly one `IN_PROGRESS` ticket: `T-040`.
-  - `docs/TICKET_SWITCH_RETRO.md` records the T-031/T-032 freeze and beta-readiness pivot.
-  - `docs/easy_process/*` current-memory files point to beta readiness instead of May T-031 patch work.
-  - `docs/easy_process/T040_BETA_READINESS_PACKET.md` and `docs/easy_process/T040_VALIDATION_MAP.md` exist and are referenced by the production workflow.
-  - `docs/easy_process/AI_ORCHESTRATION.md` defines compact skill/subagent/MCP use.
-  - `scripts/auto-retro.sh`, `scripts/update-session-brief.sh`, and `scripts/pmba-gate.sh` distinguish production-readiness validation from runtime patch pressure.
-  - `scripts/validate-active-ticket.sh` has targeted `T-040` validation.
-  - project skill exists for future Codex sessions.
-- Runtime posture:
-  - T-031/T-032 behavior remains preserved.
-  - new runtime patches are allowed only for P0/P1 safety/execution blockers or deterministic production-gate failures.
-  - June 18 runtime patch pauses/cancels GRID BUY legs for fee-negative dust churn while preserving SELL/unwind paths.
-  - July 1 runtime patch blocks fresh exposure after recent negative after-fee performance even during strong-bull `NORMAL` conditions; July 13 evidence confirms the deployed behavior is still keeping entry trades far below the July 1 spike.
-  - July 13 recovered from the July 3 Binance testnet `openOrders` 502 backoff; no trading behavior patch is allowed unless a bot-side P0/P1 failure is reproduced.
-  - July 14 event replay reproduced repeated neutral MARKET entry bursts in ALLO/ZEC; `entry_burst_guard_v1` passed the latest offline counterfactual.
-  - a second independent June 4→5 replay also passed; PM/BA approved and local runtime code now caps neutral/range MARKET entry bursts for bounded testnet deployment.
-- Validation commands:
-  - `bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh`
-  - `node --check scripts/feedback-evidence.js`
-  - `node --check scripts/t040-readiness-check.js`
-  - `node --check scripts/t026-calibration-runner.js`
-  - `node scripts/t040-readiness-check.js`
-  - `node scripts/t026-calibration-runner.js`
-  - `node scripts/t026-calibration-runner.js --write-fixture`
-  - `node --check scripts/t026-fixture-comparison.js`
-  - `node --check scripts/t026-grid-guard-proof.js`
-  - `node --check scripts/t026-entry-burst-proof.js`
-  - `node --test scripts/t026-entry-burst-proof.test.js`
-  - `node --check scripts/t026-risk-governor-proof.js`
-  - `node --check scripts/t026-proof-comparison.js`
-  - `node --check scripts/t040-strategy-effectiveness-report.js`
-  - `node scripts/t026-fixture-comparison.js --write-report`
-  - `node scripts/t026-grid-guard-proof.js --write-report`
-  - `node scripts/t026-entry-burst-proof.js --write-report`
-  - `node scripts/t026-risk-governor-proof.js --write-report`
-  - `node scripts/t026-proof-comparison.js --write-report`
-  - `node scripts/t040-strategy-effectiveness-report.js`
-  - `./scripts/auto-retro.sh autobot-feedback-20260618-090049.tgz`
-  - `./scripts/update-session-brief.sh autobot-feedback-20260618-090049.tgz`
-  - `./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts --no-cache` (from `apps/api`)
-  - `./node_modules/.bin/vitest run src/modules/bot/risk-budget.service.test.ts --no-cache` (from `apps/api`)
-  - `./node_modules/.bin/tsc -p tsconfig.build.json --noEmit` (from `apps/api`)
-  - `./scripts/validate-active-ticket.sh`
-  - `./scripts/pmba-gate.sh start`
-  - `./scripts/pmba-gate.sh end`
-  - `git diff --check`
-- Runtime validation plan:
-  - keep API/bot service running with deployed commit `e4c9e54`.
-  - collect the next bundle and run an independent entry-burst replay; compare fills, fees, realized-after-fees, ZEC exposure, and SELL/reduce reachability against July 14.
+- `docs/DELIVERY_BOARD.md` has exactly one `IN_PROGRESS` ticket: `T-026`.
+- deterministic calibration produces a repeatable machine-readable report.
+- candidate selection uses separate calibration and validation windows.
+- a candidate cannot pass unless after-fee expectancy and drawdown improve without reducing SELL/unwind reachability.
+- `./scripts/validate-active-ticket.sh` and `./scripts/pmba-gate.sh end` pass.
 
 ## 3) Deployment Handoff
 
-- Commit hash: `e4c9e54`
-- Deploy target: redeploy API/bot service to testnet with the entry-burst patch; do not reset state.
-- Required config changes: none
-- Operator checklist:
-  - do not reset state for this process change.
-  - use the next bundle for an independent entry-burst replay; validate fills, fees, realized-after-fees, ZEC exposure, and SELL/reduce reachability against July 14.
-  - do not request another T-031/T-032 patch unless there is P0/P1 severity or deterministic reproduction.
+- Commit hash: `e3813bb`
+- Deploy target: none for this calibration batch; keep the existing testnet deployment running.
+- Required config changes: none.
+- Operator action: do not reset data and do not redeploy until T-026 produces an accepted candidate.
 
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `MORNING (collection) / MORNING (run end)`
+  - window (local): `DAY (collection) / DAY (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `22.888`
-  - runtime uptime (hours): `2249.831`
-  - run end: `Tue Jul 14 2026 10:52:15 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `MORNING_REVIEW`
+  - bundle interval (hours): `171.836`
+  - runtime uptime (hours): `2421.667`
+  - run end: `Tue Jul 21 2026 14:42:26 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `DAY_RUN`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip ETHUSDC: Risk budget blocked new exposure (49))
+  - active ticket runtime signal: `observed` (Skip SOLUSDC: Risk budget blocked new exposure (40))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=1, historyLimitOrders=49, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=75.6%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=37, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=81.5%)
   - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `validation_required`
-- Next ticket candidate: `T-040` (stop live-wait loop and use deterministic validation)
-- Required action: `classify severity and add deterministic validation before any runtime patch; live-market churn alone is not a beta blocker`
+- Next ticket candidate: `T-026` (stop live-wait loop and use deterministic validation)
+- Required action: `continue deterministic calibration/replay; live-market churn is supporting evidence and cannot require a runtime patch`
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260714-075300.tgz`
-  - auto-updated at: `2026-07-14T08:06:18.457Z`
+  - bundle: `autobot-feedback-20260721-114241.tgz`
+  - auto-updated at: `2026-07-21T11:53:21.469Z`
 
 ## 5) Copy/paste prompt for next session
 
 ```text
-Ticket: T-040
+Ticket: T-026
 Decision: validation_required
-Required action: classify severity and add deterministic validation before any runtime patch; live-market churn alone is not a beta blocker
-Latest bundle: autobot-feedback-20260714-075300.tgz
+Required action: continue deterministic calibration/replay; live-market churn is supporting evidence and cannot require a runtime patch
+Latest bundle: autobot-feedback-20260721-114241.tgz
 Fresh runtime evidence: yes (fresh)
-Goal: move the bot toward bounded beta/production readiness, not another T-031/T-032 micro-patch.
-Patch policy: runtime patches require P0/P1 safety severity plus deterministic reproduction.
-In scope: beta gates, deterministic validation fixtures, operator controls, release/rollback packet.
-Out of scope: fixing every live-market skip loop or tuning strategy from one bundle.
+Goal: improve strategy selection and parameters through deterministic replay and walk-forward calibration.
+Live evidence policy: bundles are supporting inputs, never an automatic request for another runtime patch.
+In scope: fixtures, replay metrics, train/validation splits, candidate comparison, and promotion thresholds.
+Out of scope: tuning from one market window, weakening risk controls, or claiming profitability from testnet alone.
 Validation: ./scripts/validate-active-ticket.sh && ./scripts/pmba-gate.sh end
-After patch: update delivery board, production docs, session brief, and changelog.
+After implementation: record the executable report and the next bounded calibration hypothesis.
 ```

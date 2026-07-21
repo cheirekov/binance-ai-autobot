@@ -30,6 +30,8 @@ const sessionRaw = fs.readFileSync(sessionFile, "utf8");
 const ticketMatch = sessionRaw.match(/^- Active ticket:\s*`([^`]+)`/m);
 const activeTicket = ticketMatch ? ticketMatch[1].trim() : "unknown";
 const isProductionReadinessTicket = /^(T-040|T-PROD|T-BETA)\b/i.test(activeTicket);
+const isDeterministicCalibrationTicket = /^T-026\b/i.test(activeTicket);
+const isLivePatchExemptTicket = isProductionReadinessTicket || isDeterministicCalibrationTicket;
 
 const resolveBundles = () => {
   const entries = listBundles();
@@ -150,7 +152,7 @@ const triggers = [repeatedDominantLoop, effectiveThreeNegativeDailyNet, noTrendI
 const decision = (() => {
   if (staleStreak >= 2) return "validation_required";
   if (!latest.freshness?.hasFreshRuntimeEvidence) return "await_fresh_evidence";
-  if (isProductionReadinessTicket) {
+  if (isLivePatchExemptTicket) {
     if (exchangeBackoffObserved) return "validation_required";
     if (triggers > 0) return "validation_required";
     return "continue";
@@ -168,6 +170,9 @@ const requiredAction = (() => {
   if (decision === "patch_required") return "same-ticket mitigation required before next long run";
   if (decision === "pivot_required") return "PM/BA pivot review required before next long run";
   if (decision === "await_fresh_evidence") return "do not patch from this bundle alone; wait for fresh runtime evidence";
+  if (isDeterministicCalibrationTicket) {
+    return "continue deterministic calibration/replay; live-market churn is supporting evidence and cannot require a runtime patch";
+  }
   if (isProductionReadinessTicket) {
     return "classify severity and add deterministic validation before any runtime patch; live-market churn alone is not a beta blocker";
   }
@@ -213,6 +218,12 @@ const lines = [
     ? [
         "- Production readiness mode: `enabled`",
         "- Patch policy: `runtime patches require P0/P1 safety severity plus deterministic reproduction`"
+      ]
+    : []),
+  ...(isDeterministicCalibrationTicket
+    ? [
+        "- Deterministic calibration mode: `enabled`",
+        "- Live evidence policy: `supporting input only; promotion requires replay/calibration acceptance`"
       ]
     : []),
   "",

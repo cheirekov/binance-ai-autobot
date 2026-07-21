@@ -174,12 +174,13 @@ const exchangeBackoffRegression = Array.isArray(bundleSummary?.activity?.skips?.
   : false;
 const mapNextTicket = (decision) => {
   if (decision === "pivot_required") return "PM/BA-TRIAGE";
-  if (decision === "validation_required" && !/^(T-040|T-PROD|T-BETA)\b/i.test(activeTicket)) return "PM/BA-VALIDATION";
+  if (decision === "validation_required" && !/^(T-026|T-040|T-PROD|T-BETA)\b/i.test(activeTicket)) return "PM/BA-VALIDATION";
   return activeTicket;
 };
 const decision = retroDecision || "pending_auto_retro";
 const nextTicket = mapNextTicket(decision);
 const isProductionReadinessTicket = /^(T-040|T-PROD|T-BETA)\b/i.test(activeTicket);
+const isDeterministicCalibrationTicket = /^T-026\b/i.test(activeTicket);
 
 const conversionTrades = Number.isFinite(totals.conversions) ? totals.conversions : 0;
 const totalTrades = Number.isFinite(totals.trades) ? totals.trades : 0;
@@ -241,6 +242,17 @@ const promptLines = (() => {
     `Latest bundle: ${path.basename(bundlePath)}`,
     `Fresh runtime evidence: ${freshRuntimeEvidence ? "yes" : "no"} (${freshnessClass})`
   ];
+  if (isDeterministicCalibrationTicket) {
+    return [
+      ...base,
+      "Goal: improve strategy selection and parameters through deterministic replay and walk-forward calibration.",
+      "Live evidence policy: bundles are supporting inputs, never an automatic request for another runtime patch.",
+      "In scope: fixtures, replay metrics, train/validation splits, candidate comparison, and promotion thresholds.",
+      "Out of scope: tuning from one market window, weakening risk controls, or claiming profitability from testnet alone.",
+      "Validation: ./scripts/validate-active-ticket.sh && ./scripts/pmba-gate.sh end",
+      "After implementation: record the executable report and the next bounded calibration hypothesis."
+    ];
+  }
   if (isProductionReadinessTicket) {
     return [
       ...base,

@@ -1,6 +1,6 @@
 # DELIVERY BOARD (PM v2) — Binance AI Autobot
 
-Last updated: 2026-05-28
+Last updated: 2026-07-21
 Owner: PM/BA + Codex + User
 
 This board is structured to reduce scope drift and context-window churn.
@@ -106,7 +106,8 @@ Profit milestone rule:
 
 | ID | Status | Title | Scope freeze |
 |---|---|---|---|
-| T-040 | IN_PROGRESS | Bounded beta readiness | Freeze runtime strategy micro-patching and produce the Gate P1 beta-readiness packet: deterministic validation map, release/rollback runbook, severity gate, and exact remaining blockers. |
+| T-026 | IN_PROGRESS | Offline calibration runner | Build deterministic walk-forward strategy comparison with train/validation separation, after-fee expectancy, drawdown, and SELL-reachability acceptance. Live bundles are inputs, not patch triggers. |
+| T-040 | VALIDATION | Bounded beta readiness | Entry-burst guard passed post-deploy validation on July 21. Production remains blocked by negative strategy expectancy; reopen only for release review or P0/P1 safety evidence. |
 | T-031 | VALIDATION | Regime engine v2 | Preserved runtime behavior. Reopen only for P0/P1 safety or deterministic reproduction of a production-gate blocker; live-market skip churn alone is backlog, not same-ticket patch pressure. |
 | T-032 | VALIDATION | Exit manager v2 | Preserved downside-control behavior. Reopen only for P0/P1 downside-control regression or deterministic failure of sell/unwind reachability. |
 | T-034 | DONE | Multi-quote execution policy v1 | Closed after routing/funding loops stopped dominating runtime evidence |
@@ -123,7 +124,6 @@ Profit milestone rule:
 |---|---|---|---|---|
 | 1 | T-020 | TODO | Remove hidden ENV fallbacks | one effective runtime config source for beta |
 | 2 | T-028 | TODO | Compact advanced UX | improve operator readability without changing strategy behavior |
-| 3 | T-026 | TODO | Offline calibration runner | deterministic validation and replay foundation for adaptive decisions |
 
 ### LATER (after Gate A)
 
@@ -136,7 +136,7 @@ Profit milestone rule:
 
 | Priority | ID | Status | Title |
 |---|---|---|---|
-| 1 | T-026 | TODO | Offline calibration runner |
+| 1 | T-026 | NOW | Offline calibration runner |
 | 2 | T-025 | TODO | Adaptive confidence shadow model v1 |
 | 3 | T-035 | TODO | News dataset + event store |
 | 4 | T-036 | TODO | AI decision contract + budget gate |

@@ -127,7 +127,9 @@ if (freshWindow.length < 2) process.exit(0);
 
 const dominantLoopRepeated = classifyRepeatedDominantLoop(freshWindow[0], freshWindow[1]);
 
-if (dominantLoopRepeated.failed && !/^(T-040|T-PROD|T-BETA)\b/i.test(activeTicket)) {
+const isLivePatchExemptTicket = /^(T-026|T-040|T-PROD|T-BETA)\b/i.test(activeTicket);
+
+if (dominantLoopRepeated.failed && !isLivePatchExemptTicket) {
   console.error(
     `FAIL: Dominant loop reason repeated in last 2 fresh bundles for active ticket ${activeTicket}: ${dominantLoopRepeated.details}.`
   );
@@ -135,8 +137,9 @@ if (dominantLoopRepeated.failed && !/^(T-040|T-PROD|T-BETA)\b/i.test(activeTicke
   process.exit(1);
 }
 if (dominantLoopRepeated.failed) {
+  const lane = /^T-026\b/i.test(activeTicket) ? "deterministic-calibration" : "production-readiness";
   console.error(
-    `WARN: Dominant loop repeated for production-readiness ticket ${activeTicket}: ${dominantLoopRepeated.details}. Treat as validation/backlog unless P0/P1 safety severity is proven.`
+    `WARN: Dominant loop repeated for ${lane} ticket ${activeTicket}: ${dominantLoopRepeated.details}. Treat as supporting validation/backlog unless P0/P1 safety severity is proven.`
   );
 }
 NODE

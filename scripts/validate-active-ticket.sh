@@ -68,7 +68,8 @@ case "$ACTIVE_TICKET" in
     node --check scripts/t026-proof-comparison.js
     node --check scripts/t026-risk-governor-proof.js
     node --check scripts/t040-strategy-effectiveness-report.js
-    node --test scripts/t026-entry-burst-proof.test.js
+    node --check scripts/t040-entry-burst-postdeploy-check.js
+    node --test scripts/t026-entry-burst-proof.test.js scripts/t026-strategy-replay.test.js scripts/t040-entry-burst-postdeploy-check.test.js
     set +e
     T040_OUTPUT="$(node scripts/t040-readiness-check.js 2>&1)"
     T040_STATUS=$?
@@ -102,9 +103,12 @@ case "$ACTIVE_TICKET" in
     T040_EFFECTIVENESS_OUTPUT="$(node scripts/t040-strategy-effectiveness-report.js)"
     printf '%s\n' "$T040_EFFECTIVENESS_OUTPUT"
     T040_EFFECTIVENESS_VERDICT="$(printf '%s\n' "$T040_EFFECTIVENESS_OUTPUT" | sed -n 's/^T-040 strategy effectiveness verdict: //p' | head -n1)"
+    T040_ENTRY_BURST_POSTDEPLOY_OUTPUT="$(node scripts/t040-entry-burst-postdeploy-check.js)"
+    printf '%s\n' "$T040_ENTRY_BURST_POSTDEPLOY_OUTPUT"
+    T040_ENTRY_BURST_POSTDEPLOY_VERDICT="$(printf '%s\n' "$T040_ENTRY_BURST_POSTDEPLOY_OUTPUT" | sed -n 's/^T-040 entry burst post-deploy verdict: //p' | head -n1)"
     ./scripts/pmba-gate.sh start
     ./scripts/pmba-gate.sh end
-    export T040_CLASSIFICATION T026_RECOMMENDATION T026_FIXTURE_VERDICT T026_GRID_GUARD_VERDICT T026_ENTRY_BURST_VERDICT T026_ENTRY_BURST_INDEPENDENT_VERDICT T026_RISK_GOVERNOR_VERDICT T026_PROOF_COMPARISON_VERDICT T040_EFFECTIVENESS_VERDICT
+    export T040_CLASSIFICATION T026_RECOMMENDATION T026_FIXTURE_VERDICT T026_GRID_GUARD_VERDICT T026_ENTRY_BURST_VERDICT T026_ENTRY_BURST_INDEPENDENT_VERDICT T026_RISK_GOVERNOR_VERDICT T026_PROOF_COMPARISON_VERDICT T040_EFFECTIVENESS_VERDICT T040_ENTRY_BURST_POSTDEPLOY_VERDICT
     node <<'NODE'
 const fs = require('fs');
 const { execFileSync } = require('child_process');
@@ -144,10 +148,12 @@ const t026EntryBurstIndependentVerdict = process.env.T026_ENTRY_BURST_INDEPENDEN
 const t026RiskGovernorVerdict = process.env.T026_RISK_GOVERNOR_VERDICT ?? '';
 const t026ProofComparisonVerdict = process.env.T026_PROOF_COMPARISON_VERDICT ?? '';
 const t040EffectivenessVerdict = process.env.T040_EFFECTIVENESS_VERDICT ?? '';
+const t040EntryBurstPostdeployVerdict = process.env.T040_ENTRY_BURST_POSTDEPLOY_VERDICT ?? '';
 const changedFiles = (() => {
   try {
-    return execFileSync('git', ['diff', '--name-only', 'HEAD', '--'], { encoding: 'utf8' })
-      .split(/\r?\n/)
+    const tracked = execFileSync('git', ['diff', '--name-only', 'HEAD', '--'], { encoding: 'utf8' });
+    const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { encoding: 'utf8' });
+    return `${tracked}\n${untracked}`.split(/\r?\n/)
       .map((line) => line.trim())
       .filter(Boolean);
   } catch {
@@ -185,6 +191,12 @@ if (!/^(CONTINUE_READINESS|VALIDATION_REQUIRED|PATCH_ALLOWED_REVIEW)$/.test(t040
 }
 if (!/^(NOT_BETA_READY|CANDIDATE_READY_FOR_OPERATOR_REVIEW)$/.test(t040EffectivenessVerdict)) {
   fail(`unexpected T-040 strategy effectiveness verdict ${t040EffectivenessVerdict || 'empty'}`);
+}
+if (t040EntryBurstPostdeployVerdict !== 'ENTRY_BURST_POSTDEPLOY_PASS') {
+  fail(`expected entry-burst post-deploy audit to pass, found ${t040EntryBurstPostdeployVerdict || 'empty'}`);
+}
+if (!/Entry-burst post-deploy audit/.test(validationMap)) {
+  fail('validation map is missing the entry-burst post-deploy audit');
 }
 if (!/^(FIXTURE_CANDIDATE_[A-Z0-9_]+|NO_FIXTURE_CANDIDATE)$/.test(t026FixtureVerdict)) {
   fail(`unexpected T-026 fixture comparison verdict ${t026FixtureVerdict || 'empty'}`);
@@ -247,6 +259,45 @@ if (t040Classification === 'VALIDATION_REQUIRED' && t040EffectivenessVerdict ===
     `PASS: T-040 no-docs-only loop gate (${codeOrValidationChanges.length > 0 ? 'runtime/test or deterministic validation-code changes present' : 'operator stop decision present'})`
   );
 }
+NODE
+    ;;
+  T-026)
+    echo "Validation mode: targeted deterministic calibration"
+    echo "Active ticket: $ACTIVE_TICKET"
+    bash -n scripts/auto-retro.sh scripts/update-session-brief.sh scripts/pmba-gate.sh scripts/validate-active-ticket.sh
+    node --check scripts/feedback-evidence.js
+    node --check scripts/t026-calibration-runner.js
+    node --check scripts/t026-strategy-replay.js
+    node --check scripts/t026-fixture-comparison.js
+    node --check scripts/t026-grid-guard-proof.js
+    node --check scripts/t026-entry-burst-proof.js
+    node --check scripts/t026-proof-comparison.js
+    node --check scripts/t026-risk-governor-proof.js
+    node --test scripts/t026-entry-burst-proof.test.js scripts/t026-strategy-replay.test.js scripts/t040-entry-burst-postdeploy-check.test.js
+    node scripts/t026-calibration-runner.js
+    node scripts/t026-fixture-comparison.js
+    node scripts/t026-grid-guard-proof.js
+    node scripts/t026-entry-burst-proof.js
+    node scripts/t026-risk-governor-proof.js
+    node scripts/t026-proof-comparison.js
+    node <<'NODE'
+const fs = require('node:fs');
+
+const board = fs.readFileSync('docs/DELIVERY_BOARD.md', 'utf8');
+const session = fs.readFileSync('docs/SESSION_BRIEF.md', 'utf8');
+const retro = fs.readFileSync('docs/RETROSPECTIVE_AUTO.md', 'utf8');
+const inProgress = [...board.matchAll(/^\| (T-[0-9]{3}) \| IN_PROGRESS \|/gm)].map((match) => match[1]);
+
+if (inProgress.length !== 1 || inProgress[0] !== 'T-026') {
+  throw new Error(`expected exactly one IN_PROGRESS ticket T-026, found ${inProgress.join(', ') || 'none'}`);
+}
+if (!/^- Active ticket: `T-026`/m.test(session)) throw new Error('session brief is not aligned to T-026');
+if (!/^Active ticket: `T-026`/m.test(retro)) throw new Error('auto-retro is not aligned to T-026');
+if (!/Deterministic calibration mode: `enabled`/.test(retro)) {
+  throw new Error('auto-retro deterministic calibration mode is not enabled');
+}
+
+console.log('PASS: T-026 deterministic calibration process validation');
 NODE
     ;;
   T-032)

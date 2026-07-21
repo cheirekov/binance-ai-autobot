@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "bundle": "autobot-feedback-20260721-114241.tgz",
+  "verdict": "ENTRY_BURST_POSTDEPLOY_PASS",
+  "checks": {
+    "deployedCommitMatchesWorkspace": true,
+    "guardActivated": true,
+    "noForbiddenNeutralRangeFill": true,
+    "marketBuyMetadataCoverage": true,
+    "sellReachabilityObserved": true,
+    "noRejectedOrders": true,
+    "noHealthErrors": true,
+    "noRestarts": true
+  },
+  "commits": {
+    "deployed": "e3813bb",
+    "workspace": "e3813bb43f2eb4d410bb1338546e13c11119d1eb"
+  },
+  "evidence": {
+    "shadowEvents": 5000,
+    "filledOrders": 184,
+    "filledBuys": 96,
+    "filledSells": 88,
+    "filledSellsAfterFirstActivation": 88,
+    "marketBuyOrders": 93,
+    "marketBuysWithMetadata": 93,
+    "metadataCoveragePct": 100,
+    "neutralRangeMarketEntries": 4,
+    "maxObservedNeutralRangeStreak": 2,
+    "guardActivations": 6,
+    "activationsBySymbol": [
+      {
+        "symbol": "GRAMUSDC",
+        "count": 4
+      },
+      {
+        "symbol": "BANKUSDC",
+        "count": 1
+      },
+      {
+        "symbol": "TLMUSDC",
+        "count": 1
+      }
+    ],
+    "violations": []
+  }
+}

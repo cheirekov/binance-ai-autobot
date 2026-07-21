@@ -6,6 +6,7 @@ const ROOT_DIR = path.resolve(__dirname, "..");
 const DEFAULT_LIMIT = 240;
 const DEFAULT_CAPITAL = 1000;
 const DEFAULT_FEE_BPS = 10;
+const DEFAULT_TRAIN_RATIO = 0.6;
 
 const parseArgs = (argv) => {
   const options = {
@@ -14,7 +15,9 @@ const parseArgs = (argv) => {
     limit: DEFAULT_LIMIT,
     capital: DEFAULT_CAPITAL,
     feeBps: DEFAULT_FEE_BPS,
+    trainRatio: DEFAULT_TRAIN_RATIO,
     baseUrl: null,
+    writeReport: null,
     json: false
   };
 
@@ -38,8 +41,14 @@ const parseArgs = (argv) => {
     } else if (arg === "--fee-bps" && next) {
       options.feeBps = Number(next);
       index += 1;
+    } else if (arg === "--train-ratio" && next) {
+      options.trainRatio = Number(next);
+      index += 1;
     } else if (arg === "--base-url" && next) {
       options.baseUrl = next;
+      index += 1;
+    } else if (arg === "--write-report" && next) {
+      options.writeReport = next;
       index += 1;
     } else {
       throw new Error(`Unknown or incomplete argument: ${arg}`);
@@ -54,6 +63,9 @@ const parseArgs = (argv) => {
   }
   if (!Number.isFinite(options.feeBps) || options.feeBps < 0 || options.feeBps > 100) {
     throw new Error(`--fee-bps must be between 0 and 100, got ${options.feeBps}`);
+  }
+  if (!Number.isFinite(options.trainRatio) || options.trainRatio < 0.5 || options.trainRatio > 0.8) {
+    throw new Error(`--train-ratio must be between 0.5 and 0.8, got ${options.trainRatio}`);
   }
 
   return options;
@@ -362,15 +374,98 @@ const simulateGrid = ({ candles, capital, feeRate }) => {
     equity.push(quote + base * close);
   }
 
+  const final = finalizePosition({ quote, base, lastClose: closes.at(-1), feeRate });
   return buildResult({
     family: "GRID",
     capital,
-    quote,
-    base,
+    quote: final.quote,
+    base: final.base,
     lastClose: closes.at(-1),
-    trades,
+    trades: trades + final.trades,
     equity
   });
+};
+
+const STRATEGY_FAMILIES = ["TREND", "MEAN_REVERSION", "GRID"];
+
+const simulateFamilies = ({ candles, capital, feeRate }) => {
+  const params = { candles, capital, feeRate };
+  return {
+    BUY_HOLD: simulateBuyHold(params),
+    TREND: simulateTrend(params),
+    MEAN_REVERSION: simulateMeanReversion(params),
+    GRID: simulateGrid(params)
+  };
+};
+
+const strategyUtility = (result) => result.netPct - result.maxDrawdownPct * 0.5;
+
+const runWalkForward = ({ candles, capital, feeRate, trainRatio = DEFAULT_TRAIN_RATIO }) => {
+  const splitIndex = Math.floor(candles.length * trainRatio);
+  const trainCandles = candles.slice(0, splitIndex);
+  const validationCandles = candles.slice(splitIndex);
+  if (trainCandles.length < 40 || validationCandles.length < 40) {
+    throw new Error(`walk-forward split needs at least 40 candles per side, got ${trainCandles.length}/${validationCandles.length}`);
+  }
+
+  const train = simulateFamilies({ candles: trainCandles, capital, feeRate });
+  const validation = simulateFamilies({ candles: validationCandles, capital, feeRate });
+  const selectedFamily = STRATEGY_FAMILIES
+    .slice()
+    .sort((left, right) => strategyUtility(train[right]) - strategyUtility(train[left]) || left.localeCompare(right))[0];
+
+  return {
+    splitIndex,
+    trainCandles: trainCandles.length,
+    validationCandles: validationCandles.length,
+    selectedFamily,
+    trainSelected: train[selectedFamily],
+    validationSelected: validation[selectedFamily],
+    validationBuyHold: validation.BUY_HOLD,
+    train,
+    validation
+  };
+};
+
+const summarizeWalkForward = (symbolResults) => {
+  const values = symbolResults.map((result) => result.walkForward).filter(Boolean);
+  const average = (selector) => values.reduce((sum, value) => sum + selector(value), 0) / Math.max(1, values.length);
+  const selections = values.reduce((counts, value) => {
+    counts[value.selectedFamily] = (counts[value.selectedFamily] ?? 0) + 1;
+    return counts;
+  }, {});
+  const profitableSymbols = values.filter((value) => value.validationSelected.netPct > 0).length;
+  const validationAvgNetPct = average((value) => value.validationSelected.netPct);
+  const validationAvgMaxDrawdownPct = average((value) => value.validationSelected.maxDrawdownPct);
+  const buyHoldAvgNetPct = average((value) => value.validationBuyHold.netPct);
+  const buyHoldAvgMaxDrawdownPct = average((value) => value.validationBuyHold.maxDrawdownPct);
+  const minimumProfitable = Math.ceil(values.length / 2);
+  const checks = {
+    enoughSymbols: values.length >= 3,
+    positiveAfterFees: validationAvgNetPct > 0,
+    majorityProfitable: profitableSymbols >= minimumProfitable,
+    drawdownNotWorseThanBuyHold: validationAvgMaxDrawdownPct <= buyHoldAvgMaxDrawdownPct + 1e-9,
+    competitiveWithBuyHold: validationAvgNetPct >= buyHoldAvgNetPct - 0.25
+  };
+  const passed = Object.values(checks).every(Boolean);
+  const dominantSelection = Object.entries(selections)
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] ?? "NONE";
+
+  return {
+    verdict: passed ? `WALK_FORWARD_CANDIDATE_${dominantSelection}` : "NO_WALK_FORWARD_EDGE",
+    passed,
+    checks,
+    symbols: values.length,
+    selections,
+    profitableSymbols,
+    minimumProfitable,
+    trainAvgNetPct: average((value) => value.trainSelected.netPct),
+    validationAvgNetPct,
+    validationAvgMaxDrawdownPct,
+    validationTrades: values.reduce((sum, value) => sum + value.validationSelected.trades, 0),
+    buyHoldAvgNetPct,
+    buyHoldAvgMaxDrawdownPct
+  };
 };
 
 const summarizeFamily = (family, results) => {
@@ -398,16 +493,19 @@ const runReplay = async (options) => {
   for (const symbol of symbols) {
     try {
       const candles = await fetchKlines({ baseUrl, symbol, interval, limit: options.limit });
-      const params = { candles, capital: options.capital, feeRate };
+      const results = simulateFamilies({ candles, capital: options.capital, feeRate });
       symbolResults.push({
         symbol,
         candles: candles.length,
         firstClose: candles[0].close,
         lastClose: candles.at(-1).close,
-        BUY_HOLD: simulateBuyHold(params),
-        TREND: simulateTrend(params),
-        MEAN_REVERSION: simulateMeanReversion(params),
-        GRID: simulateGrid(params)
+        ...results,
+        walkForward: runWalkForward({
+          candles,
+          capital: options.capital,
+          feeRate,
+          trainRatio: options.trainRatio
+        })
       });
     } catch (error) {
       errors.push({ symbol, error: error.message || String(error) });
@@ -418,26 +516,21 @@ const runReplay = async (options) => {
   const familySummary = families
     .map((family) => summarizeFamily(family, symbolResults))
     .sort((a, b) => b.avgNetPct - a.avgNetPct || a.avgMaxDrawdownPct - b.avgMaxDrawdownPct);
-  const best = familySummary.find((family) => family.family !== "BUY_HOLD") ?? familySummary[0];
-  const buyHold = familySummary.find((family) => family.family === "BUY_HOLD");
-  const bestHasEdge =
-    best &&
-    buyHold &&
-    best.avgNetPct > 0 &&
-    best.avgNetPct >= buyHold.avgNetPct - 0.25 &&
-    best.profitableSymbols >= Math.ceil(best.symbols / 2);
+  const walkForward = summarizeWalkForward(symbolResults);
 
   return {
-    verdict: bestHasEdge ? `REPLAY_CANDIDATE_${best.family}` : "NO_REPLAY_EDGE",
+    verdict: walkForward.verdict,
     baseUrl,
     interval,
     limit: options.limit,
     capital: options.capital,
     feeBps: options.feeBps,
+    trainRatio: options.trainRatio,
     symbolsRequested: symbols.length,
     symbolsEvaluated: symbolResults.length,
     errors,
     familySummary,
+    walkForward,
     symbolResults
   };
 };
@@ -446,13 +539,19 @@ const formatPct = (value) => Number.isFinite(value) ? `${value >= 0 ? "+" : ""}$
 
 const printReport = (report) => {
   console.log(`T-026 strategy replay verdict: ${report.verdict}`);
-  console.log(`- source=${report.baseUrl}; interval=${report.interval}; limit=${report.limit}; feeBps=${report.feeBps}`);
+  console.log(`- source=${report.baseUrl}; interval=${report.interval}; limit=${report.limit}; feeBps=${report.feeBps}; trainRatio=${report.trainRatio}`);
   console.log(`- symbols=evaluated=${report.symbolsEvaluated}; requested=${report.symbolsRequested}; errors=${report.errors.length}`);
   for (const family of report.familySummary) {
     console.log(
       `- ${family.family}: avgNet=${formatPct(family.avgNetPct)}; avgMaxDD=${formatPct(family.avgMaxDrawdownPct)}; profitable=${family.profitableSymbols}/${family.symbols}; trades=${family.totalTrades}`
     );
   }
+  console.log(
+    `- walkForward=trainAvg=${formatPct(report.walkForward.trainAvgNetPct)}; validationAvg=${formatPct(report.walkForward.validationAvgNetPct)}; validationMaxDD=${formatPct(report.walkForward.validationAvgMaxDrawdownPct)}; profitable=${report.walkForward.profitableSymbols}/${report.walkForward.symbols}; trades=${report.walkForward.validationTrades}`
+  );
+  console.log(
+    `- validationBuyHold=avgNet=${formatPct(report.walkForward.buyHoldAvgNetPct)}; avgMaxDD=${formatPct(report.walkForward.buyHoldAvgMaxDrawdownPct)}; selections=${JSON.stringify(report.walkForward.selections)}; checks=${JSON.stringify(report.walkForward.checks)}`
+  );
   const topSymbols = report.symbolResults.slice(0, 8).map((result) => {
     const best = ["TREND", "MEAN_REVERSION", "GRID"]
       .map((family) => result[family])
@@ -468,6 +567,14 @@ const printReport = (report) => {
 const main = async () => {
   const options = parseArgs(process.argv.slice(2));
   const report = await runReplay(options);
+  if (options.writeReport) {
+    const target = path.isAbsolute(options.writeReport)
+      ? options.writeReport
+      : path.resolve(ROOT_DIR, options.writeReport);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`);
+    if (!options.json) console.log(`Wrote report: ${target}`);
+  }
   if (options.json) {
     console.log(JSON.stringify(report, null, 2));
   } else {
@@ -485,4 +592,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { runReplay };
+module.exports = { runReplay, runWalkForward, summarizeWalkForward };

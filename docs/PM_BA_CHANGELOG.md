@@ -16,6 +16,16 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-07-21 12:05 UTC — T-040 acceptance and T-026 activation
+- Scope: validate deployed `entry_burst_guard_v1`, close the T-040 live-window loop, and activate deterministic strategy calibration.
+- BA requirement mapping: profitability remains unproven; July 21 reports `-17.89 USDT` daily net and `-28.72 USDT` realized after fees.
+- PM milestone mapping: T-040 moves to validation; T-026 becomes the only active ticket.
+- Technical changes: added an exact post-deploy order/shadow audit with tests; added deterministic-calibration routing and targeted T-026 validation; fixed untracked-file handling in the no-docs-only gate; changed strategy replay to select on 60% training candles and evaluate on a disjoint 40% validation slice.
+- Risk slider impact: none.
+- Validation evidence: six guard activations, zero forbidden fills, max streak two, 100% MARKET metadata coverage, 88 sells after first activation, zero rejects/errors/restarts. Initial walk-forward result is `NO_WALK_FORWARD_EDGE`: validation `+0.08%`, profitable `3/12`, buy-and-hold `+3.47%`.
+- Runtime test request: none; keep commit `e3813bb` running on testnet without state reset.
+- Follow-up: implement walk-forward candidate comparison with separate calibration/validation acceptance.
+
 ## 2026-07-14 08:24 UTC — T-040 deterministic entry-burst proof
 - Scope:
   - classify `autobot-feedback-20260714-075300.tgz` and continue the pending deterministic strategy proof.
