@@ -17,7 +17,9 @@ import { resolveRouteBridgeAssets, resolveUniverseDefaultQuoteAssets, resolveWal
 import { resolveBinanceBaseUrl } from "../integrations/binance-base-url";
 import { BinanceClient } from "../integrations/binance-client";
 import { BinanceTradingService } from "../integrations/binance-trading.service";
+import { MarketHistoryService, type MarketCandle } from "../history/market-history.service";
 import { getPairPolicyBlockReason } from "../policy/trading-policy";
+import { computeAdx, computeAtrPct, computeRsi } from "./market-indicators";
 
 type ExchangeInfoResponse = {
   symbols?: Array<{
@@ -145,113 +147,6 @@ function clampNumber(v: number | null, min: number, max: number): number | null 
   return v;
 }
 
-function computeRsi(closes: number[], period = 14): number | null {
-  if (closes.length < period + 1) return null;
-  let gain = 0;
-  let loss = 0;
-  for (let i = 1; i <= period; i += 1) {
-    const diff = closes[i] - closes[i - 1];
-    if (diff >= 0) gain += diff;
-    else loss -= diff;
-  }
-  let avgGain = gain / period;
-  let avgLoss = loss / period;
-
-  for (let i = period + 1; i < closes.length; i += 1) {
-    const diff = closes[i] - closes[i - 1];
-    const g = diff > 0 ? diff : 0;
-    const l = diff < 0 ? -diff : 0;
-    avgGain = (avgGain * (period - 1) + g) / period;
-    avgLoss = (avgLoss * (period - 1) + l) / period;
-  }
-
-  if (avgLoss === 0) return 100;
-  const rs = avgGain / avgLoss;
-  return 100 - 100 / (1 + rs);
-}
-
-function computeAtrPct(highs: number[], lows: number[], closes: number[], period = 14): number | null {
-  if (closes.length < period + 1) return null;
-  let atr: number | null = null;
-  for (let i = 1; i < closes.length; i += 1) {
-    const tr = Math.max(
-      highs[i] - lows[i],
-      Math.abs(highs[i] - closes[i - 1]),
-      Math.abs(lows[i] - closes[i - 1])
-    );
-    if (i <= period) {
-      atr = (atr ?? 0) + tr;
-      if (i === period) atr = (atr ?? 0) / period;
-      continue;
-    }
-    atr = ((atr ?? 0) * (period - 1) + tr) / period;
-  }
-  const lastClose = closes[closes.length - 1];
-  if (!atr || lastClose <= 0) return null;
-  return (atr / lastClose) * 100;
-}
-
-function computeAdx(highs: number[], lows: number[], closes: number[], period = 14): number | null {
-  if (closes.length < period * 2 + 2) return null;
-  const plusDM: number[] = [];
-  const minusDM: number[] = [];
-  const trArr: number[] = [];
-  for (let i = 1; i < closes.length; i += 1) {
-    const upMove = highs[i] - highs[i - 1];
-    const downMove = lows[i - 1] - lows[i];
-    plusDM.push(upMove > downMove && upMove > 0 ? upMove : 0);
-    minusDM.push(downMove > upMove && downMove > 0 ? downMove : 0);
-    const tr = Math.max(
-      highs[i] - lows[i],
-      Math.abs(highs[i] - closes[i - 1]),
-      Math.abs(lows[i] - closes[i - 1])
-    );
-    trArr.push(tr);
-  }
-
-  const smooth = (values: number[]): number[] => {
-    const out: number[] = [];
-    let sum = 0;
-    for (let i = 0; i < values.length; i += 1) {
-      sum += values[i];
-      if (i === period - 1) {
-        out.push(sum);
-        continue;
-      }
-      if (i >= period) {
-        sum = out[out.length - 1] - out[out.length - 1] / period + values[i];
-        out.push(sum);
-      }
-    }
-    return out;
-  };
-
-  const trSmooth = smooth(trArr);
-  const plusSmooth = smooth(plusDM);
-  const minusSmooth = smooth(minusDM);
-  const len = Math.min(trSmooth.length, plusSmooth.length, minusSmooth.length);
-  if (len === 0) return null;
-
-  const dx: number[] = [];
-  for (let i = 0; i < len; i += 1) {
-    const tr = trSmooth[i];
-    if (tr === 0) continue;
-    const plusDI = (100 * plusSmooth[i]) / tr;
-    const minusDI = (100 * minusSmooth[i]) / tr;
-    const denom = plusDI + minusDI;
-    if (denom === 0) continue;
-    dx.push((100 * Math.abs(plusDI - minusDI)) / denom);
-  }
-  if (dx.length < period) return null;
-
-  // Wilder smoothing for ADX
-  let adx = dx.slice(0, period).reduce((a, b) => a + b, 0) / period;
-  for (let i = period; i < dx.length; i += 1) {
-    adx = ((adx * (period - 1)) + dx[i]) / period;
-  }
-  return adx;
-}
-
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length) as R[];
   let nextIndex = 0;
@@ -278,7 +173,8 @@ export class UniverseService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly trading: BinanceTradingService
+    private readonly trading: BinanceTradingService,
+    private readonly marketHistory: MarketHistoryService
   ) {}
 
   private async getWalletQuoteHints(maxItems: number): Promise<string[]> {
@@ -509,6 +405,37 @@ export class UniverseService {
         }
 
         const rows = raw as unknown as KlineRow[];
+        const historyCandles = rows.map((row): MarketCandle | null => {
+          const openTime = safeNumber(row?.[0]);
+          const open = safeNumber(row?.[1]);
+          const high = safeNumber(row?.[2]);
+          const low = safeNumber(row?.[3]);
+          const close = safeNumber(row?.[4]);
+          const volume = safeNumber(row?.[5]);
+          const closeTime = safeNumber(row?.[6]);
+          const quoteVolume = safeNumber(row?.[7]);
+          const trades = safeNumber(row?.[8]);
+          if ([openTime, open, high, low, close, volume, closeTime].some((value) => value === null)) return null;
+          return {
+            openTime: openTime as number,
+            closeTime: closeTime as number,
+            open: open as number,
+            high: high as number,
+            low: low as number,
+            close: close as number,
+            volume: volume as number,
+            quoteVolume,
+            trades
+          };
+        }).filter((candle): candle is MarketCandle => candle !== null);
+        try {
+          this.marketHistory.upsertCandles({ symbol: s.symbol, interval, source: baseUrl, candles: historyCandles });
+        } catch (historyError) {
+          errors.push({
+            symbol: s.symbol,
+            error: `History persistence failed: ${historyError instanceof Error ? historyError.message : String(historyError)}`
+          });
+        }
         const highs: number[] = [];
         const lows: number[] = [];
         const closes: number[] = [];
@@ -534,13 +461,15 @@ export class UniverseService {
 
         const normalizedVolume = s.quoteVolumeHome24h && s.quoteVolumeHome24h > 0 ? s.quoteVolumeHome24h : s.quoteVolume24h;
         const volumeScore = Math.log10(Math.max(1, normalizedVolume));
-        const trendScore = adx14 ? Math.min(adx14 / 50, 1) : 0;
+        const trendStrengthScore = adx14 ? Math.min(adx14 / 50, 1) : 0;
         const volScore = atrPct14 ? Math.min(atrPct14 / 10, 1) : 0;
         const breakoutScore =
-          donchianBreakoutPct20 === null ? 0 : Math.min(1, Math.abs(donchianBreakoutPct20) / 1.5);
-        const emaSpreadScore = emaTrendSpreadPct === null ? 0 : Math.min(1, Math.abs(emaTrendSpreadPct) / 1.2);
-        const bandExtremeScore =
-          bollingerPosition20 === null ? 0 : Math.min(1, Math.abs(bollingerPosition20 - 0.5) * 2);
+          donchianBreakoutPct20 === null ? 0 : Math.min(1, Math.max(0, donchianBreakoutPct20) / 1.5);
+        const emaSpreadScore = emaTrendSpreadPct === null ? 0 : Math.min(1, Math.max(0, emaTrendSpreadPct) / 1.2);
+        const positiveChangeScore = Math.min(1, Math.max(0, s.priceChangePct24h) / 5);
+        const trendScore = trendStrengthScore * Math.max(positiveChangeScore, breakoutScore, emaSpreadScore);
+        const lowerBandScore =
+          bollingerPosition20 === null ? 0 : Math.min(1, Math.max(0, 0.3 - bollingerPosition20) / 0.3);
         const rangeScore = rangeCycleScore20 ?? 0;
 
         const score =
@@ -549,16 +478,16 @@ export class UniverseService {
           volScore * 0.12 +
           breakoutScore * 0.13 +
           emaSpreadScore * 0.08 +
-          bandExtremeScore * 0.07 +
+          lowerBandScore * 0.07 +
           rangeScore * 0.07;
 
         const strategyHint =
-          (adx14 && adx14 >= 25) ||
-          (donchianBreakoutPct20 !== null && Math.abs(donchianBreakoutPct20) >= 0.4) ||
-          (emaTrendSpreadPct !== null && Math.abs(emaTrendSpreadPct) >= 0.65)
+          (adx14 && adx14 >= 25 && (s.priceChangePct24h > 0 || (emaTrendSpreadPct ?? 0) > 0.2)) ||
+          (donchianBreakoutPct20 !== null && donchianBreakoutPct20 >= 0.4) ||
+          (emaTrendSpreadPct !== null && emaTrendSpreadPct >= 0.65)
             ? "TREND"
-            : (rsi14 && (rsi14 >= 70 || rsi14 <= 30)) ||
-                (bollingerPosition20 !== null && (bollingerPosition20 <= 0.12 || bollingerPosition20 >= 0.88))
+            : (rsi14 && rsi14 <= 30) ||
+                (bollingerPosition20 !== null && bollingerPosition20 <= 0.12)
               ? "MEAN_REVERSION"
               : "RANGE";
 

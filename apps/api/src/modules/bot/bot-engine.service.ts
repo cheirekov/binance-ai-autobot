@@ -19,6 +19,7 @@ import {
 import { ConversionRouterService } from "../integrations/conversion-router.service";
 import { getPairPolicyBlockReason, isStableAsset } from "../policy/trading-policy";
 import { UniverseService } from "../universe/universe.service";
+import { getFreshLongBlockReason, scoreAdaptiveStrategy } from "./adaptive-strategy";
 import { deriveRiskBudgetDecision, type RiskBudgetRecentPerformance } from "./risk-budget.service";
 
 const EXECUTION_FIAT_QUOTES = new Set(["EUR", "JPY", "GBP", "TRY", "BRL", "AUD"]);
@@ -4661,71 +4662,7 @@ export class BotEngineService implements OnModuleInit {
   }
 
   private buildAdaptiveStrategyScores(candidate: UniverseCandidate | null, regime: RegimeLabel): AdaptiveStrategyScores {
-    const adx = Number.isFinite(candidate?.adx14) ? Math.max(0, candidate?.adx14 ?? 0) : 0;
-    const rsi = Number.isFinite(candidate?.rsi14) ? Math.max(0, Math.min(100, candidate?.rsi14 ?? 50)) : 50;
-    const atr = Number.isFinite(candidate?.atrPct14) ? Math.max(0, candidate?.atrPct14 ?? 0) : 0;
-    const change = Number.isFinite(candidate?.priceChangePct24h) ? Math.abs(candidate?.priceChangePct24h ?? 0) : 0;
-    const donchianBreakout = Number.isFinite(candidate?.donchianBreakoutPct20) ? candidate?.donchianBreakoutPct20 ?? 0 : 0;
-    const bollingerPosition = Number.isFinite(candidate?.bollingerPosition20) ? candidate?.bollingerPosition20 ?? 0.5 : 0.5;
-    const bollingerWidth = Number.isFinite(candidate?.bollingerWidthPct20) ? Math.max(0, candidate?.bollingerWidthPct20 ?? 0) : 0;
-    const emaTrendSpread = Number.isFinite(candidate?.emaTrendSpreadPct) ? candidate?.emaTrendSpreadPct ?? 0 : 0;
-    const rangeCycleScore = Number.isFinite(candidate?.rangeCycleScore20)
-      ? Math.max(0, Math.min(1, candidate?.rangeCycleScore20 ?? 0))
-      : 0;
-    const bullishBreakoutScore = this.clamp01(Math.max(0, donchianBreakout) / 1.5);
-    const bearishBreakoutScore = this.clamp01(Math.max(0, -donchianBreakout) / 1.5);
-    const bullishEmaScore = this.clamp01(Math.max(0, emaTrendSpread) / 1.2);
-    const bearishEmaScore = this.clamp01(Math.max(0, -emaTrendSpread) / 1.2);
-    const bandExtremeScore = this.clamp01(Math.abs(bollingerPosition - 0.5) * 2);
-    const lowBandReversionScore = this.clamp01((0.28 - bollingerPosition) / 0.28);
-    const highBandReversionScore = this.clamp01((bollingerPosition - 0.72) / 0.28);
-    const moderateBandWidthScore = bollingerWidth > 0 ? this.clamp01(1 - Math.abs(bollingerWidth - 2.2) / 3.2) : 0;
-
-    let trend = this.clamp01(
-      (adx / 45) * 0.38 +
-        (Math.min(8, change) / 8) * 0.16 +
-        bullishBreakoutScore * 0.24 +
-        bullishEmaScore * 0.18 +
-        bearishBreakoutScore * 0.04
-    );
-    let meanReversion = this.clamp01(
-      (rsi <= 35 || rsi >= 65 ? 0.42 : 0.18) +
-        bandExtremeScore * 0.22 +
-        Math.max(lowBandReversionScore, highBandReversionScore) * 0.18 +
-        Math.min(1.2, atr) * 0.12
-    );
-    let grid = this.clamp01(
-      (regime === "RANGE" ? 0.52 : 0.18) +
-        rangeCycleScore * 0.26 +
-        moderateBandWidthScore * 0.12 +
-        Math.min(1.4, atr) * 0.1
-    );
-
-    if (regime === "BEAR_TREND") {
-      trend = this.clamp01(trend * 0.45 + bearishBreakoutScore * 0.05 + bearishEmaScore * 0.04);
-      meanReversion = this.clamp01(meanReversion + lowBandReversionScore * 0.08);
-      grid = this.clamp01(grid - 0.18);
-    } else if (regime === "BULL_TREND") {
-      trend = this.clamp01(trend + 0.1 + bullishBreakoutScore * 0.08 + bullishEmaScore * 0.06);
-      grid = this.clamp01(grid - 0.04);
-    } else if (regime === "RANGE") {
-      trend = this.clamp01(trend - 0.04);
-      grid = this.clamp01(grid + rangeCycleScore * 0.08);
-    }
-
-    const candidates: Array<{ strategy: AdaptiveStrategy; score: number }> = [
-      { strategy: "TREND", score: trend },
-      { strategy: "MEAN_REVERSION", score: meanReversion },
-      { strategy: "GRID", score: grid }
-    ];
-    candidates.sort((a, b) => b.score - a.score);
-
-    return {
-      trend: this.toRounded(trend, 4),
-      meanReversion: this.toRounded(meanReversion, 4),
-      grid: this.toRounded(grid, 4),
-      recommended: candidates[0]?.strategy ?? "TREND"
-    };
+    return scoreAdaptiveStrategy(candidate, regime);
   }
 
   private getRegimeAdjustedMinNetEdgePct(params: {
@@ -5825,6 +5762,7 @@ export class BotEngineService implements OnModuleInit {
             if (policyReason) continue;
             const entryGuard = this.getEntryGuard({ symbol, state: current });
             if (tradeMode !== "SPOT_GRID" && entryGuard) continue;
+            if (tradeMode !== "SPOT_GRID" && getFreshLongBlockReason(candidate)) continue;
 
             if (tradeMode === "SPOT_GRID") {
               const symbolOpenLimitOrdersAll = current.activeOrders.filter((order) => {
@@ -5896,6 +5834,10 @@ export class BotEngineService implements OnModuleInit {
                 bridgeAssets: selectionBridgeAssets,
                 minExposureHome: minCountableExposureHome
               });
+              const freshLongBlockReason = getFreshLongBlockReason(candidate);
+              if (freshLongBlockReason && !hasInventory && !hasBuyLimit && !hasSellLimit) {
+                continue;
+              }
               const hasEntryGuard = Boolean(entryGuard);
               if (restrictToManagedSymbolsInCaution && !hasInventory) {
                 continue;
@@ -5980,7 +5922,12 @@ export class BotEngineService implements OnModuleInit {
               }
 
               const missingBuyLeg =
-                !hasBuyLimit && !buyPaused && !suppressBuyLegFromRejectStorm && !hasEntryGuard && (!openPositionCapReached || hasInventory);
+                !hasBuyLimit &&
+                !buyPaused &&
+                !freshLongBlockReason &&
+                !suppressBuyLegFromRejectStorm &&
+                !hasEntryGuard &&
+                (!openPositionCapReached || hasInventory);
               const missingSellLeg = !hasSellLimit && hasInventory && sellLegLikelyFeasible && !suppressSellLegFromRejectStorm;
               if (
                 this.shouldSuppressGridQuoteStarvedCandidate({
@@ -7526,6 +7473,41 @@ export class BotEngineService implements OnModuleInit {
             return;
           }
 
+          const freshLongBlockReason = getFreshLongBlockReason(selectedCandidate ?? null);
+          const hasActiveCandidateBuy = current.activeOrders.some(
+            (order) => order.symbol === candidateSymbol && order.status === "NEW" && order.side === "BUY"
+          );
+          if (!candidateIsOpen && !hasActiveCandidateBuy && freshLongBlockReason) {
+            const summary = `Skip ${candidateSymbol}: ${freshLongBlockReason}`;
+            const alreadyLogged = current.decisions[0]?.kind === "SKIP" && current.decisions[0]?.summary === summary;
+            const next = {
+              ...current,
+              activeOrders: filled.activeOrders,
+              orderHistory: filled.orderHistory,
+              decisions: alreadyLogged
+                ? current.decisions
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      ts: new Date().toISOString(),
+                      kind: "SKIP",
+                      summary,
+                      details: {
+                        stage: "adaptive-fresh-long-guard",
+                        candidateSymbol,
+                        candidateFeatures: selectedCandidate,
+                        regime: selectedRegime,
+                        strategy: selectedStrategy
+                      }
+                    },
+                    ...current.decisions
+                  ].slice(0, 200),
+              lastError: undefined
+            } satisfies BotState;
+            this.save(next);
+            return;
+          }
+
           if ((cautionPauseNewSymbols || riskBudgetBlocksNewExposure) && !candidateIsOpen) {
             const summary = cautionPauseNewSymbols
               ? `Skip ${candidateSymbol}: Daily loss caution (new symbols paused)`
@@ -8827,10 +8809,11 @@ export class BotEngineService implements OnModuleInit {
             const t = risk / 100;
             const pauseConfidenceThreshold = this.getBearPauseConfidenceThreshold(risk);
             const shouldPauseBuys =
-              regime.label === "BEAR_TREND" &&
-              typeof regime.confidence === "number" &&
-              Number.isFinite(regime.confidence) &&
-              regime.confidence >= pauseConfidenceThreshold;
+              Boolean(freshLongBlockReason) ||
+              (regime.label === "BEAR_TREND" &&
+                typeof regime.confidence === "number" &&
+                Number.isFinite(regime.confidence) &&
+                regime.confidence >= pauseConfidenceThreshold);
             const buyPausedByRiskBudget = !selectedRiskBudget.allowedActions.placeGridBuy;
             const buyPausedByCaution = cautionPauseNewSymbols || buyPausedByRiskBudget;
             let buyPausedByLossChurn = false;
@@ -8860,6 +8843,7 @@ export class BotEngineService implements OnModuleInit {
                   buyPaused,
                   buyPausedByCaution,
                   buyPausedByRiskBudget,
+                  freshLongBlockReason,
                   pauseConfidenceThreshold,
                   existingBuyPauseLock: Boolean(existingBuyPauseLock),
                   canceledBuyOrders: defensiveBuyOrders.length
@@ -8881,10 +8865,13 @@ export class BotEngineService implements OnModuleInit {
                 type: "GRID_GUARD_BUY_PAUSE",
                 scope: "SYMBOL",
                 symbol: candidateSymbol,
-                reason: `Grid guard: pause BUY legs (${regime.label} ${Math.round(regime.confidence * 100)}%)`,
+                reason: freshLongBlockReason
+                  ? `Grid guard: ${freshLongBlockReason}`
+                  : `Grid guard: pause BUY legs (${regime.label} ${Math.round(regime.confidence * 100)}%)`,
                 expiresAt: new Date(Date.now() + guardLockMs).toISOString(),
                 details: {
                   regime,
+                  freshLongBlockReason,
                   pauseConfidenceThreshold,
                   guardLockMs
                 }

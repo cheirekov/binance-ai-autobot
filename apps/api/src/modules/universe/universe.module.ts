@@ -2,11 +2,12 @@ import { Module } from "@nestjs/common";
 
 import { ConfigModule } from "../config/config.module";
 import { IntegrationsModule } from "../integrations/integrations.module";
+import { MarketHistoryModule } from "../history/market-history.module";
 import { UniverseController } from "./universe.controller";
 import { UniverseService } from "./universe.service";
 
 @Module({
-  imports: [ConfigModule, IntegrationsModule],
+  imports: [ConfigModule, IntegrationsModule, MarketHistoryModule],
   controllers: [UniverseController],
   providers: [UniverseService],
   exports: [UniverseService]
