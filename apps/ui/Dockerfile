@@ -5,7 +5,7 @@ RUN corepack enable
 
 COPY . .
 
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --filter @autobot/ui... --frozen-lockfile --ignore-scripts
 RUN pnpm -C packages/shared build
 RUN pnpm -C apps/ui build
 

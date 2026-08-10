@@ -6,7 +6,7 @@ RUN apk add --no-cache python3 make g++
 
 COPY . .
 
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --filter @autobot/api... --frozen-lockfile
 RUN pnpm -C packages/shared build
 RUN pnpm -C apps/api build
 
