@@ -1,6 +1,6 @@
 # Session Brief
 
-Last updated: 2026-07-21 11:53 UTC
+Last updated: 2026-08-10 06:29 UTC
 Owner: PM/BA + Codex
 
 ## 1) Batch Contract
@@ -23,7 +23,7 @@ Owner: PM/BA + Codex
 
 ## 3) Deployment Handoff
 
-- Commit hash: `e3813bb`
+- Commit hash: `4090ad1`
 - Deploy target: none for this calibration batch; keep the existing testnet deployment running.
 - Required config changes: none.
 - Operator action: do not reset data and do not redeploy until T-026 produces an accepted candidate.
@@ -31,20 +31,20 @@ Owner: PM/BA + Codex
 ## 4) End-of-batch result (fill after run)
 
 - Run context:
-  - window (local): `DAY (collection) / DAY (run end)`
+  - window (local): `MORNING (collection) / MORNING (run end)`
   - timezone: `Europe/Sofia`
-  - bundle interval (hours): `171.836`
-  - runtime uptime (hours): `2421.667`
-  - run end: `Tue Jul 21 2026 14:42:26 GMT+0300 (Eastern European Summer Time)`
-  - declared cycle: `DAY_RUN`
+  - bundle interval (hours): `474.759`
+  - runtime uptime (hours): `2896.427`
+  - run end: `Mon Aug 10 2026 09:28:00 GMT+0300 (Eastern European Summer Time)`
+  - declared cycle: `MORNING_REVIEW`
   - cycle source: `auto-inferred`
 - Definition of Done status:
   - fresh runtime evidence: `met` (class=fresh, staleStreak=0)
   - funding regression absent: `met` (no dominant funding regression in latest top skips)
-  - active ticket runtime signal: `observed` (Skip SOLUSDC: Risk budget blocked new exposure (40))
+  - active ticket runtime signal: `observed` (Skip ETHUSDC: Risk budget blocked new exposure (45))
 - Observed KPI delta:
-  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=37, activeMarketOrders=0)
-  - market-only share reduced: `yes` (historyMarketShare=81.5%)
+  - open LIMIT lifecycle observed: `yes` (openLimitOrders=0, historyLimitOrders=17, activeMarketOrders=0)
+  - market-only share reduced: `yes` (historyMarketShare=91.5%)
   - sizing reject pressure: `low` (sizingRejectSkips=0, decisions=200, ratio=0.0%)
   - fresh runtime evidence: `yes` (class=fresh)
 - Decision: `validation_required`
@@ -53,8 +53,8 @@ Owner: PM/BA + Codex
 - Open risks:
   - none critical from automated checks.
 - Notes for next session:
-  - bundle: `autobot-feedback-20260721-114241.tgz`
-  - auto-updated at: `2026-07-21T11:53:21.469Z`
+  - bundle: `autobot-feedback-20260810-062844.tgz`
+  - auto-updated at: `2026-08-10T06:29:01.980Z`
 
 ## 5) Copy/paste prompt for next session
 
@@ -62,7 +62,7 @@ Owner: PM/BA + Codex
 Ticket: T-026
 Decision: validation_required
 Required action: continue deterministic calibration/replay; live-market churn is supporting evidence and cannot require a runtime patch
-Latest bundle: autobot-feedback-20260721-114241.tgz
+Latest bundle: autobot-feedback-20260810-062844.tgz
 Fresh runtime evidence: yes (fresh)
 Goal: improve strategy selection and parameters through deterministic replay and walk-forward calibration.
 Live evidence policy: bundles are supporting inputs, never an automatic request for another runtime patch.

@@ -6,21 +6,17 @@
     "autobot-feedback-20260714-075300.tgz",
     "autobot-feedback-20260604-082337.tgz",
     "autobot-feedback-20260605-075150.tgz",
-    "autobot-feedback-20260618-090049.tgz",
-    "autobot-feedback-20260617-093804.tgz",
-    "autobot-feedback-20260616-152318.tgz",
-    "autobot-feedback-20260615-065149.tgz",
-    "autobot-feedback-20260612-063453.tgz"
+    "autobot-feedback-20260810-062844.tgz",
+    "autobot-feedback-20260721-114241.tgz",
+    "autobot-feedback-20260703-091448.tgz"
   ],
-  "verdict": "OFFLINE_PROOF_COMPARE_GRID_PRIMARY_RISK_FALLBACK",
+  "verdict": "OFFLINE_PROOF_COMPARE_BLOCKED",
   "runtime_patch_allowed": false,
   "approval_scope": "none",
-  "primary": "grid_guard_v2",
-  "secondary": "risk_governor_hysteresis",
+  "primary": "none",
+  "secondary": "none",
   "reasons": [
-    "entry_burst_guard_v1 passed post-deploy acceptance and is removed from candidate selection",
-    "fixture comparison ranks grid_guard_v2 first for the next offline calibration",
-    "risk governor stays active due close score, exposure, or persistent after-fee losses"
+    "entry_burst_guard_v1 passed post-deploy acceptance and is removed from candidate selection"
   ],
   "scores": {
     "grid_guard_v2": 58,
@@ -31,13 +27,13 @@
     "entry_burst_guard_v1": "ENTRY_BURST_GUARD_OFFLINE_PROOF_PASSED",
     "entry_burst_guard_v1_independent": "ENTRY_BURST_GUARD_OFFLINE_PROOF_PASSED",
     "entry_burst_guard_v1_postdeploy": "ENTRY_BURST_POSTDEPLOY_PASS",
-    "grid_guard_v2": "GRID_GUARD_OFFLINE_PROOF_TARGET_READY",
-    "risk_governor_hysteresis": "RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY"
+    "grid_guard_v2": "GRID_GUARD_PROOF_BLOCKED_SAFETY",
+    "risk_governor_hysteresis": "RISK_GOVERNOR_PROOF_BLOCKED_SAFETY"
   },
   "aggregate": {
-    "totalDailyNet": -112.73188050000044,
-    "totalFees": 55.23398384000001,
-    "totalRealizedAfterFees": -147.66051973,
+    "totalDailyNet": -117.50646899999992,
+    "totalFees": 43.47159546,
+    "totalRealizedAfterFees": -238.35954826000003,
     "leadingNegativeWindows": 5,
     "negativeAfterFeesWindows": 5,
     "highExposureWindows": 2

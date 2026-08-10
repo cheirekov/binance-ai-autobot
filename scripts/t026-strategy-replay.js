@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
+const { execFileSync } = require("node:child_process");
 
 const ROOT_DIR = path.resolve(__dirname, "..");
 const DEFAULT_LIMIT = 240;
@@ -17,6 +18,10 @@ const parseArgs = (argv) => {
     feeBps: DEFAULT_FEE_BPS,
     trainRatio: DEFAULT_TRAIN_RATIO,
     baseUrl: null,
+    bundle: null,
+    candleFixture: null,
+    writeCandleFixture: null,
+    endTime: null,
     writeReport: null,
     json: false
   };
@@ -47,6 +52,18 @@ const parseArgs = (argv) => {
     } else if (arg === "--base-url" && next) {
       options.baseUrl = next;
       index += 1;
+    } else if (arg === "--bundle" && next) {
+      options.bundle = next;
+      index += 1;
+    } else if (arg === "--candle-fixture" && next) {
+      options.candleFixture = next;
+      index += 1;
+    } else if (arg === "--write-candle-fixture" && next) {
+      options.writeCandleFixture = next;
+      index += 1;
+    } else if (arg === "--end-time" && next) {
+      options.endTime = next;
+      index += 1;
     } else if (arg === "--write-report" && next) {
       options.writeReport = next;
       index += 1;
@@ -67,6 +84,9 @@ const parseArgs = (argv) => {
   if (!Number.isFinite(options.trainRatio) || options.trainRatio < 0.5 || options.trainRatio > 0.8) {
     throw new Error(`--train-ratio must be between 0.5 and 0.8, got ${options.trainRatio}`);
   }
+  if (options.candleFixture && options.writeCandleFixture) {
+    throw new Error("--candle-fixture and --write-candle-fixture cannot be used together");
+  }
 
   return options;
 };
@@ -75,6 +95,23 @@ const readJson = (relativePath) => {
   const target = path.join(ROOT_DIR, relativePath);
   if (!fs.existsSync(target)) return null;
   return JSON.parse(fs.readFileSync(target, "utf8"));
+};
+
+const resolvePath = (target) => path.isAbsolute(target) ? target : path.resolve(ROOT_DIR, target);
+
+const readBundleJson = (bundlePath, innerPath) => {
+  for (const candidate of [`./${innerPath}`, innerPath]) {
+    try {
+      return JSON.parse(execFileSync("tar", ["-xOf", resolvePath(bundlePath), candidate], {
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+        stdio: ["ignore", "pipe", "ignore"]
+      }));
+    } catch {
+      // Try alternate archive path spelling.
+    }
+  }
+  throw new Error(`${bundlePath} is missing ${innerPath}`);
 };
 
 const resolveBaseUrl = (explicit) => {
@@ -89,14 +126,17 @@ const resolveBaseUrl = (explicit) => {
   return "https://api.binance.com";
 };
 
-const loadUniverse = () => {
-  const universe = readJson("data/universe.json") ?? {};
+const normalizeUniverse = (universe = {}) => {
   const candidates = Array.isArray(universe.candidates) ? universe.candidates : [];
   return {
     interval: typeof universe.interval === "string" ? universe.interval : "1h",
     candidates
   };
 };
+
+const loadUniverse = (bundlePath) => normalizeUniverse(
+  bundlePath ? readBundleJson(bundlePath, "data/universe.json") : readJson("data/universe.json")
+);
 
 const selectSymbols = (options, universe) => {
   if (options.symbols?.length) return options.symbols.slice(0, 24);
@@ -112,11 +152,20 @@ const asNumber = (value, fallback = Number.NaN) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const fetchKlines = async ({ baseUrl, symbol, interval, limit }) => {
+const parseEndTime = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = Number(value);
+  const parsed = Number.isFinite(numeric) ? numeric : Date.parse(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`invalid end time: ${value}`);
+  return parsed;
+};
+
+const fetchKlines = async ({ baseUrl, symbol, interval, limit, endTime }) => {
   const url = new URL("/api/v3/klines", baseUrl);
   url.searchParams.set("symbol", symbol);
   url.searchParams.set("interval", interval);
   url.searchParams.set("limit", String(limit));
+  if (endTime) url.searchParams.set("endTime", String(endTime));
 
   const response = await fetch(url, { headers: { accept: "application/json" } });
   if (!response.ok) {
@@ -217,6 +266,54 @@ const atrPctSeries = (candles, period = 14) => {
     const atr = smaAt(trs, index, period);
     return Number.isFinite(atr) && candle.close > 0 ? (atr / candle.close) * 100 : Number.NaN;
   });
+};
+
+const adxSeries = (candles, period = 14) => {
+  const plusDm = Array(candles.length).fill(0);
+  const minusDm = Array(candles.length).fill(0);
+  const tr = trueRangeSeries(candles);
+  for (let index = 1; index < candles.length; index += 1) {
+    const upMove = candles[index].high - candles[index - 1].high;
+    const downMove = candles[index - 1].low - candles[index].low;
+    plusDm[index] = upMove > downMove && upMove > 0 ? upMove : 0;
+    minusDm[index] = downMove > upMove && downMove > 0 ? downMove : 0;
+  }
+
+  const smooth = (values) => {
+    const result = Array(values.length).fill(Number.NaN);
+    if (values.length <= period) return result;
+    let value = values.slice(1, period + 1).reduce((sum, item) => sum + item, 0);
+    result[period] = value;
+    for (let index = period + 1; index < values.length; index += 1) {
+      value = value - value / period + values[index];
+      result[index] = value;
+    }
+    return result;
+  };
+
+  const smoothTr = smooth(tr);
+  const smoothPlus = smooth(plusDm);
+  const smoothMinus = smooth(minusDm);
+  const plusDi = candles.map((_, index) => Number.isFinite(smoothTr[index]) && smoothTr[index] > 0
+    ? (smoothPlus[index] / smoothTr[index]) * 100
+    : Number.NaN);
+  const minusDi = candles.map((_, index) => Number.isFinite(smoothTr[index]) && smoothTr[index] > 0
+    ? (smoothMinus[index] / smoothTr[index]) * 100
+    : Number.NaN);
+  const dx = candles.map((_, index) => {
+    const total = plusDi[index] + minusDi[index];
+    return Number.isFinite(total) && total > 0 ? (Math.abs(plusDi[index] - minusDi[index]) / total) * 100 : Number.NaN;
+  });
+  const adx = Array(candles.length).fill(Number.NaN);
+  const firstAdxIndex = period * 2;
+  const seed = dx.slice(period + 1, firstAdxIndex + 1).filter(Number.isFinite);
+  if (seed.length === period) {
+    adx[firstAdxIndex] = seed.reduce((sum, value) => sum + value, 0) / period;
+    for (let index = firstAdxIndex + 1; index < candles.length; index += 1) {
+      adx[index] = ((adx[index - 1] * (period - 1)) + dx[index]) / period;
+    }
+  }
+  return { adx, plusDi, minusDi };
 };
 
 const maxDrawdownPct = (equity) => {
@@ -386,7 +483,70 @@ const simulateGrid = ({ candles, capital, feeRate }) => {
   });
 };
 
-const STRATEGY_FAMILIES = ["TREND", "MEAN_REVERSION", "GRID"];
+const simulateRegimeAdaptive = ({ candles, capital, feeRate }) => {
+  const closes = candles.map((candle) => candle.close);
+  const emaFast = emaSeries(closes, 12);
+  const emaSlow = emaSeries(closes, 26);
+  const rsi = rsiSeries(closes, 14);
+  const tr = trueRangeSeries(candles);
+  const { adx, plusDi, minusDi } = adxSeries(candles, 14);
+  let quote = capital;
+  let base = 0;
+  let entry = 0;
+  let peak = 0;
+  let entryMode = null;
+  let trades = 0;
+  const equity = [];
+
+  for (let index = 30; index < candles.length; index += 1) {
+    const close = closes[index];
+    const atr = smaAt(tr, index, 14);
+    const mid = smaAt(closes, index, 20);
+    const sd = stdAt(closes, index, 20, mid);
+    const lower = mid - sd * 1.8;
+    const strongTrend = adx[index] >= 24;
+    const bullishTrend = strongTrend && plusDi[index] > minusDi[index] && emaFast[index] > emaSlow[index];
+    const rangeMarket = adx[index] <= 20;
+    const momentumEntry = bullishTrend && rsi[index] >= 50 && rsi[index] <= 72 && close > closes[index - 8];
+    const rangeEntry = rangeMarket && close <= lower && rsi[index] <= 36;
+
+    if (base <= 0 && quote > 0 && (momentumEntry || rangeEntry)) {
+      base = (quote / close) * (1 - feeRate);
+      quote = 0;
+      entry = close;
+      peak = close;
+      entryMode = momentumEntry ? "TREND" : "RANGE";
+      trades += 1;
+    } else if (base > 0) {
+      peak = Math.max(peak, close);
+      const atrStop = Number.isFinite(atr) ? Math.max(entry - atr * 2.5, peak - atr * 2.5) : entry * 0.96;
+      const trendExit = entryMode === "TREND" && (emaFast[index] < emaSlow[index] || minusDi[index] > plusDi[index]);
+      const rangeExit = entryMode === "RANGE" && (close >= mid || rsi[index] >= 55);
+      if (close <= atrStop || trendExit || rangeExit) {
+        quote = base * close * (1 - feeRate);
+        base = 0;
+        entry = 0;
+        peak = 0;
+        entryMode = null;
+        trades += 1;
+      }
+    }
+    equity.push(quote + base * close);
+  }
+
+  const final = finalizePosition({ quote, base, lastClose: closes.at(-1), feeRate });
+  return buildResult({
+    family: "REGIME_ADAPTIVE",
+    capital,
+    quote: final.quote,
+    base: final.base,
+    lastClose: closes.at(-1),
+    trades: trades + final.trades,
+    equity
+  });
+};
+
+const STRATEGY_FAMILIES = ["TREND", "MEAN_REVERSION", "GRID", "REGIME_ADAPTIVE"];
 
 const simulateFamilies = ({ candles, capital, feeRate }) => {
   const params = { candles, capital, feeRate };
@@ -394,7 +554,8 @@ const simulateFamilies = ({ candles, capital, feeRate }) => {
     BUY_HOLD: simulateBuyHold(params),
     TREND: simulateTrend(params),
     MEAN_REVERSION: simulateMeanReversion(params),
-    GRID: simulateGrid(params)
+    GRID: simulateGrid(params),
+    REGIME_ADAPTIVE: simulateRegimeAdaptive(params)
   };
 };
 
@@ -482,17 +643,33 @@ const summarizeFamily = (family, results) => {
 };
 
 const runReplay = async (options) => {
-  const universe = loadUniverse();
-  const interval = options.interval ?? universe.interval;
+  const fixture = options.candleFixture
+    ? JSON.parse(fs.readFileSync(resolvePath(options.candleFixture), "utf8"))
+    : null;
+  const bundleContext = options.bundle ? readBundleJson(options.bundle, "meta/run-context.json") : null;
+  const universe = fixture
+    ? normalizeUniverse({
+        interval: fixture.interval,
+        candidates: (fixture.symbols ?? []).map((entry) => ({ symbol: entry.symbol, score: entry.score ?? 0 }))
+      })
+    : loadUniverse(options.bundle);
+  const interval = options.interval ?? fixture?.interval ?? universe.interval;
   const symbols = selectSymbols(options, universe);
   const baseUrl = resolveBaseUrl(options.baseUrl);
+  const endTime = parseEndTime(
+    options.endTime ?? fixture?.endTime ?? bundleContext?.run_ended_at_utc ?? bundleContext?.run_end_utc
+  );
   const feeRate = options.feeBps / 10_000;
   const symbolResults = [];
   const errors = [];
+  const capturedSymbols = [];
+  const fixtureBySymbol = new Map((fixture?.symbols ?? []).map((entry) => [String(entry.symbol).toUpperCase(), entry]));
 
   for (const symbol of symbols) {
     try {
-      const candles = await fetchKlines({ baseUrl, symbol, interval, limit: options.limit });
+      const fixtureEntry = fixtureBySymbol.get(String(symbol).toUpperCase());
+      const candles = fixtureEntry?.candles ?? await fetchKlines({ baseUrl, symbol, interval, limit: options.limit, endTime });
+      capturedSymbols.push({ symbol, score: fixtureEntry?.score ?? 0, candles });
       const results = simulateFamilies({ candles, capital: options.capital, feeRate });
       symbolResults.push({
         symbol,
@@ -512,15 +689,31 @@ const runReplay = async (options) => {
     }
   }
 
-  const families = ["BUY_HOLD", "TREND", "MEAN_REVERSION", "GRID"];
+  const families = ["BUY_HOLD", "TREND", "MEAN_REVERSION", "GRID", "REGIME_ADAPTIVE"];
   const familySummary = families
     .map((family) => summarizeFamily(family, symbolResults))
     .sort((a, b) => b.avgNetPct - a.avgNetPct || a.avgMaxDrawdownPct - b.avgMaxDrawdownPct);
   const walkForward = summarizeWalkForward(symbolResults);
 
+  if (options.writeCandleFixture) {
+    const target = resolvePath(options.writeCandleFixture);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, `${JSON.stringify({
+      schema_version: 1,
+      source_bundle: options.bundle ? path.basename(options.bundle) : null,
+      source: baseUrl,
+      interval,
+      limit: options.limit,
+      endTime,
+      symbols: capturedSymbols
+    }, null, 2)}\n`);
+  }
+
   return {
     verdict: walkForward.verdict,
-    baseUrl,
+    baseUrl: fixture ? `fixture:${path.basename(options.candleFixture)}` : baseUrl,
+    sourceBundle: options.bundle ? path.basename(options.bundle) : fixture?.source_bundle ?? null,
+    endTime,
     interval,
     limit: options.limit,
     capital: options.capital,
@@ -539,7 +732,7 @@ const formatPct = (value) => Number.isFinite(value) ? `${value >= 0 ? "+" : ""}$
 
 const printReport = (report) => {
   console.log(`T-026 strategy replay verdict: ${report.verdict}`);
-  console.log(`- source=${report.baseUrl}; interval=${report.interval}; limit=${report.limit}; feeBps=${report.feeBps}; trainRatio=${report.trainRatio}`);
+  console.log(`- source=${report.baseUrl}; bundle=${report.sourceBundle ?? "none"}; endTime=${report.endTime ?? "latest"}; interval=${report.interval}; limit=${report.limit}; feeBps=${report.feeBps}; trainRatio=${report.trainRatio}`);
   console.log(`- symbols=evaluated=${report.symbolsEvaluated}; requested=${report.symbolsRequested}; errors=${report.errors.length}`);
   for (const family of report.familySummary) {
     console.log(
@@ -553,7 +746,7 @@ const printReport = (report) => {
     `- validationBuyHold=avgNet=${formatPct(report.walkForward.buyHoldAvgNetPct)}; avgMaxDD=${formatPct(report.walkForward.buyHoldAvgMaxDrawdownPct)}; selections=${JSON.stringify(report.walkForward.selections)}; checks=${JSON.stringify(report.walkForward.checks)}`
   );
   const topSymbols = report.symbolResults.slice(0, 8).map((result) => {
-    const best = ["TREND", "MEAN_REVERSION", "GRID"]
+    const best = STRATEGY_FAMILIES
       .map((family) => result[family])
       .sort((a, b) => b.netPct - a.netPct)[0];
     return `${result.symbol}:${best.family}:${formatPct(best.netPct)}`;
@@ -592,4 +785,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { runReplay, runWalkForward, summarizeWalkForward };
+module.exports = { parseEndTime, runReplay, runWalkForward, summarizeWalkForward };

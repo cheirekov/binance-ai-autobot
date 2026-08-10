@@ -1,7 +1,7 @@
 # Production Delta Note
 
-Last updated: 2026-07-21 12:05 UTC
+Last updated: 2026-08-10 07:10 UTC
 
-The deployed entry-burst guard is accepted, but the bot is not production-ready. July 21 improved daily net, realized-after-fees, and allocation versus July 14, while overall after-fee expectancy stayed negative.
+The deployed entry-burst guard remains accepted, but the bot is not production-ready. August 10 has clean execution safety and only `0.13%` allocation, while daily net and realized-after-fees worsened to `-40.19` and `-57.20 USDT`.
 
-The remaining blocker is strategy quality across regimes. T-026 now owns deterministic walk-forward calibration; live-window waiting is no longer the development gate.
+The fixed two-cutoff walk-forward gate rejects the current selector (`-0.02%` selected average versus `+2.48%` buy-and-hold). Strategy quality remains the blocker; no runtime patch is approved.

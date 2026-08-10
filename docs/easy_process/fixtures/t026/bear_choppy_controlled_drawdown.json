@@ -4,32 +4,36 @@
   "recommendation": "BUILD_BEAR_CHOPPY_FIXTURE",
   "objective": "prove a reference-inspired strategy can reduce drawdown/fee burn without increasing rejects, restarts, or hard-risk violations",
   "source_bundles": [
-    "autobot-feedback-20260618-090049.tgz",
-    "autobot-feedback-20260617-093804.tgz",
-    "autobot-feedback-20260616-152318.tgz",
-    "autobot-feedback-20260615-065149.tgz",
-    "autobot-feedback-20260612-063453.tgz"
+    "autobot-feedback-20260810-062844.tgz",
+    "autobot-feedback-20260721-114241.tgz",
+    "autobot-feedback-20260714-075300.tgz",
+    "autobot-feedback-20260713-085946.tgz",
+    "autobot-feedback-20260703-091448.tgz"
   ],
   "windows": [
     {
-      "bundle": "autobot-feedback-20260618-090049.tgz",
+      "bundle": "autobot-feedback-20260810-062844.tgz",
       "class": "CONTROLLED_DRAWDOWN",
-      "dailyNet": -39.768505290000576,
-      "fees": 10.82968267,
-      "maxDrawdown": 1.087590981357583,
-      "totalAllocation": 0.10975416974906686,
-      "submittedOrders": 201,
-      "filledOrders": 186,
+      "dailyNet": -40.186620149999726,
+      "fees": 9.26999138,
+      "maxDrawdown": 1.2201388728729183,
+      "totalAllocation": 0.1275558396726834,
+      "submittedOrders": 200,
+      "filledOrders": 189,
       "rejectedOrders": 0,
-      "canceledOrders": 14,
-      "buys": 112,
-      "sells": 74,
+      "canceledOrders": 11,
+      "buys": 103,
+      "sells": 86,
       "healthErrors": 0,
       "restarts": 0,
-      "topReason": "Skip: No feasible candidates after policy/exposure filters",
+      "topReason": "Skip ETHUSDC: Risk budget blocked new exposure",
       "topReasons": [
         {
-          "reason": "Skip: No feasible candidates after policy/exposure filters",
+          "reason": "Skip ETHUSDC: Risk budget blocked new exposure",
+          "count": 45
+        },
+        {
+          "reason": "Skip BTCUSDC: Risk budget blocked new exposure",
           "count": 45
         },
         {
@@ -37,237 +41,235 @@
           "count": 35
         },
         {
-          "reason": "Skip NEARUSDC: Risk budget blocked new exposure",
-          "count": 15
+          "reason": "Skip WLDUSDC: Risk budget blocked new exposure",
+          "count": 5
+        },
+        {
+          "reason": "Skip TUTUSDC: Grid sell leg not actionable yet",
+          "count": 4
+        },
+        {
+          "reason": "Skip TUTUSDC: Risk budget paused GRID BUY leg",
+          "count": 4
+        },
+        {
+          "reason": "Skip BMTUSDC: Grid sell leg not actionable yet",
+          "count": 3
+        },
+        {
+          "reason": "Skip BMTUSDC: Risk budget paused GRID BUY leg",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "bundle": "autobot-feedback-20260721-114241.tgz",
+      "class": "CONTROLLED_DRAWDOWN",
+      "dailyNet": -17.885123770000064,
+      "fees": 8.06064769,
+      "maxDrawdown": 0.6358966772788268,
+      "totalAllocation": 3.564319801477136,
+      "submittedOrders": 200,
+      "filledOrders": 184,
+      "rejectedOrders": 0,
+      "canceledOrders": 16,
+      "buys": 96,
+      "sells": 88,
+      "healthErrors": 0,
+      "restarts": 0,
+      "topReason": "Skip SOLUSDC: Risk budget blocked new exposure",
+      "topReasons": [
+        {
+          "reason": "Skip SOLUSDC: Risk budget blocked new exposure",
+          "count": 40
+        },
+        {
+          "reason": "Skip BTCUSDC: Risk budget blocked new exposure",
+          "count": 37
         },
         {
           "reason": "Skip ETHUSDC: Risk budget blocked new exposure",
-          "count": 12
+          "count": 35
         },
         {
-          "reason": "Skip XLMUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 11
-        },
-        {
-          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.115% < 0.559%)",
+          "reason": "Skip XRPUSDC: Risk budget blocked new exposure",
           "count": 5
         },
         {
-          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.201% < 0.559%)",
-          "count": 4
+          "reason": "Skip ONDOUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 5
         },
         {
-          "reason": "Skip SOLUSDC: Fee/edge filter (net 0.189% < 0.559%)",
+          "reason": "Skip ADAUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 5
+        },
+        {
+          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.192% < 0.559%)",
+          "count": 5
+        },
+        {
+          "reason": "Skip ENAUSDC: Risk budget market entry cap below exchange minimum",
           "count": 4
         }
       ]
     },
     {
-      "bundle": "autobot-feedback-20260617-093804.tgz",
-      "class": "CONTROLLED_DRAWDOWN",
-      "dailyNet": -29.624865529999624,
-      "fees": 11.71260433,
-      "maxDrawdown": 0.6540478704402268,
-      "totalAllocation": 1.6190335473181376,
-      "submittedOrders": 201,
-      "filledOrders": 182,
+      "bundle": "autobot-feedback-20260714-075300.tgz",
+      "class": "NEUTRAL_OR_INCONCLUSIVE",
+      "dailyNet": -31.071832560000075,
+      "fees": 8.31282255,
+      "maxDrawdown": 0.934782517656259,
+      "totalAllocation": 5.088329250796161,
+      "submittedOrders": 202,
+      "filledOrders": 169,
       "rejectedOrders": 0,
-      "canceledOrders": 18,
-      "buys": 115,
-      "sells": 67,
+      "canceledOrders": 32,
+      "buys": 97,
+      "sells": 72,
       "healthErrors": 0,
       "restarts": 0,
-      "topReason": "Skip BTCUSDC: Risk budget blocked new exposure",
+      "topReason": "Skip ETHUSDC: Risk budget blocked new exposure",
       "topReasons": [
         {
-          "reason": "Skip BTCUSDC: Risk budget blocked new exposure",
-          "count": 62
+          "reason": "Skip ETHUSDC: Risk budget blocked new exposure",
+          "count": 49
         },
         {
-          "reason": "Skip SOLUSDC: Risk budget blocked new exposure",
-          "count": 31
+          "reason": "Skip BTCUSDC: Risk budget blocked new exposure",
+          "count": 49
+        },
+        {
+          "reason": "Skip NEARUSDC: Risk budget blocked new exposure",
+          "count": 24
+        },
+        {
+          "reason": "Skip XRPUSDC: Risk budget blocked new exposure",
+          "count": 17
         },
         {
           "reason": "Skip ZECUSDC: Risk budget paused GRID BUY leg",
-          "count": 21
+          "count": 6
         },
         {
-          "reason": "Skip WLDUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 16
-        },
-        {
-          "reason": "Skip NEARUSDC: Risk budget blocked new exposure",
-          "count": 14
-        },
-        {
-          "reason": "Skip XRPUSDC: Risk budget blocked new exposure",
-          "count": 9
-        },
-        {
-          "reason": "Skip UNIUSDC: Risk budget market entry cap below exchange minimum",
+          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.002% < 0.559%)",
           "count": 5
         },
         {
-          "reason": "Skip ETHUSDC: Grid sell leg not actionable yet",
-          "count": 3
+          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.079% < 0.559%)",
+          "count": 5
+        },
+        {
+          "reason": "Skip SOLUSDC: Risk budget blocked new exposure",
+          "count": 4
         }
       ]
     },
     {
-      "bundle": "autobot-feedback-20260616-152318.tgz",
-      "class": "NEUTRAL_OR_INCONCLUSIVE",
-      "dailyNet": -12.740767450000021,
-      "fees": 11.43434278,
-      "maxDrawdown": 0.4600063150083683,
-      "totalAllocation": 5.109796260111092,
-      "submittedOrders": 200,
-      "filledOrders": 193,
+      "bundle": "autobot-feedback-20260713-085946.tgz",
+      "class": "CONTROLLED_DRAWDOWN",
+      "dailyNet": -25.680295950000072,
+      "fees": 8.74618601,
+      "maxDrawdown": 0.7514425315938852,
+      "totalAllocation": 3.1006077690895952,
+      "submittedOrders": 201,
+      "filledOrders": 173,
       "rejectedOrders": 0,
-      "canceledOrders": 7,
-      "buys": 115,
-      "sells": 78,
+      "canceledOrders": 27,
+      "buys": 98,
+      "sells": 75,
       "healthErrors": 0,
       "restarts": 0,
       "topReason": "Skip BTCUSDC: Risk budget blocked new exposure",
       "topReasons": [
         {
           "reason": "Skip BTCUSDC: Risk budget blocked new exposure",
-          "count": 58
+          "count": 51
         },
         {
-          "reason": "Skip JTOUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 18
+          "reason": "Skip ETHUSDC: Risk budget blocked new exposure",
+          "count": 49
         },
         {
-          "reason": "Skip XLMUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 14
-        },
-        {
-          "reason": "Skip XRPUSDC: Risk budget blocked new exposure",
-          "count": 10
-        },
-        {
-          "reason": "Skip WLDUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 8
-        },
-        {
-          "reason": "Skip ETHUSDC: Grid sell leg not actionable yet",
-          "count": 6
-        },
-        {
-          "reason": "Skip ETHUSDC: Risk budget paused GRID BUY leg",
-          "count": 6
+          "reason": "Skip SOLUSDC: Risk budget blocked new exposure",
+          "count": 44
         },
         {
           "reason": "Skip NEARUSDC: Risk budget blocked new exposure",
+          "count": 9
+        },
+        {
+          "reason": "Skip ZECUSDC: Grid sell leg not actionable yet",
           "count": 6
+        },
+        {
+          "reason": "Skip ZECUSDC: Risk budget paused GRID BUY leg",
+          "count": 6
+        },
+        {
+          "reason": "Skip: No eligible universe candidates after policy and lock filters",
+          "count": 3
+        },
+        {
+          "reason": "Skip ETHUSDC: Fee/edge filter (net -0.001% < 0.559%)",
+          "count": 2
         }
       ]
     },
     {
-      "bundle": "autobot-feedback-20260615-065149.tgz",
-      "class": "NEUTRAL_OR_INCONCLUSIVE",
-      "dailyNet": -23.60006977000012,
-      "fees": 10.44629194,
-      "maxDrawdown": 0.7533116749168529,
-      "totalAllocation": 5.109274417534431,
-      "submittedOrders": 201,
-      "filledOrders": 195,
+      "bundle": "autobot-feedback-20260703-091448.tgz",
+      "class": "SAFETY_FAILURE",
+      "dailyNet": -2.682596569999987,
+      "fees": 9.08194783,
+      "maxDrawdown": 0.369175356792606,
+      "totalAllocation": 5.091033902601742,
+      "submittedOrders": 200,
+      "filledOrders": 181,
       "rejectedOrders": 0,
-      "canceledOrders": 5,
-      "buys": 111,
-      "sells": 84,
-      "healthErrors": 0,
+      "canceledOrders": 19,
+      "buys": 104,
+      "sells": 77,
+      "healthErrors": 1,
       "restarts": 0,
-      "topReason": "Skip SOLUSDC: Risk budget market entry cap below exchange minimum",
+      "topReason": "Skip ETHUSDC: Risk budget market entry cap below exchange minimum",
       "topReasons": [
-        {
-          "reason": "Skip SOLUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 26
-        },
-        {
-          "reason": "Skip NEARUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 18
-        },
-        {
-          "reason": "Skip OPGUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 15
-        },
         {
           "reason": "Skip ETHUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 15
+          "count": 38
         },
         {
-          "reason": "Skip ZECUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 12
+          "reason": "Skip TLMUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 29
         },
         {
-          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.553% < 0.559%)",
-          "count": 12
-        },
-        {
-          "reason": "Skip TAOUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 9
-        },
-        {
-          "reason": "Skip BTCUSDC: Risk budget blocked new exposure",
-          "count": 9
-        }
-      ]
-    },
-    {
-      "bundle": "autobot-feedback-20260612-063453.tgz",
-      "class": "CONTROLLED_DRAWDOWN",
-      "dailyNet": -6.9976724600001035,
-      "fees": 10.81106212,
-      "maxDrawdown": 0.6207561827458495,
-      "totalAllocation": 2.3316000294709562,
-      "submittedOrders": 201,
-      "filledOrders": 176,
-      "rejectedOrders": 0,
-      "canceledOrders": 24,
-      "buys": 106,
-      "sells": 70,
-      "healthErrors": 0,
-      "restarts": 0,
-      "topReason": "Skip EPICUSDC: Risk budget market entry cap below exchange minimum",
-      "topReasons": [
-        {
-          "reason": "Skip EPICUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 27
-        },
-        {
-          "reason": "Skip CRVUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 22
-        },
-        {
-          "reason": "Skip XPLUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 21
-        },
-        {
-          "reason": "Skip BTCUSDC: Risk budget blocked new exposure",
+          "reason": "Skip: Transient exchange backoff active",
           "count": 14
         },
         {
-          "reason": "Skip ZECUSDC: Risk budget blocked new exposure",
-          "count": 12
+          "reason": "Skip: Live order sync failed",
+          "count": 14
         },
         {
-          "reason": "Skip ETHUSDC: Risk budget market entry cap below exchange minimum",
-          "count": 9
+          "reason": "Skip ADAUSDC: Risk budget market entry cap below exchange minimum",
+          "count": 14
         },
         {
-          "reason": "Skip ETHUSDC: Risk budget paused GRID BUY leg",
+          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.478% < 0.559%)",
+          "count": 8
+        },
+        {
+          "reason": "Skip ALLOUSDC: Risk budget market entry cap below exchange minimum",
           "count": 7
         },
         {
-          "reason": "Skip BTCUSDC: Fee/edge filter (net 0.138% < 0.559%)",
-          "count": 3
+          "reason": "Skip ETHUSDC: Fee/edge filter (net 0.475% < 0.559%)",
+          "count": 6
         }
       ]
     }
   ],
   "safety_signals": {
+    "latestSafetyFailure": false,
+    "safetyFailureWindows": 1,
     "rejectedWindowsRecent": 0,
     "totalRejectedRecent": 0,
     "repeatedSmallRejects": false
@@ -287,7 +289,7 @@
     },
     {
       "family": "mean_reversion_gate",
-      "score": 18,
+      "score": 21,
       "reason": "candidate entry-quality gate for range/choppy windows; must stay shadow/offline until replay proves edge",
       "rank": 3
     }

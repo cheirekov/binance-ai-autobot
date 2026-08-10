@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "verdict": "WALK_FORWARD_REJECTED",
+  "promotion_candidate": false,
+  "runtime_patch_allowed": false,
+  "checks": {
+    "atLeastTwoCutoffs": true,
+    "uniqueCutoffs": true,
+    "deterministicFixtures": true,
+    "noDataErrors": true,
+    "positiveEveryCutoff": false,
+    "majorityProfitable": false,
+    "competitiveWithBuyHold": false,
+    "drawdownNotWorseThanBuyHold": true
+  },
+  "aggregate": {
+    "cutoffs": 2,
+    "totalSymbols": 24,
+    "totalProfitable": 10,
+    "validationAvgNetPct": -0.02239675406199665,
+    "buyHoldAvgNetPct": 2.479633871582583,
+    "relativeEdgePct": -2.5020306256445797
+  },
+  "windows": [
+    {
+      "source": "fixture:20260721-mainnet-core-1h-candles.json",
+      "sourceBundle": "autobot-feedback-20260721-114241.tgz",
+      "endTime": 1784634146740,
+      "verdict": "NO_WALK_FORWARD_EDGE",
+      "errors": 0,
+      "symbols": 12,
+      "validationAvgNetPct": -0.05072522783060831,
+      "validationAvgMaxDrawdownPct": 1.0482139499498386,
+      "profitableSymbols": 4,
+      "buyHoldAvgNetPct": 4.456645647591029,
+      "buyHoldAvgMaxDrawdownPct": 2.4044524146937287
+    },
+    {
+      "source": "fixture:20260810-mainnet-core-1h-candles.json",
+      "sourceBundle": "autobot-feedback-20260810-062844.tgz",
+      "endTime": 1786343280628,
+      "verdict": "NO_WALK_FORWARD_EDGE",
+      "errors": 0,
+      "symbols": 12,
+      "validationAvgNetPct": 0.005931719706615009,
+      "validationAvgMaxDrawdownPct": 0.4840768915185312,
+      "profitableSymbols": 6,
+      "buyHoldAvgNetPct": 0.5026220955741375,
+      "buyHoldAvgMaxDrawdownPct": 2.740925471812258
+    }
+  ],
+  "next_action": "keep runtime unchanged; improve or replace the offline selector and rerun the same fixed fixtures"
+}

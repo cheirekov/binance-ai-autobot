@@ -16,6 +16,16 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-08-10 07:10 UTC — T-026 reproducible multi-fixture walk-forward gate
+- Scope: classify the August bundle and advance deterministic calibration without a live trading patch.
+- BA requirement mapping: runtime safety is clean, but strategy effectiveness remains `NOT_BETA_READY` at `-57.20 USDT` realized after fees.
+- Technical changes: added bundle-anchored candle capture/replay, fixed-core universe fixtures, clean-room `REGIME_ADAPTIVE` simulation, and a two-cutoff promotion gate with tests.
+- Bias controls: rejected end-of-window dynamic-universe fixtures after detecting survivorship/look-ahead bias; retained only fixed liquid-core fixtures.
+- Validation evidence: entry-burst post-deploy `PASS`; walk-forward gate `WALK_FORWARD_REJECTED`, selected average `-0.02%`, buy-and-hold `+2.48%`, profitable `10/24`.
+- Risk slider impact: none. `runtime_patch_allowed=false`.
+- Runtime test request: keep testnet commit `4090ad1` running without reset or redeploy.
+- Follow-up: improve or replace the selector against unchanged preserved fixtures.
+
 ## 2026-07-21 12:05 UTC — T-040 acceptance and T-026 activation
 - Scope: validate deployed `entry_burst_guard_v1`, close the T-040 live-window loop, and activate deterministic strategy calibration.
 - BA requirement mapping: profitability remains unproven; July 21 reports `-17.89 USDT` daily net and `-28.72 USDT` realized after fees.

@@ -2,17 +2,17 @@
   "schema_version": 1,
   "fixture": "bear_choppy_controlled_drawdown",
   "source_bundles": [
-    "autobot-feedback-20260618-090049.tgz",
-    "autobot-feedback-20260617-093804.tgz",
-    "autobot-feedback-20260616-152318.tgz",
-    "autobot-feedback-20260615-065149.tgz",
-    "autobot-feedback-20260612-063453.tgz"
+    "autobot-feedback-20260810-062844.tgz",
+    "autobot-feedback-20260721-114241.tgz",
+    "autobot-feedback-20260714-075300.tgz",
+    "autobot-feedback-20260713-085946.tgz",
+    "autobot-feedback-20260703-091448.tgz"
   ],
-  "verdict": "RISK_GOVERNOR_OFFLINE_PROOF_TARGET_READY",
+  "verdict": "RISK_GOVERNOR_PROOF_BLOCKED_SAFETY",
   "runtime_patch_allowed": false,
   "reason": "offline proof target only; runtime risk-governor changes still require focused tests proving earlier defensive state preserves SELL/unwind reachability",
   "checks": {
-    "safetyClean": true,
+    "safetyClean": false,
     "candidatePresent": true,
     "negativeStreakPresent": true,
     "negativeAfterFeesPresent": true,
@@ -29,12 +29,12 @@
     "negativeAfterFeesWindows": 5,
     "highExposureWindows": 2,
     "tradeChurnWindows": 5,
-    "totalDailyNet": -112.73188050000044,
-    "totalFees": 55.23398384000001,
-    "totalRealizedAfterFees": -147.66051973,
-    "totalRiskBudgetReasons": 602,
-    "totalFeeEdgeReasons": 81,
-    "totalFixtureSells": 373
+    "totalDailyNet": -117.50646899999992,
+    "totalFees": 43.47159546,
+    "totalRealizedAfterFees": -238.35954826000003,
+    "totalRiskBudgetReasons": 673,
+    "totalFeeEdgeReasons": 94,
+    "totalFixtureSells": 398
   },
   "candidate_scores": {
     "grid_guard_v2": 58,
@@ -49,104 +49,104 @@
   },
   "windows": [
     {
-      "bundle": "autobot-feedback-20260618-090049.tgz",
+      "bundle": "autobot-feedback-20260810-062844.tgz",
       "class": "CONTROLLED_DRAWDOWN",
-      "dailyNet": -39.768505290000576,
-      "realizedAfterFees": -58.81594493,
-      "totalAllocPct": 0.10975416974906686,
-      "filledOrders": 186,
+      "dailyNet": -40.186620149999726,
+      "realizedAfterFees": -57.20355291,
+      "totalAllocPct": 0.1275558396726834,
+      "filledOrders": 189,
       "rejectedOrders": 0,
-      "riskBudgetReasonCount": 79,
+      "riskBudgetReasonCount": 144,
+      "feeEdgeReasonCount": 4,
+      "largestOpenExposure": {
+        "symbol": "TUTUSDC",
+        "openCost": 1.43994259,
+        "netAfterFees": -18.73094626,
+        "buys": 18,
+        "sells": 14
+      },
+      "fixtureBuys": 103,
+      "fixtureSells": 86
+    },
+    {
+      "bundle": "autobot-feedback-20260721-114241.tgz",
+      "class": "CONTROLLED_DRAWDOWN",
+      "dailyNet": -17.885123770000064,
+      "realizedAfterFees": -28.71664755,
+      "totalAllocPct": 3.564319801477136,
+      "filledOrders": 184,
+      "rejectedOrders": 0,
+      "riskBudgetReasonCount": 131,
+      "feeEdgeReasonCount": 22,
+      "largestOpenExposure": {
+        "symbol": "ADAUSDC",
+        "openCost": 89.57207271,
+        "netAfterFees": -0.7498419700000001,
+        "buys": 3,
+        "sells": 1
+      },
+      "fixtureBuys": 96,
+      "fixtureSells": 88
+    },
+    {
+      "bundle": "autobot-feedback-20260714-075300.tgz",
+      "class": "NEUTRAL_OR_INCONCLUSIVE",
+      "dailyNet": -31.071832560000075,
+      "realizedAfterFees": -72.46298397000001,
+      "totalAllocPct": 5.088329250796161,
+      "filledOrders": 169,
+      "rejectedOrders": 0,
+      "riskBudgetReasonCount": 149,
       "feeEdgeReasonCount": 23,
       "largestOpenExposure": {
-        "symbol": "XPLUSDC",
-        "openCost": 2.07783462,
-        "netAfterFees": -16.89104351,
-        "buys": 49,
-        "sells": 17
-      },
-      "fixtureBuys": 112,
-      "fixtureSells": 74
-    },
-    {
-      "bundle": "autobot-feedback-20260617-093804.tgz",
-      "class": "CONTROLLED_DRAWDOWN",
-      "dailyNet": -29.624865529999624,
-      "realizedAfterFees": -26.46896781,
-      "totalAllocPct": 1.6190335473181376,
-      "filledOrders": 182,
-      "rejectedOrders": 0,
-      "riskBudgetReasonCount": 163,
-      "feeEdgeReasonCount": 5,
-      "largestOpenExposure": {
         "symbol": "ZECUSDC",
-        "openCost": 75.37558742,
-        "netAfterFees": 0.09673171000000003,
+        "openCost": 229.74175382,
+        "netAfterFees": -4.88182878,
         "buys": 19,
-        "sells": 7
+        "sells": 9
       },
-      "fixtureBuys": 115,
-      "fixtureSells": 67
+      "fixtureBuys": 97,
+      "fixtureSells": 72
     },
     {
-      "bundle": "autobot-feedback-20260616-152318.tgz",
-      "class": "NEUTRAL_OR_INCONCLUSIVE",
-      "dailyNet": -12.740767450000021,
-      "realizedAfterFees": -8.269055609999999,
-      "totalAllocPct": 5.109796260111092,
-      "filledOrders": 193,
-      "rejectedOrders": 0,
-      "riskBudgetReasonCount": 127,
-      "feeEdgeReasonCount": 2,
-      "largestOpenExposure": {
-        "symbol": "WLDUSDC",
-        "openCost": 174.56731797,
-        "netAfterFees": -1.23947874,
-        "buys": 12,
-        "sells": 6
-      },
-      "fixtureBuys": 115,
-      "fixtureSells": 78
-    },
-    {
-      "bundle": "autobot-feedback-20260615-065149.tgz",
-      "class": "NEUTRAL_OR_INCONCLUSIVE",
-      "dailyNet": -23.60006977000012,
-      "realizedAfterFees": -32.85216238,
-      "totalAllocPct": 5.109274417534431,
-      "filledOrders": 195,
-      "rejectedOrders": 0,
-      "riskBudgetReasonCount": 119,
-      "feeEdgeReasonCount": 32,
-      "largestOpenExposure": {
-        "symbol": "ETHUSDC",
-        "openCost": 250.03988307,
-        "netAfterFees": -0.22614416999999998,
-        "buys": 7,
-        "sells": 2
-      },
-      "fixtureBuys": 111,
-      "fixtureSells": 84
-    },
-    {
-      "bundle": "autobot-feedback-20260612-063453.tgz",
+      "bundle": "autobot-feedback-20260713-085946.tgz",
       "class": "CONTROLLED_DRAWDOWN",
-      "dailyNet": -6.9976724600001035,
-      "realizedAfterFees": -21.254389000000003,
-      "totalAllocPct": 2.3316000294709562,
-      "filledOrders": 176,
+      "dailyNet": -25.680295950000072,
+      "realizedAfterFees": -53.11307076,
+      "totalAllocPct": 3.1006077690895952,
+      "filledOrders": 173,
       "rejectedOrders": 0,
-      "riskBudgetReasonCount": 114,
-      "feeEdgeReasonCount": 19,
+      "riskBudgetReasonCount": 159,
+      "feeEdgeReasonCount": 11,
+      "largestOpenExposure": {
+        "symbol": "PUMPUSDC",
+        "openCost": 138.56992496,
+        "netAfterFees": -0.13152096,
+        "buys": 2,
+        "sells": 0
+      },
+      "fixtureBuys": 98,
+      "fixtureSells": 75
+    },
+    {
+      "bundle": "autobot-feedback-20260703-091448.tgz",
+      "class": "SAFETY_FAILURE",
+      "dailyNet": -2.682596569999987,
+      "realizedAfterFees": -26.86329307,
+      "totalAllocPct": 5.091033902601742,
+      "filledOrders": 181,
+      "rejectedOrders": 0,
+      "riskBudgetReasonCount": 90,
+      "feeEdgeReasonCount": 34,
       "largestOpenExposure": {
         "symbol": "ETHUSDC",
-        "openCost": 112.22826983,
-        "netAfterFees": -0.10594364999999994,
-        "buys": 14,
-        "sells": 12
+        "openCost": 232.93832394,
+        "netAfterFees": 0.37135912000000004,
+        "buys": 6,
+        "sells": 3
       },
-      "fixtureBuys": 106,
-      "fixtureSells": 70
+      "fixtureBuys": 104,
+      "fixtureSells": 77
     }
   ]
 }

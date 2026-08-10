@@ -62,6 +62,7 @@ case "$ACTIVE_TICKET" in
     node --check scripts/t040-readiness-check.js
     node --check scripts/t026-calibration-runner.js
     node --check scripts/t026-strategy-replay.js
+    node --check scripts/t026-walk-forward-gate.js
     node --check scripts/t026-fixture-comparison.js
     node --check scripts/t026-grid-guard-proof.js
     node --check scripts/t026-entry-burst-proof.js
@@ -69,7 +70,7 @@ case "$ACTIVE_TICKET" in
     node --check scripts/t026-risk-governor-proof.js
     node --check scripts/t040-strategy-effectiveness-report.js
     node --check scripts/t040-entry-burst-postdeploy-check.js
-    node --test scripts/t026-entry-burst-proof.test.js scripts/t026-strategy-replay.test.js scripts/t040-entry-burst-postdeploy-check.test.js
+    node --test scripts/t026-entry-burst-proof.test.js scripts/t026-strategy-replay.test.js scripts/t026-walk-forward-gate.test.js scripts/t040-entry-burst-postdeploy-check.test.js
     set +e
     T040_OUTPUT="$(node scripts/t040-readiness-check.js 2>&1)"
     T040_STATUS=$?
@@ -268,18 +269,20 @@ NODE
     node --check scripts/feedback-evidence.js
     node --check scripts/t026-calibration-runner.js
     node --check scripts/t026-strategy-replay.js
+    node --check scripts/t026-walk-forward-gate.js
     node --check scripts/t026-fixture-comparison.js
     node --check scripts/t026-grid-guard-proof.js
     node --check scripts/t026-entry-burst-proof.js
     node --check scripts/t026-proof-comparison.js
     node --check scripts/t026-risk-governor-proof.js
-    node --test scripts/t026-entry-burst-proof.test.js scripts/t026-strategy-replay.test.js scripts/t040-entry-burst-postdeploy-check.test.js
+    node --test scripts/t026-entry-burst-proof.test.js scripts/t026-strategy-replay.test.js scripts/t026-walk-forward-gate.test.js scripts/t040-entry-burst-postdeploy-check.test.js
     node scripts/t026-calibration-runner.js
     node scripts/t026-fixture-comparison.js
     node scripts/t026-grid-guard-proof.js
     node scripts/t026-entry-burst-proof.js
     node scripts/t026-risk-governor-proof.js
     node scripts/t026-proof-comparison.js
+    node scripts/t026-walk-forward-gate.js
     node <<'NODE'
 const fs = require('node:fs');
 

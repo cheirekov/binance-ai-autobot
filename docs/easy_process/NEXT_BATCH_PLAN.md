@@ -1,11 +1,11 @@
 # Next Batch Plan
 
-Last updated: 2026-07-21 12:05 UTC
+Last updated: 2026-08-10 07:10 UTC
 
 Active ticket: `T-026`
 
-Implement deterministic walk-forward comparison of strategy candidates. Separate calibration from validation windows and score after-fee expectancy, drawdown, fees/turnover, exposure, and SELL reachability. Reject candidates that improve only the calibration slice.
+Improve or replace the offline family selector against the same fixed July 21 and August 10 core-universe fixtures. Do not change the fixtures or promotion thresholds to make a candidate pass.
 
-Initial July 21 walk-forward result: `NO_WALK_FORWARD_EDGE`. The selected families averaged `+0.08%` on validation with only `3/12` profitable symbols, versus buy-and-hold `+3.47%`; no runtime candidate is promoted.
+Current multi-fixture result: `WALK_FORWARD_REJECTED`. Average validation is `-0.02%`, buy-and-hold is `+2.48%`, and only `10/24` symbol-windows are profitable. The clean-room `REGIME_ADAPTIVE` candidate is retained only as rejected offline evidence.
 
 Live bundles continue in the background as datasets. They do not authorize runtime patches unless they reproduce a P0/P1 safety failure.
