@@ -1,9 +1,9 @@
 {
   "schema_version": 2,
-  "verdict": "NO_WALK_FORWARD_EDGE",
-  "baseUrl": "fixture:20260810-mainnet-core-1h-candles.json",
-  "sourceBundle": "autobot-feedback-20260810-062844.tgz",
-  "endTime": 1786343280628,
+  "verdict": "WALK_FORWARD_CANDIDATE_MEAN_REVERSION",
+  "baseUrl": "fixture:20260831-mainnet-core-1h-candles.json",
+  "sourceBundle": "autobot-feedback-20260831-084332.tgz",
+  "endTime": 1788165761315,
   "interval": "1h",
   "limit": 240,
   "capital": 1000,
@@ -14,92 +14,92 @@
   "errors": [],
   "familySummary": [
     {
-      "family": "BUY_HOLD",
-      "symbols": 12,
-      "avgNetPct": 2.2403417361821756,
-      "avgMaxDrawdownPct": 4.407813305937563,
-      "totalTrades": 24,
-      "profitableSymbols": 9
-    },
-    {
       "family": "MEAN_REVERSION",
       "symbols": 12,
-      "avgNetPct": 1.4506387918934445,
-      "avgMaxDrawdownPct": 1.4422006084224936,
-      "totalTrades": 76,
-      "profitableSymbols": 10
+      "avgNetPct": 1.412454587542367,
+      "avgMaxDrawdownPct": 2.9132598404107384,
+      "totalTrades": 94,
+      "profitableSymbols": 8
     },
     {
       "family": "GRID",
       "symbols": 12,
-      "avgNetPct": 0.6492330283088658,
-      "avgMaxDrawdownPct": 0.9903977467408481,
-      "totalTrades": 292,
-      "profitableSymbols": 10
+      "avgNetPct": 0.6510257736290204,
+      "avgMaxDrawdownPct": 0.8603620572841347,
+      "totalTrades": 241,
+      "profitableSymbols": 8
+    },
+    {
+      "family": "BUY_HOLD",
+      "symbols": 12,
+      "avgNetPct": -1.5899487720404,
+      "avgMaxDrawdownPct": 12.208530898723366,
+      "totalTrades": 24,
+      "profitableSymbols": 4
     },
     {
       "family": "REGIME_ADAPTIVE",
       "symbols": 12,
-      "avgNetPct": -0.7377123080340292,
-      "avgMaxDrawdownPct": 3.297034869437937,
-      "totalTrades": 124,
-      "profitableSymbols": 3
+      "avgNetPct": -3.023730895851369,
+      "avgMaxDrawdownPct": 4.400017829997434,
+      "totalTrades": 66,
+      "profitableSymbols": 1
     },
     {
       "family": "TREND",
       "symbols": 12,
-      "avgNetPct": -0.8212103721231662,
-      "avgMaxDrawdownPct": 4.379126671442333,
-      "totalTrades": 92,
-      "profitableSymbols": 5
+      "avgNetPct": -5.264217959658898,
+      "avgMaxDrawdownPct": 6.838855578555396,
+      "totalTrades": 82,
+      "profitableSymbols": 1
     }
   ],
   "crossSectionalSelection": {
     "scope": "CROSS_SECTIONAL_GLOBAL",
     "method": "MAX_AFTER_FEE_EXPECTANCY_WITH_BUY_HOLD_DRAWDOWN_CONSTRAINT",
     "selectedFamily": "MEAN_REVERSION",
-    "trainingBuyHoldMaxDrawdownPct": 3.503834145333395,
+    "trainingBuyHoldMaxDrawdownPct": 10.863672752133203,
     "familyScores": {
       "TREND": {
-        "avgNetPct": -0.1578238010428814,
-        "avgMaxDrawdownPct": 3.2887146601443358,
+        "avgNetPct": -1.106368608525087,
+        "avgMaxDrawdownPct": 3.454860535076896,
         "drawdownConstraintPassed": true,
-        "profitableSymbols": 2,
+        "profitableSymbols": 4,
         "symbols": 12
       },
       "MEAN_REVERSION": {
-        "avgNetPct": 1.0862973909745688,
-        "avgMaxDrawdownPct": 0.9167322012314223,
+        "avgNetPct": 1.2673085701010869,
+        "avgMaxDrawdownPct": 2.420744583623768,
         "drawdownConstraintPassed": true,
-        "profitableSymbols": 10,
+        "profitableSymbols": 8,
         "symbols": 12
       },
       "GRID": {
-        "avgNetPct": 0.5411664935202926,
-        "avgMaxDrawdownPct": 0.7781534363910715,
+        "avgNetPct": 0.5792567574213876,
+        "avgMaxDrawdownPct": 0.38761435065204425,
         "drawdownConstraintPassed": true,
-        "profitableSymbols": 10,
+        "profitableSymbols": 8,
         "symbols": 12
       },
       "REGIME_ADAPTIVE": {
-        "avgNetPct": 0.04678009107000869,
-        "avgMaxDrawdownPct": 2.373713638651329,
+        "avgNetPct": -0.9801755514126181,
+        "avgMaxDrawdownPct": 2.1881900213724723,
         "drawdownConstraintPassed": true,
-        "profitableSymbols": 6,
+        "profitableSymbols": 2,
         "symbols": 12
       }
     }
   },
   "walkForward": {
-    "verdict": "NO_WALK_FORWARD_EDGE",
-    "passed": false,
+    "verdict": "WALK_FORWARD_CANDIDATE_MEAN_REVERSION",
+    "passed": true,
     "checks": {
       "enoughSymbols": true,
       "positiveAfterFees": true,
       "majorityProfitable": true,
       "sellReachabilityPreserved": true,
       "drawdownNotWorseThanBuyHold": true,
-      "competitiveWithBuyHold": false
+      "competitiveWithBuyHold": true
     },
     "symbols": 12,
     "selections": {
@@ -108,61 +108,61 @@
     "profitableSymbols": 7,
     "sellReachableSymbols": 12,
     "minimumProfitable": 6,
-    "trainAvgNetPct": 1.0862973909745688,
-    "validationAvgNetPct": 0.25095725646411987,
-    "validationAvgMaxDrawdownPct": 0.8659326719966813,
-    "validationTrades": 34,
-    "buyHoldAvgNetPct": 0.5026220955741375,
-    "buyHoldAvgMaxDrawdownPct": 2.7557182811589414
+    "trainAvgNetPct": 1.2673085701010869,
+    "validationAvgNetPct": 0.1237787946605702,
+    "validationAvgMaxDrawdownPct": 1.8012148971257098,
+    "validationTrades": 46,
+    "buyHoldAvgNetPct": -4.090693634785232,
+    "buyHoldAvgMaxDrawdownPct": 6.358374682692173
   },
   "symbolResults": [
     {
       "symbol": "BTCUSDC",
       "candles": 240,
-      "firstClose": 63894.8,
-      "lastClose": 65139.64,
+      "firstClose": 77894.2,
+      "lastClose": 78461.4,
       "BUY_HOLD": {
         "family": "BUY_HOLD",
-        "finalEquity": 1017.4447037887277,
-        "netPct": 1.744470378872768,
-        "maxDrawdownPct": 2.3229949855074326,
+        "finalEquity": 1005.268115744176,
+        "netPct": 0.5268115744176043,
+        "maxDrawdownPct": 4.145633963252021,
         "trades": 2,
         "endingBase": 0,
         "sellReachable": true
       },
       "TREND": {
         "family": "TREND",
-        "finalEquity": 987.9095925455127,
-        "netPct": -1.2090407454487262,
-        "maxDrawdownPct": 2.3057847167322976,
-        "trades": 8,
+        "finalEquity": 1003.773644798998,
+        "netPct": 0.37736447989980204,
+        "maxDrawdownPct": 3.6287687278851184,
+        "trades": 6,
         "endingBase": 0,
         "sellReachable": true
       },
       "MEAN_REVERSION": {
         "family": "MEAN_REVERSION",
-        "finalEquity": 1008.642345771727,
-        "netPct": 0.8642345771727037,
-        "maxDrawdownPct": 0.6265727491416224,
+        "finalEquity": 1006.7578067880665,
+        "netPct": 0.6757806788066546,
+        "maxDrawdownPct": 1.3385302951082216,
         "trades": 6,
         "endingBase": 0,
         "sellReachable": true
       },
       "GRID": {
         "family": "GRID",
-        "finalEquity": 1011.1073108639939,
-        "netPct": 1.1107310863993918,
-        "maxDrawdownPct": 0.34257472233129516,
-        "trades": 21,
+        "finalEquity": 1012.9093101564998,
+        "netPct": 1.2909310156499827,
+        "maxDrawdownPct": 0.6671001189643804,
+        "trades": 26,
         "endingBase": 0,
         "sellReachable": true
       },
       "REGIME_ADAPTIVE": {
         "family": "REGIME_ADAPTIVE",
-        "finalEquity": 987.7731227482337,
-        "netPct": -1.2226877251766268,
-        "maxDrawdownPct": 1.730031867110863,
-        "trades": 12,
+        "finalEquity": 950.1801554113085,
+        "netPct": -4.981984458869147,
+        "maxDrawdownPct": 5.174625534787183,
+        "trades": 6,
         "endingBase": 0,
         "sellReachable": true
       },
@@ -174,27 +174,27 @@
         "selectedFamily": "MEAN_REVERSION",
         "trainSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 1007.9216018882295,
-          "netPct": 0.7921601888229475,
-          "maxDrawdownPct": 0.6265727491416224,
+          "finalEquity": 1017.0635369882737,
+          "netPct": 1.7063536988273655,
+          "maxDrawdownPct": 0.8761794127449661,
           "trades": 4,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 1000.7150793098863,
-          "netPct": 0.07150793098862777,
-          "maxDrawdownPct": 0.1,
+          "finalEquity": 989.8671716904489,
+          "netPct": -1.0132828309551085,
+          "maxDrawdownPct": 1.3385302951082167,
           "trades": 2,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationBuyHold": {
           "family": "BUY_HOLD",
-          "finalEquity": 1003.9915364918858,
-          "netPct": 0.39915364918857676,
-          "maxDrawdownPct": 1.0444518562039133,
+          "finalEquity": 978.9989519369485,
+          "netPct": -2.1001048063051484,
+          "maxDrawdownPct": 4.002649349444006,
           "trades": 2,
           "endingBase": 0,
           "sellReachable": true
@@ -202,46 +202,46 @@
         "train": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 1012.1231605535975,
-            "netPct": 1.2123160553597472,
-            "maxDrawdownPct": 2.3229949855074326,
+            "finalEquity": 1021.7973447510855,
+            "netPct": 2.179734475108546,
+            "maxDrawdownPct": 3.624148052391163,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 999.7443187380112,
-            "netPct": -0.02556812619887978,
-            "maxDrawdownPct": 2.3057847167322976,
+            "finalEquity": 1016.8751430063855,
+            "netPct": 1.6875143006385545,
+            "maxDrawdownPct": 3.4204906266638933,
             "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 1007.9216018882295,
-            "netPct": 0.7921601888229475,
-            "maxDrawdownPct": 0.6265727491416224,
+            "finalEquity": 1017.0635369882737,
+            "netPct": 1.7063536988273655,
+            "maxDrawdownPct": 0.8761794127449661,
             "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "GRID": {
             "family": "GRID",
-            "finalEquity": 1011.0404991016829,
-            "netPct": 1.1040499101682941,
-            "maxDrawdownPct": 0.34257472233129516,
-            "trades": 21,
+            "finalEquity": 1009.9345808683966,
+            "netPct": 0.9934580868396551,
+            "maxDrawdownPct": 0.6671001189643804,
+            "trades": 19,
             "endingBase": 0,
             "sellReachable": true
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 998.4795663680284,
-            "netPct": -0.15204336319716277,
-            "maxDrawdownPct": 1.5294773881755197,
-            "trades": 8,
+            "finalEquity": 981.8850302097445,
+            "netPct": -1.8114969790255488,
+            "maxDrawdownPct": 2.0105659530197917,
+            "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           }
@@ -249,101 +249,101 @@
         "validation": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 1003.9915364918858,
-            "netPct": 0.39915364918857676,
-            "maxDrawdownPct": 1.0444518562039133,
+            "finalEquity": 978.9989519369485,
+            "netPct": -2.1001048063051484,
+            "maxDrawdownPct": 4.002649349444006,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 986.9175158406523,
-            "netPct": -1.30824841593477,
-            "maxDrawdownPct": 1.733960284561932,
-            "trades": 6,
+            "finalEquity": 982.2753501681464,
+            "netPct": -1.772464983185364,
+            "maxDrawdownPct": 2.4172070548952616,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 1000.7150793098863,
-            "netPct": 0.07150793098862777,
-            "maxDrawdownPct": 0.1,
+            "finalEquity": 989.8671716904489,
+            "netPct": -1.0132828309551085,
+            "maxDrawdownPct": 1.3385302951082167,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "GRID": {
             "family": "GRID",
-            "finalEquity": 1000.6118192501664,
-            "netPct": 0.06118192501663771,
-            "maxDrawdownPct": 0.17593199572282492,
-            "trades": 5,
+            "finalEquity": 1002.163131529206,
+            "netPct": 0.2163131529205998,
+            "maxDrawdownPct": 1.0682647342677536,
+            "trades": 16,
             "endingBase": 0,
             "sellReachable": true
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 988.0311173709019,
-            "netPct": -1.196888262909806,
-            "maxDrawdownPct": 1.6230804891967932,
-            "trades": 6,
+            "finalEquity": 967.7101963845369,
+            "netPct": -3.2289803615463146,
+            "maxDrawdownPct": 3.3065130541179175,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           }
         },
-        "localSelectedFamily": "GRID",
+        "localSelectedFamily": "MEAN_REVERSION",
         "selectionScope": "CROSS_SECTIONAL_GLOBAL"
       }
     },
     {
       "symbol": "ETHUSDC",
       "candles": 240,
-      "firstClose": 1888.62,
-      "lastClose": 1924.66,
+      "firstClose": 2403.54,
+      "lastClose": 2445.8,
       "BUY_HOLD": {
         "family": "BUY_HOLD",
-        "finalEquity": 1017.0455701305716,
-        "netPct": 1.7045570130571606,
-        "maxDrawdownPct": 2.916170537217647,
+        "finalEquity": 1015.5482520781848,
+        "netPct": 1.5548252078184759,
+        "maxDrawdownPct": 5.904977913828252,
         "trades": 2,
         "endingBase": 0,
         "sellReachable": true
       },
       "TREND": {
         "family": "TREND",
-        "finalEquity": 964.8164095119299,
-        "netPct": -3.518359048807008,
-        "maxDrawdownPct": 3.7225982156787496,
-        "trades": 14,
+        "finalEquity": 969.6409350360285,
+        "netPct": -3.035906496397149,
+        "maxDrawdownPct": 5.576867818930005,
+        "trades": 8,
         "endingBase": 0,
         "sellReachable": true
       },
       "MEAN_REVERSION": {
         "family": "MEAN_REVERSION",
-        "finalEquity": 1025.504370741209,
-        "netPct": 2.5504370741208957,
-        "maxDrawdownPct": 0.12026718818564613,
-        "trades": 4,
+        "finalEquity": 1034.1360234570586,
+        "netPct": 3.413602345705863,
+        "maxDrawdownPct": 0.9081426172997799,
+        "trades": 8,
         "endingBase": 0,
         "sellReachable": true
       },
       "GRID": {
         "family": "GRID",
-        "finalEquity": 1008.7920459016628,
-        "netPct": 0.8792045901662845,
-        "maxDrawdownPct": 0.6031528734388886,
-        "trades": 25,
+        "finalEquity": 1002.0459513132042,
+        "netPct": 0.20459513132042276,
+        "maxDrawdownPct": 0.05649434637541617,
+        "trades": 3,
         "endingBase": 0,
         "sellReachable": true
       },
       "REGIME_ADAPTIVE": {
         "family": "REGIME_ADAPTIVE",
-        "finalEquity": 961.0139265970585,
-        "netPct": -3.8986073402941543,
-        "maxDrawdownPct": 3.823640403745615,
-        "trades": 12,
+        "finalEquity": 990.8520743744244,
+        "netPct": -0.9147925625575567,
+        "maxDrawdownPct": 2.283520569747865,
+        "trades": 6,
         "endingBase": 0,
         "sellReachable": true
       },
@@ -355,27 +355,27 @@
         "selectedFamily": "MEAN_REVERSION",
         "trainSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 1019.7186606152404,
-          "netPct": 1.9718660615240424,
-          "maxDrawdownPct": 0.12026718818564613,
-          "trades": 2,
+          "finalEquity": 1023.1421744831514,
+          "netPct": 2.314217448315139,
+          "maxDrawdownPct": 0.46175728602460564,
+          "trades": 4,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 1005.6738298017199,
-          "netPct": 0.5673829801719875,
-          "maxDrawdownPct": 0.1,
-          "trades": 2,
+          "finalEquity": 1010.7451820950112,
+          "netPct": 1.0745182095011159,
+          "maxDrawdownPct": 0.8586359836426752,
+          "trades": 4,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationBuyHold": {
           "family": "BUY_HOLD",
-          "finalEquity": 1006.9949224155558,
-          "netPct": 0.6994922415555834,
-          "maxDrawdownPct": 1.1704932126931071,
+          "finalEquity": 963.039720743789,
+          "netPct": -3.6960279256211037,
+          "maxDrawdownPct": 5.112362157193081,
           "trades": 2,
           "endingBase": 0,
           "sellReachable": true
@@ -383,46 +383,46 @@
         "train": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 1010.2711142739142,
-            "netPct": 1.0271114273914237,
-            "maxDrawdownPct": 2.916170537217647,
+            "finalEquity": 1050.8171491799594,
+            "netPct": 5.081714917995941,
+            "maxDrawdownPct": 5.904977913828252,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 988.5593907860793,
-            "netPct": -1.1440609213920654,
-            "maxDrawdownPct": 3.7225982156787496,
-            "trades": 6,
+            "finalEquity": 1024.3251586722981,
+            "netPct": 2.432515867229813,
+            "maxDrawdownPct": 2.191612005565501,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 1019.7186606152404,
-            "netPct": 1.9718660615240424,
-            "maxDrawdownPct": 0.12026718818564613,
-            "trades": 2,
+            "finalEquity": 1023.1421744831514,
+            "netPct": 2.314217448315139,
+            "maxDrawdownPct": 0.46175728602460564,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "GRID": {
             "family": "GRID",
-            "finalEquity": 1008.7201609825294,
-            "netPct": 0.8720160982529365,
-            "maxDrawdownPct": 0.6031528734388886,
-            "trades": 25,
+            "finalEquity": 1002.1227931527701,
+            "netPct": 0.21227931527701005,
+            "maxDrawdownPct": 0.05649434637541617,
+            "trades": 3,
             "endingBase": 0,
             "sellReachable": true
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 981.4499517040863,
-            "netPct": -1.8550048295913713,
-            "maxDrawdownPct": 1.876665272431742,
-            "trades": 4,
+            "finalEquity": 989.5588598604056,
+            "netPct": -1.044114013959438,
+            "maxDrawdownPct": 1.4825983460793193,
+            "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           }
@@ -430,46 +430,46 @@
         "validation": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 1006.9949224155558,
-            "netPct": 0.6994922415555834,
-            "maxDrawdownPct": 1.1704932126931071,
+            "finalEquity": 963.039720743789,
+            "netPct": -3.6960279256211037,
+            "maxDrawdownPct": 5.112362157193081,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 972.8151317484123,
-            "netPct": -2.7184868251587657,
-            "maxDrawdownPct": 2.753161858613578,
-            "trades": 10,
+            "finalEquity": 943.2870904888892,
+            "netPct": -5.671290951111075,
+            "maxDrawdownPct": 5.671290951111075,
+            "trades": 6,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 1005.6738298017199,
-            "netPct": 0.5673829801719875,
-            "maxDrawdownPct": 0.1,
-            "trades": 2,
+            "finalEquity": 1010.7451820950112,
+            "netPct": 1.0745182095011159,
+            "maxDrawdownPct": 0.8586359836426752,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "GRID": {
             "family": "GRID",
-            "finalEquity": 1001.4196351675171,
-            "netPct": 0.14196351675170715,
-            "maxDrawdownPct": 0.12573770038255466,
-            "trades": 7,
+            "finalEquity": 1002.5825204785784,
+            "netPct": 0.25825204785784306,
+            "maxDrawdownPct": 0.4797953380610268,
+            "trades": 13,
             "endingBase": 0,
             "sellReachable": true
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 979.177720604556,
-            "netPct": -2.0822279395443957,
-            "maxDrawdownPct": 2.118310235091502,
-            "trades": 8,
+            "finalEquity": 1001.3068596184378,
+            "netPct": 0.1306859618437784,
+            "maxDrawdownPct": 1.9580828829113737,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           }
@@ -481,574 +481,31 @@
     {
       "symbol": "SOLUSDC",
       "candles": 240,
-      "firstClose": 73.62,
-      "lastClose": 76.88,
+      "firstClose": 91.67,
+      "lastClose": 103.22,
       "BUY_HOLD": {
         "family": "BUY_HOLD",
-        "finalEquity": 1042.1939266503666,
-        "netPct": 4.219392665036662,
-        "maxDrawdownPct": 3.6009779951100196,
+        "finalEquity": 1123.7445535071454,
+        "netPct": 12.37445535071454,
+        "maxDrawdownPct": 7.276051188299819,
         "trades": 2,
         "endingBase": 0,
         "sellReachable": true
       },
       "TREND": {
         "family": "TREND",
-        "finalEquity": 1014.5109762163186,
-        "netPct": 1.4510976216318567,
-        "maxDrawdownPct": 3.4854280354632525,
-        "trades": 6,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "MEAN_REVERSION": {
-        "family": "MEAN_REVERSION",
-        "finalEquity": 1007.5033391981112,
-        "netPct": 0.7503339198111234,
-        "maxDrawdownPct": 1.267445742904829,
-        "trades": 4,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "GRID": {
-        "family": "GRID",
-        "finalEquity": 1018.0797633602459,
-        "netPct": 1.807976336024592,
-        "maxDrawdownPct": 1.0856741790451736,
-        "trades": 39,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "REGIME_ADAPTIVE": {
-        "family": "REGIME_ADAPTIVE",
-        "finalEquity": 1017.1765875213031,
-        "netPct": 1.7176587521303077,
-        "maxDrawdownPct": 1.6831012794003521,
-        "trades": 10,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "walkForward": {
-        "splitIndex": 144,
-        "trainCandles": 144,
-        "validationCandles": 96,
-        "validationWarmupCandles": 144,
-        "selectedFamily": "MEAN_REVERSION",
-        "trainSelected": {
-          "family": "MEAN_REVERSION",
-          "finalEquity": 1007.9976711185308,
-          "netPct": 0.7997671118530775,
-          "maxDrawdownPct": 1.267445742904829,
-          "trades": 2,
-          "endingBase": 0,
-          "sellReachable": true
-        },
-        "validationSelected": {
-          "family": "MEAN_REVERSION",
-          "finalEquity": 999.5095902157482,
-          "netPct": -0.0490409784251824,
-          "maxDrawdownPct": 0.37456369382987303,
-          "trades": 2,
-          "endingBase": 0,
-          "sellReachable": true
-        },
-        "validationBuyHold": {
-          "family": "BUY_HOLD",
-          "finalEquity": 1039.5111350765478,
-          "netPct": 3.951113507654782,
-          "maxDrawdownPct": 1.8262987012987115,
-          "trades": 2,
-          "endingBase": 0,
-          "sellReachable": true
-        },
-        "train": {
-          "BUY_HOLD": {
-            "family": "BUY_HOLD",
-            "finalEquity": 1003.0167616136918,
-            "netPct": 0.3016761613691756,
-            "maxDrawdownPct": 3.6009779951100196,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "TREND": {
-            "family": "TREND",
-            "finalEquity": 976.4789793149149,
-            "netPct": -2.352102068508509,
-            "maxDrawdownPct": 3.2688003119414577,
-            "trades": 4,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "MEAN_REVERSION": {
-            "family": "MEAN_REVERSION",
-            "finalEquity": 1007.9976711185308,
-            "netPct": 0.7997671118530775,
-            "maxDrawdownPct": 1.267445742904829,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "GRID": {
-            "family": "GRID",
-            "finalEquity": 1010.3688011979729,
-            "netPct": 1.0368801197972857,
-            "maxDrawdownPct": 1.0856741790451736,
-            "trades": 30,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "REGIME_ADAPTIVE": {
-            "family": "REGIME_ADAPTIVE",
-            "finalEquity": 1000.0427305126057,
-            "netPct": 0.004273051260565808,
-            "maxDrawdownPct": 1.1265822609653355,
-            "trades": 4,
-            "endingBase": 0,
-            "sellReachable": true
-          }
-        },
-        "validation": {
-          "BUY_HOLD": {
-            "family": "BUY_HOLD",
-            "finalEquity": 1039.5111350765478,
-            "netPct": 3.951113507654782,
-            "maxDrawdownPct": 1.8262987012987115,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "TREND": {
-            "family": "TREND",
-            "finalEquity": 1038.948095870007,
-            "netPct": 3.8948095870006907,
-            "maxDrawdownPct": 1.4861721375032066,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "MEAN_REVERSION": {
-            "family": "MEAN_REVERSION",
-            "finalEquity": 999.5095902157482,
-            "netPct": -0.0490409784251824,
-            "maxDrawdownPct": 0.37456369382987303,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "GRID": {
-            "family": "GRID",
-            "finalEquity": 1001.0373777870483,
-            "netPct": 0.10373777870482855,
-            "maxDrawdownPct": 0.2555998614210604,
-            "trades": 5,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "REGIME_ADAPTIVE": {
-            "family": "REGIME_ADAPTIVE",
-            "finalEquity": 1017.1331249014879,
-            "netPct": 1.713312490148792,
-            "maxDrawdownPct": 1.6831012794003422,
-            "trades": 6,
-            "endingBase": 0,
-            "sellReachable": true
-          }
-        },
-        "localSelectedFamily": "GRID",
-        "selectionScope": "CROSS_SECTIONAL_GLOBAL"
-      }
-    },
-    {
-      "symbol": "BNBUSDC",
-      "candles": 240,
-      "firstClose": 589.3,
-      "lastClose": 602.93,
-      "BUY_HOLD": {
-        "family": "BUY_HOLD",
-        "finalEquity": 1021.0839011199729,
-        "netPct": 2.108390111997289,
-        "maxDrawdownPct": 3.077936111298716,
-        "trades": 2,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "TREND": {
-        "family": "TREND",
-        "finalEquity": 1011.5483930798259,
-        "netPct": 1.1548393079825927,
-        "maxDrawdownPct": 2.1849842083875464,
-        "trades": 6,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "MEAN_REVERSION": {
-        "family": "MEAN_REVERSION",
-        "finalEquity": 1000.6567808359002,
-        "netPct": 0.06567808359002356,
-        "maxDrawdownPct": 1.7465434235098654,
-        "trades": 6,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "GRID": {
-        "family": "GRID",
-        "finalEquity": 1011.2296810463451,
-        "netPct": 1.122968104634515,
-        "maxDrawdownPct": 0.7201297778604271,
-        "trades": 25,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "REGIME_ADAPTIVE": {
-        "family": "REGIME_ADAPTIVE",
-        "finalEquity": 991.4690771786137,
-        "netPct": -0.8530922821386298,
-        "maxDrawdownPct": 1.9501157188353662,
-        "trades": 10,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "walkForward": {
-        "splitIndex": 144,
-        "trainCandles": 144,
-        "validationCandles": 96,
-        "validationWarmupCandles": 144,
-        "selectedFamily": "MEAN_REVERSION",
-        "trainSelected": {
-          "family": "MEAN_REVERSION",
-          "finalEquity": 993.0081737111724,
-          "netPct": -0.6991826288827611,
-          "maxDrawdownPct": 1.7465434235098654,
-          "trades": 2,
-          "endingBase": 0,
-          "sellReachable": true
-        },
-        "validationSelected": {
-          "family": "MEAN_REVERSION",
-          "finalEquity": 1007.7024613968108,
-          "netPct": 0.7702461396810805,
-          "maxDrawdownPct": 0.4796351440382727,
-          "trades": 4,
-          "endingBase": 0,
-          "sellReachable": true
-        },
-        "validationBuyHold": {
-          "family": "BUY_HOLD",
-          "finalEquity": 1011.6591451268515,
-          "netPct": 1.1659145126851513,
-          "maxDrawdownPct": 1.7392743657425171,
-          "trades": 2,
-          "endingBase": 0,
-          "sellReachable": true
-        },
-        "train": {
-          "BUY_HOLD": {
-            "family": "BUY_HOLD",
-            "finalEquity": 1007.1291611912441,
-            "netPct": 0.7129161191244066,
-            "maxDrawdownPct": 3.077936111298716,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "TREND": {
-            "family": "TREND",
-            "finalEquity": 996.2089556434271,
-            "netPct": -0.3791044356572911,
-            "maxDrawdownPct": 1.8610894748181224,
-            "trades": 4,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "MEAN_REVERSION": {
-            "family": "MEAN_REVERSION",
-            "finalEquity": 993.0081737111724,
-            "netPct": -0.6991826288827611,
-            "maxDrawdownPct": 1.7465434235098654,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "GRID": {
-            "family": "GRID",
-            "finalEquity": 1009.3792394709926,
-            "netPct": 0.9379239470992615,
-            "maxDrawdownPct": 0.7201297778604271,
-            "trades": 19,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "REGIME_ADAPTIVE": {
-            "family": "REGIME_ADAPTIVE",
-            "finalEquity": 990.4355350667915,
-            "netPct": -0.9564464933208455,
-            "maxDrawdownPct": 1.9501157188353662,
-            "trades": 6,
-            "endingBase": 0,
-            "sellReachable": true
-          }
-        },
-        "validation": {
-          "BUY_HOLD": {
-            "family": "BUY_HOLD",
-            "finalEquity": 1011.6591451268515,
-            "netPct": 1.1659145126851513,
-            "maxDrawdownPct": 1.7392743657425171,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "TREND": {
-            "family": "TREND",
-            "finalEquity": 1015.3978112217346,
-            "netPct": 1.5397811221734627,
-            "maxDrawdownPct": 1.1637654716701966,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "MEAN_REVERSION": {
-            "family": "MEAN_REVERSION",
-            "finalEquity": 1007.7024613968108,
-            "netPct": 0.7702461396810805,
-            "maxDrawdownPct": 0.4796351440382727,
-            "trades": 4,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "GRID": {
-            "family": "GRID",
-            "finalEquity": 1001.6426188800384,
-            "netPct": 0.16426188800384126,
-            "maxDrawdownPct": 0.323898342290613,
-            "trades": 9,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "REGIME_ADAPTIVE": {
-            "family": "REGIME_ADAPTIVE",
-            "finalEquity": 1001.0435228495234,
-            "netPct": 0.1043522849523356,
-            "maxDrawdownPct": 1.1624340450712634,
-            "trades": 4,
-            "endingBase": 0,
-            "sellReachable": true
-          }
-        },
-        "localSelectedFamily": "GRID",
-        "selectionScope": "CROSS_SECTIONAL_GLOBAL"
-      }
-    },
-    {
-      "symbol": "XRPUSDC",
-      "candles": 240,
-      "firstClose": 1.0787,
-      "lastClose": 1.0354,
-      "BUY_HOLD": {
-        "family": "BUY_HOLD",
-        "finalEquity": 957.9403313247428,
-        "netPct": -4.205966867525717,
-        "maxDrawdownPct": 6.538957450727587,
-        "trades": 2,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "TREND": {
-        "family": "TREND",
-        "finalEquity": 956.6964927152429,
-        "netPct": -4.3303507284757075,
-        "maxDrawdownPct": 5.160664567984767,
-        "trades": 10,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "MEAN_REVERSION": {
-        "family": "MEAN_REVERSION",
-        "finalEquity": 1008.4372848524712,
-        "netPct": 0.8437284852471181,
-        "maxDrawdownPct": 3.318479188394795,
-        "trades": 12,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "GRID": {
-        "family": "GRID",
-        "finalEquity": 984.007286118917,
-        "netPct": -1.5992713881082976,
-        "maxDrawdownPct": 4.013720634641609,
-        "trades": 28,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "REGIME_ADAPTIVE": {
-        "family": "REGIME_ADAPTIVE",
-        "finalEquity": 986.9657029082806,
-        "netPct": -1.3034297091719393,
-        "maxDrawdownPct": 2.6296129182615724,
+        "finalEquity": 997.3982674527716,
+        "netPct": -0.26017325472283803,
+        "maxDrawdownPct": 7.869653783819984,
         "trades": 8,
         "endingBase": 0,
         "sellReachable": true
       },
-      "walkForward": {
-        "splitIndex": 144,
-        "trainCandles": 144,
-        "validationCandles": 96,
-        "validationWarmupCandles": 144,
-        "selectedFamily": "MEAN_REVERSION",
-        "trainSelected": {
-          "family": "MEAN_REVERSION",
-          "finalEquity": 1006.803215854092,
-          "netPct": 0.6803215854091945,
-          "maxDrawdownPct": 1.0867603761041007,
-          "trades": 8,
-          "endingBase": 0,
-          "sellReachable": true
-        },
-        "validationSelected": {
-          "family": "MEAN_REVERSION",
-          "finalEquity": 1014.6846199063219,
-          "netPct": 1.4684619906321927,
-          "maxDrawdownPct": 1.6777552791437496,
-          "trades": 6,
-          "endingBase": 0,
-          "sellReachable": true
-        },
-        "validationBuyHold": {
-          "family": "BUY_HOLD",
-          "finalEquity": 985.81400057241,
-          "netPct": -1.418599942758999,
-          "maxDrawdownPct": 3.7830662747700825,
-          "trades": 2,
-          "endingBase": 0,
-          "sellReachable": true
-        },
-        "train": {
-          "BUY_HOLD": {
-            "family": "BUY_HOLD",
-            "finalEquity": 972.1882365810698,
-            "netPct": -2.781176341893024,
-            "maxDrawdownPct": 3.9878430650211865,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "TREND": {
-            "family": "TREND",
-            "finalEquity": 974.2677135012432,
-            "netPct": -2.573228649875682,
-            "maxDrawdownPct": 3.4187924959508558,
-            "trades": 6,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "MEAN_REVERSION": {
-            "family": "MEAN_REVERSION",
-            "finalEquity": 1006.803215854092,
-            "netPct": 0.6803215854091945,
-            "maxDrawdownPct": 1.0867603761041007,
-            "trades": 8,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "GRID": {
-            "family": "GRID",
-            "finalEquity": 996.1912525791236,
-            "netPct": -0.3808747420876443,
-            "maxDrawdownPct": 1.8395882336796423,
-            "trades": 28,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "REGIME_ADAPTIVE": {
-            "family": "REGIME_ADAPTIVE",
-            "finalEquity": 998.0283747155809,
-            "netPct": -0.19716252844191332,
-            "maxDrawdownPct": 1.746570013324952,
-            "trades": 6,
-            "endingBase": 0,
-            "sellReachable": true
-          }
-        },
-        "validation": {
-          "BUY_HOLD": {
-            "family": "BUY_HOLD",
-            "finalEquity": 985.81400057241,
-            "netPct": -1.418599942758999,
-            "maxDrawdownPct": 3.7830662747700825,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "TREND": {
-            "family": "TREND",
-            "finalEquity": 981.9646894354589,
-            "netPct": -1.803531056454108,
-            "maxDrawdownPct": 2.78508897008102,
-            "trades": 4,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "MEAN_REVERSION": {
-            "family": "MEAN_REVERSION",
-            "finalEquity": 1014.6846199063219,
-            "netPct": 1.4684619906321927,
-            "maxDrawdownPct": 1.6777552791437496,
-            "trades": 6,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "GRID": {
-            "family": "GRID",
-            "finalEquity": 1002.6295425028856,
-            "netPct": 0.2629542502885556,
-            "maxDrawdownPct": 0.823277033048452,
-            "trades": 20,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "REGIME_ADAPTIVE": {
-            "family": "REGIME_ADAPTIVE",
-            "finalEquity": 1003.8179865941325,
-            "netPct": 0.3817986594132549,
-            "maxDrawdownPct": 0.6075216972034715,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          }
-        },
-        "localSelectedFamily": "MEAN_REVERSION",
-        "selectionScope": "CROSS_SECTIONAL_GLOBAL"
-      }
-    },
-    {
-      "symbol": "ADAUSDC",
-      "candles": 240,
-      "firstClose": 0.1697,
-      "lastClose": 0.1986,
-      "BUY_HOLD": {
-        "family": "BUY_HOLD",
-        "finalEquity": 1167.9610995875075,
-        "netPct": 16.796109958750755,
-        "maxDrawdownPct": 6.851940584571152,
-        "trades": 2,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "TREND": {
-        "family": "TREND",
-        "finalEquity": 1041.0561073488159,
-        "netPct": 4.105610734881589,
-        "maxDrawdownPct": 8.416202885468781,
-        "trades": 6,
-        "endingBase": 0,
-        "sellReachable": true
-      },
       "MEAN_REVERSION": {
         "family": "MEAN_REVERSION",
-        "finalEquity": 1051.2986890448562,
-        "netPct": 5.129868904485624,
-        "maxDrawdownPct": 0.25265285497727336,
+        "finalEquity": 1030.656758707175,
+        "netPct": 3.065675870717496,
+        "maxDrawdownPct": 0.8480320317254951,
         "trades": 6,
         "endingBase": 0,
         "sellReachable": true
@@ -1064,10 +521,10 @@
       },
       "REGIME_ADAPTIVE": {
         "family": "REGIME_ADAPTIVE",
-        "finalEquity": 1053.1863334090983,
-        "netPct": 5.318633340909833,
-        "maxDrawdownPct": 7.225771761512704,
-        "trades": 14,
+        "finalEquity": 1013.9983886501415,
+        "netPct": 1.3998388650141464,
+        "maxDrawdownPct": 4.8533845882006394,
+        "trades": 4,
         "endingBase": 0,
         "sellReachable": true
       },
@@ -1079,27 +536,27 @@
         "selectedFamily": "MEAN_REVERSION",
         "trainSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 1005.4846711301552,
-          "netPct": 0.5484671130155221,
-          "maxDrawdownPct": 0.09999999999998864,
+          "finalEquity": 1013.4706426476748,
+          "netPct": 1.3470642647674822,
+          "maxDrawdownPct": 0.10000000000001136,
           "trades": 2,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 1022.7280800501935,
-          "netPct": 2.272808005019351,
-          "maxDrawdownPct": 0.25265285497726847,
+          "finalEquity": 1016.9576851428094,
+          "netPct": 1.6957685142809396,
+          "maxDrawdownPct": 0.8480320317254952,
           "trades": 4,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationBuyHold": {
           "family": "BUY_HOLD",
-          "finalEquity": 1050.3603529411766,
-          "netPct": 5.0360352941176645,
-          "maxDrawdownPct": 6.8519405845711585,
+          "finalEquity": 986.7209120689655,
+          "netPct": -1.3279087931034497,
+          "maxDrawdownPct": 7.2760511882998316,
           "trades": 2,
           "endingBase": 0,
           "sellReachable": true
@@ -1107,27 +564,27 @@
         "train": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 1106.2108903948144,
-            "netPct": 10.621089039481445,
-            "maxDrawdownPct": 5.083884087442803,
+            "finalEquity": 1139.4216718664777,
+            "netPct": 13.942167186647772,
+            "maxDrawdownPct": 6.941081517352708,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 1046.805164978697,
-            "netPct": 4.680516497869689,
-            "maxDrawdownPct": 6.881185792668018,
-            "trades": 4,
+            "finalEquity": 1034.6531943592668,
+            "netPct": 3.465319435926676,
+            "maxDrawdownPct": 5.294241022872304,
+            "trades": 6,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 1005.4846711301552,
-            "netPct": 0.5484671130155221,
-            "maxDrawdownPct": 0.09999999999998864,
+            "finalEquity": 1013.4706426476748,
+            "netPct": 1.3470642647674822,
+            "maxDrawdownPct": 0.10000000000001136,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
@@ -1143,10 +600,10 @@
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 1042.02582905829,
-            "netPct": 4.20258290582899,
-            "maxDrawdownPct": 7.225771761512704,
-            "trades": 10,
+            "finalEquity": 1001.6523959992809,
+            "netPct": 0.1652395999280884,
+            "maxDrawdownPct": 4.8533845882006394,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           }
@@ -1154,28 +611,162 @@
         "validation": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 1050.3603529411766,
-            "netPct": 5.0360352941176645,
-            "maxDrawdownPct": 6.8519405845711585,
+            "finalEquity": 986.7209120689655,
+            "netPct": -1.3279087931034497,
+            "maxDrawdownPct": 7.2760511882998316,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 994.5079965,
-            "netPct": -0.549200350000001,
-            "maxDrawdownPct": 5.654048873981795,
-            "trades": 2,
+            "finalEquity": 949.3664733334003,
+            "netPct": -5.063352666659966,
+            "maxDrawdownPct": 7.869653783819971,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 1022.7280800501935,
-            "netPct": 2.272808005019351,
-            "maxDrawdownPct": 0.25265285497726847,
+            "finalEquity": 1016.9576851428094,
+            "netPct": 1.6957685142809396,
+            "maxDrawdownPct": 0.8480320317254952,
             "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1003.3948747543276,
+            "netPct": 0.33948747543275887,
+            "maxDrawdownPct": 1.0410546554531699,
+            "trades": 13,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "REGIME_ADAPTIVE": {
+            "family": "REGIME_ADAPTIVE",
+            "finalEquity": 1015.7368487031702,
+            "netPct": 1.5736848703170152,
+            "maxDrawdownPct": 3.250411334552098,
+            "trades": 2,
+            "endingBase": 0,
+            "sellReachable": true
+          }
+        },
+        "localSelectedFamily": "MEAN_REVERSION",
+        "selectionScope": "CROSS_SECTIONAL_GLOBAL"
+      }
+    },
+    {
+      "symbol": "BNBUSDC",
+      "candles": 240,
+      "firstClose": 678.08,
+      "lastClose": 687.63,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 1012.0567302235723,
+        "netPct": 1.2056730223572345,
+        "maxDrawdownPct": 5.850439680282711,
+        "trades": 2,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 976.1726196376994,
+        "netPct": -2.3827380362300574,
+        "maxDrawdownPct": 4.5495648192131,
+        "trades": 6,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 994.016217633485,
+        "netPct": -0.5983782366515016,
+        "maxDrawdownPct": 1.3987631442854536,
+        "trades": 4,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 1000,
+        "netPct": 0,
+        "maxDrawdownPct": 0,
+        "trades": 0,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "REGIME_ADAPTIVE": {
+        "family": "REGIME_ADAPTIVE",
+        "finalEquity": 978.9768196634891,
+        "netPct": -2.1023180336510903,
+        "maxDrawdownPct": 2.271987600580409,
+        "trades": 4,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "validationWarmupCandles": 144,
+        "selectedFamily": "MEAN_REVERSION",
+        "trainSelected": {
+          "family": "MEAN_REVERSION",
+          "finalEquity": 1000,
+          "netPct": 0,
+          "maxDrawdownPct": 0,
+          "trades": 0,
+          "endingBase": 0,
+          "sellReachable": true
+        },
+        "validationSelected": {
+          "family": "MEAN_REVERSION",
+          "finalEquity": 994.016217633485,
+          "netPct": -0.5983782366515016,
+          "maxDrawdownPct": 1.3987631442854536,
+          "trades": 4,
+          "endingBase": 0,
+          "sellReachable": true
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 963.1384769971369,
+          "netPct": -3.686152300286312,
+          "maxDrawdownPct": 4.333818915284626,
+          "trades": 2,
+          "endingBase": 0,
+          "sellReachable": true
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1045.039862612081,
+            "netPct": 4.503986261208092,
+            "maxDrawdownPct": 5.850439680282711,
+            "trades": 2,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 996.2557709577492,
+            "netPct": -0.37442290422508223,
+            "maxDrawdownPct": 3.581484899740054,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0,
             "endingBase": 0,
             "sellReachable": true
           },
@@ -1190,64 +781,111 @@
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 988.6355933403943,
-            "netPct": -1.136440665960572,
-            "maxDrawdownPct": 2.973476645538768,
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0,
+            "endingBase": 0,
+            "sellReachable": true
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 963.1384769971369,
+            "netPct": -3.686152300286312,
+            "maxDrawdownPct": 4.333818915284626,
+            "trades": 2,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 974.4790448784721,
+            "netPct": -2.552095512152789,
+            "maxDrawdownPct": 2.7707205798749417,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 994.016217633485,
+            "netPct": -0.5983782366515016,
+            "maxDrawdownPct": 1.3987631442854536,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 998.0452055988201,
+            "netPct": -0.19547944011799245,
+            "maxDrawdownPct": 0.7587714153947013,
+            "trades": 15,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "REGIME_ADAPTIVE": {
+            "family": "REGIME_ADAPTIVE",
+            "finalEquity": 978.9768196634891,
+            "netPct": -2.1023180336510903,
+            "maxDrawdownPct": 2.271987600580409,
             "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           }
         },
-        "localSelectedFamily": "TREND",
+        "localSelectedFamily": "GRID",
         "selectionScope": "CROSS_SECTIONAL_GLOBAL"
       }
     },
     {
-      "symbol": "DOGEUSDC",
+      "symbol": "XRPUSDC",
       "candles": 240,
-      "firstClose": 0.07001,
-      "lastClose": 0.06998,
+      "firstClose": 1.4201,
+      "lastClose": 1.3733,
       "BUY_HOLD": {
         "family": "BUY_HOLD",
-        "finalEquity": 997.5733463790887,
-        "netPct": -0.24266536209113385,
-        "maxDrawdownPct": 2.967778405879041,
+        "finalEquity": 965.1114522216747,
+        "netPct": -3.4888547778325347,
+        "maxDrawdownPct": 19.181954887218044,
         "trades": 2,
         "endingBase": 0,
         "sellReachable": true
       },
       "TREND": {
         "family": "TREND",
-        "finalEquity": 931.5142736436543,
-        "netPct": -6.8485726356345715,
-        "maxDrawdownPct": 6.8485726356345715,
-        "trades": 12,
+        "finalEquity": 878.2121216226733,
+        "netPct": -12.17878783773267,
+        "maxDrawdownPct": 12.402020654530773,
+        "trades": 10,
         "endingBase": 0,
         "sellReachable": true
       },
       "MEAN_REVERSION": {
         "family": "MEAN_REVERSION",
-        "finalEquity": 1035.0832366955806,
-        "netPct": 3.508323669558058,
-        "maxDrawdownPct": 0.8949191685912226,
+        "finalEquity": 982.5064794843305,
+        "netPct": -1.7493520515669503,
+        "maxDrawdownPct": 5.440922388059712,
         "trades": 8,
         "endingBase": 0,
         "sellReachable": true
       },
       "GRID": {
         "family": "GRID",
-        "finalEquity": 1009.9358984455089,
-        "netPct": 0.9935898445508884,
-        "maxDrawdownPct": 0.48331266113692967,
-        "trades": 34,
+        "finalEquity": 1005.094900774099,
+        "netPct": 0.5094900774098959,
+        "maxDrawdownPct": 2.6503735682031087,
+        "trades": 28,
         "endingBase": 0,
         "sellReachable": true
       },
       "REGIME_ADAPTIVE": {
         "family": "REGIME_ADAPTIVE",
-        "finalEquity": 1011.4144532335341,
-        "netPct": 1.1414453233534119,
-        "maxDrawdownPct": 1.2921241050119345,
+        "finalEquity": 977.5186876565671,
+        "netPct": -2.248131234343293,
+        "maxDrawdownPct": 4.395760531109089,
         "trades": 6,
         "endingBase": 0,
         "sellReachable": true
@@ -1260,27 +898,27 @@
         "selectedFamily": "MEAN_REVERSION",
         "trainSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 1026.0134434368738,
-          "netPct": 2.601344343687378,
-          "maxDrawdownPct": 0.5455850681981421,
+          "finalEquity": 980.3751760695123,
+          "netPct": -1.9624823930487652,
+          "maxDrawdownPct": 5.440922388059712,
           "trades": 4,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 1008.839838616856,
-          "netPct": 0.8839838616856013,
-          "maxDrawdownPct": 0.8949191685912159,
+          "finalEquity": 1002.1739671371147,
+          "netPct": 0.2173967137114687,
+          "maxDrawdownPct": 1.851830550026682,
           "trades": 4,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationBuyHold": {
           "family": "BUY_HOLD",
-          "finalEquity": 1001.4354743332378,
-          "netPct": 0.14354743332378347,
-          "maxDrawdownPct": 2.7095325003509743,
+          "finalEquity": 954.4917983842886,
+          "netPct": -4.550820161571141,
+          "maxDrawdownPct": 8.336744439896309,
           "trades": 2,
           "endingBase": 0,
           "sellReachable": true
@@ -1288,45 +926,45 @@
         "train": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 995.8627318954436,
-            "netPct": -0.4137268104556369,
-            "maxDrawdownPct": 2.4223425477344076,
+            "finalEquity": 1008.3316912893459,
+            "netPct": 0.833169128934594,
+            "maxDrawdownPct": 17.521804511278187,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 945.8643915653026,
-            "netPct": -5.413560843469736,
-            "maxDrawdownPct": 5.413560843469736,
-            "trades": 8,
+            "finalEquity": 934.5570542139528,
+            "netPct": -6.544294578604718,
+            "maxDrawdownPct": 6.781849718797092,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 1026.0134434368738,
-            "netPct": 2.601344343687378,
-            "maxDrawdownPct": 0.5455850681981421,
+            "finalEquity": 980.3751760695123,
+            "netPct": -1.9624823930487652,
+            "maxDrawdownPct": 5.440922388059712,
             "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "GRID": {
             "family": "GRID",
-            "finalEquity": 1006.1802526632194,
-            "netPct": 0.6180252663219449,
-            "maxDrawdownPct": 0.2739911201188365,
-            "trades": 22,
+            "finalEquity": 1009.8234086682082,
+            "netPct": 0.9823408668208231,
+            "maxDrawdownPct": 0.30800698130349247,
+            "trades": 7,
             "endingBase": 0,
             "sellReachable": true
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 1011.6702755190311,
-            "netPct": 1.1670275519031066,
-            "maxDrawdownPct": 0.5455850681981307,
+            "finalEquity": 963.7158846100568,
+            "netPct": -3.6284115389943166,
+            "maxDrawdownPct": 3.7585820895522435,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
@@ -1335,45 +973,226 @@
         "validation": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 1001.4354743332378,
-            "netPct": 0.14354743332378347,
-            "maxDrawdownPct": 2.7095325003509743,
+            "finalEquity": 954.4917983842886,
+            "netPct": -4.550820161571141,
+            "maxDrawdownPct": 8.336744439896309,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 984.828567340504,
-            "netPct": -1.5171432659495963,
-            "maxDrawdownPct": 3.7436610293684773,
-            "trades": 4,
+            "finalEquity": 939.7094780492877,
+            "netPct": -6.029052195071234,
+            "maxDrawdownPct": 7.693331670728219,
+            "trades": 6,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 1008.839838616856,
-            "netPct": 0.8839838616856013,
-            "maxDrawdownPct": 0.8949191685912159,
+            "finalEquity": 1002.1739671371147,
+            "netPct": 0.2173967137114687,
+            "maxDrawdownPct": 1.851830550026682,
             "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "GRID": {
             "family": "GRID",
-            "finalEquity": 1001.0657067411806,
-            "netPct": 0.10657067411806338,
-            "maxDrawdownPct": 0.16617312884503715,
-            "trades": 5,
+            "finalEquity": 995.7139855775209,
+            "netPct": -0.428601442247907,
+            "maxDrawdownPct": 2.618314336501085,
+            "trades": 22,
             "endingBase": 0,
             "sellReachable": true
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 999.7471287911807,
-            "netPct": -0.02528712088193288,
-            "maxDrawdownPct": 1.2921241050119503,
+            "finalEquity": 1014.3224816223665,
+            "netPct": 1.4322481622366467,
+            "maxDrawdownPct": 3.4254013387036695,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          }
+        },
+        "localSelectedFamily": "GRID",
+        "selectionScope": "CROSS_SECTIONAL_GLOBAL"
+      }
+    },
+    {
+      "symbol": "ADAUSDC",
+      "candles": 240,
+      "firstClose": 0.2157,
+      "lastClose": 0.1966,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 909.6290987482614,
+        "netPct": -9.03709012517386,
+        "maxDrawdownPct": 24.28177882723338,
+        "trades": 2,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 906.0516609926058,
+        "netPct": -9.394833900739423,
+        "maxDrawdownPct": 9.394833900739423,
+        "trades": 6,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 1055.2150629505784,
+        "netPct": 5.521506295057838,
+        "maxDrawdownPct": 3.287037037037039,
+        "trades": 10,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 999.2497966674842,
+        "netPct": -0.07502033325157527,
+        "maxDrawdownPct": 2.360741798557136,
+        "trades": 32,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "REGIME_ADAPTIVE": {
+        "family": "REGIME_ADAPTIVE",
+        "finalEquity": 924.6040458526254,
+        "netPct": -7.53959541473746,
+        "maxDrawdownPct": 8.004074146109692,
+        "trades": 6,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "validationWarmupCandles": 144,
+        "selectedFamily": "MEAN_REVERSION",
+        "trainSelected": {
+          "family": "MEAN_REVERSION",
+          "finalEquity": 1048.7124323062344,
+          "netPct": 4.871243230623441,
+          "maxDrawdownPct": 3.287037037037039,
+          "trades": 6,
+          "endingBase": 0,
+          "sellReachable": true
+        },
+        "validationSelected": {
+          "family": "MEAN_REVERSION",
+          "finalEquity": 1006.2005850641478,
+          "netPct": 0.6200585064147844,
+          "maxDrawdownPct": 2.591393643031779,
+          "trades": 4,
+          "endingBase": 0,
+          "sellReachable": true
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 913.4403938547487,
+          "netPct": -8.655960614525133,
+          "maxDrawdownPct": 10.80203987019009,
+          "trades": 2,
+          "endingBase": 0,
+          "sellReachable": true
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 993.3741988873436,
+            "netPct": -0.6625801112656404,
+            "maxDrawdownPct": 19.834710743801658,
+            "trades": 2,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 959.5238699338847,
+            "netPct": -4.0476130066115275,
+            "maxDrawdownPct": 3.951564571182712,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1048.7124323062344,
+            "netPct": 4.871243230623441,
+            "maxDrawdownPct": 3.287037037037039,
+            "trades": 6,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1009.3039181167143,
+            "netPct": 0.9303918116714271,
+            "maxDrawdownPct": 0.62605234846882,
+            "trades": 11,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "REGIME_ADAPTIVE": {
+            "family": "REGIME_ADAPTIVE",
+            "finalEquity": 969.0994530256588,
+            "netPct": -3.0900546974341183,
+            "maxDrawdownPct": 3.4803662499999826,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 913.4403938547487,
+            "netPct": -8.655960614525133,
+            "maxDrawdownPct": 10.80203987019009,
+            "trades": 2,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 941.9458165496486,
+            "netPct": -5.805418345035139,
+            "maxDrawdownPct": 6.1045461804574686,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1006.2005850641478,
+            "netPct": 0.6200585064147844,
+            "maxDrawdownPct": 2.591393643031779,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 994.0971954425745,
+            "netPct": -0.5902804557425497,
+            "maxDrawdownPct": 2.3211158861259045,
+            "trades": 26,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "REGIME_ADAPTIVE": {
+            "family": "REGIME_ADAPTIVE",
+            "finalEquity": 951.7353158559678,
+            "netPct": -4.826468414403223,
+            "maxDrawdownPct": 5.1287050398280325,
             "trades": 4,
             "endingBase": 0,
             "sellReachable": true
@@ -1384,51 +1203,232 @@
       }
     },
     {
-      "symbol": "LINKUSDC",
+      "symbol": "DOGEUSDC",
       "candles": 240,
-      "firstClose": 8.293,
-      "lastClose": 8.224,
+      "firstClose": 0.08447,
+      "lastClose": 0.0828,
       "BUY_HOLD": {
         "family": "BUY_HOLD",
-        "finalEquity": 989.6973621126252,
-        "netPct": -1.0302637887374773,
-        "maxDrawdownPct": 4.385964912280687,
+        "finalEquity": 978.2701882325085,
+        "netPct": -2.172981176749147,
+        "maxDrawdownPct": 17.167512690355338,
         "trades": 2,
         "endingBase": 0,
         "sellReachable": true
       },
       "TREND": {
         "family": "TREND",
-        "finalEquity": 954.492654428021,
-        "netPct": -4.550734557197904,
-        "maxDrawdownPct": 5.673699246000503,
-        "trades": 8,
+        "finalEquity": 943.0203795575933,
+        "netPct": -5.697962044240671,
+        "maxDrawdownPct": 5.697962044240671,
+        "trades": 4,
         "endingBase": 0,
         "sellReachable": true
       },
       "MEAN_REVERSION": {
         "family": "MEAN_REVERSION",
-        "finalEquity": 1037.480347855718,
-        "netPct": 3.7480347855718037,
-        "maxDrawdownPct": 0.6558173427252753,
-        "trades": 6,
+        "finalEquity": 940.5780028785755,
+        "netPct": -5.942199712142451,
+        "maxDrawdownPct": 8.10973448923728,
+        "trades": 8,
         "endingBase": 0,
         "sellReachable": true
       },
       "GRID": {
         "family": "GRID",
-        "finalEquity": 1015.9636237846759,
-        "netPct": 1.5963623784675858,
-        "maxDrawdownPct": 1.5837657965766632,
-        "trades": 50,
+        "finalEquity": 999.1253375139333,
+        "netPct": -0.08746624860666542,
+        "maxDrawdownPct": 0.5405127900503317,
+        "trades": 3,
         "endingBase": 0,
         "sellReachable": true
       },
       "REGIME_ADAPTIVE": {
         "family": "REGIME_ADAPTIVE",
-        "finalEquity": 986.8458695171657,
-        "netPct": -1.3154130482834263,
-        "maxDrawdownPct": 2.4764414329623605,
+        "finalEquity": 929.4134543978112,
+        "netPct": -7.058654560218884,
+        "maxDrawdownPct": 7.9460273219959605,
+        "trades": 6,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "validationWarmupCandles": 144,
+        "selectedFamily": "MEAN_REVERSION",
+        "trainSelected": {
+          "family": "MEAN_REVERSION",
+          "finalEquity": 972.0517925486719,
+          "netPct": -2.794820745132813,
+          "maxDrawdownPct": 5.827245309994213,
+          "trades": 4,
+          "endingBase": 0,
+          "sellReachable": true
+        },
+        "validationSelected": {
+          "family": "MEAN_REVERSION",
+          "finalEquity": 967.6212832367976,
+          "netPct": -3.2378716763202418,
+          "maxDrawdownPct": 5.898749408633157,
+          "trades": 4,
+          "endingBase": 0,
+          "sellReachable": true
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 929.7309045904591,
+          "netPct": -7.02690954095409,
+          "maxDrawdownPct": 8.592874747927404,
+          "trades": 2,
+          "endingBase": 0,
+          "sellReachable": true
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 1053.6489780987333,
+            "netPct": 5.364897809873332,
+            "maxDrawdownPct": 14.416243654822336,
+            "trades": 2,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 998.0010000000001,
+            "netPct": -0.199899999999991,
+            "maxDrawdownPct": 0.09999999999998864,
+            "trades": 2,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 972.0517925486719,
+            "netPct": -2.794820745132813,
+            "maxDrawdownPct": 5.827245309994213,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "REGIME_ADAPTIVE": {
+            "family": "REGIME_ADAPTIVE",
+            "finalEquity": 968.1322727954428,
+            "netPct": -3.186772720455724,
+            "maxDrawdownPct": 4.015128038116588,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 929.7309045904591,
+            "netPct": -7.02690954095409,
+            "maxDrawdownPct": 8.592874747927404,
+            "trades": 2,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 944.8214520721959,
+            "netPct": -5.5178547927804065,
+            "maxDrawdownPct": 5.688169180892562,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 967.6212832367976,
+            "netPct": -3.2378716763202418,
+            "maxDrawdownPct": 5.898749408633157,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 970.7521736600149,
+            "netPct": -2.924782633998507,
+            "maxDrawdownPct": 4.391154144589633,
+            "trades": 20,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "REGIME_ADAPTIVE": {
+            "family": "REGIME_ADAPTIVE",
+            "finalEquity": 961.3215013491957,
+            "netPct": -3.867849865080427,
+            "maxDrawdownPct": 4.181287449317437,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          }
+        },
+        "localSelectedFamily": "GRID",
+        "selectionScope": "CROSS_SECTIONAL_GLOBAL"
+      }
+    },
+    {
+      "symbol": "LINKUSDC",
+      "candles": 240,
+      "firstClose": 11.476,
+      "lastClose": 11.276,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 980.6081627744857,
+        "netPct": -1.939183722551434,
+        "maxDrawdownPct": 11.552894211576852,
+        "trades": 2,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 934.9015296625357,
+        "netPct": -6.5098470337464285,
+        "maxDrawdownPct": 7.129433178776414,
+        "trades": 6,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 1076.4229013576248,
+        "netPct": 7.642290135762482,
+        "maxDrawdownPct": 1.464690496948579,
+        "trades": 10,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 1015.2688923792562,
+        "netPct": 1.5268892379256158,
+        "maxDrawdownPct": 0.2934296732225367,
+        "trades": 23,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "REGIME_ADAPTIVE": {
+        "family": "REGIME_ADAPTIVE",
+        "finalEquity": 957.9918870544706,
+        "netPct": -4.200811294552944,
+        "maxDrawdownPct": 8.090332941131994,
         "trades": 8,
         "endingBase": 0,
         "sellReachable": true
@@ -1441,27 +1441,27 @@
         "selectedFamily": "MEAN_REVERSION",
         "trainSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 1034.881423478028,
-          "netPct": 3.4881423478027953,
-          "maxDrawdownPct": 0.1948605529168161,
-          "trades": 4,
+          "finalEquity": 1067.2467489359278,
+          "netPct": 6.724674893592783,
+          "maxDrawdownPct": 1.3763375033271246,
+          "trades": 6,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 1002.5113257603518,
-          "netPct": 0.2511325760351838,
-          "maxDrawdownPct": 0.6558173427252915,
-          "trades": 2,
+          "finalEquity": 1008.5979670875976,
+          "netPct": 0.8597967087597568,
+          "maxDrawdownPct": 1.4646904969485737,
+          "trades": 4,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationBuyHold": {
           "family": "BUY_HOLD",
-          "finalEquity": 1003.3692205378973,
-          "netPct": 0.33692205378972634,
-          "maxDrawdownPct": 2.3763802208353324,
+          "finalEquity": 948.9382980015179,
+          "netPct": -5.106170199848214,
+          "maxDrawdownPct": 7.482879572406893,
           "trades": 2,
           "endingBase": 0,
           "sellReachable": true
@@ -1469,45 +1469,45 @@
         "train": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 985.7260570360547,
-            "netPct": -1.4273942963945274,
-            "maxDrawdownPct": 4.385964912280687,
+            "finalEquity": 1030.8734623562214,
+            "netPct": 3.0873462356221353,
+            "maxDrawdownPct": 11.161676646706582,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 989.325873596523,
-            "netPct": -1.0674126403476976,
-            "maxDrawdownPct": 2.231358760429083,
-            "trades": 2,
+            "finalEquity": 994.3940302168517,
+            "netPct": -0.5605969783148339,
+            "maxDrawdownPct": 4.131986183304662,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 1034.881423478028,
-            "netPct": 3.4881423478027953,
-            "maxDrawdownPct": 0.1948605529168161,
-            "trades": 4,
+            "finalEquity": 1067.2467489359278,
+            "netPct": 6.724674893592783,
+            "maxDrawdownPct": 1.3763375033271246,
+            "trades": 6,
             "endingBase": 0,
             "sellReachable": true
           },
           "GRID": {
             "family": "GRID",
-            "finalEquity": 1007.9114776960009,
-            "netPct": 0.7911477696000929,
-            "maxDrawdownPct": 1.420288014359405,
-            "trades": 30,
+            "finalEquity": 1011.0540106963513,
+            "netPct": 1.1054010696351269,
+            "maxDrawdownPct": 0.2934296732225367,
+            "trades": 13,
             "endingBase": 0,
             "sellReachable": true
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 1004.3860096376605,
-            "netPct": 0.438600963766055,
-            "maxDrawdownPct": 1.9484833969010715,
+            "finalEquity": 1030.8412659677379,
+            "netPct": 3.0841265967737854,
+            "maxDrawdownPct": 1.3734581401452248,
             "trades": 4,
             "endingBase": 0,
             "sellReachable": true
@@ -1516,46 +1516,46 @@
         "validation": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 1003.3692205378973,
-            "netPct": 0.33692205378972634,
-            "maxDrawdownPct": 2.3763802208353324,
+            "finalEquity": 948.9382980015179,
+            "netPct": -5.106170199848214,
+            "maxDrawdownPct": 7.482879572406893,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 964.7909550349962,
-            "netPct": -3.520904496500384,
-            "maxDrawdownPct": 4.745695425651317,
-            "trades": 6,
+            "finalEquity": 937.8970984048954,
+            "netPct": -6.210290159510464,
+            "maxDrawdownPct": 7.018077957833784,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 1002.5113257603518,
-            "netPct": 0.2511325760351838,
-            "maxDrawdownPct": 0.6558173427252915,
-            "trades": 2,
+            "finalEquity": 1008.5979670875976,
+            "netPct": 0.8597967087597568,
+            "maxDrawdownPct": 1.4646904969485737,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "GRID": {
             "family": "GRID",
-            "finalEquity": 1000.8257875257475,
-            "netPct": 0.08257875257475007,
-            "maxDrawdownPct": 0.04134247252068235,
-            "trades": 3,
+            "finalEquity": 996.2306516644941,
+            "netPct": -0.37693483355059243,
+            "maxDrawdownPct": 2.609960530586283,
+            "trades": 24,
             "endingBase": 0,
             "sellReachable": true
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 982.5364551555007,
-            "netPct": -1.7463544844499326,
-            "maxDrawdownPct": 2.1894976258478103,
-            "trades": 4,
+            "finalEquity": 927.08139557258,
+            "netPct": -7.291860442741995,
+            "maxDrawdownPct": 8.090332941131992,
+            "trades": 6,
             "endingBase": 0,
             "sellReachable": true
           }
@@ -1567,50 +1567,50 @@
     {
       "symbol": "AVAXUSDC",
       "candles": 240,
-      "firstClose": 6.456,
-      "lastClose": 6.523,
+      "firstClose": 7.588,
+      "lastClose": 7.216,
       "BUY_HOLD": {
         "family": "BUY_HOLD",
-        "finalEquity": 1008.3581974907061,
-        "netPct": 0.8358197490706061,
-        "maxDrawdownPct": 7.576633892423365,
+        "finalEquity": 949.0742245651029,
+        "netPct": -5.0925775434897105,
+        "maxDrawdownPct": 13.859223300970868,
         "trades": 2,
         "endingBase": 0,
         "sellReachable": true
       },
       "TREND": {
         "family": "TREND",
-        "finalEquity": 954.0123661950287,
-        "netPct": -4.598763380497132,
-        "maxDrawdownPct": 7.257512362821824,
+        "finalEquity": 906.0781355597849,
+        "netPct": -9.392186444021513,
+        "maxDrawdownPct": 9.392186444021513,
         "trades": 8,
         "endingBase": 0,
         "sellReachable": true
       },
       "MEAN_REVERSION": {
         "family": "MEAN_REVERSION",
-        "finalEquity": 992.7866885761983,
-        "netPct": -0.7213311423801656,
-        "maxDrawdownPct": 4.491366949152539,
-        "trades": 8,
+        "finalEquity": 1046.5493133434152,
+        "netPct": 4.654931334341518,
+        "maxDrawdownPct": 2.5302969769609853,
+        "trades": 10,
         "endingBase": 0,
         "sellReachable": true
       },
       "GRID": {
         "family": "GRID",
-        "finalEquity": 1003.335391019374,
-        "netPct": 0.3335391019374015,
-        "maxDrawdownPct": 2.0845479977939436,
-        "trades": 21,
+        "finalEquity": 1013.5315152658247,
+        "netPct": 1.3531515265824736,
+        "maxDrawdownPct": 0.42756599358996195,
+        "trades": 29,
         "endingBase": 0,
         "sellReachable": true
       },
       "REGIME_ADAPTIVE": {
         "family": "REGIME_ADAPTIVE",
-        "finalEquity": 968.1474501435586,
-        "netPct": -3.185254985644144,
-        "maxDrawdownPct": 6.165822429350387,
-        "trades": 12,
+        "finalEquity": 1000,
+        "netPct": 0,
+        "maxDrawdownPct": 0,
+        "trades": 0,
         "endingBase": 0,
         "sellReachable": true
       },
@@ -1622,27 +1622,27 @@
         "selectedFamily": "MEAN_REVERSION",
         "trainSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 1005.5712546926752,
-          "netPct": 0.557125469267521,
-          "maxDrawdownPct": 4.491366949152539,
+          "finalEquity": 1038.599979275148,
+          "netPct": 3.859997927514792,
+          "maxDrawdownPct": 2.5302969769609853,
           "trades": 6,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 987.2862653374234,
-          "netPct": -1.27137346625766,
-          "maxDrawdownPct": 2.045904907975455,
-          "trades": 2,
+          "finalEquity": 1007.6538939215222,
+          "netPct": 0.765389392152224,
+          "maxDrawdownPct": 0.9299781181619331,
+          "trades": 4,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationBuyHold": {
           "family": "BUY_HOLD",
-          "finalEquity": 974.5449884730539,
-          "netPct": -2.5455011526946123,
-          "maxDrawdownPct": 4.407065868263464,
+          "finalEquity": 966.9139656283564,
+          "netPct": -3.3086034371643565,
+          "maxDrawdownPct": 5.7120085015940525,
           "trades": 2,
           "endingBase": 0,
           "sellReachable": true
@@ -1650,46 +1650,46 @@
         "train": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 1030.7730278810407,
-            "netPct": 3.077302788104066,
-            "maxDrawdownPct": 5.866008027168879,
+            "finalEquity": 983.1388343437005,
+            "netPct": -1.6861165656299477,
+            "maxDrawdownPct": 12.58495145631067,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 978.8377455058943,
-            "netPct": -2.1162254494105697,
-            "maxDrawdownPct": 4.346761133603256,
-            "trades": 4,
+            "finalEquity": 955.1245332495238,
+            "netPct": -4.487546675047622,
+            "maxDrawdownPct": 4.391938613661284,
+            "trades": 6,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 1005.5712546926752,
-            "netPct": 0.557125469267521,
-            "maxDrawdownPct": 4.491366949152539,
+            "finalEquity": 1038.599979275148,
+            "netPct": 3.859997927514792,
+            "maxDrawdownPct": 2.5302969769609853,
             "trades": 6,
             "endingBase": 0,
             "sellReachable": true
           },
           "GRID": {
             "family": "GRID",
-            "finalEquity": 1001.2249345140664,
-            "netPct": 0.12249345140663763,
-            "maxDrawdownPct": 2.0845479977939436,
-            "trades": 15,
+            "finalEquity": 1009.5585292474252,
+            "netPct": 0.9558529247425214,
+            "maxDrawdownPct": 0.42756599358996195,
+            "trades": 17,
             "endingBase": 0,
             "sellReachable": true
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 1000.627178136336,
-            "netPct": 0.0627178136336056,
-            "maxDrawdownPct": 3.5423720783436576,
-            "trades": 8,
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0,
             "endingBase": 0,
             "sellReachable": true
           }
@@ -1697,45 +1697,226 @@
         "validation": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 974.5449884730539,
-            "netPct": -2.5455011526946123,
-            "maxDrawdownPct": 4.407065868263464,
+            "finalEquity": 966.9139656283564,
+            "netPct": -3.3086034371643565,
+            "maxDrawdownPct": 5.7120085015940525,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 974.6379015063061,
-            "netPct": -2.5362098493693908,
-            "maxDrawdownPct": 3.064545672942409,
+            "finalEquity": 947.2597567970172,
+            "netPct": -5.274024320298281,
+            "maxDrawdownPct": 5.897161201710258,
             "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 987.2862653374234,
-            "netPct": -1.27137346625766,
-            "maxDrawdownPct": 2.045904907975455,
-            "trades": 2,
+            "finalEquity": 1007.6538939215222,
+            "netPct": 0.765389392152224,
+            "maxDrawdownPct": 0.9299781181619331,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "GRID": {
             "family": "GRID",
-            "finalEquity": 1007.1644452325339,
-            "netPct": 0.7164445232533923,
-            "maxDrawdownPct": 0.3295603271983623,
-            "trades": 23,
+            "finalEquity": 1002.7785778710825,
+            "netPct": 0.27785778710824616,
+            "maxDrawdownPct": 1.2277479123207313,
+            "trades": 25,
             "endingBase": 0,
             "sellReachable": true
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 967.5406298145224,
-            "netPct": -3.2459370185477607,
-            "maxDrawdownPct": 3.2459370185477607,
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0,
+            "endingBase": 0,
+            "sellReachable": true
+          }
+        },
+        "localSelectedFamily": "MEAN_REVERSION",
+        "selectionScope": "CROSS_SECTIONAL_GLOBAL"
+      }
+    },
+    {
+      "symbol": "LTCUSDC",
+      "candles": 240,
+      "firstClose": 50.68,
+      "lastClose": 48.75,
+      "BUY_HOLD": {
+        "family": "BUY_HOLD",
+        "finalEquity": 959.9950424230465,
+        "netPct": -4.000495757695353,
+        "maxDrawdownPct": 12.70939548434088,
+        "trades": 2,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "TREND": {
+        "family": "TREND",
+        "finalEquity": 940.8714804278866,
+        "netPct": -5.912851957211342,
+        "maxDrawdownPct": 6.347185383014072,
+        "trades": 4,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "MEAN_REVERSION": {
+        "family": "MEAN_REVERSION",
+        "finalEquity": 1023.73009196293,
+        "netPct": 2.3730091962930033,
+        "maxDrawdownPct": 2.4037521985538466,
+        "trades": 8,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "GRID": {
+        "family": "GRID",
+        "finalEquity": 1006.0632750031543,
+        "netPct": 0.6063275003154331,
+        "maxDrawdownPct": 0.8382868374281937,
+        "trades": 30,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "REGIME_ADAPTIVE": {
+        "family": "REGIME_ADAPTIVE",
+        "finalEquity": 988.2143588218324,
+        "netPct": -1.1785641178167565,
+        "maxDrawdownPct": 1.678326919181677,
+        "trades": 4,
+        "endingBase": 0,
+        "sellReachable": true
+      },
+      "walkForward": {
+        "splitIndex": 144,
+        "trainCandles": 144,
+        "validationCandles": 96,
+        "validationWarmupCandles": 144,
+        "selectedFamily": "MEAN_REVERSION",
+        "trainSelected": {
+          "family": "MEAN_REVERSION",
+          "finalEquity": 1006.6792905696451,
+          "netPct": 0.6679290569645104,
+          "maxDrawdownPct": 2.4037521985538466,
+          "trades": 4,
+          "endingBase": 0,
+          "sellReachable": true
+        },
+        "validationSelected": {
+          "family": "MEAN_REVERSION",
+          "finalEquity": 1016.9376697752832,
+          "netPct": 1.693766977528321,
+          "maxDrawdownPct": 1.678326919181677,
+          "trades": 4,
+          "endingBase": 0,
+          "sellReachable": true
+        },
+        "validationBuyHold": {
+          "family": "BUY_HOLD",
+          "finalEquity": 968.2099253731343,
+          "netPct": -3.17900746268657,
+          "maxDrawdownPct": 4.692417910447773,
+          "trades": 2,
+          "endingBase": 0,
+          "sellReachable": true
+        },
+        "train": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 988.3518190607733,
+            "netPct": -1.1648180939226678,
+            "maxDrawdownPct": 9.81427530954116,
+            "trades": 2,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 968.7142889390522,
+            "netPct": -3.1285711060947845,
+            "maxDrawdownPct": 3.5757575757575792,
+            "trades": 2,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1006.6792905696451,
+            "netPct": 0.6679290569645104,
+            "maxDrawdownPct": 2.4037521985538466,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1004.1779829917972,
+            "netPct": 0.4177982991797194,
+            "maxDrawdownPct": 0.2563160022990446,
+            "trades": 9,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "REGIME_ADAPTIVE": {
+            "family": "REGIME_ADAPTIVE",
+            "finalEquity": 1000,
+            "netPct": 0,
+            "maxDrawdownPct": 0,
+            "trades": 0,
+            "endingBase": 0,
+            "sellReachable": true
+          }
+        },
+        "validation": {
+          "BUY_HOLD": {
+            "family": "BUY_HOLD",
+            "finalEquity": 968.2099253731343,
+            "netPct": -3.17900746268657,
+            "maxDrawdownPct": 4.692417910447773,
+            "trades": 2,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "TREND": {
+            "family": "TREND",
+            "finalEquity": 971.2579768574908,
+            "netPct": -2.87420231425092,
+            "maxDrawdownPct": 4.311568431568427,
+            "trades": 2,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 1016.9376697752832,
+            "netPct": 1.693766977528321,
+            "maxDrawdownPct": 1.678326919181677,
+            "trades": 4,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 1002.0242897301894,
+            "netPct": 0.20242897301893664,
+            "maxDrawdownPct": 0.8214594696571406,
+            "trades": 22,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "REGIME_ADAPTIVE": {
+            "family": "REGIME_ADAPTIVE",
+            "finalEquity": 988.2143588218324,
+            "netPct": -1.1785641178167565,
+            "maxDrawdownPct": 1.678326919181677,
             "trades": 4,
             "endingBase": 0,
             "sellReachable": true
@@ -1746,51 +1927,51 @@
       }
     },
     {
-      "symbol": "LTCUSDC",
+      "symbol": "TRXUSDC",
       "candles": 240,
-      "firstClose": 45.35,
-      "lastClose": 45.47,
+      "firstClose": 0.3411,
+      "lastClose": 0.3365,
       "BUY_HOLD": {
         "family": "BUY_HOLD",
-        "finalEquity": 1000.6417964718852,
-        "netPct": 0.06417964718851864,
-        "maxDrawdownPct": 3.38227122381478,
+        "finalEquity": 984.5421767810028,
+        "netPct": -1.545782321899719,
+        "maxDrawdownPct": 4.376430205949661,
         "trades": 2,
         "endingBase": 0,
         "sellReachable": true
       },
       "TREND": {
         "family": "TREND",
-        "finalEquity": 1007.9572252900655,
-        "netPct": 0.795722529006548,
-        "maxDrawdownPct": 2.2520896165446094,
-        "trades": 4,
+        "finalEquity": 961.3193388091892,
+        "netPct": -3.868066119081084,
+        "maxDrawdownPct": 3.868066119081084,
+        "trades": 12,
         "endingBase": 0,
         "sellReachable": true
       },
       "MEAN_REVERSION": {
         "family": "MEAN_REVERSION",
-        "finalEquity": 1013.4219643773098,
-        "netPct": 1.3421964377309792,
-        "maxDrawdownPct": 0.9315881708652649,
+        "finalEquity": 975.4120217877357,
+        "netPct": -2.458797821226426,
+        "maxDrawdownPct": 2.694286888388598,
         "trades": 6,
         "endingBase": 0,
         "sellReachable": true
       },
       "GRID": {
         "family": "GRID",
-        "finalEquity": 1011.6848709072594,
-        "netPct": 1.1684870907259437,
-        "maxDrawdownPct": 0.734899287134527,
-        "trades": 33,
+        "finalEquity": 1003.0767626162233,
+        "netPct": 0.3076762616223277,
+        "maxDrawdownPct": 0.48042952734942646,
+        "trades": 24,
         "endingBase": 0,
         "sellReachable": true
       },
       "REGIME_ADAPTIVE": {
         "family": "REGIME_ADAPTIVE",
-        "finalEquity": 973.8298030046648,
-        "netPct": -2.617019699533523,
-        "maxDrawdownPct": 3.235253048871705,
+        "finalEquity": 980.7179298824594,
+        "netPct": -1.9282070117540568,
+        "maxDrawdownPct": 2.127284799844952,
         "trades": 8,
         "endingBase": 0,
         "sellReachable": true
@@ -1803,27 +1984,27 @@
         "selectedFamily": "MEAN_REVERSION",
         "trainSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 1019.4716752274533,
-          "netPct": 1.9471675227453262,
-          "maxDrawdownPct": 0.6989853438556964,
+          "finalEquity": 981.0807842736042,
+          "netPct": -1.8919215726395804,
+          "maxDrawdownPct": 2.508019830854473,
+          "trades": 2,
+          "endingBase": 0,
+          "sellReachable": true
+        },
+        "validationSelected": {
+          "family": "MEAN_REVERSION",
+          "finalEquity": 994.2219207870172,
+          "netPct": -0.5778079212982788,
+          "maxDrawdownPct": 0.7795918367346931,
           "trades": 4,
           "endingBase": 0,
           "sellReachable": true
         },
-        "validationSelected": {
-          "family": "MEAN_REVERSION",
-          "finalEquity": 994.0658372398685,
-          "netPct": -0.5934162760131472,
-          "maxDrawdownPct": 0.9315881708652796,
-          "trades": 2,
-          "endingBase": 0,
-          "sellReachable": true
-        },
         "validationBuyHold": {
           "family": "BUY_HOLD",
-          "finalEquity": 1008.6487101578127,
-          "netPct": 0.8648710157812729,
-          "maxDrawdownPct": 2.477380439465748,
+          "finalEquity": 998.5945182872435,
+          "netPct": -0.14054817127564545,
+          "maxDrawdownPct": 1.7266608135791701,
           "trades": 2,
           "endingBase": 0,
           "sellReachable": true
@@ -1831,227 +2012,46 @@
         "train": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 990.9588760749724,
-            "netPct": -0.9041123925027591,
-            "maxDrawdownPct": 3.38227122381478,
+            "finalEquity": 983.6644274406333,
+            "netPct": -1.633557255936671,
+            "maxDrawdownPct": 4.376430205949661,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 999.3023746105604,
-            "netPct": -0.06976253894396223,
-            "maxDrawdownPct": 1.795627758977794,
-            "trades": 4,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "MEAN_REVERSION": {
-            "family": "MEAN_REVERSION",
-            "finalEquity": 1019.4716752274533,
-            "netPct": 1.9471675227453262,
-            "maxDrawdownPct": 0.6989853438556964,
-            "trades": 4,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "GRID": {
-            "family": "GRID",
-            "finalEquity": 1010.8430921700273,
-            "netPct": 1.0843092170027262,
-            "maxDrawdownPct": 0.734899287134527,
-            "trades": 31,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "REGIME_ADAPTIVE": {
-            "family": "REGIME_ADAPTIVE",
-            "finalEquity": 988.0842394675884,
-            "netPct": -1.1915760532411583,
-            "maxDrawdownPct": 1.467902962473416,
-            "trades": 4,
-            "endingBase": 0,
-            "sellReachable": true
-          }
-        },
-        "validation": {
-          "BUY_HOLD": {
-            "family": "BUY_HOLD",
-            "finalEquity": 1008.6487101578127,
-            "netPct": 0.8648710157812729,
-            "maxDrawdownPct": 2.477380439465748,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "TREND": {
-            "family": "TREND",
-            "finalEquity": 997.3422534653465,
-            "netPct": -0.26577465346534834,
-            "maxDrawdownPct": 2.2520896165445907,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "MEAN_REVERSION": {
-            "family": "MEAN_REVERSION",
-            "finalEquity": 994.0658372398685,
-            "netPct": -0.5934162760131472,
-            "maxDrawdownPct": 0.9315881708652796,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "GRID": {
-            "family": "GRID",
-            "finalEquity": 1000.7113998663724,
-            "netPct": 0.07113998663724032,
-            "maxDrawdownPct": 0.016666666666662878,
-            "trades": 3,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "REGIME_ADAPTIVE": {
-            "family": "REGIME_ADAPTIVE",
-            "finalEquity": 985.5736627571308,
-            "netPct": -1.442633724286918,
-            "maxDrawdownPct": 1.793679561823558,
-            "trades": 4,
-            "endingBase": 0,
-            "sellReachable": true
-          }
-        },
-        "localSelectedFamily": "MEAN_REVERSION",
-        "selectionScope": "CROSS_SECTIONAL_GLOBAL"
-      }
-    },
-    {
-      "symbol": "TRXUSDC",
-      "candles": 240,
-      "firstClose": 0.3284,
-      "lastClose": 0.3296,
-      "BUY_HOLD": {
-        "family": "BUY_HOLD",
-        "finalEquity": 1001.6477758830694,
-        "netPct": 0.16477758830693573,
-        "maxDrawdownPct": 1.4199395770392818,
-        "trades": 2,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "TREND": {
-        "family": "TREND",
-        "finalEquity": 995.8134936768936,
-        "netPct": -0.4186506323106414,
-        "maxDrawdownPct": 1.466107625327846,
-        "trades": 6,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "MEAN_REVERSION": {
-        "family": "MEAN_REVERSION",
-        "finalEquity": 1006.8636639376176,
-        "netPct": 0.6863663937617617,
-        "maxDrawdownPct": 0.12239902080782299,
-        "trades": 6,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "GRID": {
-        "family": "GRID",
-        "finalEquity": 1001.5830984173377,
-        "netPct": 0.15830984173377374,
-        "maxDrawdownPct": 0.10739620653048101,
-        "trades": 9,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "REGIME_ADAPTIVE": {
-        "family": "REGIME_ADAPTIVE",
-        "finalEquity": 986.9277089060893,
-        "netPct": -1.3072291093910735,
-        "maxDrawdownPct": 1.709282119861932,
-        "trades": 12,
-        "endingBase": 0,
-        "sellReachable": true
-      },
-      "walkForward": {
-        "splitIndex": 144,
-        "trainCandles": 144,
-        "validationCandles": 96,
-        "validationWarmupCandles": 144,
-        "selectedFamily": "MEAN_REVERSION",
-        "trainSelected": {
-          "family": "MEAN_REVERSION",
-          "finalEquity": 1003.4838957644978,
-          "netPct": 0.3483895764497788,
-          "maxDrawdownPct": 0.12239902080782299,
-          "trades": 6,
-          "endingBase": 0,
-          "sellReachable": true
-        },
-        "validationSelected": {
-          "family": "MEAN_REVERSION",
-          "finalEquity": 1000,
-          "netPct": 0,
-          "maxDrawdownPct": 0,
-          "trades": 0,
-          "endingBase": 0,
-          "sellReachable": true
-        },
-        "validationBuyHold": {
-          "family": "BUY_HOLD",
-          "finalEquity": 1005.9361761467889,
-          "netPct": 0.5936176146788852,
-          "maxDrawdownPct": 0.36618858712236513,
-          "trades": 2,
-          "endingBase": 0,
-          "sellReachable": true
-        },
-        "train": {
-          "BUY_HOLD": {
-            "family": "BUY_HOLD",
-            "finalEquity": 992.5308361753957,
-            "netPct": -0.7469163824604266,
-            "maxDrawdownPct": 1.4199395770392818,
-            "trades": 2,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "TREND": {
-            "family": "TREND",
-            "finalEquity": 991.7534512186169,
-            "netPct": -0.8246548781383126,
-            "maxDrawdownPct": 1.2167069486404873,
-            "trades": 4,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "MEAN_REVERSION": {
-            "family": "MEAN_REVERSION",
-            "finalEquity": 1003.4838957644978,
-            "netPct": 0.3483895764497788,
-            "maxDrawdownPct": 0.12239902080782299,
-            "trades": 6,
-            "endingBase": 0,
-            "sellReachable": true
-          },
-          "GRID": {
-            "family": "GRID",
-            "finalEquity": 1000.8014203331991,
-            "netPct": 0.08014203331990757,
-            "maxDrawdownPct": 0.10739620653048101,
+            "finalEquity": 972.0170940095527,
+            "netPct": -2.7982905990447304,
+            "maxDrawdownPct": 2.7982905990447304,
             "trades": 8,
             "endingBase": 0,
             "sellReachable": true
           },
+          "MEAN_REVERSION": {
+            "family": "MEAN_REVERSION",
+            "finalEquity": 981.0807842736042,
+            "netPct": -1.8919215726395804,
+            "maxDrawdownPct": 2.508019830854473,
+            "trades": 2,
+            "endingBase": 0,
+            "sellReachable": true
+          },
+          "GRID": {
+            "family": "GRID",
+            "finalEquity": 999.7070163206297,
+            "netPct": -0.02929836793703089,
+            "maxDrawdownPct": 0.48042952734942646,
+            "trades": 12,
+            "endingBase": 0,
+            "sellReachable": true
+          },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 986.2042436344558,
-            "netPct": -1.3795756365544207,
-            "maxDrawdownPct": 1.5509909690470407,
-            "trades": 10,
+            "finalEquity": 992.166442852967,
+            "netPct": -0.7833557147033049,
+            "maxDrawdownPct": 0.9157480314960541,
+            "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           }
@@ -2059,28 +2059,28 @@
         "validation": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 1005.9361761467889,
-            "netPct": 0.5936176146788852,
-            "maxDrawdownPct": 0.36618858712236513,
+            "finalEquity": 998.5945182872435,
+            "netPct": -0.14054817127564545,
+            "maxDrawdownPct": 1.7266608135791701,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 1004.0938021978021,
-            "netPct": 0.409380219780212,
-            "maxDrawdownPct": 0.252472527472537,
-            "trades": 2,
+            "finalEquity": 988.994272563422,
+            "netPct": -1.1005727436578012,
+            "maxDrawdownPct": 2.0735502472221428,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 1000,
-            "netPct": 0,
-            "maxDrawdownPct": 0,
-            "trades": 0,
+            "finalEquity": 994.2219207870172,
+            "netPct": -0.5778079212982788,
+            "maxDrawdownPct": 0.7795918367346931,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
@@ -2095,65 +2095,65 @@
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 1000.7335856404015,
-            "netPct": 0.0733585640401543,
-            "maxDrawdownPct": 0.24242424242424615,
-            "trades": 2,
+            "finalEquity": 988.4610963684806,
+            "netPct": -1.1538903631519362,
+            "maxDrawdownPct": 2.1272847998449738,
+            "trades": 6,
             "endingBase": 0,
             "sellReachable": true
           }
         },
-        "localSelectedFamily": "MEAN_REVERSION",
+        "localSelectedFamily": "GRID",
         "selectionScope": "CROSS_SECTIONAL_GLOBAL"
       }
     },
     {
       "symbol": "DOTUSDC",
       "candles": 240,
-      "firstClose": 0.77,
-      "lastClose": 0.808,
+      "firstClose": 0.893,
+      "lastClose": 0.828,
       "BUY_HOLD": {
         "family": "BUY_HOLD",
-        "finalEquity": 1047.2529974025974,
-        "netPct": 4.725299740259743,
-        "maxDrawdownPct": 7.852193995381048,
+        "finalEquity": 925.358150055991,
+        "netPct": -7.464184994400898,
+        "maxDrawdownPct": 20.19607843137256,
         "trades": 2,
         "endingBase": 0,
         "sellReachable": true
       },
       "TREND": {
         "family": "TREND",
-        "finalEquity": 1081.126770693911,
-        "netPct": 8.112677069391111,
-        "maxDrawdownPct": 3.7758759412632537,
+        "finalEquity": 950.8537312831661,
+        "netPct": -4.9146268716833905,
+        "maxDrawdownPct": 6.209724068412608,
         "trades": 4,
         "endingBase": 0,
         "sellReachable": true
       },
       "MEAN_REVERSION": {
         "family": "MEAN_REVERSION",
-        "finalEquity": 986.397943140514,
-        "netPct": -1.360205685948597,
-        "maxDrawdownPct": 2.878355501813769,
-        "trades": 4,
+        "finalEquity": 1003.5138701541088,
+        "netPct": 0.35138701541087586,
+        "maxDrawdownPct": 4.534929521323878,
+        "trades": 10,
         "endingBase": 0,
         "sellReachable": true
       },
       "GRID": {
         "family": "GRID",
-        "finalEquity": 1002.1889935317431,
-        "netPct": 0.2188993531743108,
-        "maxDrawdownPct": 0.12559882440023873,
-        "trades": 7,
+        "finalEquity": 1021.7573511458033,
+        "netPct": 2.175735114580334,
+        "maxDrawdownPct": 2.0094100336691247,
+        "trades": 43,
         "endingBase": 0,
         "sellReachable": true
       },
       "REGIME_ADAPTIVE": {
         "family": "REGIME_ADAPTIVE",
-        "finalEquity": 986.7244878683161,
-        "netPct": -1.3275512131683855,
-        "maxDrawdownPct": 5.643221348330455,
-        "trades": 12,
+        "finalEquity": 944.6844907327061,
+        "netPct": -5.531550926729392,
+        "maxDrawdownPct": 5.974889007279746,
+        "trades": 8,
         "endingBase": 0,
         "sellReachable": true
       },
@@ -2165,27 +2165,27 @@
         "selectedFamily": "MEAN_REVERSION",
         "trainSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 1000,
-          "netPct": 0,
-          "maxDrawdownPct": 0,
-          "trades": 0,
+          "finalEquity": 1003.6544703142869,
+          "netPct": 0.36544703142868684,
+          "maxDrawdownPct": 4.237387059928238,
+          "trades": 6,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationSelected": {
           "family": "MEAN_REVERSION",
-          "finalEquity": 986.397943140514,
-          "netPct": -1.360205685948597,
-          "maxDrawdownPct": 2.878355501813769,
+          "finalEquity": 999.8599117880336,
+          "netPct": -0.014008821196637199,
+          "maxDrawdownPct": 1.976056338028184,
           "trades": 4,
           "endingBase": 0,
           "sellReachable": true
         },
         "validationBuyHold": {
           "family": "BUY_HOLD",
-          "finalEquity": 968.0489891956784,
-          "netPct": -3.195101080432164,
-          "maxDrawdownPct": 4.31654676258992,
+          "finalEquity": 936.8988979591837,
+          "netPct": -6.310110204081627,
+          "maxDrawdownPct": 8.229988726042848,
           "trades": 2,
           "endingBase": 0,
           "sellReachable": true
@@ -2193,46 +2193,46 @@
         "train": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 1082.2478376623376,
-            "netPct": 8.22478376623376,
-            "maxDrawdownPct": 3.5796766743649044,
+            "finalEquity": 994.6482530795074,
+            "netPct": -0.5351746920492587,
+            "maxDrawdownPct": 18.33333333333335,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 1093.9127844155844,
-            "netPct": 9.39127844155844,
-            "maxDrawdownPct": 3.002309468822175,
+            "finalEquity": 1012.794629418472,
+            "netPct": 1.2794629418472028,
+            "maxDrawdownPct": 1.23911060433295,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 1000,
-            "netPct": 0,
-            "maxDrawdownPct": 0,
-            "trades": 0,
+            "finalEquity": 1003.6544703142869,
+            "netPct": 0.36544703142868684,
+            "maxDrawdownPct": 4.237387059928238,
+            "trades": 6,
             "endingBase": 0,
             "sellReachable": true
           },
           "GRID": {
             "family": "GRID",
-            "finalEquity": 1002.2788485136207,
-            "netPct": 0.2278848513620687,
-            "maxDrawdownPct": 0.12559882440023873,
-            "trades": 7,
+            "finalEquity": 1013.828570828274,
+            "netPct": 1.3828570828273996,
+            "maxDrawdownPct": 1.5359772162514524,
+            "trades": 15,
             "endingBase": 0,
             "sellReachable": true
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 1004.1796771079465,
-            "netPct": 0.41796771079465317,
-            "maxDrawdownPct": 3.9740467736070073,
-            "trades": 8,
+            "finalEquity": 985.3273285091916,
+            "netPct": -1.4672671490808398,
+            "maxDrawdownPct": 4.368448819859826,
+            "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           }
@@ -2240,46 +2240,46 @@
         "validation": {
           "BUY_HOLD": {
             "family": "BUY_HOLD",
-            "finalEquity": 968.0489891956784,
-            "netPct": -3.195101080432164,
-            "maxDrawdownPct": 4.31654676258992,
+            "finalEquity": 936.8988979591837,
+            "netPct": -6.310110204081627,
+            "maxDrawdownPct": 8.229988726042848,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "TREND": {
             "family": "TREND",
-            "finalEquity": 988.3116699029125,
-            "netPct": -1.1688330097087487,
-            "maxDrawdownPct": 1.1688330097087487,
+            "finalEquity": 958.2213587338805,
+            "netPct": -4.177864126611951,
+            "maxDrawdownPct": 5.63079584775086,
             "trades": 2,
             "endingBase": 0,
             "sellReachable": true
           },
           "MEAN_REVERSION": {
             "family": "MEAN_REVERSION",
-            "finalEquity": 986.397943140514,
-            "netPct": -1.360205685948597,
-            "maxDrawdownPct": 2.878355501813769,
+            "finalEquity": 999.8599117880336,
+            "netPct": -0.014008821196637199,
+            "maxDrawdownPct": 1.976056338028184,
             "trades": 4,
             "endingBase": 0,
             "sellReachable": true
           },
           "GRID": {
             "family": "GRID",
-            "finalEquity": 991.5404648240677,
-            "netPct": -0.8459535175932275,
-            "maxDrawdownPct": 2.1232358230499733,
-            "trades": 20,
+            "finalEquity": 1008.9733923677388,
+            "netPct": 0.8973392367738824,
+            "maxDrawdownPct": 1.9515328842802777,
+            "trades": 29,
             "endingBase": 0,
             "sellReachable": true
           },
           "REGIME_ADAPTIVE": {
             "family": "REGIME_ADAPTIVE",
-            "finalEquity": 982.6174641475502,
-            "netPct": -1.7382535852449792,
-            "maxDrawdownPct": 1.7382535852449792,
-            "trades": 4,
+            "finalEquity": 967.7337498399004,
+            "netPct": -3.2266250160099617,
+            "maxDrawdownPct": 3.675810268126969,
+            "trades": 6,
             "endingBase": 0,
             "sellReachable": true
           }

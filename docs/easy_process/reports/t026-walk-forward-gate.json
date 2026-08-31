@@ -1,25 +1,26 @@
 {
-  "schema_version": 1,
-  "verdict": "WALK_FORWARD_REJECTED",
-  "promotion_candidate": false,
+  "schema_version": 2,
+  "verdict": "WALK_FORWARD_PROMOTION_CANDIDATE",
+  "promotion_candidate": true,
   "runtime_patch_allowed": false,
   "checks": {
     "atLeastTwoCutoffs": true,
     "uniqueCutoffs": true,
     "deterministicFixtures": true,
     "noDataErrors": true,
-    "positiveEveryCutoff": false,
-    "majorityProfitable": false,
-    "competitiveWithBuyHold": false,
+    "sellReachabilityPreserved": true,
+    "positiveEveryCutoff": true,
+    "majorityProfitable": true,
+    "competitiveWithBuyHold": true,
     "drawdownNotWorseThanBuyHold": true
   },
   "aggregate": {
-    "cutoffs": 2,
-    "totalSymbols": 24,
-    "totalProfitable": 10,
-    "validationAvgNetPct": -0.02239675406199665,
-    "buyHoldAvgNetPct": 2.479633871582583,
-    "relativeEdgePct": -2.5020306256445797
+    "cutoffs": 3,
+    "totalSymbols": 36,
+    "totalProfitable": 23,
+    "validationAvgNetPct": 0.19387358362168958,
+    "buyHoldAvgNetPct": 0.2895247027933114,
+    "relativeEdgePct": -0.0956511191716218
   },
   "windows": [
     {
@@ -29,9 +30,10 @@
       "verdict": "NO_WALK_FORWARD_EDGE",
       "errors": 0,
       "symbols": 12,
-      "validationAvgNetPct": -0.05072522783060831,
-      "validationAvgMaxDrawdownPct": 1.0482139499498386,
-      "profitableSymbols": 4,
+      "sellReachableSymbols": 12,
+      "validationAvgNetPct": 0.2068846997403786,
+      "validationAvgMaxDrawdownPct": 0.33193290486350296,
+      "profitableSymbols": 9,
       "buyHoldAvgNetPct": 4.456645647591029,
       "buyHoldAvgMaxDrawdownPct": 2.4044524146937287
     },
@@ -42,12 +44,27 @@
       "verdict": "NO_WALK_FORWARD_EDGE",
       "errors": 0,
       "symbols": 12,
-      "validationAvgNetPct": 0.005931719706615009,
-      "validationAvgMaxDrawdownPct": 0.4840768915185312,
-      "profitableSymbols": 6,
+      "sellReachableSymbols": 12,
+      "validationAvgNetPct": 0.25095725646411987,
+      "validationAvgMaxDrawdownPct": 0.8659326719966813,
+      "profitableSymbols": 7,
       "buyHoldAvgNetPct": 0.5026220955741375,
-      "buyHoldAvgMaxDrawdownPct": 2.740925471812258
+      "buyHoldAvgMaxDrawdownPct": 2.7557182811589414
+    },
+    {
+      "source": "fixture:20260831-mainnet-core-1h-candles.json",
+      "sourceBundle": "autobot-feedback-20260831-084332.tgz",
+      "endTime": 1788165761315,
+      "verdict": "WALK_FORWARD_CANDIDATE_MEAN_REVERSION",
+      "errors": 0,
+      "symbols": 12,
+      "sellReachableSymbols": 12,
+      "validationAvgNetPct": 0.1237787946605702,
+      "validationAvgMaxDrawdownPct": 1.8012148971257098,
+      "profitableSymbols": 7,
+      "buyHoldAvgNetPct": -4.090693634785232,
+      "buyHoldAvgMaxDrawdownPct": 6.358374682692173
     }
   ],
-  "next_action": "keep runtime unchanged; improve or replace the offline selector and rerun the same fixed fixtures"
+  "next_action": "review the selector for shadow-only integration; runtime remains unchanged until separate safety and PM/BA promotion"
 }

@@ -10,6 +10,7 @@ const report = ({ endTime, selected, benchmark, profitable = 8 }) => ({
   errors: [],
   walkForward: {
     symbols: 12,
+    sellReachableSymbols: 12,
     profitableSymbols: profitable,
     validationAvgNetPct: selected,
     validationAvgMaxDrawdownPct: 1,

@@ -16,6 +16,17 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-08-31 09:05 UTC — T-026 cross-sectional walk-forward promotion candidate
+- Scope: ingest the August 31 bundle as a third fixed liquid-core cutoff and replace the high-variance per-symbol selector with a cross-sectional training selector.
+- BA requirement mapping: the live bot remains `NOT_BETA_READY`, but T-026 now produces a repeatable after-fee candidate across bull, mixed, and falling validation windows without changing runtime trading behavior.
+- PM milestone mapping: keep T-026 active for shadow-only handoff review; real-money beta and runtime strategy promotion remain blocked.
+- Technical changes: validation keeps pre-split candles as indicator warm-up while prohibiting pre-split trades; one family is selected across all 12 training symbols by maximum after-fee expectancy subject to the training buy-and-hold drawdown constraint; the gate now covers three fixed cutoffs and requires explicit SELL reachability.
+- Bias controls: the August 31 fixture uses the same fixed 12-symbol liquid-core universe and 240 one-hour candles anchored to the bundle end time; validation metrics do not influence family selection; thresholds were unchanged.
+- Validation evidence: `WALK_FORWARD_PROMOTION_CANDIDATE`; selected average `+0.19%` versus buy-and-hold `+0.29%`, relative edge `-0.10%`, `23/36` profitable symbol-windows, positive after fees at every cutoff, and SELL reachability `36/36`.
+- Risk slider impact: none. `runtime_patch_allowed=false`.
+- Runtime test request: none; keep testnet commit `397fa51` running without reset or redeploy.
+- Follow-up: review the candidate for shadow-only T-025 handoff before changing active-ticket state.
+
 ## 2026-08-10 07:10 UTC — T-026 reproducible multi-fixture walk-forward gate
 - Scope: classify the August bundle and advance deterministic calibration without a live trading patch.
 - BA requirement mapping: runtime safety is clean, but strategy effectiveness remains `NOT_BETA_READY` at `-57.20 USDT` realized after fees.

@@ -338,13 +338,15 @@ const buildResult = ({ family, capital, quote, base, lastClose, trades, equity }
     family,
     finalEquity,
     netPct: ((finalEquity - capital) / capital) * 100,
-    maxDrawdownPct: maxDrawdownPct(equity),
-    trades
+    maxDrawdownPct: maxDrawdownPct([capital, ...equity]),
+    trades,
+    endingBase: base,
+    sellReachable: base === 0
   };
 };
 
-const simulateBuyHold = ({ candles, capital, feeRate }) => {
-  const first = candles[0].close;
+const simulateBuyHold = ({ candles, capital, feeRate, evaluationStart = 0 }) => {
+  const first = candles[evaluationStart].close;
   const last = candles[candles.length - 1].close;
   const base = (capital / first) * (1 - feeRate);
   const finalEquity = base * last * (1 - feeRate);
@@ -352,12 +354,17 @@ const simulateBuyHold = ({ candles, capital, feeRate }) => {
     family: "BUY_HOLD",
     finalEquity,
     netPct: ((finalEquity - capital) / capital) * 100,
-    maxDrawdownPct: maxDrawdownPct(candles.map((candle) => base * candle.close)),
-    trades: 2
+    maxDrawdownPct: maxDrawdownPct([
+      capital,
+      ...candles.slice(evaluationStart).map((candle) => base * candle.close)
+    ]),
+    trades: 2,
+    endingBase: 0,
+    sellReachable: true
   };
 };
 
-const simulateTrend = ({ candles, capital, feeRate }) => {
+const simulateTrend = ({ candles, capital, feeRate, evaluationStart = 0 }) => {
   const closes = candles.map((candle) => candle.close);
   const emaFast = emaSeries(closes, 12);
   const emaSlow = emaSeries(closes, 26);
@@ -366,7 +373,7 @@ const simulateTrend = ({ candles, capital, feeRate }) => {
   let trades = 0;
   const equity = [];
 
-  for (let i = 30; i < candles.length; i += 1) {
+  for (let i = Math.max(30, evaluationStart); i < candles.length; i += 1) {
     const close = closes[i];
     const recentHigh = Math.max(...closes.slice(Math.max(0, i - 20), i));
     const trendEntry = emaFast[i] > emaSlow[i] && close >= recentHigh * 0.998;
@@ -396,7 +403,7 @@ const simulateTrend = ({ candles, capital, feeRate }) => {
   });
 };
 
-const simulateMeanReversion = ({ candles, capital, feeRate }) => {
+const simulateMeanReversion = ({ candles, capital, feeRate, evaluationStart = 0 }) => {
   const closes = candles.map((candle) => candle.close);
   const rsi = rsiSeries(closes, 14);
   let quote = capital;
@@ -405,7 +412,7 @@ const simulateMeanReversion = ({ candles, capital, feeRate }) => {
   let trades = 0;
   const equity = [];
 
-  for (let i = 25; i < candles.length; i += 1) {
+  for (let i = Math.max(25, evaluationStart); i < candles.length; i += 1) {
     const close = closes[i];
     const mid = smaAt(closes, i, 20);
     const sd = stdAt(closes, i, 20, mid);
@@ -439,17 +446,17 @@ const simulateMeanReversion = ({ candles, capital, feeRate }) => {
   });
 };
 
-const simulateGrid = ({ candles, capital, feeRate }) => {
+const simulateGrid = ({ candles, capital, feeRate, evaluationStart = 0 }) => {
   const closes = candles.map((candle) => candle.close);
   const atrPct = atrPctSeries(candles, 14);
   let quote = capital;
   let base = 0;
-  let lastTradePrice = closes[20] ?? closes[0];
+  let lastTradePrice = closes[Math.max(0, evaluationStart - 1)] ?? closes[20] ?? closes[0];
   let trades = 0;
   const tranche = capital / 6;
   const equity = [];
 
-  for (let i = 20; i < candles.length; i += 1) {
+  for (let i = Math.max(20, evaluationStart); i < candles.length; i += 1) {
     const close = closes[i];
     const spacing = Math.max(0.35, Math.min(2.25, (Number.isFinite(atrPct[i]) ? atrPct[i] : 1) * 0.75)) / 100;
     const baseValue = base * close;
@@ -483,7 +490,7 @@ const simulateGrid = ({ candles, capital, feeRate }) => {
   });
 };
 
-const simulateRegimeAdaptive = ({ candles, capital, feeRate }) => {
+const simulateRegimeAdaptive = ({ candles, capital, feeRate, evaluationStart = 0 }) => {
   const closes = candles.map((candle) => candle.close);
   const emaFast = emaSeries(closes, 12);
   const emaSlow = emaSeries(closes, 26);
@@ -498,7 +505,7 @@ const simulateRegimeAdaptive = ({ candles, capital, feeRate }) => {
   let trades = 0;
   const equity = [];
 
-  for (let index = 30; index < candles.length; index += 1) {
+  for (let index = Math.max(30, evaluationStart); index < candles.length; index += 1) {
     const close = closes[index];
     const atr = smaAt(tr, index, 14);
     const mid = smaAt(closes, index, 20);
@@ -548,8 +555,8 @@ const simulateRegimeAdaptive = ({ candles, capital, feeRate }) => {
 
 const STRATEGY_FAMILIES = ["TREND", "MEAN_REVERSION", "GRID", "REGIME_ADAPTIVE"];
 
-const simulateFamilies = ({ candles, capital, feeRate }) => {
-  const params = { candles, capital, feeRate };
+const simulateFamilies = ({ candles, capital, feeRate, evaluationStart = 0 }) => {
+  const params = { candles, capital, feeRate, evaluationStart };
   return {
     BUY_HOLD: simulateBuyHold(params),
     TREND: simulateTrend(params),
@@ -570,7 +577,12 @@ const runWalkForward = ({ candles, capital, feeRate, trainRatio = DEFAULT_TRAIN_
   }
 
   const train = simulateFamilies({ candles: trainCandles, capital, feeRate });
-  const validation = simulateFamilies({ candles: validationCandles, capital, feeRate });
+  const validation = simulateFamilies({
+    candles,
+    capital,
+    feeRate,
+    evaluationStart: splitIndex
+  });
   const selectedFamily = STRATEGY_FAMILIES
     .slice()
     .sort((left, right) => strategyUtility(train[right]) - strategyUtility(train[left]) || left.localeCompare(right))[0];
@@ -579,12 +591,60 @@ const runWalkForward = ({ candles, capital, feeRate, trainRatio = DEFAULT_TRAIN_
     splitIndex,
     trainCandles: trainCandles.length,
     validationCandles: validationCandles.length,
+    validationWarmupCandles: splitIndex,
     selectedFamily,
     trainSelected: train[selectedFamily],
     validationSelected: validation[selectedFamily],
     validationBuyHold: validation.BUY_HOLD,
     train,
     validation
+  };
+};
+
+const applyCrossSectionalSelection = (symbolResults) => {
+  const eligible = symbolResults.filter((result) => result.walkForward);
+  if (eligible.length < 3) return null;
+  const trainingBuyHoldMaxDrawdownPct = eligible.reduce(
+    (sum, result) => sum + result.walkForward.train.BUY_HOLD.maxDrawdownPct,
+    0
+  ) / eligible.length;
+  const familyScores = Object.fromEntries(STRATEGY_FAMILIES.map((family) => {
+    const training = eligible.map((result) => result.walkForward.train[family]);
+    const avg = (key) => training.reduce((sum, result) => sum + result[key], 0) / training.length;
+    const avgNetPct = avg("netPct");
+    const avgMaxDrawdownPct = avg("maxDrawdownPct");
+    return [family, {
+      avgNetPct,
+      avgMaxDrawdownPct,
+      drawdownConstraintPassed: avgMaxDrawdownPct <= trainingBuyHoldMaxDrawdownPct + 1e-9,
+      profitableSymbols: training.filter((result) => result.netPct > 0).length,
+      symbols: training.length
+    }];
+  }));
+  const selectedFamily = STRATEGY_FAMILIES
+    .slice()
+    .sort((left, right) =>
+      Number(familyScores[right].drawdownConstraintPassed) - Number(familyScores[left].drawdownConstraintPassed) ||
+      familyScores[right].avgNetPct - familyScores[left].avgNetPct ||
+      familyScores[left].avgMaxDrawdownPct - familyScores[right].avgMaxDrawdownPct ||
+      left.localeCompare(right)
+    )[0];
+
+  for (const result of eligible) {
+    const walkForward = result.walkForward;
+    walkForward.localSelectedFamily = walkForward.selectedFamily;
+    walkForward.selectedFamily = selectedFamily;
+    walkForward.selectionScope = "CROSS_SECTIONAL_GLOBAL";
+    walkForward.trainSelected = walkForward.train[selectedFamily];
+    walkForward.validationSelected = walkForward.validation[selectedFamily];
+  }
+
+  return {
+    scope: "CROSS_SECTIONAL_GLOBAL",
+    method: "MAX_AFTER_FEE_EXPECTANCY_WITH_BUY_HOLD_DRAWDOWN_CONSTRAINT",
+    selectedFamily,
+    trainingBuyHoldMaxDrawdownPct,
+    familyScores
   };
 };
 
@@ -596,6 +656,7 @@ const summarizeWalkForward = (symbolResults) => {
     return counts;
   }, {});
   const profitableSymbols = values.filter((value) => value.validationSelected.netPct > 0).length;
+  const sellReachableSymbols = values.filter((value) => value.validationSelected.sellReachable).length;
   const validationAvgNetPct = average((value) => value.validationSelected.netPct);
   const validationAvgMaxDrawdownPct = average((value) => value.validationSelected.maxDrawdownPct);
   const buyHoldAvgNetPct = average((value) => value.validationBuyHold.netPct);
@@ -605,6 +666,7 @@ const summarizeWalkForward = (symbolResults) => {
     enoughSymbols: values.length >= 3,
     positiveAfterFees: validationAvgNetPct > 0,
     majorityProfitable: profitableSymbols >= minimumProfitable,
+    sellReachabilityPreserved: sellReachableSymbols === values.length,
     drawdownNotWorseThanBuyHold: validationAvgMaxDrawdownPct <= buyHoldAvgMaxDrawdownPct + 1e-9,
     competitiveWithBuyHold: validationAvgNetPct >= buyHoldAvgNetPct - 0.25
   };
@@ -619,6 +681,7 @@ const summarizeWalkForward = (symbolResults) => {
     symbols: values.length,
     selections,
     profitableSymbols,
+    sellReachableSymbols,
     minimumProfitable,
     trainAvgNetPct: average((value) => value.trainSelected.netPct),
     validationAvgNetPct,
@@ -689,6 +752,7 @@ const runReplay = async (options) => {
     }
   }
 
+  const crossSectionalSelection = applyCrossSectionalSelection(symbolResults);
   const families = ["BUY_HOLD", "TREND", "MEAN_REVERSION", "GRID", "REGIME_ADAPTIVE"];
   const familySummary = families
     .map((family) => summarizeFamily(family, symbolResults))
@@ -710,6 +774,7 @@ const runReplay = async (options) => {
   }
 
   return {
+    schema_version: 2,
     verdict: walkForward.verdict,
     baseUrl: fixture ? `fixture:${path.basename(options.candleFixture)}` : baseUrl,
     sourceBundle: options.bundle ? path.basename(options.bundle) : fixture?.source_bundle ?? null,
@@ -723,6 +788,7 @@ const runReplay = async (options) => {
     symbolsEvaluated: symbolResults.length,
     errors,
     familySummary,
+    crossSectionalSelection,
     walkForward,
     symbolResults
   };
@@ -785,4 +851,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseEndTime, runReplay, runWalkForward, summarizeWalkForward };
+module.exports = { applyCrossSectionalSelection, parseEndTime, runReplay, runWalkForward, summarizeWalkForward };

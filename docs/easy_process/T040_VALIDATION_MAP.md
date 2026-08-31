@@ -1,6 +1,6 @@
 # T040_VALIDATION_MAP
 
-Last updated: 2026-07-21 12:05 UTC
+Last updated: 2026-08-31 09:05 UTC
 Owner: Validation Engineer + PM/BA
 
 Purpose: make beta-readiness measurable. This file maps each production-readiness question to a command, fixture, or explicit gap.
@@ -9,8 +9,10 @@ Purpose: make beta-readiness measurable. This file maps each production-readines
 
 | Validation class | Command / artifact | Status |
 | --- | --- | --- |
-| T-040 readiness classifier | `node scripts/t040-readiness-check.js` | `VALIDATION_REQUIRED`; negative daily net across latest 3 fresh bundles, no latest P0/P1 safety trigger |
-| T-040 strategy effectiveness report | `node scripts/t040-strategy-effectiveness-report.js` | `NOT_BETA_READY`; dailyNet `-17.89`; five-window net `-90.97`; latest realized-after-fees `-28.72` |
+| T-040 readiness classifier | `node scripts/t040-readiness-check.js` | `VALIDATION_REQUIRED`; latest daily net `-10.67`, no latest P0/P1 safety trigger |
+| T-040 strategy effectiveness report | `node scripts/t040-strategy-effectiveness-report.js` | `NOT_BETA_READY`; dailyNet `-10.67`; five-window net `-125.50`; latest realized-after-fees `-23.10` |
+| T-026 fixed-cutoff replay | `node scripts/t026-strategy-replay.js --candle-fixture <fixture> --write-report <report>` | `PASS`; three fixed 12-symbol cutoffs, pre-split indicator warm-up, no pre-split validation trades, after-fee metrics and explicit SELL reachability |
+| T-026 multi-cutoff gate | `node scripts/t026-walk-forward-gate.js` | `WALK_FORWARD_PROMOTION_CANDIDATE`; selected `+0.19%`, buy-and-hold `+0.29%`, profitable `23/36`, SELL reachability `36/36`, runtime patch allowed `no` |
 | T-026 fixture comparison | `node scripts/t026-fixture-comparison.js` | `FIXTURE_CANDIDATE_GRID_GUARD_V2`; runtimePatchAllowed `no` |
 | T-026 grid guard proof | `node scripts/t026-grid-guard-proof.js` | `GRID_GUARD_OFFLINE_PROOF_TARGET_READY`; preserve SELL/reduce-only and managed unwind paths |
 | T-026 entry burst proof | `node --test scripts/t026-entry-burst-proof.test.js && node scripts/t026-entry-burst-proof.js` | `PASS` twice: July 13→14 improved mark-to-market `5.74 USDC` and exposure `92.27 USDC`; June 4→5 improved mark-to-market `0.95 USDC` and exposure `18.63 USDC` |
@@ -22,48 +24,48 @@ Purpose: make beta-readiness measurable. This file maps each production-readines
 | Grid/dust guard regression slice | `./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts -t 'fee-negative dust churn|cancels bot grid buy orders|does not let a dust sell leg block' --no-cache` from `apps/api` | `PASS` |
 | Full bot-engine unit file | `./node_modules/.bin/vitest run src/modules/bot/bot-engine.service.test.ts --no-cache` from `apps/api` | `PASS`; 128 tests |
 | API TypeScript build check | `./node_modules/.bin/tsc -p tsconfig.build.json --noEmit` from `apps/api` | `PASS` |
-| T-040 active validation | `./scripts/validate-active-ticket.sh` | `PASS`; `VALIDATION_REQUIRED`, no-docs-only gate satisfied by deterministic validation-code changes |
+| T-026 active validation | `./scripts/validate-active-ticket.sh` | `PASS`; deterministic calibration scripts, fixed-cutoff reports, and PM/BA gates are included |
 | PM/BA start gate | `./scripts/pmba-gate.sh start` | `PASS` |
 | PM/BA end gate | `./scripts/pmba-gate.sh end` | `PASS` |
 | Full CI | `./scripts/validate-active-ticket.sh --full` | `NOT RUN` in this short patch batch |
 
 ## Latest Bundle Evidence
 
-`autobot-feedback-20260721-114241.tgz` is validation-only evidence:
-- deployed commit `e3813bb`.
+`autobot-feedback-20260831-084332.tgz` is validation-only evidence:
+- deployed commit `397fa51`.
 - `testnet` environment.
 - `NORMAL` risk state.
-- `-17.89 USDT` daily net; `-90.97 USDT` five-window net; `-28.72 USDT` realized-after-fees.
-- `0.64%` max drawdown; `3.56%` total allocation across `9` open positions.
-- open exposure cost `161.54 USDC`, mostly `ADAUSDC=89.57` and `PUMPUSDC=69.25`.
-- `200` submitted orders, `184` filled, `0` rejected; `8.06 USDC` fees; `6` reported entry trades.
+- `-10.67 USDT` daily net; `-125.50 USDT` five-window net; `-23.10 USDT` realized-after-fees.
+- `0.48%` max drawdown; `1.46%` total allocation across `9` open positions.
+- open exposure cost is concentrated in `UNIUSDC=56.36`; remaining named exposures are small.
+- `200` submitted orders, `183` filled, `0` rejected; `8.15 USDC` fees; `3` reported entry trades.
 - `0` health errors and `0` restarts.
 - no exchange/order-sync backoff observed in latest top reasons.
 
-Interpretation: the deployed entry-burst guard is accepted and safety is clean, but beta readiness is still blocked because after-fee expectancy is negative.
+Interpretation: runtime safety is clean and the offline selector passed the three-cutoff gate, but beta readiness is still blocked because live after-fee expectancy is negative.
 
 ## Required Deterministic Scenarios
 
 | Scenario | Why it matters | Current proof | Required next proof |
 | --- | --- | --- | --- |
-| Exposure cannot grow beyond hard caps | prevents production capital blow-up | live allocation is `5.09%`, mostly ZEC | next bundle must show ZEC/total exposure not growing beyond the watch level |
+| Exposure cannot grow beyond hard caps | prevents production capital blow-up | latest live allocation is `1.46%`, mostly UNI | retain deterministic cap coverage and monitor the next normal bundle |
 | Sell/unwind remains reachable while fresh exposure is blocked | prevents boxed-in managed exposure | `PASS`; 88 filled sells occurred after first guard activation | retain as regression coverage |
 | Repeated neutral/range entries are bounded | prevents identical signals stacking exposure before a stop | `PASS`; 6 activations, 0 forbidden fills, max executed streak 2 | retain as regression coverage |
 | Exchange order rejects do not create retry storms | prevents order chaos | latest bundle has `0` rejects | add synthetic reject fixture later |
 | Exchange/order-sync backoff is bounded | prevents trading while order state is untrusted | July 13 has `0` health errors and no backoff top reason | keep detector; no hotfix unless it recurs |
-| Strategy/adaptation improves after fees | proves product value | still `NOT_BETA_READY`; entry-burst proof confirmed twice and testnet patch implemented | collect post-deploy evidence |
+| Strategy/adaptation improves after fees | proves product value | offline gate is `WALK_FORWARD_PROMOTION_CANDIDATE`, but live report remains `NOT_BETA_READY` | shadow-only handoff; no runtime promotion yet |
 
 ## Strategy Effectiveness Result
 
 `node scripts/t040-strategy-effectiveness-report.js` now reports:
 - `NOT_BETA_READY`
 - `aiMode=OFF`
-- `dailyNet=-17.89`, `fiveWindowNet=-90.97`, `realizedAfterFees=-28.72`
-- current window classes: `SAFETY_FAILURE=1`, `CONTROLLED_DRAWDOWN=2`, `NEUTRAL_OR_INCONCLUSIVE=2`
-- adaptive shadow signals: `5000` events, `GRID=1874`, `TREND=1632`, `MEAN_REVERSION=1494`
-- execution lanes observed: `DEFENSIVE=3396`, `MARKET=924`, `GRID=663`, `UNSPECIFIED=17`
-- top losses after fees: `BANKUSDC=-11.10`, `TLMUSDC=-8.51`, `TOWNSUSDC=-6.15`, `HEMIUSDC=-3.46`, `PEPEUSDC=-1.64`
-- top open exposure cost: `ADAUSDC=89.57`, `PUMPUSDC=69.25`, `BANKUSDC=1.01`, `HEMIUSDC=0.55`, `TLMUSDC=0.47`
+- `dailyNet=-10.67`, `fiveWindowNet=-125.50`, `realizedAfterFees=-23.10`
+- current window classes: `CONTROLLED_DRAWDOWN=4`, `NEUTRAL_OR_INCONCLUSIVE=1`
+- adaptive shadow signals: `5000` events, `GRID=3311`, `TREND=1483`, `MEAN_REVERSION=206`
+- execution lanes observed: `DEFENSIVE=2208`, `GRID=1465`, `MARKET=903`, `UNSPECIFIED=424`
+- top losses after fees: `ZKCUSDC=-10.46`, `ENAUSDC=-6.47`, `HEMIUSDC=-6.03`, `TRUMPUSDC=-1.93`, `UNIUSDC=-0.73`
+- top open exposure cost: `UNIUSDC=56.36`, `HEMIUSDC=1.11`, `ZECUSDC=0.86`, `ENAUSDC=0.83`, `TRUMPUSDC=0.52`
 
 Client-facing interpretation: the bot is not beta-ready. It changes rule-based strategy/lane labels, but after-fee expectancy is still negative.
 

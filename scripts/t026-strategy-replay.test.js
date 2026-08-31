@@ -3,7 +3,12 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { runReplay, runWalkForward, summarizeWalkForward } = require("./t026-strategy-replay");
+const {
+  applyCrossSectionalSelection,
+  runReplay,
+  runWalkForward,
+  summarizeWalkForward
+} = require("./t026-strategy-replay");
 
 const candles = (count, priceAt) => Array.from({ length: count }, (_, index) => {
   const close = priceAt(index);
@@ -18,15 +23,54 @@ const candles = (count, priceAt) => Array.from({ length: count }, (_, index) => 
   };
 });
 
-test("selects on the training slice and evaluates on a disjoint validation slice", () => {
+test("selects on training and starts validation trading at a disjoint boundary with prior indicator warmup", () => {
   const input = candles(200, (index) => index < 120 ? 100 + index * 0.3 : 136 - (index - 120) * 0.35);
   const result = runWalkForward({ candles: input, capital: 1000, feeRate: 0.001, trainRatio: 0.6 });
 
   assert.equal(result.splitIndex, 120);
   assert.equal(result.trainCandles, 120);
   assert.equal(result.validationCandles, 80);
+  assert.equal(result.validationWarmupCandles, 120);
   assert.ok(["TREND", "MEAN_REVERSION", "GRID", "REGIME_ADAPTIVE"].includes(result.selectedFamily));
   assert.notStrictEqual(result.trainSelected, result.validationSelected);
+});
+
+test("selects one cross-sectional family from training expectancy under the drawdown constraint", () => {
+  const metric = (family, netPct, maxDrawdownPct) => ({
+    family,
+    finalEquity: 1000 + netPct * 10,
+    netPct,
+    maxDrawdownPct,
+    trades: 2
+  });
+  const symbolResult = () => ({
+    walkForward: {
+      selectedFamily: "GRID",
+      train: {
+        BUY_HOLD: metric("BUY_HOLD", 2, 2),
+        TREND: metric("TREND", 2, 5),
+        MEAN_REVERSION: metric("MEAN_REVERSION", 1.2, 1),
+        GRID: metric("GRID", 0.5, 0.2),
+        REGIME_ADAPTIVE: metric("REGIME_ADAPTIVE", 0.1, 0.1)
+      },
+      validation: {
+        BUY_HOLD: metric("BUY_HOLD", 1, 2),
+        TREND: metric("TREND", 0, 1),
+        MEAN_REVERSION: metric("MEAN_REVERSION", -5, 1),
+        GRID: metric("GRID", 10, 1),
+        REGIME_ADAPTIVE: metric("REGIME_ADAPTIVE", 0, 1)
+      }
+    }
+  });
+  const results = [symbolResult(), symbolResult(), symbolResult()];
+
+  const selection = applyCrossSectionalSelection(results);
+
+  assert.equal(selection.selectedFamily, "MEAN_REVERSION");
+  assert.equal(selection.method, "MAX_AFTER_FEE_EXPECTANCY_WITH_BUY_HOLD_DRAWDOWN_CONSTRAINT");
+  assert.equal(selection.familyScores.TREND.drawdownConstraintPassed, false);
+  assert.ok(results.every((result) => result.walkForward.selectedFamily === "MEAN_REVERSION"));
+  assert.ok(results.every((result) => result.walkForward.validationSelected.netPct === -5));
 });
 
 test("rejects an in-sample winner that does not produce positive out-of-sample edge", () => {

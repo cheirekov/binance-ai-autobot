@@ -5,7 +5,8 @@ const path = require("node:path");
 const ROOT_DIR = path.resolve(__dirname, "..");
 const DEFAULT_REPORTS = [
   "docs/easy_process/reports/t026-walk-forward-20260721-mainnet-core.json",
-  "docs/easy_process/reports/t026-walk-forward-20260810-mainnet-core.json"
+  "docs/easy_process/reports/t026-walk-forward-20260810-mainnet-core.json",
+  "docs/easy_process/reports/t026-walk-forward-20260831-mainnet-core.json"
 ];
 const DEFAULT_OUTPUT = "docs/easy_process/reports/t026-walk-forward-gate.json";
 
@@ -21,6 +22,7 @@ const buildGate = (reports) => {
     verdict: report.verdict,
     errors: report.errors?.length ?? 0,
     symbols: report.walkForward?.symbols ?? 0,
+    sellReachableSymbols: report.walkForward?.sellReachableSymbols ?? 0,
     validationAvgNetPct: report.walkForward?.validationAvgNetPct ?? Number.NaN,
     validationAvgMaxDrawdownPct: report.walkForward?.validationAvgMaxDrawdownPct ?? Number.NaN,
     profitableSymbols: report.walkForward?.profitableSymbols ?? 0,
@@ -38,6 +40,7 @@ const buildGate = (reports) => {
     uniqueCutoffs: new Set(windows.map((window) => window.endTime)).size === windows.length,
     deterministicFixtures: windows.every((window) => String(window.source).startsWith("fixture:")),
     noDataErrors: windows.every((window) => window.errors === 0 && window.symbols >= 3),
+    sellReachabilityPreserved: windows.every((window) => window.sellReachableSymbols === window.symbols),
     positiveEveryCutoff: windows.every((window) => window.validationAvgNetPct > 0),
     majorityProfitable: totalProfitable >= Math.ceil(totalSymbols / 2),
     competitiveWithBuyHold: validationAvgNetPct >= buyHoldAvgNetPct - 0.25,
@@ -48,7 +51,7 @@ const buildGate = (reports) => {
   const passed = Object.values(checks).every(Boolean);
 
   return {
-    schema_version: 1,
+    schema_version: 2,
     verdict: passed ? "WALK_FORWARD_PROMOTION_CANDIDATE" : "WALK_FORWARD_REJECTED",
     promotion_candidate: passed,
     runtime_patch_allowed: false,
