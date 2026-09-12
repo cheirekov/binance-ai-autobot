@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { buildGate } = require("./t026-walk-forward-gate");
+const { buildGate, DEFAULT_REPORTS } = require("./t026-walk-forward-gate");
 
 const report = ({ endTime, selected, benchmark, profitable = 8 }) => ({
   baseUrl: `fixture:${endTime}.json`,
@@ -17,6 +17,15 @@ const report = ({ endTime, selected, benchmark, profitable = 8 }) => ({
     buyHoldAvgNetPct: benchmark,
     buyHoldAvgMaxDrawdownPct: 2
   }
+});
+
+test("keeps the September fixed-core cutoff in the default promotion gate", () => {
+  assert.deepEqual(DEFAULT_REPORTS, [
+    "docs/easy_process/reports/t026-walk-forward-20260721-mainnet-core.json",
+    "docs/easy_process/reports/t026-walk-forward-20260810-mainnet-core.json",
+    "docs/easy_process/reports/t026-walk-forward-20260831-mainnet-core.json",
+    "docs/easy_process/reports/t026-walk-forward-20260912-mainnet-core.json"
+  ]);
 });
 
 test("rejects when one preserved cutoff has no positive validation edge", () => {

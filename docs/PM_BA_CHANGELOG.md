@@ -16,6 +16,17 @@ This log is mandatory for every implementation patch batch.
 - Follow-up:
 ```
 
+## 2026-09-12 09:37 UTC — T-026 fourth fixed cutoff rejects shadow candidate
+- Scope: ingest `autobot-feedback-20260912-093754.tgz` as an independent, bundle-anchored fixed liquid-core cutoff and rerun the unchanged cross-sectional walk-forward gate.
+- BA requirement mapping: the latest runtime bundle remains supporting evidence only. The new fixed September validation window has `-1.70%` after-fee selected return and `2/12` profitable symbol-windows, so the prior shadow-only candidate does not generalize. Its eight `牛来USDC` unknown-symbol health errors are a separate `PATCH_ALLOWED_REVIEW` signal, not an authorized runtime patch under the active P0/P1 reproduction rule.
+- PM milestone mapping: keep T-026 active. Withdraw the shadow-only promotion candidate; runtime strategy and real-money beta remain blocked.
+- Technical changes: added a reproducible 240-candle, one-hour fixture for the same 12-symbol liquid core, made it the fourth default gate input, and refreshed the standard machine-readable gate report. The bundle's dynamic universe was not used for selection, preventing cross-quote/invalid-symbol and look-ahead bias.
+- Bias controls: family selection uses only each cutoff's 60% training segment; the fixed universe, fee rate, candle count, and acceptance thresholds are unchanged. Fixture replay was byte-for-byte repeatable.
+- Validation evidence: `WALK_FORWARD_REJECTED`; aggregate selected `-0.28%` versus buy-and-hold `-0.61%`, `25/48` profitable symbol-windows, SELL reachability `48/48`, and drawdown no worse than buy-and-hold at every cutoff. The rejection is solely because positive after-fee expectancy did not hold at every cutoff.
+- Risk slider impact: none. `runtime_patch_allowed=false`.
+- Runtime test request: none; keep testnet commit `397fa51` running without reset or redeploy.
+- Follow-up: improve or replace the offline selector against the preserved four-fixture set before reconsidering a shadow-only handoff.
+
 ## 2026-08-31 09:05 UTC — T-026 cross-sectional walk-forward promotion candidate
 - Scope: ingest the August 31 bundle as a third fixed liquid-core cutoff and replace the high-variance per-symbol selector with a cross-sectional training selector.
 - BA requirement mapping: the live bot remains `NOT_BETA_READY`, but T-026 now produces a repeatable after-fee candidate across bull, mixed, and falling validation windows without changing runtime trading behavior.

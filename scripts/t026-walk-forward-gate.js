@@ -6,7 +6,8 @@ const ROOT_DIR = path.resolve(__dirname, "..");
 const DEFAULT_REPORTS = [
   "docs/easy_process/reports/t026-walk-forward-20260721-mainnet-core.json",
   "docs/easy_process/reports/t026-walk-forward-20260810-mainnet-core.json",
-  "docs/easy_process/reports/t026-walk-forward-20260831-mainnet-core.json"
+  "docs/easy_process/reports/t026-walk-forward-20260831-mainnet-core.json",
+  "docs/easy_process/reports/t026-walk-forward-20260912-mainnet-core.json"
 ];
 const DEFAULT_OUTPUT = "docs/easy_process/reports/t026-walk-forward-gate.json";
 
@@ -124,4 +125,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildGate };
+module.exports = { buildGate, DEFAULT_REPORTS };
