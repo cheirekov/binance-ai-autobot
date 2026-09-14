@@ -94,6 +94,43 @@ Astra is deliberately prospective only: historical LLM calls can know subsequent
 events. Its added value must be measured against the simultaneously running baseline,
 including API charges, open-position PnL and drawdown, not just closed-trade profit.
 
+## Frozen research protocol
+
+`research/protocol-v1.json` defines eleven chronological quarterly folds, four
+non-AI candidates and a screening gate before execution. Development folds do
+not count toward the gate; only validation and holdout folds do. Strategies expose
+no hyperopt parameters, and the runner never invokes a model or a trading process.
+
+Download the exact hourly dataset:
+
+```sh
+mkdir -p data/trader-v2/research/data/binance
+docker run --rm -v "$PWD:/repo" --entrypoint freqtrade \
+  freqtradeorg/freqtrade:2026.8 download-data \
+  --config /repo/apps/trader/config.json \
+  --data-dir /repo/data/trader-v2/research/data/binance \
+  --timerange 20231201-20260912 --timeframes 1h --no-color
+```
+
+Run the screening inside the pinned Freqtrade image:
+
+```sh
+docker run --rm -v "$PWD:/repo" -w /repo \
+  -e PYTHONPATH=/repo/apps/trader:/repo/apps/trader/strategies \
+  --entrypoint python freqtradeorg/freqtrade:2026.8 \
+  /repo/apps/trader/research.py \
+  --protocol /repo/apps/trader/research/protocol-v1.json \
+  --config /repo/apps/trader/config.json \
+  --strategy-path /repo/apps/trader/strategies \
+  --data-dir /repo/data/trader-v2/research/data/binance \
+  --output-dir /repo/data/trader-v2/research/runs \
+  --user-data-dir /repo/data/trader-v2/research/user_data
+```
+
+The first frozen result is `research/RESULTS-v1.md`: every candidate failed.
+That result is retained instead of tuning thresholds against already-inspected
+evaluation data.
+
 ## Historical handoff, 2026-09-12
 
 Branch: `codex/trader-v2`. The remote legacy bot was only inspected, not changed.

@@ -1,0 +1,45 @@
+{
+  "protocol": "autobot-research-v1",
+  "description": "Frozen quarterly screening; passing does not authorize live trading.",
+  "timeframe": "1h",
+  "pairs": ["BTC/USDC", "ETH/USDC", "SOL/USDC"],
+  "strategies": [
+    "AutobotBaseline",
+    "ResearchTrendPullback",
+    "ResearchMeanReversion",
+    "ResearchVolatilityBreakout"
+  ],
+  "fee_ratio_per_side": 0.001,
+  "starting_wallet": 1000,
+  "stake_amount": 100,
+  "max_open_trades": 3,
+  "gate_stages": ["validation", "holdout"],
+  "folds": [
+    {"name": "2024-Q1", "stage": "development", "timerange": "20240101-20240401"},
+    {"name": "2024-Q2", "stage": "development", "timerange": "20240401-20240701"},
+    {"name": "2024-Q3", "stage": "development", "timerange": "20240701-20241001"},
+    {"name": "2024-Q4", "stage": "development", "timerange": "20241001-20250101"},
+    {"name": "2025-Q1", "stage": "validation", "timerange": "20250101-20250401"},
+    {"name": "2025-Q2", "stage": "validation", "timerange": "20250401-20250701"},
+    {"name": "2025-Q3", "stage": "validation", "timerange": "20250701-20251001"},
+    {"name": "2025-Q4", "stage": "validation", "timerange": "20251001-20260101"},
+    {"name": "2026-Q1", "stage": "holdout", "timerange": "20260101-20260401"},
+    {"name": "2026-Q2", "stage": "holdout", "timerange": "20260401-20260701"},
+    {"name": "2026-Q3-partial", "stage": "holdout", "timerange": "20260701-20260912"}
+  ],
+  "screening_gate": {
+    "min_total_trades": 100,
+    "min_profit_factor": 1.15,
+    "min_positive_fold_ratio": 0.6,
+    "min_total_return_pct": 0.0,
+    "max_drawdown_pct": 10.0,
+    "max_worst_fold_loss_pct": 5.0
+  },
+  "limitations": [
+    "This is retrospective screening, not proof of future profitability.",
+    "Hourly OHLCV backtests cannot reproduce intrabar order paths or guaranteed fills.",
+    "Each fold closes at its boundary and starts again with the configured wallet.",
+    "The fee is fixed and does not model every spread, slippage, latency or Binance tier.",
+    "No hyperoptimization and no AI/model calls are permitted in this protocol."
+  ]
+}
