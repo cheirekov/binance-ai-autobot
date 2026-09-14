@@ -33,6 +33,7 @@ From repository root:
 mkdir -p data/trader-v2/baseline data/trader-v2/astra
 export TRADER_API_PASSWORD='<generate a private value>'
 export TRADER_API_JWT_SECRET='<generate a different value of at least 32 characters>'
+export COMPOSE_PROJECT_NAME='autobot-v2'
 export TRADER_UI_USER='<operator username>'
 export TRADER_UI_PASSWORD_HASH='<bcrypt hash; never the plain password>'
 docker compose -f apps/trader/compose.yml up -d baseline
@@ -51,6 +52,21 @@ adapter and Freqtrade's authenticated internal APIs; it does not start the legac
 NestJS engine. Baseline and Astra APIs have no host ports. UI controls can start,
 pause entries, or stop each dry-run account, but cannot force trades or enable live
 money. Set `TRADER_UI_PORT` to change the host port.
+The port binds to `127.0.0.1` by default; use an SSH tunnel or a reviewed HTTPS
+reverse proxy. Do not expose Basic authentication over plain public HTTP.
+
+For a separate i2 worktree, reuse the existing OpenAI key and bcrypt UI login
+without printing either value:
+
+```sh
+python apps/trader/install_env.py \
+  --legacy-config /root/work/binance-ai-autobot/data/config.json \
+  --output apps/trader/.env
+cd apps/trader
+docker-compose --profile ai up -d --build
+```
+
+The installer refuses to overwrite an existing file and creates it with mode 0600.
 
 Tests (offline):
 

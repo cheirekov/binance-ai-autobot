@@ -1,4 +1,3 @@
-name: autobot-v2
 x-trader: &trader
   image: freqtradeorg/freqtrade:2026.8@sha256:4d23160b501d2b34579e76f57ad75edfa274967cd0dd824ff1c1b86d8c166ab4
   user: "${TRADER_UID:-1000}:${TRADER_GID:-1000}"
@@ -69,5 +68,5 @@ services:
       UI_AUTH_USERNAME: "${TRADER_UI_USER:-}"
       UI_AUTH_PASSWORD_HASH: "${TRADER_UI_PASSWORD_HASH:-}"
     ports:
-      - "${TRADER_UI_PORT:-4174}:4173"
+      - "${TRADER_UI_BIND:-127.0.0.1}:${TRADER_UI_PORT:-4174}:4173"
     depends_on: [dashboard]
