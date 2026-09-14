@@ -5,6 +5,9 @@ from pathlib import Path
 
 from research import aggregate, extract_result
 from ResearchCandidates import (
+    Research4hMeanReversion,
+    Research4hRegimeBreakout,
+    Research4hSlowTrend,
     ResearchMeanReversion,
     ResearchTrendPullback,
     ResearchVolatilityBreakout,
@@ -72,7 +75,12 @@ class ResearchTests(unittest.TestCase):
             "volume": 1000 + index % 17,
         } for index in range(500)]
         for strategy_type in (
-            ResearchTrendPullback, ResearchMeanReversion, ResearchVolatilityBreakout
+            ResearchTrendPullback,
+            ResearchMeanReversion,
+            ResearchVolatilityBreakout,
+            Research4hRegimeBreakout,
+            Research4hSlowTrend,
+            Research4hMeanReversion,
         ):
             strategy = strategy_type({"stake_currency": "USDC", "dry_run": True})
 

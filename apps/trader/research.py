@@ -162,6 +162,7 @@ def run(args) -> Path:
             "--strategy-path", str(Path(args.strategy_path).resolve()),
             "--strategy-list", *protocol["strategies"],
             "--data-dir", str(Path(args.data_dir).resolve()),
+            "--pairs", *protocol["pairs"],
             "--timeframe", protocol["timeframe"],
             "--timerange", fold["timerange"],
             "--fee", str(protocol["fee_ratio_per_side"]),
@@ -171,6 +172,8 @@ def run(args) -> Path:
             "--enable-protections", "--cache", "none", "--export", "trades",
             "--export-directory", str(fold_dir),
         ]
+        if protocol.get("timeframe_detail"):
+            command.extend(["--timeframe-detail", protocol["timeframe_detail"]])
         completed = subprocess.run(command, text=True, capture_output=True)
         if completed.returncode:
             (fold_dir / "stderr.log").write_text(completed.stderr)
