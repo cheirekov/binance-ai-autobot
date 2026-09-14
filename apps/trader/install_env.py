@@ -24,7 +24,9 @@ def create_environment(legacy_path, output_path):
         raise ValueError("Legacy UI bcrypt authentication must be enabled")
     values = {
         "COMPOSE_PROJECT_NAME": "autobot-v2",
-        "TRADER_UID": str(os.getuid()), "TRADER_GID": str(os.getgid()),
+        # The pinned image installs Freqtrade in ftuser's user site (1000:1000).
+        # Host root is not a compatible container runtime user.
+        "TRADER_UID": "1000", "TRADER_GID": "1000",
         "TRADER_API_USER": "autobot-v2-internal",
         "TRADER_API_PASSWORD": secrets.token_urlsafe(36),
         "TRADER_API_JWT_SECRET": secrets.token_hex(32),

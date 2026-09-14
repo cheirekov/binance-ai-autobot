@@ -26,6 +26,7 @@ class InstallEnvironmentTests(unittest.TestCase):
             contents = output.read_text()
             self.assertIn("OPENAI_API_KEY='sk-test-never-print'", contents)
             self.assertIn("TRADER_UI_PASSWORD_HASH='$2b$10$hash/value'", contents)
+            self.assertIn("TRADER_UID='1000'", contents)
             with self.assertRaises(FileExistsError):
                 create_environment(source, output)
 

@@ -66,7 +66,9 @@ cd apps/trader
 docker-compose --profile ai up -d --build
 ```
 
-The installer refuses to overwrite an existing file and creates it with mode 0600.
+The installer refuses to overwrite an existing file, creates it with mode 0600,
+and uses the pinned image's `1000:1000` runtime identity. Ensure the two new
+`data/trader-v2` account directories are writable by that identity.
 
 Tests (offline):
 
