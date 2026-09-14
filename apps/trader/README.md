@@ -128,9 +128,21 @@ This proves integration only. The smoke script has a separate $0.20 daily budget
   zero-budget Astra integration made no API request.
 - Before retirement, the i2 legacy engine was rechecked: zero active orders and
   eleven testnet inventory positions (about 142 USDC FIL and 61 USDC NEAR were the
-  material items; the rest was small residual inventory). Its trading engine was
-  stopped through its API and verified `STOPPED`; no forced sales or state deletion.
-  The legacy API/UI containers remain available temporarily as a rollback surface.
+  material items; the rest was small residual inventory). An API-level stop proved
+  non-durable because the engine returned to `TRADING`. With active orders still
+  zero, the legacy API and UI containers were stopped instead. They were not removed;
+  no forced sales or state deletion occurred, so the old runtime remains a manual
+  rollback only and cannot trade concurrently with V2.
+- Remote V2 was deployed from a separate worktree at
+  `/root/work/binance-ai-autobot-v2`. Baseline, Astra, dashboard and UI survived a
+  restart. Both accounts reported `dryRun=true`, 1000 USDC simulated wallets, zero
+  trades and zero positions. A first remote Astra plan completed successfully for
+  **$0.04568**, denied entries on all three pairs, and remained cached across restart;
+  call count stayed one with no unresolved cost reservation.
+- The remote V2 UI is authenticated and bound only to i2 loopback. Open a tunnel
+  with `ssh -L 4174:127.0.0.1:4174 i2`, then visit
+  `http://127.0.0.1:4174` and use the existing UI username/password. An unauthenticated
+  request was verified to return HTTP 401.
 
 Context-only smoke (no paid requests, no orders):
 
@@ -156,5 +168,6 @@ never a fabricated zero return. This is a CLI snapshot, not a dashboard or
 drawdown series; marks are not guaranteed fills. Development, server and tax costs
 are not included. The isolated smoke-call costs are not mixed into the prospective
 account. The local prospective accounts were started only for integration testing
-and stopped afterwards with zero trades. Remote V2 rollout remains a separate,
-reviewed cutover.
+and stopped afterwards with zero trades. The remote prospective accounts are now
+running continuously in dry-run; this is an observation phase, not promotion to
+real funds or evidence of profitability.
