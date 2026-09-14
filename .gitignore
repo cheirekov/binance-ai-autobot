@@ -11,6 +11,8 @@ data/
 # Logs & coverage
 coverage/
 *.log
+__pycache__/
+*.pyc
 
 # Debug/support bundles (generated locally)
 autobot-feedback-*.tgz

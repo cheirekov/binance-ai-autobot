@@ -1,0 +1,73 @@
+name: autobot-v2
+x-trader: &trader
+  image: freqtradeorg/freqtrade:2026.8@sha256:4d23160b501d2b34579e76f57ad75edfa274967cd0dd824ff1c1b86d8c166ab4
+  user: "${TRADER_UID:-1000}:${TRADER_GID:-1000}"
+  restart: unless-stopped
+  stop_grace_period: 60s
+x-api-env: &api-env
+  FREQTRADE__API_SERVER__ENABLED: "true"
+  FREQTRADE__API_SERVER__LISTEN_IP_ADDRESS: "0.0.0.0"
+  FREQTRADE__API_SERVER__LISTEN_PORT: "8080"
+  FREQTRADE__API_SERVER__USERNAME: "${TRADER_API_USER:-autobot-v2-internal}"
+  FREQTRADE__API_SERVER__PASSWORD: "${TRADER_API_PASSWORD:?Set TRADER_API_PASSWORD}"
+  FREQTRADE__API_SERVER__JWT_SECRET_KEY: "${TRADER_API_JWT_SECRET:?Set TRADER_API_JWT_SECRET}"
+  FREQTRADE__API_SERVER__VERBOSITY: "error"
+services:
+  baseline:
+    <<: *trader
+    environment:
+      <<: *api-env
+      FREQTRADE__BOT_NAME: "autobot-v2-baseline"
+    volumes:
+      - ./config.json:/freqtrade/config.json:ro
+      - ./strategies:/freqtrade/user_data/strategies:ro
+      - ../../data/trader-v2/baseline:/freqtrade/user_data
+    command: ["trade", "--config", "/freqtrade/config.json", "--strategy", "AutobotBaseline", "--db-url", "sqlite:////freqtrade/user_data/trades.sqlite"]
+  astra:
+    <<: *trader
+    profiles: ["ai"]
+    environment:
+      <<: *api-env
+      FREQTRADE__BOT_NAME: "autobot-v2-astra"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ASTRA_DAILY_BUDGET_USD: "${ASTRA_DAILY_BUDGET_USD:-0.50}"
+    volumes:
+      - ./config.json:/freqtrade/config.json:ro
+      - ./strategies:/freqtrade/user_data/strategies:ro
+      - ../../data/trader-v2/astra:/freqtrade/user_data
+    command: ["trade", "--config", "/freqtrade/config.json", "--strategy", "AutobotAstra", "--db-url", "sqlite:////freqtrade/user_data/trades.sqlite"]
+  dashboard:
+    image: freqtradeorg/freqtrade:2026.8@sha256:4d23160b501d2b34579e76f57ad75edfa274967cd0dd824ff1c1b86d8c166ab4
+    profiles: ["ai"]
+    user: "${TRADER_UID:-1000}:${TRADER_GID:-1000}"
+    restart: unless-stopped
+    environment:
+      TRADER_API_USER: "${TRADER_API_USER:-autobot-v2-internal}"
+      TRADER_API_PASSWORD: "${TRADER_API_PASSWORD:?Set TRADER_API_PASSWORD}"
+      BASELINE_API_URL: "http://baseline:8080/api/v1"
+      ASTRA_API_URL: "http://astra:8080/api/v1"
+      ADVISOR_DB: "/data/astra/advisor.sqlite"
+    volumes:
+      - ./dashboard_api.py:/freqtrade/dashboard_api.py:ro
+      - ../../data/trader-v2/astra:/data/astra:ro
+    entrypoint: ["python", "-m", "uvicorn"]
+    command: ["dashboard_api:app", "--host", "0.0.0.0", "--port", "8090"]
+    depends_on: [baseline, astra]
+  ui:
+    profiles: ["ai"]
+    build:
+      context: ../..
+      dockerfile: apps/ui/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /data
+      HOST: 0.0.0.0
+      PORT: "4173"
+      API_BASE_URL: http://dashboard:8090
+      UI_AUTH_ENABLED: "${TRADER_UI_AUTH_ENABLED:-true}"
+      UI_AUTH_USERNAME: "${TRADER_UI_USER:-}"
+      UI_AUTH_PASSWORD_HASH: "${TRADER_UI_PASSWORD_HASH:-}"
+    ports:
+      - "${TRADER_UI_PORT:-4174}:4173"
+    depends_on: [dashboard]

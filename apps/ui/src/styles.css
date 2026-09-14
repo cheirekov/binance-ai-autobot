@@ -167,6 +167,25 @@ select {
   margin-bottom: 14px;
 }
 
+.topbar.compact { margin-bottom: 12px; }
+.pill-row, .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill-row { margin-bottom: 14px; }
+.actions { margin-top: 14px; }
+.section { margin-bottom: 14px; }
+.notice { margin-bottom: 14px; border-color: rgba(246, 195, 86, 0.55); }
+.metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+.metric-grid > div { padding: 10px; border-radius: 10px; background: rgba(255,255,255,.03); min-width: 0; }
+.metric-grid span, .metric-grid b { display: block; }
+.metric-grid span { color: var(--muted); font-size: 11px; margin-bottom: 5px; }
+.metric-grid b { font-size: 15px; overflow-wrap: break-word; }
+.plain-list { color: var(--muted); font-size: 13px; line-height: 1.5; padding-left: 20px; }
+.table-wrap { overflow-x: auto; }
+.footer-note { margin: 18px 2px 4px; text-align: center; }
+
+@media (max-width: 520px) {
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 .title {
   font-size: 18px;
   font-weight: 700;
