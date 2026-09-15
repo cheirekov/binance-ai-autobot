@@ -182,6 +182,12 @@ This proves integration only. The smoke script has a separate $0.20 daily budget
   trades and zero positions. A first remote Astra plan completed successfully for
   **$0.04568**, denied entries on all three pairs, and remained cached across restart;
   call count stayed one with no unresolved cost reservation.
+- On 2026-09-15 the isolated `AutobotMomentumCandidate` shadow was deployed on
+  i2 with its own 1000 USDC simulated wallet and database. After restart,
+  Baseline, Astra and Momentum all reported `running` and `dryRun=true`, with
+  no open positions; unauthenticated UI access still returned HTTP 401. Momentum
+  begins a later prospective interval, so lifetime totals across the three
+  accounts must not be treated as a time-aligned performance comparison.
 - The remote V2 UI is authenticated and bound only to i2 loopback. Open a tunnel
   with `ssh -L 4174:127.0.0.1:4174 i2`, then visit
   `http://127.0.0.1:4174` and use the existing UI username/password. An unauthenticated

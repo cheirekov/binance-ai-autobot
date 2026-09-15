@@ -41,8 +41,8 @@ function AccountCard({ name, label, account, busy, control }: {
       </div>
       <div className="metric-grid">
         <div><span>Wallet</span><b>{money(account.wallet.totalQuote, quote)}</b></div>
-        <div><span>Closed P&amp;L</span><b>{money(account.metrics.profit_closed_coin, quote)}</b></div>
-        <div><span>Marked P&amp;L</span><b>{money(account.metrics.profit_all_coin, quote)}</b></div>
+        <div><span>Lifetime closed P&amp;L</span><b>{money(account.metrics.profit_closed_coin, quote)}</b></div>
+        <div><span>Lifetime marked P&amp;L</span><b>{money(account.metrics.profit_all_coin, quote)}</b></div>
         <div><span>Drawdown</span><b>{percent(account.metrics.max_drawdown === undefined ? undefined : account.metrics.max_drawdown * 100)}</b></div>
         <div><span>Trades</span><b>{account.metrics.trade_count ?? "—"}</b></div>
         <div><span>Win rate</span><b>{percent(account.metrics.winrate === undefined ? undefined : account.metrics.winrate * 100)}</b></div>
@@ -99,7 +99,7 @@ export function TraderV2Page(): JSX.Element {
         <span className="pill warn">Dry-run only</span>
         <span className="pill">Market: Binance public spot</span>
         <span className="pill">Orders: simulated locally</span>
-        <span className={snapshot.comparison.ready ? "pill ok" : "pill bad"}>Comparison: {snapshot.comparison.ready ? "available" : "blocked"}</span>
+        <span className={snapshot.comparison.ready ? "pill ok" : "pill bad"}>Telemetry: {snapshot.comparison.ready ? "ready" : "blocked"}</span>
         <span className="pill bad">Real money: blocked</span>
       </div>
       {(dashboard.error || message) ? <div className="card notice"><div className="subtitle">{dashboard.error ?? message}</div></div> : null}
@@ -113,7 +113,7 @@ export function TraderV2Page(): JSX.Element {
       <div className="row cols-2 section">
         <div className="card">
           <div className="title">Experiment integrity</div>
-          <div className="subtitle">All accounts remain isolated and are compared only over the same prospective interval. Historical results do not authorize promotion.</div>
+          <div className="subtitle">Cards show account-lifetime values and are not automatically time-aligned. Performance comparison requires a separately recorded common interval.</div>
           <ul className="plain-list">{snapshot.comparison.limitations.map((item) => <li key={item}>{item}</li>)}</ul>
           <div className="subtitle">Promotion gate: {snapshot.promotion.reason}</div>
         </div>

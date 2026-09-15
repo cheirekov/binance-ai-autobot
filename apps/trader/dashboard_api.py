@@ -133,7 +133,8 @@ def build_snapshot():
         "marketData": "Binance public spot mainnet", "orders": "simulated locally by Freqtrade",
         "accounts": accounts,
         "comparison": {"ready": not reasons, "limitations": reasons or [
-            "Different entry decisions create different capital timing; compare over the same prospective interval",
+            "Account lifetime totals may begin at different times; compare only a separately recorded common interval",
+            "Different entry decisions create different capital timing within that common interval",
             "API cost is USD while trading P&L is USDC and is shown separately",
         ]},
         "promotion": {"realMoneyAllowed": False, "reason": "No profitable edge has been validated"},
