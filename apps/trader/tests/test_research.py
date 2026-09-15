@@ -3,7 +3,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from research import aggregate, extract_result
+from research import aggregate, extract_result, fold_metrics
 from ResearchCandidates import (
     Research4hMeanReversion,
     Research4hRegimeBreakout,
@@ -29,6 +29,12 @@ def row(profits, drawdown=2):
 
 
 class ResearchTests(unittest.TestCase):
+    def test_risk_uses_open_position_wallet_drawdown(self):
+        raw = {"max_drawdown_account": 0.01, "wallet_stats": {"max_relative_drawdown": 0.25}}
+        self.assertEqual(fold_metrics(raw)["max_drawdown_pct"], 25)
+        with self.assertRaises(ValueError):
+            fold_metrics({"max_drawdown_account": 0.01})
+
     def setUp(self):
         self.gate = {
             "min_total_trades": 4,

@@ -1,0 +1,171 @@
+{
+  "settings": {
+    "purpose": "Audit the existing deployed strategy, without tuning parameters or creating another bot",
+    "strategy": "AutobotMomentumCandidate",
+    "timeframe": "4h",
+    "timeframe_detail": "15m",
+    "pairs": [
+      "BTC/USDC",
+      "ETH/USDC",
+      "SOL/USDC"
+    ],
+    "starting_wallet": 1000,
+    "cases": [
+      {
+        "name": "full-with-warmup",
+        "timerange": "20240201-20260912",
+        "cost_per_side": 0.0015
+      },
+      {
+        "name": "evaluation",
+        "timerange": "20250101-20260912",
+        "cost_per_side": 0.0015
+      },
+      {
+        "name": "evaluation-double-cost",
+        "timerange": "20250101-20260912",
+        "cost_per_side": 0.003
+      },
+      {
+        "name": "recent-2026",
+        "timerange": "20260101-20260912",
+        "cost_per_side": 0.0015
+      }
+    ],
+    "bootstrap": {
+      "seed": 20260915,
+      "block_days": 30,
+      "samples": 5000
+    },
+    "decision": "Diagnostic only. Retain the failed quarterly gate; do not promote based on these overlapping previously inspected intervals."
+  },
+  "input_sha256": {
+    "apps/trader/research/momentum-audit.json": "fb0d131c7ba7c7197cf7aea232d9e60f92148ef93d1055ab28dc279a4f6d4819",
+    "apps/trader/config.json": "e85c45c4068c6b48dba6a5bfbcdca21a79e27327d1284d42924c1e8f5da618e1",
+    "apps/trader/momentum_audit.py": "d2941b07b6fb9e63f929db959fff4db1ace99bf743f02972ea97c1476277c8bd",
+    "apps/trader/strategies/MomentumCandidate.py": "5011c6a56d56f257028c90c2eb9ba835aa6f11c99bc38c848463adb9293639ce",
+    "apps/trader/strategies/AutobotV2.py": "bbda84b910445f6a8fe14d8b2b7c417148ef541a8b6dd29d9c4230c8b6a456a3",
+    "apps/trader/research.py": "c97c74cdf2b2fce23c764b42bd6853636cd726b6caf429f5e03bbcbf9417e1b7",
+    "data/trader-v2/research/data/binance/BTC_USDC-4h.feather": "9588c23bfa08ba0343739d293c3be98f2ca911d01a9e0c1198f8e64a28c29dc4",
+    "data/trader-v2/research/data/binance/BTC_USDC-15m.feather": "8942adc05672a3afe7f4c010475373d9e89175daa366d1c1f99e5f72e77ed018",
+    "data/trader-v2/research/data/binance/ETH_USDC-4h.feather": "42bbbb3f9b529256de545e56c3cdde2de29886e28555c839df548aaa6a1dd393",
+    "data/trader-v2/research/data/binance/ETH_USDC-15m.feather": "792fabb5b88671e28950ccbb5a2812e9277af0a5cd9e598376b07f8d02ff8fb0",
+    "data/trader-v2/research/data/binance/SOL_USDC-4h.feather": "d06fec936d7c2f074e130c80c2688bf6739dd45f06d2c8a24bf555f5a9005c74",
+    "data/trader-v2/research/data/binance/SOL_USDC-15m.feather": "41211f1b228823696b11b688f78618572bbdd8a396c47228a60f3f6044a1e57a"
+  },
+  "freqtrade": "Operating System:\tLinux-7.0.0-31-generic-x86_64-with-glibc2.41\nPython Version:\t\tPython 3.14.7\nCCXT Version:\t\t4.5.76\n\nFreqtrade Version:\tfreqtrade 2026.8",
+  "cases": {
+    "full-with-warmup": {
+      "trades": 49,
+      "return_pct": 25.281579255000032,
+      "profit_factor": 2.0147262701461894,
+      "marked_drawdown_pct": 13.26994191169838,
+      "including_final_exit_drawdown_pct": 13.26994191169838,
+      "closed_trade_drawdown_pct": 6.119774783406704,
+      "daily_sharpe_zero_rate": 0.7222962625375511,
+      "cagr_pct": 9.00630261682136,
+      "cagr_block_bootstrap_95pct": [
+        -7.407103801281533,
+        31.224676471976107
+      ],
+      "net_quote": 252.8157925500002,
+      "top_three_winners_quote": 205.4944317,
+      "net_without_top_three_winners_quote": 47.32136084999999,
+      "final_forced_exits_quote": 54.30798841,
+      "per_pair_quote": {
+        "BTC/USDC": 134.18628474000002,
+        "ETH/USDC": 130.98546692,
+        "SOL/USDC": -12.355959110000002
+      }
+    },
+    "evaluation": {
+      "trades": 30,
+      "return_pct": 5.982463507000002,
+      "profit_factor": 1.4437474153511738,
+      "marked_drawdown_pct": 12.605634725926485,
+      "including_final_exit_drawdown_pct": 12.605634725926485,
+      "closed_trade_drawdown_pct": 6.055237054299021,
+      "daily_sharpe_zero_rate": 0.3879767150309089,
+      "cagr_pct": 3.4855006887460016,
+      "cagr_block_bootstrap_95pct": [
+        -8.82038794293635,
+        18.22957790602222
+      ],
+      "net_quote": 59.82463507000011,
+      "top_three_winners_quote": 123.6586534,
+      "net_without_top_three_winners_quote": -63.834018330000006,
+      "final_forced_exits_quote": 45.94170078,
+      "per_pair_quote": {
+        "BTC/USDC": 21.3826636,
+        "ETH/USDC": 47.77068269,
+        "SOL/USDC": -9.328711220000002
+      }
+    },
+    "evaluation-double-cost": {
+      "trades": 30,
+      "return_pct": 4.903032439999988,
+      "profit_factor": 1.3484083865251215,
+      "marked_drawdown_pct": 12.963155326107124,
+      "including_final_exit_drawdown_pct": 12.963155326107124,
+      "closed_trade_drawdown_pct": 6.568244065882226,
+      "daily_sharpe_zero_rate": 0.32839759529484797,
+      "cagr_pct": 2.8626935753553795,
+      "cagr_block_bootstrap_95pct": [
+        -9.47731678229832,
+        17.689772926046963
+      ],
+      "net_quote": 49.03032439999993,
+      "top_three_winners_quote": 122.01442374,
+      "net_without_top_three_winners_quote": -72.98409934,
+      "final_forced_exits_quote": 44.33596126,
+      "per_pair_quote": {
+        "BTC/USDC": 15.269482890000003,
+        "ETH/USDC": 45.001156529999996,
+        "SOL/USDC": -11.240315020000002
+      }
+    },
+    "recent-2026": {
+      "trades": 14,
+      "return_pct": -0.17586439300000256,
+      "profit_factor": 0.9709243901078506,
+      "marked_drawdown_pct": 7.601473133411474,
+      "including_final_exit_drawdown_pct": 7.601473133411474,
+      "closed_trade_drawdown_pct": 4.653211480000005,
+      "daily_sharpe_zero_rate": 0.01783687858115787,
+      "cagr_pct": -0.2526213731255389,
+      "cagr_block_bootstrap_95pct": [
+        -14.989154622196564,
+        17.165044186471857
+      ],
+      "net_quote": -1.758643930000062,
+      "top_three_winners_quote": 53.14410716,
+      "net_without_top_three_winners_quote": -54.90275109,
+      "final_forced_exits_quote": 43.27425572,
+      "per_pair_quote": {
+        "BTC/USDC": -8.1172603,
+        "ETH/USDC": 25.06098667,
+        "SOL/USDC": -18.7023703
+      }
+    }
+  },
+  "original_quarterly_gate_with_corrected_risk": {
+    "trades": 35,
+    "profit_abs": 27.61774404000001,
+    "return_pct": 2.761774404000002,
+    "profit_factor": 1.1652205174228472,
+    "profit_factor_infinite": false,
+    "positive_fold_ratio": 0.5714285714285714,
+    "max_fold_drawdown_pct": 8.761543265053975,
+    "worst_fold_return_pct": -7.113498582,
+    "expectancy_quote_per_trade": 0.7890784011428571,
+    "checks": {
+      "total_trades": true,
+      "profit_factor": true,
+      "positive_fold_ratio": false,
+      "total_return_pct": true,
+      "max_drawdown_pct": true,
+      "worst_fold_loss_pct": false
+    },
+    "screening_pass": false
+  }
+}

@@ -1,5 +1,10 @@
 # Autobot operational momentum v6 result
 
+Historical report. See `AUDIT-2026-09-15.md` for corrected risk and interpretation:
+the max evaluation fold wallet drawdown is 8.76%, and full-period maximum
+percentage wallet drawdown is 13.27%. The runtime is not equivalent to V4/V5.
+The later decision is not to select Momentum as a validated product strategy.
+
 Protocol SHA-256: `9013dc4a11db90000222a5020269ba57fed4a52034e092890ff503b4a088d74b`
 
 This check translates the frozen portfolio lead into the exact Freqtrade strategy

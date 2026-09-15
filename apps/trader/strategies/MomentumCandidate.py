@@ -1,4 +1,4 @@
-"""Conservative Freqtrade translation of the portfolio TSMOM research lead."""
+"""Entry-sized momentum experiment; not the weekly rebalanced portfolio model."""
 
 import math
 
@@ -9,7 +9,7 @@ from AutobotV2 import AutobotBaseline
 
 
 class AutobotMomentumCandidate(AutobotBaseline):
-    """Weekly 30-day time-series momentum with a conservative volatility stake."""
+    """Weekly signals with volatility sizing at entry, without ongoing rebalancing."""
 
     timeframe = "4h"
     startup_candle_count = 200
@@ -57,9 +57,14 @@ class AutobotMomentumCandidate(AutobotBaseline):
             frame, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
             volatility = float(frame.iloc[-1]["annualized_volatility_30d"])
             capital = float(self.wallets.get_total(self.config["stake_currency"]))
+            if (not math.isfinite(volatility) or volatility <= 0
+                    or not math.isfinite(capital) or capital <= 0
+                    or not math.isfinite(max_stake) or max_stake <= 0
+                    or (min_stake is not None and (not math.isfinite(min_stake) or min_stake < 0))):
+                return 0.0
             configured_slots = int(self.config.get("max_open_trades", 3))
             pair_count = len(self.config.get("exchange", {}).get("pair_whitelist", [])) or 3
-            slots = max(1, min(configured_slots, pair_count))
+            slots = pair_count if configured_slots == -1 else max(1, min(configured_slots, pair_count))
             weight = min(0.5, (self.target_portfolio_volatility / slots) / volatility)
             stake = min(capital * weight, max_stake)
             return stake if math.isfinite(stake) and stake >= (min_stake or 0) else 0.0

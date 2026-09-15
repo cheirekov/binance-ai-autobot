@@ -1,0 +1,16 @@
+{
+  "purpose": "Audit the existing deployed strategy, without tuning parameters or creating another bot",
+  "strategy": "AutobotMomentumCandidate",
+  "timeframe": "4h",
+  "timeframe_detail": "15m",
+  "pairs": ["BTC/USDC", "ETH/USDC", "SOL/USDC"],
+  "starting_wallet": 1000,
+  "cases": [
+    {"name": "full-with-warmup", "timerange": "20240201-20260912", "cost_per_side": 0.0015},
+    {"name": "evaluation", "timerange": "20250101-20260912", "cost_per_side": 0.0015},
+    {"name": "evaluation-double-cost", "timerange": "20250101-20260912", "cost_per_side": 0.003},
+    {"name": "recent-2026", "timerange": "20260101-20260912", "cost_per_side": 0.0015}
+  ],
+  "bootstrap": {"seed": 20260915, "block_days": 30, "samples": 5000},
+  "decision": "Diagnostic only. Retain the failed quarterly gate; do not promote based on these overlapping previously inspected intervals."
+}

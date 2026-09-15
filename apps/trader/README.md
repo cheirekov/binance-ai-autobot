@@ -131,11 +131,12 @@ docker run --rm -v "$PWD:/repo" -w /repo \
   --user-data-dir /repo/data/trader-v2/research/user_data
 ```
 
-The versioned protocols and results retain failures instead of tuning thresholds
-against inspected data. `RESULTS-v6.md` documents the operational momentum
-translation: it fails the quarterly gate narrowly, passes no live-money gate, and
-is allowed only as a separate prospective dry-run shadow after a clean 47-signal
-look-ahead analysis.
+The versioned protocols and results retain failures. The current conclusion is in
+`research/AUDIT-2026-09-15.md`: Momentum fails the quarterly screen and is not
+selected as a validated product strategy. The portfolio model and runtime are
+different algorithms. A clean signal look-ahead diagnostic does not establish
+profitability or equivalence. The simulation now requires full candle coverage
+and enough warmup; the original V3/V4 January 2024 start fails that requirement.
 
 ## Historical handoff, 2026-09-12
 

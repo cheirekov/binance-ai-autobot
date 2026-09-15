@@ -1,9 +1,11 @@
 import unittest
+import tempfile
+from pathlib import Path
 
 import pandas as pd
 from unittest.mock import Mock
 
-from portfolio_research import capped_weights, simulate, volatility_scale
+from portfolio_research import capped_weights, simulate, volatility_scale, metrics, load_closes, rebalance_after_cost
 from MomentumCandidate import AutobotMomentumCandidate
 
 
@@ -29,9 +31,43 @@ class PortfolioResearchTests(unittest.TestCase):
         dates = pd.date_range("2026-01-01", periods=12, tz="UTC")
         closes = pd.DataFrame({"A": 100.0, "B": 100.0}, index=dates)
         result = simulate(closes, {"kind": "buy_hold"}, protocol(cost=0.01))
-        self.assertAlmostEqual(result.iloc[0]["equity"], 0.99)
+        self.assertAlmostEqual(result.iloc[0]["equity"], 1 / 1.01)
         self.assertEqual((result["turnover"] > 0).sum(), 1)
-        self.assertAlmostEqual(result.iloc[-1]["equity"], 0.99)
+        self.assertAlmostEqual(result.iloc[-1]["equity"], 1 / 1.01)
+
+    def test_rebalance_cash_conservation_with_fee(self):
+        old = pd.Series({"A": 0.4, "B": 0.3})
+        desired = pd.Series({"A": 0.1, "B": 0.6})
+        remaining, turnover = rebalance_after_cost(old, desired, 0.01)
+        self.assertAlmostEqual(remaining + turnover * 0.01, 1.0)
+        expected_cash = 1 - old.sum() - (desired * remaining - old).sum() - turnover * 0.01
+        self.assertAlmostEqual(expected_cash, remaining * (1 - desired.sum()))
+
+    def test_drawdown_includes_loss_from_starting_capital(self):
+        value = metrics(pd.DataFrame({"net_return": [-0.1, 0], "turnover": [1, 0], "exposure": [1, 1]}))
+        self.assertAlmostEqual(value["max_drawdown_pct"], 10)
+
+    def test_incomplete_candles_are_not_silently_dropped(self):
+        frame = pd.DataFrame({"date": pd.date_range("2025-01-01", periods=18, freq="4h", tz="UTC"),
+                              "close": 100.0, "volume": 10.0})
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "BTC_USDC-4h.feather"
+            frame.to_feather(path)
+            self.assertEqual(len(load_closes(Path(directory), ["BTC/USDC"], "4h", "2025-01-04")), 3)
+            for broken in (frame.drop(index=8), frame.drop(index=range(6, 12)), pd.concat([frame, frame.iloc[[0]]])):
+                broken.reset_index(drop=True).to_feather(path)
+                with self.assertRaises(ValueError):
+                    load_closes(Path(directory), ["BTC/USDC"], "4h", "2025-01-04")
+
+    def test_simulation_requires_full_range_and_warmup(self):
+        closes = pd.DataFrame({"A": 100.0}, index=pd.date_range("2026-01-01", periods=12, tz="UTC"))
+        from_feather = closes.copy()
+        from_feather.index = from_feather.index.as_unit("ms")
+        self.assertEqual(len(simulate(from_feather, {"kind": "buy_hold"}, protocol())), 8)
+        with self.assertRaisesRegex(ValueError, "warmup"):
+            simulate(closes, {"kind": "tsmom_equal", "lookback_days": 30}, protocol())
+        with self.assertRaisesRegex(ValueError, "calendar day"):
+            simulate(closes.drop(closes.index[5]), {"kind": "buy_hold"}, protocol())
 
     def test_volatility_target_only_reduces_exposure(self):
         dates = pd.date_range("2025-01-01", periods=60, tz="UTC")
@@ -55,9 +91,11 @@ class PortfolioResearchTests(unittest.TestCase):
         candidate = {"kind": "tsmom_equal", "lookback_days": 30}
         original = simulate(closes, candidate, config)
         changed = closes.copy()
-        changed.iloc[-1, 0] *= 100
+        change_at = pd.Timestamp("2026-01-08", tz="UTC")
+        changed.loc[change_at:, "A"] *= 2
         revised = simulate(changed, candidate, config)
-        pd.testing.assert_frame_equal(original.iloc[:-1], revised.iloc[:-1])
+        pd.testing.assert_frame_equal(original.loc[original.index < change_at], revised.loc[revised.index < change_at])
+        self.assertNotEqual(original.loc[change_at, "equity"], revised.loc[change_at, "equity"])
 
     def test_runtime_candidate_sizes_each_asset_to_conservative_risk_budget(self):
         strategy = AutobotMomentumCandidate({
@@ -77,6 +115,13 @@ class PortfolioResearchTests(unittest.TestCase):
         )
         self.assertAlmostEqual(stake, 111.11111111111111)
         self.assertLessEqual(stake, 500)
+        for volatility in (float("nan"), float("inf"), 0, -0.6):
+            strategy.dp.get_analyzed_dataframe.return_value = (
+                pd.DataFrame([{"annualized_volatility_30d": volatility}]), None
+            )
+            with self.subTest(volatility=volatility):
+                self.assertEqual(strategy.custom_stake_amount(
+                    "BTC/USDC", None, 100, 100, 10, 1000, 1, None, "long"), 0)
 
 
 if __name__ == "__main__":

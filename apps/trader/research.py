@@ -35,12 +35,16 @@ def extract_result(archive: Path) -> dict:
 
 def fold_metrics(raw: dict) -> dict:
     trades = raw.get("trades", [])
+    wallet_dd = finite(raw.get("wallet_stats", {}).get("max_relative_drawdown"), None)
+    if wallet_dd is None or not 0 <= wallet_dd <= 1:
+        raise ValueError("Marked wallet drawdown missing or invalid; cannot evaluate risk")
     return {
         "trades": int(raw.get("total_trades", len(trades))),
         "profit_abs": finite(raw.get("profit_total_abs")),
         "return_pct": finite(raw.get("profit_total")) * 100,
         "profit_factor": finite(raw.get("profit_factor"), None),
-        "max_drawdown_pct": finite(raw.get("max_drawdown_account")) * 100,
+        "max_drawdown_pct": wallet_dd * 100,
+        "drawdown_basis": "maximum relative marked-wallet drawdown, including open positions",
         "wins": int(raw.get("wins", 0)),
         "losses": int(raw.get("losses", 0)),
         "trade_profits": [finite(trade.get("profit_abs")) for trade in trades],
@@ -92,7 +96,10 @@ def markdown(report: dict) -> str:
         "",
         "This is a retrospective screening result. A pass does not authorize live trading.",
         "",
-        "| Strategy | Eval trades | Eval return | PF | Positive folds | Max fold DD | Worst fold | All-history return | Gate |",
+        "Returns below are sums of independent reset-wallet folds, not compounded continuous returns.",
+        "Drawdown uses marked wallet equity including open positions, not only closed trades.",
+        "",
+        "| Strategy | Eval trades | Sum fold returns | PF | Positive folds | Max fold wallet DD | Worst fold | All-fold sum | Gate |",
         "|---|---:|---:|---:|---:|---:|---:|---:|:---:|",
     ]
     for name, result in report["strategies"].items():

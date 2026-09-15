@@ -17,19 +17,56 @@ import pandas as pd
 def load_closes(data_dir: Path, pairs: list[str], timeframe: str, end: str) -> pd.DataFrame:
     series = {}
     end_at = pd.Timestamp(end, tz="UTC")
+    step = pd.Timedelta(timeframe)
+    if step <= pd.Timedelta(0) or pd.Timedelta(days=1) % step:
+        raise ValueError("Timeframe must divide one day")
+    expected_count = int(pd.Timedelta(days=1) / step)
     for pair in pairs:
         path = data_dir / f"{pair.replace('/', '_')}-{timeframe}.feather"
         frame = pd.read_feather(path)
         if not {"date", "close", "volume"}.issubset(frame.columns):
             raise ValueError(f"Missing OHLCV columns in {path}")
-        frame = frame.sort_values("date").drop_duplicates("date", keep="last")
-        frame = frame[(frame["date"] < end_at) & (frame["close"] > 0) & (frame["volume"] > 0)]
-        daily = frame.set_index("date")["close"].resample("1D").last().dropna()
+        frame = frame[frame["date"] < end_at].sort_values("date")
+        if (frame.empty or frame["date"].duplicated().any()
+                or not np.isfinite(frame[["close", "volume"]]).all().all()
+                or (frame["close"] <= 0).any() or (frame["volume"] < 0).any()
+                or (frame["date"].dt.as_unit("ns").astype("int64") % step.value != 0).any()):
+            raise ValueError(f"Invalid candle data: {path}")
+        # A market listing can begin mid-day. Exclude that first partial day,
+        # but never silently remove an interior missing candle or trading day.
+        first = frame["date"].iloc[0].ceil("1D")
+        frame = frame[frame["date"] >= first]
+        daily_groups = frame.set_index("date")["close"].resample("1D")
+        if frame.empty or (daily_groups.count() != expected_count).any():
+            raise ValueError(f"Incomplete daily candle coverage: {path}")
+        daily = daily_groups.last()
         series[pair] = daily
-    closes = pd.DataFrame(series).dropna()
+    common_start = max(item.index.min() for item in series.values())
+    common_end = min(item.index.max() for item in series.values())
+    closes = pd.DataFrame(series).loc[common_start:common_end]
     if closes.empty or not closes.index.is_monotonic_increasing or closes.isna().any().any():
         raise ValueError("Aligned daily close data is incomplete")
     return closes
+
+
+def rebalance_after_cost(weights: pd.Series, desired: pd.Series, cost: float):
+    """Solve cash conservation with target weights measured AFTER fees.
+
+    x + cost * sum(abs(x * desired - old_weights)) = 1.
+    Turnover is actual notional divided by pre-rebalance equity.
+    """
+    if not 0 <= cost < 1:
+        raise ValueError("Invalid execution cost")
+    low, high = 0.0, 1.0
+    for _ in range(48):
+        ratio = (low + high) / 2
+        paid = cost * float((desired * ratio - weights).abs().sum())
+        if ratio + paid > 1:
+            high = ratio
+        else:
+            low = ratio
+    ratio = (low + high) / 2
+    return ratio, float((desired * ratio - weights).abs().sum())
 
 
 def capped_weights(scores: pd.Series, cap: float) -> pd.Series:
@@ -109,6 +146,14 @@ def simulate(closes: pd.DataFrame, candidate: dict, protocol: dict) -> pd.DataFr
     end_index = closes.index.searchsorted(end)
     if start_index < 1 or end_index <= start_index:
         raise ValueError("Insufficient simulation range")
+    expected = pd.date_range(start, end, inclusive="left", freq="1D")
+    if not closes.index[start_index:end_index].as_unit("ns").equals(expected.as_unit("ns")):
+        raise ValueError("Simulation must cover every requested calendar day")
+    required_history = max(candidate.get("lookback_days", 0), candidate.get("slow_days", 0),
+                           candidate.get("fast_days", 0),
+                           protocol.get("volatility_lookback_days", 0) if "vol" in candidate["kind"] else 0)
+    if start_index < required_history + 1:
+        raise ValueError(f"Insufficient warmup: need {required_history + 1} prior daily closes")
 
     weights = pd.Series(0.0, index=closes.columns)
     equity = 1.0
@@ -126,8 +171,8 @@ def simulate(closes: pd.DataFrame, candidate: dict, protocol: dict) -> pd.DataFr
         equity_before = equity
         if should_rebalance:
             desired = target(candidate, closes, signal_at, protocol)
-            turnover = float((desired - weights).abs().sum())
-            equity *= max(0.0, 1 - turnover * cost_ratio)
+            remaining, turnover = rebalance_after_cost(weights, desired, cost_ratio)
+            equity *= remaining
             weights = desired
             bought = True
 
@@ -142,7 +187,6 @@ def simulate(closes: pd.DataFrame, candidate: dict, protocol: dict) -> pd.DataFr
         cash_weight /= denominator
         total_weight = float(weights.sum()) + cash_weight
         weights /= total_weight
-        equity /= total_weight
         records.append({
             "date": closes.index[at],
             "equity": equity,
@@ -162,7 +206,7 @@ def metrics(frame: pd.DataFrame) -> dict:
     volatility = float(frame["net_return"].std(ddof=0) * math.sqrt(365))
     sharpe = float(frame["net_return"].mean() / frame["net_return"].std(ddof=0) * math.sqrt(365)) if volatility else 0
     curve = (1 + frame["net_return"]).cumprod()
-    drawdown = curve / curve.cummax() - 1
+    drawdown = curve / curve.cummax().clip(lower=1.0) - 1
     return {
         "days": len(frame),
         "return_pct": total_return * 100,

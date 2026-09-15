@@ -1,5 +1,9 @@
 # Autobot portfolio research v5 external result
 
+This is the weekly rebalanced portfolio model, not the Freqtrade runtime.
+See `AUDIT-2026-09-15.md`; the numerical result survives accounting corrections,
+but cannot be attributed to the deployed strategy.
+
 Protocol SHA-256: `3a3a284f388c64bdc42d0bca6aec64d51d48e81db5febbfba33d991bdefb1d09`
 
 V5 keeps the V4 candidate unchanged and checks a separate, earlier
