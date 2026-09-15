@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# Retired with the legacy engine on 2026-09-15.
+echo "Legacy workflow retired. Read README.md and apps/trader/README.md." >&2
+exit 2
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

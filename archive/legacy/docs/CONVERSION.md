@@ -38,4 +38,3 @@ To aggregate PnL in `USDC`, convert each commission and each realized PnL compon
 
 - We will **not** hardcode fee/tax assumptions.
 - We will compute and persist a replayable trade ledger once real Binance order placement is implemented.
-

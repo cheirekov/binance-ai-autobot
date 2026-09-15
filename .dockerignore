@@ -15,6 +15,7 @@ references
 
 .git
 .github
+archive
 
 *.log
 coverage

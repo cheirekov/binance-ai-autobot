@@ -1,5 +1,6 @@
 services:
   api:
+    profiles: ["legacy-archive"]
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -16,6 +17,7 @@ services:
       - "${API_HOST_BIND:-127.0.0.1}:${API_PORT:-8148}:8148"
 
   ui:
+    profiles: ["legacy-archive"]
     build:
       context: .
       dockerfile: apps/ui/Dockerfile

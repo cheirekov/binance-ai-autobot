@@ -1,64 +1,53 @@
-# Binance Autobot Hardening v4
+# Binance AI Autobot
 
-This pack hardens the easy-process workflow against the two biggest LLM failure modes:
-- **context window loss** across many cycles,
-- **time/cycle ambiguity** when a new model starts from a fresh chat.
+## Цел
 
-The goal is simple:
-**the project must remember itself; the LLM must not be asked to remember it.**
+Един автоматизиран трейдър на i2, с един портфейл и един интерфейс.
+AI анализира наличната информация и предлага решения. Проверими правила
+ограничават риска, а Freqtrade изпълнява поръчките и отчита позициите.
+Все още няма завършен или доказано печеливш продукт.
 
-## What this pack adds
-This pack extends the small living-file process with three mandatory continuity files:
+## Какво работи в момента
 
-1. `docs/easy_process/RUN_CONTEXT.md`
-   - explicit current time, cycle, bundle freshness, active mode
-   - prevents day/time guessing
-2. `docs/easy_process/DECISION_LEDGER.md`
-   - compact append-only log of important decisions
-   - prevents losing the reasoning trail between cycles
-3. `docs/easy_process/NEXT_CYCLE_HANDOFF.md`
-   - strict handoff contract from one cycle to the next
-   - prevents drift when models change or chats restart
+| Компонент | Какво представлява | Състояние |
+|---|---|---|
+| Старият NestJS бот (`apps/api`) | Първоначалният собствен engine | Спрян на i2, изведен от разработка |
+| Baseline | Проста стратегия във Freqtrade | Временен симулиран тест без AI |
+| Astra | Същата проста стратегия, филтрирана от AI | Временен симулиран тест на приноса на AI |
+| Momentum | Друга стратегия, следваща 30-дневната ценова тенденция | Временен симулиран тест без AI |
 
-It also updates the onboarding prompt so every new LLM reads these files first.
+Последните три са отделни тестови акаунти върху една нова платформа. Те не
+са три планирани продукта. Всички използват публични Binance цени и виртуални
+средства. Поръчки до Binance testnet или реалната борса не се изпращат.
+Проверено на 2026-09-15; това е описание, а не наблюдение в реално време.
 
-## Design principles
-1. **Chat is disposable.** The repo is the memory.
-2. **Time must be declared, not inferred.**
-3. **Every batch must leave a handoff.**
-4. **Important decisions must be append-only.**
-5. **Raw state is forensic evidence, not default context.**
+## Посока на разработката
 
-## Drop-in location
-Copy these files into your repo:
-- `docs/easy_process/`
-- `references/prompt_bundles/autobot_existing_master.md`
+1. Проверяваме качеството на данните, симулацията и стратегията, върху която
+   ще стъпи продуктът. Momentum е кандидат; проваленият му тримесечен тест
+   остава провален независимо от други положителни резултати.
+2. Измерваме дали AI подобрява избраната стратегия след разходите. Това изисква
+   един и същ период и сравними условия. Новини и макроикономически контекст
+   се добавят с източник и време на публикуване, когато можем да проверим ползата.
+3. Обединяваме избрания подход в един бот и един операторски екран. Временните
+   експерименти се приключват със заключение; не се добавят безсрочно нови акаунти.
 
-## Minimal operator flow
-1. Collect and ingest the latest bundle as you already do.
-2. Update only these small files:
-   - `RUN_CONTEXT.md`
-   - `BUNDLE_DIGEST.md`
-   - `STATE_DIGEST.md`
-   - `ACTIVE_TICKET.md` (only if changed)
-   - append one entry to `DECISION_LEDGER.md`
-   - write `NEXT_CYCLE_HANDOFF.md`
-3. Start a new model with only this prompt:
+Настоящият Astra използва простия Baseline, не Momentum. Прехвърлянето му
+към Momentum е възможна следваща стъпка, а не вече изпълнена или доказана архитектура.
+Потребителят трябва да вижда какво държи ботът, защо, риска и общия резултат
+след разходи. Текущият екран с три акаунта е развоен инструмент.
 
-```text
-Follow instructions in `references/prompt_bundles/autobot_existing_master.md`
-and write the requested outputs.
-```
+## Код и доставка
 
-## The 8 files that matter most
-1. `PROGRAM_STATUS.md`
-2. `ACTIVE_TICKET.md`
-3. `RUN_CONTEXT.md`
-4. `BUNDLE_DIGEST.md`
-5. `STATE_DIGEST.md`
-6. `VALIDATION_LEDGER.md`
-7. `DECISION_LEDGER.md`
-8. `NEXT_CYCLE_HANDOFF.md`
+- Активен код: `apps/trader/`, интерфейс: `apps/ui/`.
+- Технически инструкции: [apps/trader/README.md](apps/trader/README.md).
+- i2 checkout: `/root/work/binance-ai-autobot-v2`, Compose project: `autobot-v2`.
+- Активен Compose файл: `apps/trader/compose.yml`.
+- UI: SSH tunnel `ssh -L 4174:127.0.0.1:4174 i2`, после `http://127.0.0.1:4174`.
 
-## Keep using from the repo
-This pack is additive. Keep the repo's existing process docs authoritative for deeper rules and scripts.
+## Архив
+
+Старите документи, master prompts и T-031/T-032/T-040 процеси са в
+[archive/legacy](archive/legacy/README.md) и нямат текуща нормативна сила.
+Кореновият `docker-compose.yml` е само за изрично ръчно възстановяване на
+стария engine чрез профила `legacy-archive`. Данните и Git историята са запазени.
