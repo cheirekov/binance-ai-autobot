@@ -113,7 +113,7 @@ def main():
     parser.add_argument("--usdc-usd", type=float, help="Explicit conversion assumption; omit to keep costs separate")
     args = parser.parse_args()
     reports = {}
-    for name in ("baseline", "astra"):
+    for name in ("baseline", "astra", "momentum"):
         try:
             reports[name] = report(args.data_dir / name, name == "astra", args.usdc_usd)
         except Exception as exc:

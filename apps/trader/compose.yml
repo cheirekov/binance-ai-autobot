@@ -35,6 +35,17 @@ services:
       - ./strategies:/freqtrade/user_data/strategies:ro
       - ../../data/trader-v2/astra:/freqtrade/user_data
     command: ["trade", "--config", "/freqtrade/config.json", "--strategy", "AutobotAstra", "--db-url", "sqlite:////freqtrade/user_data/trades.sqlite"]
+  momentum:
+    <<: *trader
+    environment:
+      <<: *api-env
+      FREQTRADE__BOT_NAME: "autobot-v2-momentum-shadow"
+    volumes:
+      - ./config.json:/freqtrade/config.json:ro
+      - ./config-momentum.json:/freqtrade/config-momentum.json:ro
+      - ./strategies:/freqtrade/user_data/strategies:ro
+      - ../../data/trader-v2/momentum:/freqtrade/user_data
+    command: ["trade", "--config", "/freqtrade/config.json", "--config", "/freqtrade/config-momentum.json", "--strategy", "AutobotMomentumCandidate", "--db-url", "sqlite:////freqtrade/user_data/trades.sqlite"]
   dashboard:
     image: freqtradeorg/freqtrade:2026.8@sha256:4d23160b501d2b34579e76f57ad75edfa274967cd0dd824ff1c1b86d8c166ab4
     profiles: ["ai"]
@@ -45,13 +56,14 @@ services:
       TRADER_API_PASSWORD: "${TRADER_API_PASSWORD:?Set TRADER_API_PASSWORD}"
       BASELINE_API_URL: "http://baseline:8080/api/v1"
       ASTRA_API_URL: "http://astra:8080/api/v1"
+      MOMENTUM_API_URL: "http://momentum:8080/api/v1"
       ADVISOR_DB: "/data/astra/advisor.sqlite"
     volumes:
       - ./dashboard_api.py:/freqtrade/dashboard_api.py:ro
       - ../../data/trader-v2/astra:/data/astra:ro
     entrypoint: ["python", "-m", "uvicorn"]
     command: ["dashboard_api:app", "--host", "0.0.0.0", "--port", "8090"]
-    depends_on: [baseline, astra]
+    depends_on: [baseline, astra, momentum]
   ui:
     profiles: ["ai"]
     build:

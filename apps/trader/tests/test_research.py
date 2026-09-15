@@ -12,6 +12,7 @@ from ResearchCandidates import (
     ResearchTrendPullback,
     ResearchVolatilityBreakout,
 )
+from MomentumCandidate import AutobotMomentumCandidate
 
 
 def row(profits, drawdown=2):
@@ -68,6 +69,7 @@ class ResearchTests(unittest.TestCase):
         import pandas as pd
 
         rows = [{
+            "date": pd.Timestamp("2025-01-01", tz="UTC") + pd.Timedelta(hours=4 * index),
             "open": 100 + index * 0.03,
             "high": 101 + index * 0.03,
             "low": 99 + index * 0.03,
@@ -81,6 +83,7 @@ class ResearchTests(unittest.TestCase):
             Research4hRegimeBreakout,
             Research4hSlowTrend,
             Research4hMeanReversion,
+            AutobotMomentumCandidate,
         ):
             strategy = strategy_type({"stake_currency": "USDC", "dry_run": True})
 

@@ -1,0 +1,45 @@
+{
+  "protocol": "autobot-portfolio-v5-external",
+  "description": "External historical regime check of frozen V4 on earlier USDT markets.",
+  "timeframe": "4h",
+  "start": "2021-01-01",
+  "end": "2023-12-01",
+  "pairs": ["BTC/USDT", "ETH/USDT", "SOL/USDT"],
+  "rebalance_weekday_utc": 6,
+  "execution_cost_ratio_per_turnover": 0.0015,
+  "max_asset_weight": 0.5,
+  "volatility_lookback_days": 30,
+  "candidates": [
+    {"name": "Tsmom30Equal", "kind": "tsmom_equal", "lookback_days": 30, "role": "benchmark"},
+    {"name": "Tsmom30Vol20", "kind": "tsmom_vol", "lookback_days": 30, "target_annual_volatility": 0.20, "role": "candidate"}
+  ],
+  "gate_stages": ["external_validation"],
+  "folds": [
+    {"name": "2021-Q1", "stage": "external_validation", "start": "2021-01-01", "end": "2021-04-01"},
+    {"name": "2021-Q2", "stage": "external_validation", "start": "2021-04-01", "end": "2021-07-01"},
+    {"name": "2021-Q3", "stage": "external_validation", "start": "2021-07-01", "end": "2021-10-01"},
+    {"name": "2021-Q4", "stage": "external_validation", "start": "2021-10-01", "end": "2022-01-01"},
+    {"name": "2022-Q1", "stage": "external_validation", "start": "2022-01-01", "end": "2022-04-01"},
+    {"name": "2022-Q2", "stage": "external_validation", "start": "2022-04-01", "end": "2022-07-01"},
+    {"name": "2022-Q3", "stage": "external_validation", "start": "2022-07-01", "end": "2022-10-01"},
+    {"name": "2022-Q4", "stage": "external_validation", "start": "2022-10-01", "end": "2023-01-01"},
+    {"name": "2023-Q1", "stage": "external_validation", "start": "2023-01-01", "end": "2023-04-01"},
+    {"name": "2023-Q2", "stage": "external_validation", "start": "2023-04-01", "end": "2023-07-01"},
+    {"name": "2023-Q3", "stage": "external_validation", "start": "2023-07-01", "end": "2023-10-01"},
+    {"name": "2023-Q4-partial", "stage": "external_validation", "start": "2023-10-01", "end": "2023-12-01"}
+  ],
+  "screening_gate": {
+    "min_rebalance_events": 30,
+    "min_cagr_pct": 5.0,
+    "min_sharpe": 0.5,
+    "min_positive_fold_ratio": 0.6,
+    "max_drawdown_pct": 20.0
+  },
+  "limitations": [
+    "This is an earlier external historical regime check, not prospective evidence.",
+    "USDT markets are a price-behavior proxy; their liquidity and execution are not identical to USDC.",
+    "The algorithm and 20% volatility cap are unchanged from V4 and receive no fitting on this interval.",
+    "Trades occur at the next daily boundary after a weekly signal with constant 0.15% execution cost.",
+    "No AI/model calls, shorting, leverage or parameter fitting are permitted."
+  ]
+}

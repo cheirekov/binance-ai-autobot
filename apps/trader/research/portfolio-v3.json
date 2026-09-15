@@ -1,0 +1,47 @@
+{
+  "protocol": "autobot-portfolio-v3",
+  "description": "Frozen long/cash time-series momentum portfolio diagnostic.",
+  "timeframe": "4h",
+  "start": "2024-01-01",
+  "end": "2026-09-12",
+  "pairs": ["BTC/USDC", "ETH/USDC", "SOL/USDC"],
+  "rebalance_weekday_utc": 6,
+  "execution_cost_ratio_per_turnover": 0.0015,
+  "max_asset_weight": 0.5,
+  "volatility_lookback_days": 30,
+  "candidates": [
+    {"name": "EqualWeightBuyHold", "kind": "buy_hold", "role": "benchmark"},
+    {"name": "Tsmom30Equal", "kind": "tsmom_equal", "lookback_days": 30, "role": "candidate"},
+    {"name": "Tsmom90Equal", "kind": "tsmom_equal", "lookback_days": 90, "role": "candidate"},
+    {"name": "TsmomDualVol", "kind": "tsmom_dual_vol", "fast_days": 30, "slow_days": 90, "role": "candidate"}
+  ],
+  "gate_stages": ["validation", "holdout"],
+  "folds": [
+    {"name": "2024-Q1", "stage": "development", "start": "2024-01-01", "end": "2024-04-01"},
+    {"name": "2024-Q2", "stage": "development", "start": "2024-04-01", "end": "2024-07-01"},
+    {"name": "2024-Q3", "stage": "development", "start": "2024-07-01", "end": "2024-10-01"},
+    {"name": "2024-Q4", "stage": "development", "start": "2024-10-01", "end": "2025-01-01"},
+    {"name": "2025-Q1", "stage": "validation", "start": "2025-01-01", "end": "2025-04-01"},
+    {"name": "2025-Q2", "stage": "validation", "start": "2025-04-01", "end": "2025-07-01"},
+    {"name": "2025-Q3", "stage": "validation", "start": "2025-07-01", "end": "2025-10-01"},
+    {"name": "2025-Q4", "stage": "validation", "start": "2025-10-01", "end": "2026-01-01"},
+    {"name": "2026-Q1", "stage": "holdout", "start": "2026-01-01", "end": "2026-04-01"},
+    {"name": "2026-Q2", "stage": "holdout", "start": "2026-04-01", "end": "2026-07-01"},
+    {"name": "2026-Q3-partial", "stage": "holdout", "start": "2026-07-01", "end": "2026-09-12"}
+  ],
+  "screening_gate": {
+    "min_rebalance_events": 20,
+    "min_cagr_pct": 5.0,
+    "min_sharpe": 0.5,
+    "min_positive_fold_ratio": 0.6,
+    "max_drawdown_pct": 20.0
+  },
+  "limitations": [
+    "V3 was designed after inspecting V1 and V2; the historical interval is diagnostic, not a pristine holdout.",
+    "Signals use only each asset's own lagged returns; no cross-sectional winner ranking is used.",
+    "Trades occur at the next daily boundary after a weekly signal and assume constant proportional execution cost.",
+    "The 0.15% cost combines the regular 0.10% Binance fee with a conservative 0.05% slippage allowance.",
+    "The simulator is long/cash spot-only, unlevered, and does not model order-book capacity or taxes.",
+    "No AI/model calls and no parameter fitting are permitted in this protocol."
+  ]
+}

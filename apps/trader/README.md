@@ -1,24 +1,28 @@
 # Autobot V2 — executable dry-run prototype
 
 Independent of the existing NestJS engine and its data. Freqtrade 2026.8 (digest pinned)
-owns order execution and the trade database. Both versions use the same 1h breakout
-strategy and deterministic exits. This is an unoptimized hypothesis, not a proven
-profitable strategy. Constructor-level checks prohibit live trading.
+owns order execution and each account's trade database. Constructor-level checks
+prohibit live trading. None of the strategies is a promise of profit.
 
 - `AutobotBaseline`: EMA trend + prior 20-candle high breakout, fixed stake, stop-loss,
   trailing exit and cooldown protections.
 - `AutobotAstra`: same entry signals, with real `gpt-6-astra` approval, reduced stake
   sizing and optional exits. Model I/O runs in a background worker; expired, missing
   or invalid plans deny new entries and never veto normal exits.
+- `AutobotMomentumCandidate`: a separate non-AI research shadow using weekly
+  30-day time-series momentum, volatility-based stake sizing, long/cash only and
+  no leverage. It is an operational candidate, not a new baseline.
 - Advisor calls are reserved in SQLite before sending, at most once per six hours,
   including across restarts. Default daily estimated API budget: $0.50. Failed calls
   with unknown usage retain their reservation. API rates are dated in the source;
   this is an application budget, not a provider-side billing cap.
 - Data is public Binance **mainnet** market data; funds and orders are simulated
   locally. This prototype does not submit Binance testnet or real-money orders.
-- Three fixed pairs: BTC/USDC, ETH/USDC, SOL/USDC; virtual wallet 1000 USDC,
-  100 USDC per entry, maximum three positions. These are experiment settings.
-  Both use an explicit 0.1% simulated fee per side, not a claim about your Binance tier.
+- Three fixed pairs: BTC/USDC, ETH/USDC, SOL/USDC; virtual wallet 1000 USDC
+  and maximum three positions. Baseline/Astra propose 100 USDC per entry;
+  Momentum sizes conservatively from trailing volatility. These are experiment settings.
+  Baseline and Astra use 0.1% simulated fee per side. Momentum uses 0.15% per side
+  as a fee-and-slippage stress proxy, not a claim about your Binance tier.
 - Context: trailing 48 hours in 4h blocks, trailing seven days in 24h blocks,
   current indicators, simulated wallet and positions, and up to 20 most recent
   closed trades (both wins and losses, shortened chronologically if input budget
@@ -30,7 +34,7 @@ profitable strategy. Constructor-level checks prohibit live trading.
 From repository root:
 
 ```sh
-mkdir -p data/trader-v2/baseline data/trader-v2/astra
+mkdir -p data/trader-v2/baseline data/trader-v2/astra data/trader-v2/momentum
 export TRADER_API_PASSWORD='<generate a private value>'
 export TRADER_API_JWT_SECRET='<generate a different value of at least 32 characters>'
 export COMPOSE_PROJECT_NAME='autobot-v2'
@@ -67,7 +71,7 @@ docker-compose --profile ai up -d --build
 ```
 
 The installer refuses to overwrite an existing file, creates it with mode 0600,
-and uses the pinned image's `1000:1000` runtime identity. Ensure the two new
+and uses the pinned image's `1000:1000` runtime identity. Ensure the three
 `data/trader-v2` account directories are writable by that identity.
 
 Tests (offline):
@@ -127,9 +131,11 @@ docker run --rm -v "$PWD:/repo" -w /repo \
   --user-data-dir /repo/data/trader-v2/research/user_data
 ```
 
-The first frozen result is `research/RESULTS-v1.md`: every candidate failed.
-That result is retained instead of tuning thresholds against already-inspected
-evaluation data.
+The versioned protocols and results retain failures instead of tuning thresholds
+against inspected data. `RESULTS-v6.md` documents the operational momentum
+translation: it fails the quarterly gate narrowly, passes no live-money gate, and
+is allowed only as a separate prospective dry-run shadow after a clean 47-signal
+look-ahead analysis.
 
 ## Historical handoff, 2026-09-12
 

@@ -1,4 +1,4 @@
-"""Small V2 dashboard adapter over two authenticated Freqtrade APIs."""
+"""Small V2 dashboard adapter over authenticated Freqtrade APIs."""
 import base64
 import json
 import math
@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 BOTS = {
     "baseline": os.environ.get("BASELINE_API_URL", "http://baseline:8080/api/v1"),
     "astra": os.environ.get("ASTRA_API_URL", "http://astra:8080/api/v1"),
+    "momentum": os.environ.get("MOMENTUM_API_URL", "http://momentum:8080/api/v1"),
 }
 USER = os.environ.get("TRADER_API_USER", "")
 PASSWORD = os.environ.get("TRADER_API_PASSWORD", "")
@@ -116,16 +117,14 @@ def account_snapshot(name):
 
 
 def build_snapshot():
-    with ThreadPoolExecutor(max_workers=2) as pool:
+    with ThreadPoolExecutor(max_workers=len(BOTS)) as pool:
         accounts = dict(zip(BOTS, pool.map(account_snapshot, BOTS)))
     accounts["astra"]["advisor"] = advisor_snapshot()
-    baseline = accounts["baseline"]
-    astra = accounts["astra"]
     reasons = []
-    if not baseline["reachable"] or not astra["reachable"]:
-        reasons.append("Both prospective accounts must be reachable")
-    if not baseline.get("dryRun") or not astra.get("dryRun"):
-        reasons.append("Comparison is allowed only while both accounts are dry-run")
+    if not all(account["reachable"] for account in accounts.values()):
+        reasons.append("All prospective accounts must be reachable")
+    if not all(account.get("dryRun") for account in accounts.values()):
+        reasons.append("Comparison is allowed only while all accounts are dry-run")
     for name, account in accounts.items():
         if account.get("openPositions") and any(p["pendingOrder"] for p in account["openPositions"]):
             reasons.append(f"{name} has a pending order")

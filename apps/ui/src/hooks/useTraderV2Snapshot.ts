@@ -50,7 +50,7 @@ export type TraderV2Snapshot = {
   environment: string;
   marketData: string;
   orders: string;
-  accounts: { baseline: V2Account; astra: V2Account };
+  accounts: { baseline: V2Account; astra: V2Account; momentum: V2Account };
   comparison: { ready: boolean; limitations: string[] };
   promotion: { realMoneyAllowed: boolean; reason: string };
 };

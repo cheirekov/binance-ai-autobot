@@ -3,6 +3,8 @@ import { useState } from "react";
 import { apiPost } from "../api/http";
 import { type V2Account, useTraderV2Snapshot } from "../hooks/useTraderV2Snapshot";
 
+type AccountName = "baseline" | "astra" | "momentum";
+
 function money(value: number | undefined, currency = "USDC") {
   return value === undefined ? "—" : `${value.toFixed(2)} ${currency}`;
 }
@@ -21,11 +23,11 @@ function tone(account: V2Account) {
 }
 
 function AccountCard({ name, label, account, busy, control }: {
-  name: "baseline" | "astra";
+  name: AccountName;
   label: string;
   account: V2Account;
   busy: boolean;
-  control: (name: "baseline" | "astra", action: "start" | "pause" | "stop") => void;
+  control: (name: AccountName, action: "start" | "pause" | "stop") => void;
 }) {
   const quote = account.wallet.currency ?? "USDC";
   return (
@@ -61,7 +63,7 @@ export function TraderV2Page(): JSX.Element {
   const [message, setMessage] = useState<string>();
   const snapshot = dashboard.snapshot;
 
-  async function control(name: "baseline" | "astra", action: "start" | "pause" | "stop") {
+  async function control(name: AccountName, action: "start" | "pause" | "stop") {
     setBusy(true);
     setMessage(undefined);
     try {
@@ -80,7 +82,8 @@ export function TraderV2Page(): JSX.Element {
   }
   const accounts = snapshot.accounts;
   const positions = [...accounts.baseline.openPositions.map((p) => ({ ...p, account: "Baseline" })),
-                     ...accounts.astra.openPositions.map((p) => ({ ...p, account: "Astra" }))];
+                     ...accounts.astra.openPositions.map((p) => ({ ...p, account: "Astra" })),
+                     ...accounts.momentum.openPositions.map((p) => ({ ...p, account: "Momentum" }))];
   const advisor = accounts.astra.advisor;
 
   return (
@@ -88,7 +91,7 @@ export function TraderV2Page(): JSX.Element {
       <div className="topbar">
         <div>
           <div className="title">Binance AI Autobot V2</div>
-          <div className="subtitle">Prospective baseline versus GPT-6 Astra · measured after fees and AI cost</div>
+          <div className="subtitle">Three isolated prospective dry-runs · deterministic controls and GPT-6 Astra</div>
         </div>
         <button className="btn" disabled={busy || dashboard.loading} onClick={() => void dashboard.refresh()}>Refresh</button>
       </div>
@@ -101,15 +104,16 @@ export function TraderV2Page(): JSX.Element {
       </div>
       {(dashboard.error || message) ? <div className="card notice"><div className="subtitle">{dashboard.error ?? message}</div></div> : null}
 
-      <div className="row cols-2 section">
+      <div className="row cols-3 section">
         <AccountCard name="baseline" label="Baseline control" account={accounts.baseline} busy={busy} control={control} />
         <AccountCard name="astra" label="Astra challenger" account={accounts.astra} busy={busy} control={control} />
+        <AccountCard name="momentum" label="Momentum shadow" account={accounts.momentum} busy={busy} control={control} />
       </div>
 
       <div className="row cols-2 section">
         <div className="card">
           <div className="title">Experiment integrity</div>
-          <div className="subtitle">Both accounts must run over the same prospective interval. Astra is promoted only if its risk-adjusted result exceeds baseline after costs.</div>
+          <div className="subtitle">All accounts remain isolated and are compared only over the same prospective interval. Historical results do not authorize promotion.</div>
           <ul className="plain-list">{snapshot.comparison.limitations.map((item) => <li key={item}>{item}</li>)}</ul>
           <div className="subtitle">Promotion gate: {snapshot.promotion.reason}</div>
         </div>

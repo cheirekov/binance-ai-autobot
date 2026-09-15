@@ -53,6 +53,7 @@ class DashboardTests(unittest.TestCase):
         self.assertFalse(result["promotion"]["realMoneyAllowed"])
         self.assertEqual(result["accounts"]["baseline"]["metrics"]["profit_all_coin"], 1.5)
         self.assertEqual(result["accounts"]["astra"]["advisor"]["knownCostUsd"], 0.02)
+        self.assertTrue(result["accounts"]["momentum"]["reachable"])
         self.assertNotIn("netAfterAi", result["accounts"]["astra"])
 
     def test_unreachable_bot_blocks_comparison_without_leaking_error(self):
